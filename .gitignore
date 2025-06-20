@@ -1,7 +1,8 @@
-/caras_conocidas/*
-/videos_a_procesar/*
+caras_conocidas/*
+videos_a_procesar/*
 /data/*
 /env/*
+tag-flow-env/
 /__pycache__/*
 *.pyc
 *.pyo

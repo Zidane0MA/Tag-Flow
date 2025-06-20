@@ -1,18 +1,23 @@
-# Tag-Flow - Sistema de Clasificación de Videos
-# Dependencias principales
+# Tag-Flow - Dependencias principales
+# Versiones probadas que funcionan
 
+# Básicas (REQUERIDAS)
 pandas>=2.0.0
 streamlit>=1.28.0
-face_recognition>=1.3.0
-opencv-python>=4.8.0
-moviepy>=1.0.3
-requests>=2.31.0
 python-dotenv>=1.0.0
-
-# Dependencias adicionales para face_recognition
-dlib>=19.24.0
-cmake>=3.22.0
-
-# Para mejorar el rendimiento
+requests>=2.31.0
 numpy>=1.24.0
 pillow>=10.0.0
+
+# Video y análisis (RECOMENDADAS)
+opencv-python>=4.8.0
+moviepy>=1.0.3
+
+# Reconocimiento facial (OPCIONALES - pueden fallar)
+# Descomenta estas líneas solo si las necesitas:
+# dlib>=19.24.0
+# cmake>=3.22.0
+# face_recognition>=1.3.0
+
+# Si face_recognition falla, usar:
+# pip install https://github.com/ageitgey/face_recognition/archive/master.zip

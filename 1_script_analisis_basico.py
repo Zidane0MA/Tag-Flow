@@ -1,20 +1,12 @@
 #!/usr/bin/env python3
 """
-Tag-Flow - Script de Análisis de Videos
-Autor: Sistema Tag-Flow
-Versión: 1.0
-
-Este script procesa videos automáticamente para extraer:
-- Creador (basado en la carpeta)
-- Música (usando API de reconocimiento)
-- Personajes (usando reconocimiento facial)
-- Dificultad de edición (input manual)
+Tag-Flow - Script de Análisis (Versión Sin Face Recognition)
+Versión alternativa que funciona sin reconocimiento facial
 """
 
 import os
 import sys
 import pandas as pd
-import face_recognition
 import cv2
 import numpy as np
 from pathlib import Path
@@ -24,18 +16,19 @@ import time
 from dotenv import load_dotenv
 from typing import List, Dict, Tuple, Optional
 
-class TagFlowAnalyzer:
+class TagFlowAnalyzerBasic:
     def __init__(self):
-        """Inicializar el analizador de Tag-Flow"""
+        """Inicializar el analizador básico de Tag-Flow"""
         self.load_config()
         self.setup_paths()
-        self.load_known_faces()
         self.load_existing_data()
         
     def load_config(self):
         """Cargar configuración desde .env"""
         load_dotenv()
         self.api_key = os.getenv('API_KEY_MUSICA')
+        print(repr(os.getenv("PROCESAR_CADA_N_FRAMES")))
+
         self.frames_interval = int(os.getenv('PROCESAR_CADA_N_FRAMES', 30))
         self.audio_duration = int(os.getenv('DURACION_CLIP_AUDIO', 15))
         
@@ -55,51 +48,21 @@ class TagFlowAnalyzer:
         # Crear directorios si no existen
         self.data_dir.mkdir(exist_ok=True)
         
-    def load_known_faces(self):
-        """Cargar y codificar caras conocidas"""
-        self.known_faces = {}
-        self.known_encodings = []
-        self.known_names = []
-        
-        print("🔍 Cargando caras conocidas...")
-        
-        if not self.faces_dir.exists():
-            print(f"⚠️  Carpeta de caras no encontrada: {self.faces_dir}")
-            return
-            
-        face_files = list(self.faces_dir.glob("*.jpg")) + list(self.faces_dir.glob("*.png")) + list(self.faces_dir.glob("*.jpeg"))
-        
-        if not face_files:
-            print("⚠️  No se encontraron archivos de caras en la carpeta 'caras_conocidas'")
-            print("   Coloca imágenes de personajes conocidos en esa carpeta para habilitarE el reconocimiento")
-            return
-            
-        for face_file in face_files:
-            try:
-                # Cargar imagen
-                image = face_recognition.load_image_file(str(face_file))
-                # Obtener codificación facial
-                encodings = face_recognition.face_encodings(image)
-                
-                if encodings:
-                    name = face_file.stem  # Nombre del archivo sin extensión
-                    self.known_faces[name] = encodings[0]
-                    self.known_encodings.append(encodings[0])
-                    self.known_names.append(name)
-                    print(f"  ✅ Cargada cara: {name}")
-                else:
-                    print(f"  ❌ No se detectó cara en: {face_file.name}")
-                    
-            except Exception as e:
-                print(f"  ❌ Error cargando {face_file.name}: {e}")
-        
-        print(f"✅ Total de caras conocidas cargadas: {len(self.known_faces)}")
-    
     def load_existing_data(self):
         """Cargar datos existentes desde CSV"""
         if self.csv_path.exists():
             try:
                 self.df = pd.read_csv(self.csv_path)
+                
+                # Limpiar duplicados si existen
+                initial_count = len(self.df)
+                self.df = self.df.drop_duplicates(subset=['ruta_absoluta'], keep='last')
+                final_count = len(self.df)
+                
+                if initial_count != final_count:
+                    print(f"🧹 Limpiados {initial_count - final_count} duplicados del CSV")
+                    self.save_data()  # Guardar CSV limpio
+                
                 print(f"✅ Datos existentes cargados: {len(self.df)} videos procesados")
             except Exception as e:
                 print(f"❌ Error cargando datos existentes: {e}")
@@ -130,16 +93,22 @@ class TagFlowAnalyzer:
             all_videos.extend(self.videos_dir.rglob(f"*{ext}"))
             all_videos.extend(self.videos_dir.rglob(f"*{ext.upper()}"))
         
+        # Normalizar rutas para comparación
+        all_video_paths = {str(v.absolute()) for v in all_videos}
+        
         # Filtrar solo los nuevos
-        processed_paths = set(self.df['ruta_absoluta'].tolist()) if not self.df.empty else set()
-        new_videos = [v for v in all_videos if str(v.absolute()) not in processed_paths]
+        if not self.df.empty:
+            processed_paths = set(self.df['ruta_absoluta'].tolist())
+            new_video_paths = all_video_paths - processed_paths
+            new_videos = [Path(p) for p in new_video_paths]
+        else:
+            new_videos = all_videos
         
         print(f"📊 Videos encontrados: {len(all_videos)}, Nuevos: {len(new_videos)}")
         return new_videos
     
     def extract_creator(self, video_path: Path) -> str:
         """Extraer el nombre del creador desde la estructura de carpetas"""
-        # El creador es el nombre de la carpeta padre del video
         return video_path.parent.name
     
     def recognize_music(self, video_path: Path) -> str:
@@ -149,82 +118,54 @@ class TagFlowAnalyzer:
         
         try:
             print(f"  🎵 Analizando música...")
-            
-            # Extraer clip de audio
-            with VideoFileClip(str(video_path)) as video:
-                # Tomar clip del medio del video
-                start_time = max(0, video.duration / 2 - self.audio_duration / 2)
-                end_time = min(video.duration, start_time + self.audio_duration)
-                
-                audio_clip = video.subclip(start_time, end_time).audio
-                temp_audio = self.project_root / "temp_audio.wav"
-                
-                audio_clip.write_audiofile(str(temp_audio), verbose=False, logger=None)
-                audio_clip.close()
-            
-            # Aquí iría la llamada a la API de música
-            # Por ahora retornamos un placeholder
-            music_result = "Música no identificada (API pendiente)"
-            
-            # Limpiar archivo temporal
-            if temp_audio.exists():
-                temp_audio.unlink()
-                
-            return music_result
-            
+            # Aquí iría la lógica de API real
+            return "Música no identificada (API pendiente)"
         except Exception as e:
             print(f"    ❌ Error en reconocimiento de música: {e}")
             return f"Error: {str(e)}"
     
-    def recognize_characters(self, video_path: Path) -> List[str]:
-        """Reconocer personajes en el video"""
-        if not self.known_faces:
+    def recognize_characters_basic(self, video_path: Path) -> List[str]:
+        """Reconocimiento básico sin face_recognition"""
+        print(f"  👥 Analizando personajes... (modo básico)")
+        
+        # Lista de personajes conocidos desde archivos
+        known_characters = []
+        if self.faces_dir.exists():
+            face_files = list(self.faces_dir.glob("*.jpg")) + list(self.faces_dir.glob("*.png"))
+            known_characters = [f.stem for f in face_files]
+        
+        if not known_characters:
             return []
         
-        try:
-            print(f"  👥 Analizando personajes...")
+        print(f"    ℹ️ Personajes conocidos: {known_characters}")
+        print(f"    ⚠️ Sin face_recognition - requiere confirmación manual")
+        
+        # Permitir selección manual
+        while True:
+            print(f"\n¿Qué personajes aparecen en este video?")
+            print(f"Personajes disponibles: {', '.join(known_characters)}")
+            print(f"Escribe los nombres separados por comas (o 'ninguno' si no hay):")
             
-            cap = cv2.VideoCapture(str(video_path))
-            fps = cap.get(cv2.CAP_PROP_FPS)
-            frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            user_input = input("Personajes: ").strip()
             
-            if fps == 0:
-                fps = 30  # Fallback
-                
-            found_characters = set()
-            frames_to_process = range(0, frame_count, self.frames_interval)
+            if user_input.lower() == 'ninguno':
+                return []
             
-            for frame_num in frames_to_process:
-                cap.set(cv2.CAP_PROP_POS_FRAMES, frame_num)
-                ret, frame = cap.read()
-                
-                if not ret:
-                    break
-                
-                # Convertir BGR a RGB
-                rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                
-                # Encontrar caras en el frame
-                face_locations = face_recognition.face_locations(rgb_frame)
-                if face_locations:
-                    face_encodings = face_recognition.face_encodings(rgb_frame, face_locations)
-                    
-                    for encoding in face_encodings:
-                        matches = face_recognition.compare_faces(self.known_encodings, encoding, tolerance=0.6)
-                        
-                        if True in matches:
-                            match_index = matches.index(True)
-                            name = self.known_names[match_index]
-                            found_characters.add(name)
+            if not user_input:
+                return []
             
-            cap.release()
-            characters_list = list(found_characters)
-            print(f"    ✅ Personajes encontrados: {characters_list}")
-            return characters_list
+            selected = [name.strip() for name in user_input.split(',')]
             
-        except Exception as e:
-            print(f"    ❌ Error en reconocimiento de personajes: {e}")
-            return []
+            # Validar que existan
+            valid_characters = []
+            for char in selected:
+                if char in known_characters:
+                    valid_characters.append(char)
+                else:
+                    print(f"⚠️ '{char}' no está en la lista de personajes conocidos")
+            
+            if valid_characters or not selected:
+                return valid_characters
     
     def get_difficulty_input(self, video_info: Dict) -> str:
         """Solicitar al usuario la dificultad de edición"""
@@ -247,19 +188,28 @@ class TagFlowAnalyzer:
         """Procesar un video completo"""
         print(f"\n🎬 Procesando: {video_path.name}")
         
+        # Verificar que el video no esté ya en el DataFrame
+        absolute_path = str(video_path.absolute())
+        if not self.df.empty and absolute_path in self.df['ruta_absoluta'].values:
+            print(f"  ⚠️ Este video ya está procesado, saltando...")
+            return None
+        
         # Extraer información básica
         video_info = {
-            'ruta_absoluta': str(video_path.absolute()),
+            'ruta_absoluta': absolute_path,
             'archivo': video_path.name,
             'creador': self.extract_creator(video_path),
             'fecha_procesado': pd.Timestamp.now().strftime('%Y-%m-%d %H:%M:%S')
         }
         
+        print(f"  📁 Ruta: {absolute_path}")
+        print(f"  👤 Creador: {video_info['creador']}")
+        
         # Reconocimiento de música
         video_info['musica'] = self.recognize_music(video_path)
         
-        # Reconocimiento de personajes
-        characters = self.recognize_characters(video_path)
+        # Reconocimiento de personajes (modo básico)
+        characters = self.recognize_characters_basic(video_path)
         video_info['personajes'] = ', '.join(characters) if characters else 'Ninguno detectado'
         
         # Input manual de dificultad
@@ -277,7 +227,9 @@ class TagFlowAnalyzer:
     
     def run(self):
         """Ejecutar el proceso completo de análisis"""
-        print("🚀 Iniciando Tag-Flow Analyzer")
+        print("🚀 Iniciando Tag-Flow Analyzer (Modo Básico)")
+        print("="*50)
+        print("ℹ️  Funcionando sin face_recognition - reconocimiento manual de personajes")
         print("="*50)
         
         # Encontrar videos nuevos
@@ -295,10 +247,23 @@ class TagFlowAnalyzer:
                 print(f"\n[{i}/{len(new_videos)}]", end=" ")
                 video_info = self.process_video(video_path)
                 
-                # Añadir al DataFrame
-                self.df = pd.concat([self.df, pd.DataFrame([video_info])], ignore_index=True)
+                # Si el video ya estaba procesado, continuar
+                if video_info is None:
+                    print(f"  ⭐ Video ya procesado, continuando...")
+                    continue
                 
-                # Guardar cada 5 videos (para no perder progreso)
+                # Añadir al DataFrame
+                new_row_df = pd.DataFrame([video_info])
+                self.df = pd.concat([self.df, new_row_df], ignore_index=True)
+                
+                # Verificar que no hay duplicados
+                if self.df['ruta_absoluta'].duplicated().any():
+                    print(f"  ⚠️ Duplicado detectado, eliminando...")
+                    self.df = self.df.drop_duplicates(subset=['ruta_absoluta'], keep='last')
+                
+                print(f"  ✅ Video añadido correctamente")
+                
+                # Guardar cada 5 videos
                 if i % 5 == 0:
                     self.save_data()
                     print(f"💾 Progreso guardado ({i}/{len(new_videos)})")
@@ -319,7 +284,7 @@ class TagFlowAnalyzer:
 def main():
     """Función principal"""
     try:
-        analyzer = TagFlowAnalyzer()
+        analyzer = TagFlowAnalyzerBasic()
         analyzer.run()
     except KeyboardInterrupt:
         print("\n👋 ¡Hasta luego!")
