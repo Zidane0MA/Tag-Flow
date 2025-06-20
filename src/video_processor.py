@@ -116,7 +116,8 @@ class VideoProcessor:
             # Redimensionar
             resized = cv2.resize(frame, (new_width, new_height))
             
-            # Guardar thumbnail            success = cv2.imwrite(str(thumbnail_path), resized)
+            # Guardar thumbnail
+            success = cv2.imwrite(str(thumbnail_path), resized)
             
             if success:
                 logger.info(f"Thumbnail generado: {thumbnail_path}")

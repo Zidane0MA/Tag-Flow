@@ -42,7 +42,8 @@ class MusicRecognizer:
                 client_credentials_manager = SpotifyClientCredentials(
                     client_id=config.SPOTIFY_CLIENT_ID,
                     client_secret=config.SPOTIFY_CLIENT_SECRET
-                )                self.spotify = spotipy.Spotify(client_credentials_manager=client_credentials_manager)
+                )
+                self.spotify = spotipy.Spotify(client_credentials_manager=client_credentials_manager)
                 logger.info("Spotify API inicializada")
             except Exception as e:
                 logger.error(f"Error inicializando Spotify API: {e}")
@@ -91,7 +92,8 @@ class MusicRecognizer:
                 logger.warning(f"Error con Spotify API: {e}")
         
         # Estrategia 3: ACRCloud (fallback confiable)
-        if self.acrcloud_config:            try:
+        if self.acrcloud_config:
+            try:
                 acrcloud_result = self._recognize_with_acrcloud(audio_path)
                 if acrcloud_result['detected_music']:
                     results.update(acrcloud_result)

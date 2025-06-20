@@ -39,14 +39,63 @@ def check_python():
         print("      Actualiza Python desde: https://python.org")
         return False
 
+def setup_virtual_environment():
+    """Configurar entorno virtual (opcional)"""
+    print_step(2, "ENTORNO VIRTUAL (OPCIONAL)")
+    
+    print("   Un entorno virtual aísla las dependencias de este proyecto.")
+    print("   Recomendado si tienes otros proyectos Python.")
+    print()
+    use_venv = input("   ¿Crear entorno virtual? [Y/n]: ").lower()
+    
+    if use_venv == 'n':
+        print("   ⏭️  Saltando entorno virtual - usando Python del sistema")
+        return True
+    
+    venv_name = "tag-flow-env"
+    venv_path = Path(venv_name)
+    
+    if venv_path.exists():
+        print(f"   ✅ Entorno virtual {venv_name} ya existe")
+        return True
+    
+    try:
+        print(f"   Creando entorno virtual: {venv_name}")
+        result = subprocess.run([sys.executable, '-m', 'venv', venv_name], 
+                              capture_output=True, text=True)
+        
+        if result.returncode == 0:
+            print("   ✅ Entorno virtual creado")
+            print("   💡 Para activarlo manualmente usa:")
+            if os.name == 'nt':
+                print(f"      {venv_name}\\Scripts\\activate")
+            else:
+                print(f"      source {venv_name}/bin/activate")
+            return True
+        else:
+            print("   ⚠️  Error creando entorno virtual, continuando sin él")
+            return True
+            
+    except Exception as e:
+        print(f"   ⚠️  Error: {e}, continuando sin entorno virtual")
+        return True
+
 def install_dependencies():
     """Instalar dependencias"""
-    print_step(2, "INSTALAR DEPENDENCIAS")
+    print_step(3, "INSTALAR DEPENDENCIAS")
     
     print("   Instalando paquetes de requirements.txt...")
     print("   (Esto puede tomar varios minutos)")
     
     try:
+        # Verificar si hay entorno virtual activo
+        in_venv = hasattr(sys, 'real_prefix') or (hasattr(sys, 'base_prefix') and sys.base_prefix != sys.prefix)
+        
+        if in_venv:
+            print("   📦 Usando entorno virtual activo")
+        else:
+            print("   📦 Instalando en Python del sistema")
+        
         # Mostrar comando que se ejecutará
         print("   Ejecutando: pip install -r requirements.txt")
         
@@ -69,7 +118,7 @@ def install_dependencies():
 
 def setup_configuration():
     """Configurar el sistema"""
-    print_step(3, "CONFIGURACIÓN INICIAL")
+    print_step(4, "CONFIGURACIÓN INICIAL")
     
     if not Path('setup.py').exists():
         print("   ❌ Archivo setup.py no encontrado")
@@ -98,7 +147,7 @@ def setup_configuration():
 
 def create_example_data():
     """Crear datos de ejemplo"""
-    print_step(4, "CREAR DATOS DE EJEMPLO")
+    print_step(5, "CREAR DATOS DE EJEMPLO")
     
     print("   ¿Quieres crear personajes de ejemplo para probar el reconocimiento?")
     create = input("   [Y/n]: ").lower()
@@ -126,7 +175,7 @@ def create_example_data():
 
 def verify_installation():
     """Verificar instalación"""
-    print_step(5, "VERIFICAR INSTALACIÓN")
+    print_step(6, "VERIFICAR INSTALACIÓN")
     
     print("   Ejecutando verificación automática...")
     
@@ -150,7 +199,7 @@ def verify_installation():
 
 def setup_video_directory():
     """Configurar directorio de videos"""
-    print_step(6, "CONFIGURAR DIRECTORIO DE VIDEOS")
+    print_step(7, "CONFIGURAR DIRECTORIO DE VIDEOS")
     
     print("   Necesitas una carpeta con videos para procesar.")
     print("   Formatos soportados: MP4, AVI, MOV, MKV, WebM")
@@ -182,7 +231,7 @@ def setup_video_directory():
 
 def first_run():
     """Primera ejecución del sistema"""
-    print_step(7, "PRIMERA EJECUCIÓN")
+    print_step(8, "PRIMERA EJECUCIÓN")
     
     print("   ¡Listo para procesar videos!")
     print()
@@ -280,6 +329,7 @@ def main():
     # Lista de pasos
     steps = [
         ("Verificar Python", check_python),
+        ("Entorno virtual (opcional)", setup_virtual_environment),
         ("Instalar dependencias", install_dependencies),
         ("Configuración inicial", setup_configuration),
         ("Crear datos de ejemplo", create_example_data),

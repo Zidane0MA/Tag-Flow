@@ -48,7 +48,7 @@ Tag-Flow V2 ha sido completamente implementado con todas las funcionalidades esp
 Tag-Flow-V2/ (✅ COMPLETO)
 ├── 📄 DOCUMENTACIÓN
 │   ├── README.md                    # Guía completa del usuario
-│   ├── tag_flow_v2_plan.md         # Plan original de desarrollo
+│   ├── tag_flow_v2_plan.md          # Plan original de desarrollo
 │   └── PROYECTO_COMPLETO.md         # Este archivo de resumen
 │
 ├── ⚙️ CONFIGURACIÓN

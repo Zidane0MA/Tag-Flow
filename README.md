@@ -26,30 +26,56 @@
 
 ## 🛠️ Instalación
 
-### 1. Clonar y configurar entorno
+### 🚀 Opción 1: Instalación Automática (Recomendada)
 
 ```bash
-git clone <tu-repositorio>/Tag-Flow-V2
 cd Tag-Flow-V2
 
-# Crear entorno virtual
-python -m venv tag-flow-env
-
-# Activar entorno (Windows)
-tag-flow-env\Scripts\activate
-
-# Activar entorno (Linux/macOS)
-source tag-flow-env/bin/activate
+# Instalación completamente automática
+python quickstart.py
 ```
 
-### 2. Instalar dependencias
+**El script te preguntará:**
+- ¿Crear entorno virtual? (Recomendado: sí)
+- Configuración de APIs paso a paso
+- Creación de datos de ejemplo
+
+### ⚡ Opción 2: Sin Entorno Virtual (Más Simple)
+
+Si tienes Python limpio y quieres máxima simplicidad:
 
 ```bash
+cd Tag-Flow-V2
+pip install -r requirements.txt
+python setup.py          # Configurar APIs
+python generate_demo.py  # Datos de ejemplo
+python app.py            # Lanzar interfaz
+```
+
+**➜ Abrir:** http://localhost:5000
+
+### 🔧 Opción 3: Manual Completa
+
+```bash
+cd Tag-Flow-V2
+
+# Crear entorno virtual (recomendado)
+python -m venv tag-flow-env
+tag-flow-env\Scripts\activate  # Windows
+# source tag-flow-env/bin/activate  # Linux/Mac
+
+# Instalar dependencias
 pip install -r requirements.txt
 ```
 
 ### 3. Configurar APIs
 
+**Automático:**
+```bash
+python setup.py  # Configuración guiada interactiva
+```
+
+**Manual:**
 Edita el archivo `.env` con tus claves de API:
 
 ```env

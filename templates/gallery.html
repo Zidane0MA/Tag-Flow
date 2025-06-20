@@ -155,12 +155,12 @@
                             </button>
                             <button class="btn btn-success btn-sm" 
                                     title="Editar" 
-                                    onclick="editVideo({{ video.id }})">
+                                    onclick="editVideo('{{ video.id }}')">
                                 <i class="fas fa-edit"></i>
                             </button>
                             <button class="btn btn-info btn-sm" 
                                     title="Abrir carpeta" 
-                                    onclick="openVideoFolder({{ video.id }})">
+                                    onclick="openVideoFolder('{{ video.id }}')">
                                 <i class="fas fa-folder-open"></i>
                             </button>
                         </div>
@@ -255,17 +255,17 @@
                         <!-- Botones de edición rápida de estado -->
                         <div class="btn-group btn-group-sm" role="group">
                             <button type="button" class="btn btn-outline-secondary {{ 'active' if video.edit_status == 'nulo' else '' }}"
-                                    onclick="quickUpdateStatus({{ video.id }}, 'nulo')"
+                                    onclick="quickUpdateStatus('{{ video.id }}', 'nulo')"
                                     title="Marcar como sin procesar">
                                 <i class="fas fa-circle"></i>
                             </button>
                             <button type="button" class="btn btn-outline-warning {{ 'active' if video.edit_status == 'en_proceso' else '' }}"
-                                    onclick="quickUpdateStatus({{ video.id }}, 'en_proceso')"
+                                    onclick="quickUpdateStatus('{{ video.id }}', 'en_proceso')"
                                     title="Marcar como en proceso">
                                 <i class="fas fa-play"></i>
                             </button>
                             <button type="button" class="btn btn-outline-success {{ 'active' if video.edit_status == 'hecho' else '' }}"
-                                    onclick="quickUpdateStatus({{ video.id }}, 'hecho')"
+                                    onclick="quickUpdateStatus('{{ video.id }}', 'hecho')"
                                     title="Marcar como completado">
                                 <i class="fas fa-check"></i>
                             </button>

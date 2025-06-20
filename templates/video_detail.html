@@ -144,25 +144,25 @@
                     
                     <!-- Botones de acción -->
                     <div class="d-flex gap-2 flex-wrap">
-                        <button class="btn btn-primary" onclick="editVideo({{ video.id }})">
+                        <button class="btn btn-primary" onclick="editVideo('{{ video.id }}')">
                             <i class="fas fa-edit me-2"></i>Editar
                         </button>
                         
-                        <button class="btn btn-info" onclick="openVideoFolder({{ video.id }})">
+                        <button class="btn btn-info" onclick="openVideoFolder('{{ video.id }}')">
                             <i class="fas fa-folder-open me-2"></i>Abrir Carpeta
                         </button>
                         
                         <div class="btn-group" role="group">
                             <button type="button" class="btn btn-outline-secondary {{ 'active' if video.edit_status == 'nulo' else '' }}"
-                                    onclick="quickUpdateStatus({{ video.id }}, 'nulo')">
+                                    onclick="quickUpdateStatus('{{ video.id }}', 'nulo')">
                                 <i class="fas fa-circle me-1"></i>Sin procesar
                             </button>
                             <button type="button" class="btn btn-outline-warning {{ 'active' if video.edit_status == 'en_proceso' else '' }}"
-                                    onclick="quickUpdateStatus({{ video.id }}, 'en_proceso')">
+                                    onclick="quickUpdateStatus('{{ video.id }}', 'en_proceso')">
                                 <i class="fas fa-play me-1"></i>En proceso
                             </button>
                             <button type="button" class="btn btn-outline-success {{ 'active' if video.edit_status == 'hecho' else '' }}"
-                                    onclick="quickUpdateStatus({{ video.id }}, 'hecho')">
+                                    onclick="quickUpdateStatus('{{ video.id }}', 'hecho')">
                                 <i class="fas fa-check me-1"></i>Completado
                             </button>
                         </div>

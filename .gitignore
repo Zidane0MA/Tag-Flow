@@ -5,7 +5,7 @@
 *.env
 .env.local
 .env.production
-config/gcp_credentials.json
+config/tag-flow-0268193d12b4.json
 
 # Base de datos y datos generados
 data/
