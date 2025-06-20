@@ -111,14 +111,47 @@ Se abrirá automáticamente en tu navegador en `http://localhost:8501`
 - **📊 Estadísticas en tiempo real**: Ve métricas mientras filtras
 - **📱 Responsive**: Funciona en móviles y tablets
 
-## ⚙️ Configuración Avanzada
+## 🎵 Configuración Correcta de ACRCloud para Tag-Flow
 
-### Variables de entorno (.env)
+### Paso 1: Crear Aplicación de Audio Recognition
+
+1. **Ve a [ACRCloud Console](https://console.acrcloud.com/)**
+2. **Haz clic en "Create Application"**
+3. **Selecciona "Audio & Video Recognition"** (NO "Audio Bucket")
+4. **Configura así:**
+   ```
+   Application Name: Tag-Flow-Music-Recognition
+   Application Type: Audio & Video Recognition
+   Audio Type: Music
+   Platform: Other
+   ```
+
+### Paso 2: Obtener Credenciales Correctas
+
+Después de crear la aplicación, tendrás:
+- **Host**: `identify-eu-west-1.acrcloud.com` (o similar)
+- **Access Key**: Tu clave de acceso
+- **Access Secret**: Tu clave secreta
+
+### Paso 3: Configurar .env
+
+Tu archivo `.env` debe verse así:
 ```bash
-API_KEY_MUSICA="tu_clave_aqui"
-PROCESAR_CADA_N_FRAMES=30      # Procesar 1 frame cada 30 (1 por segundo a 30fps)
-DURACION_CLIP_AUDIO=15         # Duración del clip para análisis musical
+# Configuración ACRCloud para reconocimiento de música
+ACRCLOUD_HOST="identify-eu-west-1.acrcloud.com"
+ACRCLOUD_ACCESS_KEY="tu_access_key_aqui"
+ACRCLOUD_ACCESS_SECRET="tu_access_secret_aqui"
+
+# Configuraciones opcionales (mantener como están)
+PROCESAR_CADA_N_FRAMES=30
+DURACION_CLIP_AUDIO=15
 ```
+
+## 🔗 Enlaces Útiles
+
+- **ACRCloud Console**: https://console.acrcloud.com/
+- **Documentación API**: https://docs.acrcloud.com/
+- **Límites gratuitos**: 500 identificaciones/mes
 
 ### Formatos de video soportados
 - MP4, MOV, AVI, MKV, WMV, FLV, WebM
