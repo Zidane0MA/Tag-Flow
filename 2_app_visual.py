@@ -46,71 +46,196 @@ class TagFlowViewer:
             st.session_state.data_version = 0
         
     def apply_custom_css(self):
-        """Aplicar estilos CSS personalizados"""
+        """Aplicar estilos CSS minimalistas"""
         st.markdown("""
         <style>
-        .video-card {
-            border: 1px solid #ddd;
-            border-radius: 10px;
-            padding: 20px;
-            margin: 10px 0;
-            background-color: #f9f9f9;
+        /* Estilo minimalista general */
+        .main .block-container {
+            padding-top: 1rem;
+            padding-bottom: 1rem;
         }
-        .metric-container {
-            background-color: #ffffff;
-            padding: 10px;
-            border-radius: 5px;
-            margin: 5px 0;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        
+        /* Contenedor principal de video - sin bordes ni padding extra */
+        .video-container {
+            margin: 8px 0;
         }
-        .filter-header {
-            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 10px;
-            border-radius: 5px;
+        
+        /* Hacer que las columnas tengan la misma altura */
+        .row-widget.stColumns > div {
+            height: 100%;
+        }
+        
+        .row-widget.stColumns > div > div {
+            height: 100%;
+        }
+        
+        /* Contenedor de información que coincide con altura del video */
+        .info-section {
+            background-color: #fafafa;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            padding: 12px;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            min-height: 400px;
+        }
+        
+        /* Métricas minimalistas */
+        .metric-item {
+            background-color: #f5f5f5;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            padding: 8px 10px;
+            margin: 4px 0;
+            font-size: 0.9em;
+        }
+        
+        .metric-item .label {
+            font-weight: 600;
+            color: #424242;
+            font-size: 0.85em;
+            margin-bottom: 2px;
+        }
+        
+        .metric-item .value {
+            color: #616161;
+            line-height: 1.2;
+        }
+        
+        /* Dificultad con colores simples */
+        .difficulty-alto {
+            background-color: #ffebee;
+            border-color: #f44336;
+        }
+        
+        .difficulty-medio {
+            background-color: #fff8e1;
+            border-color: #ff9800;
+        }
+        
+        .difficulty-bajo {
+            background-color: #e8f5e8;
+            border-color: #4caf50;
+        }
+        
+        /* Header simple */
+        .app-header {
+            background-color: #f5f5f5;
+            padding: 16px;
+            border-radius: 6px;
             text-align: center;
             margin-bottom: 20px;
+            border: 1px solid #e0e0e0;
         }
-        .stats-container {
-            background-color: #e8f4fd;
-            padding: 15px;
-            border-radius: 10px;
-            border-left: 5px solid #1f77b4;
+        
+        .app-header h1 {
+            margin: 0;
+            color: #424242;
+            font-size: 1.8em;
+            font-weight: 600;
         }
-        .edit-mode {
-            background-color: #fff3cd;
-            border: 2px solid #ffc107;
-            border-radius: 10px;
-            padding: 15px;
-            margin: 10px 0;
+        
+        .app-header h3 {
+            margin: 8px 0 0 0;
+            color: #757575;
+            font-size: 1em;
+            font-weight: 400;
         }
-        .edit-header {
-            background-color: #ffc107;
-            color: #212529;
-            padding: 8px 15px;
-            border-radius: 5px;
-            font-weight: bold;
-            margin-bottom: 15px;
-        }
-        .save-success {
-            background-color: #d4edda;
-            border: 1px solid #c3e6cb;
-            color: #155724;
-            padding: 10px;
-            border-radius: 5px;
-            margin: 10px 0;
-        }
-        .edit-buttons {
-            display: flex;
-            gap: 10px;
-            margin-top: 15px;
-        }
-        .readonly-field {
-            background-color: #f8f9fa;
-            border: 1px solid #dee2e6;
-            padding: 8px;
+        
+        /* Estadísticas compactas */
+        .stat-card {
+            background-color: #f9f9f9;
+            border: 1px solid #e0e0e0;
             border-radius: 4px;
-            color: #6c757d;
+            padding: 12px;
+            text-align: center;
+        }
+        
+        .stat-number {
+            font-size: 1.5em;
+            font-weight: 600;
+            color: #424242;
+            margin: 0;
+        }
+        
+        .stat-label {
+            font-size: 0.85em;
+            color: #757575;
+            margin: 4px 0 0 0;
+        }
+        
+        /* Filtros minimalistas */
+        .filter-header {
+            background-color: #f5f5f5;
+            color: #424242;
+            padding: 12px;
+            border-radius: 4px;
+            text-align: center;
+            margin-bottom: 16px;
+            border: 1px solid #e0e0e0;
+            font-weight: 600;
+        }
+        
+        /* Botones simples */
+        .edit-btn {
+            background-color: #f5f5f5;
+            border: 1px solid #e0e0e0;
+            color: #424242;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 0.9em;
+            width: 100%;
+            margin-bottom: 12px;
+        }
+        
+        /* Modo de edición simple */
+        .edit-mode {
+            background-color: #fff8e1;
+            border: 2px solid #ff9800;
+            border-radius: 6px;
+            padding: 16px;
+            margin: 12px 0;
+        }
+        
+        /* Mensajes simples */
+        .success-msg {
+            background-color: #e8f5e8;
+            border: 1px solid #4caf50;
+            color: #2e7d32;
+            padding: 8px 12px;
+            border-radius: 4px;
+            margin: 8px 0;
+            text-align: center;
+            font-size: 0.9em;
+        }
+        
+        .info-msg {
+            background-color: #e3f2fd;
+            border: 1px solid #2196f3;
+            color: #1565c0;
+            padding: 16px;
+            border-radius: 6px;
+            margin: 16px 0;
+            text-align: center;
+        }
+        
+        /* Título de sección compacto */
+        .section-title {
+            color: #424242;
+            font-weight: 600;
+            font-size: 1em;
+            margin-bottom: 8px;
+            padding-bottom: 4px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        /* Separadores minimalistas */
+        hr {
+            border: none;
+            height: 1px;
+            background-color: #e0e0e0;
+            margin: 16px 0;
         }
         </style>
         """, unsafe_allow_html=True)
@@ -308,8 +433,8 @@ class TagFlowViewer:
         return filtered_df
     
     def create_sidebar_filters(self, df: pd.DataFrame) -> Dict:
-        """Crear la barra lateral con filtros"""
-        st.sidebar.markdown('<div class="filter-header"><h2>🔍 Filtros</h2></div>', 
+        """Crear la barra lateral con filtros minimalistas"""
+        st.sidebar.markdown('<div class="filter-header">🔍 Filtros</div>', 
                            unsafe_allow_html=True)
         
         filters = {}
@@ -318,16 +443,16 @@ class TagFlowViewer:
         st.sidebar.subheader("👤 Creadores")
         all_creators = sorted(df['creador'].unique()) if 'creador' in df.columns else []
         filters['creadores'] = st.sidebar.multiselect(
-            "Selecciona creadores:",
+            "Seleccionar:",
             options=all_creators,
             default=[]
         )
         
         # Filtro de dificultad
-        st.sidebar.subheader("⚡ Dificultad de Edición")
+        st.sidebar.subheader("⚡ Dificultad")
         difficulty_options = ['alto', 'medio', 'bajo']
         filters['dificultades'] = st.sidebar.multiselect(
-            "Selecciona dificultades:",
+            "Seleccionar:",
             options=difficulty_options,
             default=[]
         )
@@ -336,36 +461,32 @@ class TagFlowViewer:
         st.sidebar.subheader("🎭 Personajes")
         all_characters = self.get_all_characters(df)
         filters['personajes'] = st.sidebar.multiselect(
-            "Selecciona personajes:",
+            "Seleccionar:",
             options=all_characters,
             default=[]
         )
         
         # Búsqueda de texto libre
-        st.sidebar.subheader("🔤 Búsqueda de Texto")
+        st.sidebar.subheader("🔤 Búsqueda")
         filters['texto_busqueda'] = st.sidebar.text_input(
-            "Buscar en archivos, música, etc.:",
-            placeholder="Escribe para buscar..."
+            "Buscar texto:",
+            placeholder="archivo, música, etc."
         )
         
         # Botón para limpiar filtros
-        if st.sidebar.button("🗑️ Limpiar Filtros"):
+        if st.sidebar.button("🗑️ Limpiar", use_container_width=True):
             st.experimental_rerun()
         
-        # Separador
         st.sidebar.divider()
         
-        # Modo de edición global
-        st.sidebar.subheader("✏️ Herramientas de Edición")
+        # Modo de edición
+        st.sidebar.subheader("✏️ Edición")
         
         show_edit_mode = st.sidebar.checkbox(
-            "🔧 Mostrar controles de edición",
+            "Activar modo edición",
             value=False,
-            help="Habilita botones de edición en cada video"
+            help="Muestra botones de edición en cada video"
         )
-        
-        if show_edit_mode:
-            st.sidebar.info("💡 Haz clic en 'Editar' en cualquier video para modificar sus datos")
         
         filters['show_edit_mode'] = show_edit_mode
         
@@ -376,32 +497,39 @@ class TagFlowViewer:
         col1, col2, col3, col4 = st.columns(4)
         
         with col1:
-            st.metric(
-                label="📹 Total Videos",
-                value=len(df),
-                delta=None
-            )
+            st.markdown("""
+            <div class="stat-card">
+                <p class="stat-number">{}</p>
+                <p class="stat-label">📹 Total Videos</p>
+            </div>
+            """.format(len(df)), unsafe_allow_html=True)
         
         with col2:
-            st.metric(
-                label="🔍 Videos Filtrados",
-                value=len(filtered_df),
-                delta=f"{len(filtered_df) - len(df)} del total"
-            )
+            percentage = (len(filtered_df) / len(df) * 100) if len(df) > 0 else 0
+            st.markdown("""
+            <div class="stat-card">
+                <p class="stat-number">{}</p>
+                <p class="stat-label">🔍 Filtrados ({:.0f}%)</p>
+            </div>
+            """.format(len(filtered_df), percentage), unsafe_allow_html=True)
         
         with col3:
             creators_count = len(df['creador'].unique()) if 'creador' in df.columns else 0
-            st.metric(
-                label="👤 Creadores",
-                value=creators_count
-            )
+            st.markdown("""
+            <div class="stat-card">
+                <p class="stat-number">{}</p>
+                <p class="stat-label">👤 Creadores</p>
+            </div>
+            """.format(creators_count), unsafe_allow_html=True)
         
         with col4:
             characters_count = len(self.get_all_characters(df))
-            st.metric(
-                label="🎭 Personajes",
-                value=characters_count
-            )
+            st.markdown("""
+            <div class="stat-card">
+                <p class="stat-number">{}</p>
+                <p class="stat-label">🎭 Personajes</p>
+            </div>
+            """.format(characters_count), unsafe_allow_html=True)
     
     def display_video_card(self, row: pd.Series, row_index: int, show_edit_mode: bool = False):
         """Mostrar una tarjeta de video individual con capacidades de edición"""
@@ -417,9 +545,8 @@ class TagFlowViewer:
         
         # Mostrar mensaje de éxito si existe
         if st.session_state.show_success.get(row_index, False):
-            st.markdown('<div class="save-success">✅ Cambios guardados exitosamente</div>', 
+            st.markdown('<div class="success-msg">✅ Cambios guardados</div>', 
                        unsafe_allow_html=True)
-            # Limpiar mensaje después de mostrarlo
             st.session_state.show_success[row_index] = False
         
         if is_editing:
@@ -446,8 +573,8 @@ class TagFlowViewer:
             st.markdown('</div>', unsafe_allow_html=True)
         
         else:
-            # Modo de visualización normal
-            col1, col2 = st.columns([2, 1])
+            # Layout: video a la izquierda, información a la derecha - misma altura
+            col1, col2 = st.columns([2.5, 1.5])
             
             with col1:
                 # Mostrar video
@@ -457,77 +584,73 @@ class TagFlowViewer:
                     st.error(f"Error cargando video: {e}")
             
             with col2:
-                # Información del video
-                st.markdown("### 📋 Información")
+                # Contenedor de información con altura igual al video
+                st.markdown('<div class="info-section">', unsafe_allow_html=True)
                 
-                # Botón de edición
+                # Botón de edición (si está habilitado)
                 if show_edit_mode:
                     if st.button(f"✏️ Editar", key=f"edit_{row_index}", type="secondary", use_container_width=True):
                         st.session_state.edit_mode[row_index] = True
                         st.experimental_rerun()
-                    st.divider()
+                    st.markdown('<hr>', unsafe_allow_html=True)
                 
-                # Métricas en contenedores estilizados
+                # Métricas compactas
                 st.markdown(f"""
-                <div class="metric-container">
-                    <strong>📁 Archivo:</strong><br>
-                    {row['archivo']}
+                <div class="metric-item">
+                    <div class="label">📁 Archivo</div>
+                    <div class="value">{row['archivo']}</div>
                 </div>
                 """, unsafe_allow_html=True)
                 
                 st.markdown(f"""
-                <div class="metric-container">
-                    <strong>👤 Creador:</strong><br>
-                    {row['creador']}
+                <div class="metric-item">
+                    <div class="label">👤 Creador</div>
+                    <div class="value">{row['creador']}</div>
                 </div>
                 """, unsafe_allow_html=True)
                 
                 st.markdown(f"""
-                <div class="metric-container">
-                    <strong>🎵 Música:</strong><br>
-                    {row['musica']}
+                <div class="metric-item">
+                    <div class="label">🎵 Música</div>
+                    <div class="value">{row['musica']}</div>
                 </div>
                 """, unsafe_allow_html=True)
                 
                 st.markdown(f"""
-                <div class="metric-container">
-                    <strong>🎭 Personajes:</strong><br>
-                    {row['personajes']}
+                <div class="metric-item">
+                    <div class="label">🎭 Personajes</div>
+                    <div class="value">{row['personajes']}</div>
                 </div>
                 """, unsafe_allow_html=True)
                 
-                # Dificultad con color
-                difficulty_colors = {
-                    'alto': '🔴',
-                    'medio': '🟡', 
-                    'bajo': '🟢'
+                # Dificultad con colores sutiles
+                difficulty = row['dificultad_edicion'].lower()
+                difficulty_icons = {
+                    'alto': '❌',
+                    'medio': '⚠️', 
+                    'bajo': '✅'
                 }
-                difficulty_icon = difficulty_colors.get(row['dificultad_edicion'], '⚪')
+                difficulty_icon = difficulty_icons.get(difficulty, '⚪')
+                difficulty_class = f"metric-item difficulty-{difficulty}"
                 
                 st.markdown(f"""
-                <div class="metric-container">
-                    <strong>⚡ Dificultad:</strong><br>
-                    {difficulty_icon} {row['dificultad_edicion'].title()}
+                <div class="{difficulty_class}">
+                    <div class="label">⚡ Dificultad</div>
+                    <div class="value">{difficulty_icon} {row['dificultad_edicion'].title()}</div>
                 </div>
                 """, unsafe_allow_html=True)
                 
-                # Fecha de procesado
+                # Fechas compactas
                 if 'fecha_procesado' in row and pd.notna(row['fecha_procesado']):
                     st.markdown(f"""
-                    <div class="metric-container">
-                        <strong>📅 Procesado:</strong><br>
-                        {row['fecha_procesado']}
+                    <div class="metric-item">
+                        <div class="label">📅 Procesado</div>
+                        <div class="value">{row['fecha_procesado']}</div>
                     </div>
                     """, unsafe_allow_html=True)
                 
-                # Fecha de edición si existe
-                if 'fecha_editado' in row and pd.notna(row['fecha_editado']):
-                    st.markdown(f"""
-                    <div class="metric-container">
-                        <strong>✏️ Última edición:</strong><br>
-                        {row['fecha_editado']}
-                    </div>
-                    """, unsafe_allow_html=True)
+                # Cerrar contenedor de información
+                st.markdown('</div>', unsafe_allow_html=True)
     
     def display_video_list(self, df: pd.DataFrame, show_edit_mode: bool = False):
         """Mostrar lista de videos"""
@@ -622,24 +745,27 @@ class TagFlowViewer:
     
     def run(self):
         """Ejecutar la aplicación principal"""
-        # Header principal
+        # Header minimalista
         st.markdown("""
-        # 🎬 Tag-Flow
-        ### Sistema Visual de Clasificación de Videos con Editor Integrado
-        """)
+        <div class="app-header">
+            <h1>🎬 Tag-Flow</h1>
+            <h3>Sistema de Clasificación de Videos</h3>
+        </div>
+        """, unsafe_allow_html=True)
         
         # Cargar datos
         df = self.load_data()
         
         if df.empty:
-            st.warning("""
-            📋 **No hay datos disponibles**
-            
-            Para empezar:
-            1. Añade videos a la carpeta `videos_a_procesar/`
-            2. Ejecuta `python 1_script_analisis.py`
-            3. Recarga esta página
-            """)
+            st.markdown("""
+            <div class="info-msg">
+                <h3>📋 No hay datos disponibles</h3>
+                <p><strong>Para empezar:</strong></p>
+                <p>📁 Añade videos a <code>videos_a_procesar/</code></p>
+                <p>⚙️ Ejecuta <code>python 1_script_analisis.py</code></p>
+                <p>🔄 Recarga esta página</p>
+            </div>
+            """, unsafe_allow_html=True)
             self.show_help_section()
             return
         

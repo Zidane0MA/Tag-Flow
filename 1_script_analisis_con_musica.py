@@ -10,7 +10,7 @@ import pandas as pd
 import cv2
 import numpy as np
 from pathlib import Path
-from moviepy.editor import VideoFileClip
+from moviepy import VideoFileClip
 import requests
 import time
 from dotenv import load_dotenv
@@ -167,6 +167,9 @@ class TagFlowAnalyzerWithMusic:
             return "ACRCloud no configurado"
         
         temp_audio = None
+        video = None
+        audio_clip = None
+        
         try:
             print(f"  🎵 Analizando música con ACRCloud...")
             
@@ -184,36 +187,71 @@ class TagFlowAnalyzerWithMusic:
                 
                 # Verificar que el video tiene audio
                 if video.audio is None:
-                    video.close()
                     return "Sin audio en el video"
                 
                 # Verificar duración del video
-                if video.duration < 5:
-                    video.close()
+                video_duration = getattr(video, 'duration', 0)
+                if video_duration < 5:
                     return "Video demasiado corto para análisis"
                 
-                print(f"    ⏱️ Duración del video: {video.duration:.1f}s")
+                print(f"    ⏱️ Duración del video: {video_duration:.1f}s")
                 
                 # Tomar clip del medio del video
-                start_time = max(0, video.duration / 2 - self.audio_duration / 2)
-                end_time = min(video.duration, start_time + self.audio_duration)
+                start_time = max(0, video_duration / 2 - self.audio_duration / 2)
+                end_time = min(video_duration, start_time + self.audio_duration)
                 
                 print(f"    ✂️ Extrayendo audio ({start_time:.1f}s - {end_time:.1f}s)...")
                 
-                # Extraer subclip de audio
-                audio_clip = video.subclip(start_time, end_time).audio
+                # Intentar diferentes métodos para extraer subclip
+                try:
+                    # Método CORRECTO según StackOverflow: subclipped()
+                    if hasattr(video, 'subclipped'):
+                        video_clip = video.subclipped(start_time, end_time)
+                        audio_clip = video_clip.audio
+                        print(f"    ✅ Usando video.subclipped() - método correcto")
+                    # Método alternativo: subclip() (versiones más antiguas)
+                    elif hasattr(video, 'subclip'):
+                        video_clip = video.subclip(start_time, end_time)
+                        audio_clip = video_clip.audio
+                        print(f"    ✅ Usando video.subclip() - método legacy")
+                    else:
+                        # Método directo en audio
+                        if hasattr(video.audio, 'subclipped'):
+                            audio_clip = video.audio.subclipped(start_time, end_time)
+                            print(f"    ✅ Usando audio.subclipped()")
+                        elif hasattr(video.audio, 'subclip'):
+                            audio_clip = video.audio.subclip(start_time, end_time)
+                            print(f"    ✅ Usando audio.subclip()")
+                        else:
+                            return "Error: No se pudo extraer subclip de audio"
+                    
+                except Exception as subclip_error:
+                    print(f"    ⚠️ Error con subclip, intentando método alternativo: {subclip_error}")
+                    # Método alternativo: extraer todo el audio
+                    audio_clip = video.audio
+                    print(f"    ℹ️ Usando audio completo como fallback")
+                
+                if audio_clip is None:
+                    return "Error: No se pudo extraer audio"
                 
                 # Escribir archivo de audio temporal
-                audio_clip.write_audiofile(
-                    str(temp_audio), 
-                    verbose=False, 
-                    logger=None,
-                    temp_audiofile=str(self.project_root / "temp_audiofile.wav")
-                )
+                print(f"    💾 Guardando audio temporal...")
                 
-                # Cerrar clips para liberar memoria
-                audio_clip.close()
-                video.close()
+                # Llamada compatible con todas las versiones de MoviePy
+                try:
+                    # Método 1: Con parámetros completos (versiones nuevas)
+                    audio_clip.write_audiofile(
+                        str(temp_audio), 
+                        verbose=False, 
+                        logger=None
+                    )
+                except TypeError:
+                    try:
+                        # Método 2: Sin verbose (versiones que no lo soportan)
+                        audio_clip.write_audiofile(str(temp_audio), logger=None)
+                    except TypeError:
+                        # Método 3: Solo ruta (máxima compatibilidad)
+                        audio_clip.write_audiofile(str(temp_audio))
                 
                 print(f"    🔍 Enviando a ACRCloud...")
                 
@@ -243,6 +281,15 @@ class TagFlowAnalyzerWithMusic:
             return f"Error: {str(e)}"
             
         finally:
+            # Limpiar recursos
+            try:
+                if audio_clip:
+                    audio_clip.close()
+                if video:
+                    video.close()
+            except Exception:
+                pass
+                
             # Limpiar archivos temporales
             try:
                 if temp_audio and temp_audio.exists():

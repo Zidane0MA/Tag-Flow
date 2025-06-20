@@ -3,7 +3,7 @@ videos_a_procesar/*
 /data/*
 /env/*
 tag-flow-env/
-/__pycache__/*
+__pycache__/
 *.pyc
 *.pyo
 *.pyd
