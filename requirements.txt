@@ -1,23 +1,33 @@
-# Tag-Flow - Dependencias principales
-# Versiones probadas que funcionan
+# Tag-Flow V2 - Sistema de Gestión de Videos TikTok/MMD
+# Stack: Python 3.12 + Flask + SQLite + APIs Gratuitas + GPU Local
 
-# Básicas (REQUERIDAS)
-pandas>=2.0.0
-streamlit>=1.28.0
-python-dotenv>=1.0.0
-requests>=2.31.0
-numpy>=1.24.0
-pillow>=10.0.0
+# Core Framework
+Flask==3.0.0
+Jinja2==3.1.2
 
-# Video y análisis (RECOMENDADAS)
-opencv-python>=4.8.0
-moviepy>=1.0.3
+# Video Processing
+opencv-python==4.8.1
+moviepy==1.0.3
+Pillow==10.1.0
 
-# Reconocimiento facial (OPCIONALES - pueden fallar)
-# Descomenta estas líneas solo si las necesitas:
-# dlib>=19.24.0
-# cmake>=3.22.0
-# face_recognition>=1.3.0
+# AI/ML Recognition
+deepface==0.0.79
+google-cloud-vision==3.5.0
+insightface==0.7.3
 
-# Si face_recognition falla, usar:
-# pip install https://github.com/ageitgey/face_recognition/archive/master.zip
+# API Clients
+google-api-python-client==2.108.0
+spotipy==2.23.0
+requests==2.31.0
+
+# Utilities
+python-dotenv==1.0.0
+tqdm==4.66.1
+python-magic==0.4.27
+
+# Optional GPU acceleration (comentadas por compatibilidad)
+# torch==2.1.0+cu118
+# torchvision==0.16.0+cu118
+
+# Para desarrollo
+Flask-CORS==4.0.0

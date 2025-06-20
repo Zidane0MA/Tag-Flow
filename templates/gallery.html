@@ -1,0 +1,461 @@
+{% extends "base.html" %}
+
+{% block title %}Galería{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/gallery.css') }}">
+{% endblock %}
+
+{% block content %}
+<!-- Filtros y búsqueda -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-filter me-2"></i>Filtros y Búsqueda
+                </h5>
+            </div>
+            <div class="card-body">
+                <form id="filter-form" class="row g-3">
+                    <!-- Búsqueda por texto -->
+                    <div class="col-md-3">
+                        <label for="search-input" class="form-label">Búsqueda</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="search-input" 
+                                   placeholder="Buscar videos..." value="{{ request.args.get('search', '') }}">
+                            <button type="button" class="btn btn-outline-secondary" id="search-btn">
+                                <i class="fas fa-search"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Filtro por creador -->
+                    <div class="col-md-2">
+                        <label for="filter-creator" class="form-label">Creador</label>
+                        <select class="form-select" id="filter-creator" name="creator">
+                            <option value="">Todos</option>
+                            {% for creator in creators %}
+                            <option value="{{ creator }}" 
+                                    {% if current_filters.get('creator_name') == creator %}selected{% endif %}>
+                                {{ creator }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <!-- Filtro por plataforma -->
+                    <div class="col-md-2">
+                        <label for="filter-platform" class="form-label">Plataforma</label>
+                        <select class="form-select" id="filter-platform" name="platform">
+                            <option value="">Todas</option>
+                            <option value="tiktok" {% if current_filters.get('platform') == 'tiktok' %}selected{% endif %}>TikTok</option>
+                            <option value="instagram" {% if current_filters.get('platform') == 'instagram' %}selected{% endif %}>Instagram</option>
+                            <option value="youtube" {% if current_filters.get('platform') == 'youtube' %}selected{% endif %}>YouTube</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Filtro por estado de edición -->
+                    <div class="col-md-2">
+                        <label for="filter-status" class="form-label">Estado</label>
+                        <select class="form-select" id="filter-status" name="status">
+                            <option value="">Todos</option>
+                            <option value="nulo" {% if current_filters.get('edit_status') == 'nulo' %}selected{% endif %}>Sin procesar</option>
+                            <option value="en_proceso" {% if current_filters.get('edit_status') == 'en_proceso' %}selected{% endif %}>En proceso</option>
+                            <option value="hecho" {% if current_filters.get('edit_status') == 'hecho' %}selected{% endif %}>Completado</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Filtro por dificultad -->
+                    <div class="col-md-2">
+                        <label for="filter-difficulty" class="form-label">Dificultad</label>
+                        <select class="form-select" id="filter-difficulty" name="difficulty">
+                            <option value="">Todas</option>
+                            <option value="bajo" {% if current_filters.get('difficulty_level') == 'bajo' %}selected{% endif %}>Bajo</option>
+                            <option value="medio" {% if current_filters.get('difficulty_level') == 'medio' %}selected{% endif %}>Medio</option>
+                            <option value="alto" {% if current_filters.get('difficulty_level') == 'alto' %}selected{% endif %}>Alto</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Botón limpiar filtros -->
+                    <div class="col-md-1">
+                        <label class="form-label">&nbsp;</label>
+                        <button type="button" class="btn btn-outline-danger d-block" id="clear-filters">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Estadísticas -->
+{% if stats %}
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h5 class="card-title">{{ stats.total_videos }}</h5>
+                <p class="card-text">Total Videos</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h5 class="card-title">{{ stats.with_music }}</h5>
+                <p class="card-text">Con Música</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h5 class="card-title">{{ stats.with_characters }}</h5>
+                <p class="card-text">Con Personajes</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h5 class="card-title">{{ stats.by_status.get('hecho', 0) }}</h5>
+                <p class="card-text">Completados</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+<!-- Galería de videos -->
+<div class="row" id="videos-container">
+    {% if videos %}
+        {% for video in videos %}
+        <div class="col-xl-3 col-lg-4 col-md-6 col-sm-12 mb-4 video-card-wrapper" 
+             data-creator="{{ video.creator_name }}" 
+             data-platform="{{ video.platform }}" 
+             data-status="{{ video.edit_status }}" 
+             data-difficulty="{{ video.difficulty_level or '' }}">
+            
+            <div class="card video-card h-100">
+                <!-- Thumbnail -->
+                <div class="card-img-top-container position-relative">
+                    <img src="{{ video.thumbnail_url or '/static/img/no-thumbnail.jpg' }}" 
+                         class="card-img-top thumbnail-image" 
+                         alt="Thumbnail de {{ video.file_name }}"
+                         loading="lazy">
+                    
+                    <!-- Overlay con botones -->
+                    <div class="card-overlay">
+                        <div class="overlay-buttons">
+                            <button class="btn btn-primary btn-sm" 
+                                    title="Reproducir video" 
+                                    onclick="playVideo('{{ video.file_path }}')">
+                                <i class="fas fa-play"></i>
+                            </button>
+                            <button class="btn btn-success btn-sm" 
+                                    title="Editar" 
+                                    onclick="editVideo({{ video.id }})">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="btn btn-info btn-sm" 
+                                    title="Abrir carpeta" 
+                                    onclick="openVideoFolder({{ video.id }})">
+                                <i class="fas fa-folder-open"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Badges de estado -->
+                    <div class="card-badges">
+                        <span class="badge bg-{{ 'success' if video.edit_status == 'hecho' else 'warning' if video.edit_status == 'en_proceso' else 'secondary' }}">
+                            {{ {'nulo': 'Sin procesar', 'en_proceso': 'En proceso', 'hecho': 'Completado'}.get(video.edit_status, video.edit_status) }}
+                        </span>
+                        
+                        {% if video.difficulty_level %}
+                        <span class="badge bg-{{ 'danger' if video.difficulty_level == 'alto' else 'warning' if video.difficulty_level == 'medio' else 'success' }}">
+                            {{ video.difficulty_level.title() }}
+                        </span>
+                        {% endif %}
+                        
+                        <span class="badge bg-info">{{ video.platform.title() }}</span>
+                    </div>
+                </div>
+                
+                <!-- Información del video -->
+                <div class="card-body">
+                    <h6 class="card-title">{{ video.creator_name }}</h6>
+                    <p class="card-text small text-muted mb-2">{{ video.file_name[:50] }}...</p>
+                    
+                    <!-- Música -->
+                    <div class="mb-2">
+                        <i class="fas fa-music text-primary me-1"></i>
+                        <small>
+                            {% if video.final_music %}
+                                <strong>{{ video.final_music }}</strong>
+                                {% if video.final_music_artist %} - {{ video.final_music_artist }}{% endif %}
+                            {% elif video.detected_music %}
+                                {{ video.detected_music }}
+                                {% if video.detected_music_artist %} - {{ video.detected_music_artist }}{% endif %}
+                                <span class="text-muted">(auto)</span>
+                            {% else %}
+                                <span class="text-muted">Sin música detectada</span>
+                            {% endif %}
+                        </small>
+                    </div>
+                    
+                    <!-- Personajes -->
+                    <div class="mb-2">
+                        <i class="fas fa-user-friends text-success me-1"></i>
+                        <small>
+                            {% set characters = video.final_characters or video.detected_characters %}
+                            {% if characters %}
+                                {{ characters[:2] | join(', ') }}
+                                {% if characters | length > 2 %}
+                                    <span class="text-muted">+{{ characters | length - 2 }} más</span>
+                                {% endif %}
+                            {% else %}
+                                <span class="text-muted">Sin personajes</span>
+                            {% endif %}
+                        </small>
+                    </div>
+                    
+                    <!-- Metadatos técnicos -->
+                    <div class="video-metadata">
+                        {% if video.duration_seconds %}
+                        <small class="text-muted">
+                            <i class="fas fa-clock me-1"></i>{{ "%.1f"|format(video.duration_seconds) }}s
+                        </small>
+                        {% endif %}
+                        
+                        {% if video.file_size %}
+                        <small class="text-muted ms-2">
+                            <i class="fas fa-file me-1"></i>{{ "%.1f"|format(video.file_size / 1024 / 1024) }} MB
+                        </small>
+                        {% endif %}
+                    </div>
+                    
+                    <!-- Notas -->
+                    {% if video.notes %}
+                    <div class="mt-2">
+                        <small class="text-info">
+                            <i class="fas fa-sticky-note me-1"></i>{{ video.notes[:50] }}...
+                        </small>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <!-- Footer con acciones rápidas -->
+                <div class="card-footer bg-transparent">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <small class="text-muted">
+                            {{ video.created_at[:10] if video.created_at else 'Fecha desconocida' }}
+                        </small>
+                        
+                        <!-- Botones de edición rápida de estado -->
+                        <div class="btn-group btn-group-sm" role="group">
+                            <button type="button" class="btn btn-outline-secondary {{ 'active' if video.edit_status == 'nulo' else '' }}"
+                                    onclick="quickUpdateStatus({{ video.id }}, 'nulo')"
+                                    title="Marcar como sin procesar">
+                                <i class="fas fa-circle"></i>
+                            </button>
+                            <button type="button" class="btn btn-outline-warning {{ 'active' if video.edit_status == 'en_proceso' else '' }}"
+                                    onclick="quickUpdateStatus({{ video.id }}, 'en_proceso')"
+                                    title="Marcar como en proceso">
+                                <i class="fas fa-play"></i>
+                            </button>
+                            <button type="button" class="btn btn-outline-success {{ 'active' if video.edit_status == 'hecho' else '' }}"
+                                    onclick="quickUpdateStatus({{ video.id }}, 'hecho')"
+                                    title="Marcar como completado">
+                                <i class="fas fa-check"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    {% else %}
+        <!-- Estado vacío -->
+        <div class="col-12 text-center py-5">
+            <i class="fas fa-video fa-4x text-muted mb-3"></i>
+            <h4 class="text-muted">No se encontraron videos</h4>
+            <p class="text-muted">Ejecuta el script de procesamiento para analizar videos nuevos.</p>
+            <code>python main.py</code>
+        </div>
+    {% endif %}
+</div>
+
+<!-- Paginación -->
+{% if videos and videos|length >= per_page %}
+<nav aria-label="Paginación de videos">
+    <ul class="pagination justify-content-center">
+        <li class="page-item {% if page <= 1 %}disabled{% endif %}">
+            <a class="page-link" href="?page={{ page - 1 }}&{% for key, value in request.args.items() %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}">
+                Anterior
+            </a>
+        </li>
+        <li class="page-item active">
+            <span class="page-link">{{ page }}</span>
+        </li>
+        <li class="page-item">
+            <a class="page-link" href="?page={{ page + 1 }}&{% for key, value in request.args.items() %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}">
+                Siguiente
+            </a>
+        </li>
+    </ul>
+</nav>
+{% endif %}
+
+<!-- Modal de edición de video -->
+<div class="modal fade" id="editVideoModal" tabindex="-1" aria-labelledby="editVideoModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editVideoModalLabel">
+                    <i class="fas fa-edit me-2"></i>Editar Video
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="edit-video-form">
+                    <input type="hidden" id="edit-video-id" name="video_id">
+                    
+                    <div class="row">
+                        <!-- Información básica -->
+                        <div class="col-md-6">
+                            <h6 class="mb-3">Información Básica</h6>
+                            
+                            <div class="mb-3">
+                                <label for="edit-creator-name" class="form-label">Creador</label>
+                                <input type="text" class="form-control" id="edit-creator-name" readonly>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="edit-file-name" class="form-label">Archivo</label>
+                                <input type="text" class="form-control" id="edit-file-name" readonly>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="edit-platform" class="form-label">Plataforma</label>
+                                <input type="text" class="form-control" id="edit-platform" readonly>
+                            </div>
+                        </div>
+                        
+                        <!-- Edición manual -->
+                        <div class="col-md-6">
+                            <h6 class="mb-3">Edición Manual</h6>
+                            
+                            <div class="mb-3">
+                                <label for="edit-final-music" class="form-label">Música</label>
+                                <input type="text" class="form-control" id="edit-final-music" name="final_music" 
+                                       placeholder="Nombre de la canción">
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="edit-final-music-artist" class="form-label">Artista</label>
+                                <input type="text" class="form-control" id="edit-final-music-artist" name="final_music_artist" 
+                                       placeholder="Nombre del artista">
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="edit-difficulty-level" class="form-label">Nivel de Dificultad</label>
+                                <select class="form-select" id="edit-difficulty-level" name="difficulty_level">
+                                    <option value="">Sin especificar</option>
+                                    <option value="bajo">Bajo</option>
+                                    <option value="medio">Medio</option>
+                                    <option value="alto">Alto</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Personajes -->
+                    <div class="mb-3">
+                        <label for="edit-final-characters" class="form-label">Personajes</label>
+                        <textarea class="form-control" id="edit-final-characters" name="final_characters" rows="2"
+                                  placeholder="Lista de personajes separados por comas"></textarea>
+                        <div class="form-text">Separa múltiples personajes con comas</div>
+                    </div>
+                    
+                    <!-- Estado de edición -->
+                    <div class="mb-3">
+                        <label for="edit-status" class="form-label">Estado de Edición</label>
+                        <select class="form-select" id="edit-status" name="edit_status">
+                            <option value="nulo">Sin procesar</option>
+                            <option value="en_proceso">En proceso</option>
+                            <option value="hecho">Completado</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Notas -->
+                    <div class="mb-3">
+                        <label for="edit-notes" class="form-label">Notas</label>
+                        <textarea class="form-control" id="edit-notes" name="notes" rows="3"
+                                  placeholder="Notas adicionales sobre el video"></textarea>
+                    </div>
+                    
+                    <!-- Información detectada automáticamente (solo lectura) -->
+                    <div class="accordion" id="detectedInfoAccordion">
+                        <div class="accordion-item">
+                            <h2 class="accordion-header" id="headingDetected">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" 
+                                        data-bs-target="#collapseDetected" aria-expanded="false" aria-controls="collapseDetected">
+                                    <i class="fas fa-robot me-2"></i>Información Detectada Automáticamente
+                                </button>
+                            </h2>
+                            <div id="collapseDetected" class="accordion-collapse collapse" aria-labelledby="headingDetected" 
+                                 data-bs-parent="#detectedInfoAccordion">
+                                <div class="accordion-body">
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <strong>Música Detectada:</strong>
+                                            <p id="detected-music-info" class="mb-2">-</p>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <strong>Personajes Detectados:</strong>
+                                            <p id="detected-characters-info" class="mb-2">-</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="saveVideoChanges()">
+                    <i class="fas fa-save me-1"></i>Guardar Cambios
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Loading overlay -->
+<div id="loading-overlay" class="loading-overlay" style="display: none;">
+    <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Cargando...</span>
+    </div>
+</div>
+
+<!-- Toast para notificaciones -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3">
+    <div id="notification-toast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="toast-header">
+            <i class="fas fa-info-circle text-primary me-2"></i>
+            <strong class="me-auto">Tag-Flow</strong>
+            <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+        <div class="toast-body" id="toast-message">
+            <!-- Mensaje dinámico -->
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/gallery.js') }}"></script>
+{% endblock %}

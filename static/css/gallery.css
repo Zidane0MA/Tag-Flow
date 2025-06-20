@@ -1,0 +1,286 @@
+/* Tag-Flow V2 - Estilos de la Galería */
+
+/* Contenedor principal de videos */
+#videos-container {
+    margin-top: 1rem;
+}
+
+/* Cards de video */
+.video-card {
+    transition: all 0.3s ease;
+    border: none;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    overflow: hidden;
+}
+
+.video-card:hover {
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    transform: translateY(-3px);
+}
+
+/* Contenedor de thumbnail */
+.card-img-top-container {
+    position: relative;
+    height: 200px;
+    overflow: hidden;
+    background-color: #f8f9fa;
+}
+
+.thumbnail-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.3s ease;
+}
+
+.video-card:hover .thumbnail-image {
+    transform: scale(1.05);
+}
+
+/* Overlay de botones */
+.card-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.video-card:hover .card-overlay {
+    opacity: 1;
+}
+
+.overlay-buttons {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.overlay-buttons .btn {
+    padding: 0.5rem;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Badges en el thumbnail */
+.card-badges {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    align-items: flex-end;
+}
+
+.card-badges .badge {
+    font-size: 0.7rem;
+    padding: 0.25rem 0.5rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* Cuerpo de la card */
+.video-card .card-body {
+    padding: 1rem;
+    background: white;
+}
+
+.video-card .card-title {
+    font-weight: 600;
+    color: #212529;
+    margin-bottom: 0.5rem;
+    font-size: 1rem;
+}
+
+.video-card .card-text {
+    color: #6c757d;
+    font-size: 0.85rem;
+    line-height: 1.4;
+}
+
+/* Metadatos del video */
+.video-metadata {
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid #f0f0f0;
+}
+
+.video-metadata small {
+    font-size: 0.75rem;
+}
+
+/* Footer de la card */
+.video-card .card-footer {
+    background: #f8f9fa !important;
+    border-top: 1px solid #dee2e6;
+    padding: 0.75rem 1rem;
+}
+
+/* Botones de estado rápido */
+.btn-group-sm .btn {
+    padding: 0.25rem 0.4rem;
+    font-size: 0.7rem;
+    border-radius: 0.25rem;
+}
+
+.btn-group-sm .btn.active {
+    transform: scale(1.1);
+}
+
+/* Filtros y búsqueda */
+.card-header h5 {
+    color: #495057;
+    font-weight: 600;
+}
+
+#filter-form .form-label {
+    font-weight: 500;
+    color: #495057;
+    font-size: 0.9rem;
+}
+
+/* Responsive design */
+@media (max-width: 1200px) {
+    .card-img-top-container {
+        height: 180px;
+    }
+}
+
+@media (max-width: 768px) {
+    .card-img-top-container {
+        height: 160px;
+    }
+    
+    .overlay-buttons .btn {
+        width: 35px;
+        height: 35px;
+        font-size: 0.8rem;
+    }
+    
+    .video-card .card-body {
+        padding: 0.75rem;
+    }
+    
+    .card-badges .badge {
+        font-size: 0.65rem;
+        padding: 0.2rem 0.4rem;
+    }
+}
+
+@media (max-width: 576px) {
+    .overlay-buttons {
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+    
+    .card-badges {
+        position: static;
+        margin-bottom: 0.5rem;
+        flex-direction: row;
+        justify-content: flex-start;
+    }
+}
+
+/* Estados de carga */
+.video-card.loading {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.video-card.loading::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 20px;
+    height: 20px;
+    margin: -10px 0 0 -10px;
+    border: 2px solid #f3f3f3;
+    border-top: 2px solid #007bff;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Modal de edición */
+#editVideoModal .modal-dialog {
+    max-width: 800px;
+}
+
+#editVideoModal .modal-header {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+}
+
+#editVideoModal .form-label {
+    font-weight: 500;
+    color: #495057;
+}
+
+/* Animaciones para filtros */
+.video-card-wrapper {
+    transition: all 0.3s ease;
+}
+
+.video-card-wrapper.filtered-out {
+    opacity: 0;
+    transform: scale(0.8);
+    pointer-events: none;
+}
+
+/* Toast notifications */
+.toast {
+    border: none;
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+}
+
+.toast.show {
+    animation: slideInRight 0.3s ease;
+}
+
+@keyframes slideInRight {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+/* Estado vacío */
+.text-center i.fa-4x {
+    opacity: 0.5;
+}
+
+/* Paginación */
+.pagination {
+    margin-top: 2rem;
+}
+
+.page-link {
+    border-radius: 0.5rem;
+    margin: 0 0.125rem;
+    border: 1px solid #dee2e6;
+    color: #6f42c1;
+}
+
+.page-link:hover {
+    background-color: #6f42c1;
+    border-color: #6f42c1;
+    color: white;
+}

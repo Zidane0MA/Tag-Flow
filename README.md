@@ -1,222 +1,292 @@
-# 🎬 Tag-Flow - Sistema de Clasificación de Videos
+# 🎬 Tag-Flow V2 - Sistema de Gestión de Videos TikTok/MMD
 
-Sistema automatizado de dos componentes para clasificar y explorar colecciones de videos de manera visual e interactiva.
+**Sistema completo para catalogar, analizar y gestionar videos de TikTok trends y MMDs de videojuegos con reconocimiento automático de música y personajes.**
 
-## 📋 Descripción
+## 🚀 Características Principales
 
-Tag-Flow transforma una estructura de carpetas de videos en una base de datos visual y consultable mediante:
+- **Reconocimiento Musical Híbrido**: YouTube API + Spotify API + ACRCloud
+- **Reconocimiento Facial Avanzado**: Google Vision (famosos) + DeepFace GPU (personajes anime/gaming)
+- **Interfaz Web Moderna**: Flask + Bootstrap 5 con edición en tiempo real
+- **Integración 4K Downloader**: Importa automáticamente metadatos de creadores
+- **Thumbnails Automáticos**: Generación optimizada con watermarks
+- **Gestión de Estados**: Seguimiento del progreso de edición de videos
+- **Filtros Avanzados**: Búsqueda inteligente y filtrado en tiempo real
 
-- **🔍 Análisis automático**: Extrae creador, personajes y música de cada video
-- **🏷️ Etiquetado manual**: Permite asignar dificultad de edición de forma eficiente  
-- **📊 Visualización interactiva**: Interfaz web con filtros múltiples para explorar la colección
-- **⚡ Escalabilidad**: Procesa solo videos nuevos, sin reprocesar la colección completa
+## 📋 Requisitos
 
-## 🚀 Instalación Rápida
+### Software Base
+- **Python 3.12+**
+- **FFmpeg** (para procesamiento de audio/video)
+- **GPU NVIDIA** (opcional, para DeepFace acelerado)
 
-### 1. Crear entorno virtual (recomendado)
+### APIs Requeridas (Gratuitas)
+- **YouTube Data API v3** - [Obtener clave](https://console.developers.google.com/)
+- **Spotify Web API** - [Crear app](https://developer.spotify.com/dashboard/)
+- **Google Vision API** - [Configurar proyecto](https://console.cloud.google.com/)
+
+## 🛠️ Instalación
+
+### 1. Clonar y configurar entorno
+
 ```bash
+git clone <tu-repositorio>/Tag-Flow-V2
+cd Tag-Flow-V2
+
+# Crear entorno virtual
 python -m venv tag-flow-env
-tag-flow-env\Scripts\activate  # Windows
-# source tag-flow-env/bin/activate  # Linux/Mac
+
+# Activar entorno (Windows)
+tag-flow-env\Scripts\activate
+
+# Activar entorno (Linux/macOS)
+source tag-flow-env/bin/activate
 ```
 
 ### 2. Instalar dependencias
+
 ```bash
 pip install -r requirements.txt
 ```
 
-### 3. Configurar API de música (opcional)
-Edita el archivo `.env` y añade tu clave de API:
-```
-API_KEY_MUSICA="tu_clave_real_aqui"
+### 3. Configurar APIs
+
+Edita el archivo `.env` con tus claves de API:
+
+```env
+# YouTube Data API (GRATIS - 10k consultas/día)
+YOUTUBE_API_KEY="tu_clave_youtube_aqui"
+
+# Google Vision API  
+GOOGLE_APPLICATION_CREDENTIALS="config/gcp_credentials.json"
+
+# Spotify API (GRATIS)
+SPOTIFY_CLIENT_ID="tu_spotify_client_id"
+SPOTIFY_CLIENT_SECRET="tu_spotify_client_secret"
+
+# Rutas de trabajo (actualizar según tu configuración)
+VIDEOS_BASE_PATH="D:/Videos_TikTok"
+DOWNLOADER_DB_PATH="C:/Users/tuuser/AppData/Local/4kdownload.com/..."
 ```
 
-**APIs de música recomendadas:**
-- [ACRCloud](https://www.acrcloud.com/) - 500 consultas gratis/mes
-- [AudD](https://audd.io/) - 1000 consultas gratis/mes
+### 4. Configurar caras conocidas (opcional)
 
-## 📁 Estructura del Proyecto
+Añade fotos de referencia de personajes en:
+```
+caras_conocidas/
+├── genshin/
+│   ├── zhongli.jpg
+│   └── raiden.jpg
+└── honkai/
+    ├── firefly.jpg
+    └── blade.jpg
+```
+
+## 🎯 Uso
+
+### Procesamiento de Videos
+
+1. **Analizar videos nuevos:**
+```bash
+python main.py
+```
+
+Este comando:
+- Escanea carpetas configuradas
+- Extrae metadatos de videos
+- Genera thumbnails automáticos
+- Reconoce música con múltiples APIs
+- Detecta personajes/caras conocidas
+- Actualiza la base de datos
+
+### Interfaz Web
+
+2. **Lanzar aplicación web:**
+```bash
+python app.py
+```
+
+Accede a: http://localhost:5000
+
+### Funcionalidades Web
+
+- **Galería Visual**: Vista en grid con thumbnails y filtros
+- **Edición Inline**: Click para editar música, personajes, estado
+- **Filtros Avanzados**: Por creador, plataforma, estado, dificultad
+- **Búsqueda Inteligente**: Texto libre en múltiples campos
+- **Gestión de Estados**: Marcar como pendiente/en proceso/completado
+- **Abrir Carpetas**: Botón para abrir la ubicación del video
+
+## 📊 Estructura del Proyecto
 
 ```
-Tag-Flow/
-├── 1_script_analisis.py     # 🔧 Backend - Procesamiento de videos
-├── 2_app_visual.py          # 🌐 Frontend - Aplicación web
-├── .env                     # 🔐 Configuración de API
-├── requirements.txt         # 📦 Dependencias Python
+Tag-Flow-V2/
+├── config.py                    # Configuración central
+├── main.py                      # Script de procesamiento
+├── app.py                       # Aplicación Flask
+├── requirements.txt             # Dependencias
+├── .env                         # Configuración de APIs
 │
-├── data/
-│   └── videos.csv          # 💾 Base de datos de videos
+├── src/                         # Código fuente
+│   ├── database.py              # Gestión SQLite
+│   ├── video_processor.py       # Procesamiento videos
+│   ├── music_recognition.py     # APIs musicales
+│   ├── face_recognition.py      # Reconocimiento facial
+│   ├── thumbnail_generator.py   # Generación thumbnails
+│   └── downloader_integration.py # 4K Downloader
 │
-├── caras_conocidas/        # 👥 Fotos de referencia para reconocimiento
-│   ├── personaje_1.jpg
-│   ├── personaje_2.png
-│   └── ...
+├── templates/                   # Templates HTML
+│   ├── base.html               # Template base
+│   ├── gallery.html            # Galería principal
+│   └── error.html              # Páginas de error
 │
-└── videos_a_procesar/      # 📹 Videos organizados por creador
-    ├── Creador_A/
-    │   ├── video_001.mp4
-    │   └── video_002.mp4
-    ├── Creador_B/
-    │   └── video_003.mp4
-    └── ...
+├── static/                     # Archivos estáticos
+│   ├── css/                    # Estilos CSS
+│   ├── js/                     # JavaScript
+│   └── icons/                  # Iconos
+│
+├── data/                       # Datos de la aplicación
+│   ├── videos.db              # Base de datos principal
+│   └── thumbnails/            # Thumbnails generados
+│
+├── caras_conocidas/           # Fotos de referencia
+│   ├── genshin/               # Personajes Genshin Impact
+│   └── honkai/                # Personajes Honkai Star Rail
+│
+└── videos_procesados/         # Videos organizados (salida)
 ```
 
-## 🎯 Guía de Uso
+## 🎛️ Configuración Avanzada
 
-### Paso 1: Preparar reconocimiento de personajes
-1. Coloca fotos claras de cada personaje en `caras_conocidas/`
-2. Nombra los archivos como quieres que aparezca el personaje (ej: `Pedro.jpg`)
-3. Usa fotos con una sola cara visible y buena calidad
+### Variables de Entorno Disponibles
 
-### Paso 2: Organizar videos
-1. Crea carpetas por creador dentro de `videos_a_procesar/`
-2. Coloca los videos dentro de la carpeta correspondiente:
-   ```
-   videos_a_procesar/
-   ├── MiCreadorFavorito/
-   │   ├── video_aventura.mp4
-   │   └── video_comedia.mp4
-   └── OtroCreador/
-       └── video_tutorial.mp4
-   ```
+```env
+# Procesamiento
+THUMBNAIL_SIZE="320x180"              # Tamaño de thumbnails
+MAX_CONCURRENT_PROCESSING=3           # Videos en paralelo
+USE_GPU_DEEPFACE=true                 # Usar GPU para DeepFace
+DEEPFACE_MODEL="ArcFace"              # Modelo de reconocimiento
 
-### Paso 3: Procesar videos (Backend)
+# Flask
+FLASK_ENV="development"               # Modo de desarrollo
+FLASK_DEBUG=true                      # Debug activado
+FLASK_HOST="localhost"                # Host de la aplicación
+FLASK_PORT=5000                       # Puerto de la aplicación
+
+# Rutas personalizadas
+VIDEOS_BASE_PATH="D:/Videos_TikTok"   # Carpeta de videos a analizar
+THUMBNAILS_PATH="D:/Tag-Flow/data/thumbnails"
+PROCESSED_VIDEOS_PATH="D:/Tag-Flow/videos_procesados"
+```
+
+### Integración con 4K Video Downloader
+
+Para usar la integración automática:
+
+1. Instala 4K Video Downloader
+2. Encuentra la ruta de su base de datos SQLite
+3. Configura `DOWNLOADER_DB_PATH` en `.env`
+4. Los creadores y metadatos se importarán automáticamente
+
+Rutas típicas:
+- **Windows**: `C:/Users/username/AppData/Local/4kdownload.com/...`
+- **macOS**: `~/Library/Application Support/4kdownload.com/...`
+
+## 🧪 Testing y Desarrollo
+
+### Verificar Configuración
+
 ```bash
-python 1_script_analisis.py
+python -c "from config import config; print('✅ Configuración cargada correctamente')"
 ```
-El script:
-- ✅ Detecta automáticamente videos nuevos
-- 🎵 Analiza la música (si tienes API configurada)
-- 👥 Reconoce personajes usando las fotos de referencia
-- 📝 Te pregunta la dificultad de edición para cada video
-- 💾 Guarda todo en `data/videos.csv`
 
-### Paso 4: Explorar videos (Frontend)
+### Probar APIs
+
 ```bash
-streamlit run 2_app_visual.py
+# Probar reconocimiento musical
+python -c "from src.music_recognition import music_recognizer; print('✅ APIs musicales:', music_recognizer.youtube is not None)"
+
+# Probar reconocimiento facial  
+python -c "from src.face_recognition import face_recognizer; print('✅ APIs faciales:', face_recognizer.vision_client is not None)"
 ```
-Se abrirá automáticamente en tu navegador en `http://localhost:8501`
 
-## 🔧 Características Avanzadas
+### Logs de Debugging
 
-### Filtros Disponibles
-- **👤 Creadores**: Filtra por quién hizo el video
-- **⚡ Dificultad**: Alto, medio o bajo nivel de edición
-- **🎭 Personajes**: Por personajes detectados automáticamente
-- **🔤 Búsqueda libre**: Busca en nombres, música, personajes, etc.
+Los logs se guardan en:
+- `tag_flow_processing.log` - Procesamiento de videos
+- Consola de Flask - Aplicación web
 
-### Funciones Inteligentes
-- **🔄 Procesamiento incremental**: Solo analiza videos nuevos
-- **💾 Guardado automático**: No pierdes progreso si interrumpes el proceso
-- **📊 Estadísticas en tiempo real**: Ve métricas mientras filtras
-- **📱 Responsive**: Funciona en móviles y tablets
+## 📈 Costos y Límites
 
-## 🎵 Configuración Correcta de ACRCloud para Tag-Flow
+### APIs Gratuitas
+- **YouTube API**: 10,000 consultas/día (GRATIS)
+- **Spotify API**: Rate limits generosos (GRATIS)
+- **ACRCloud**: 3,000 consultas/mes (GRATIS)
 
-### Paso 1: Crear Aplicación de Audio Recognition
+### APIs de Pago
+- **Google Vision**: $1.50 por 1,000 detecciones
+- **Estimado mensual**: $3-5 para 200 videos/mes
 
-1. **Ve a [ACRCloud Console](https://console.acrcloud.com/)**
-2. **Haz clic en "Create Application"**
-3. **Selecciona "Audio & Video Recognition"** (NO "Audio Bucket")
-4. **Configura así:**
-   ```
-   Application Name: Tag-Flow-Music-Recognition
-   Application Type: Audio & Video Recognition
-   Audio Type: Music
-   Platform: Other
-   ```
+### Hardware Local (GRATIS)
+- **DeepFace**: Usa tu GPU local
+- **SQLite**: Base de datos local
+- **FFmpeg**: Procesamiento local
 
-### Paso 2: Obtener Credenciales Correctas
+## 🔧 Solución de Problemas
 
-Después de crear la aplicación, tendrás:
-- **Host**: `identify-eu-west-1.acrcloud.com` (o similar)
-- **Access Key**: Tu clave de acceso
-- **Access Secret**: Tu clave secreta
-
-### Paso 3: Configurar .env
-
-Tu archivo `.env` debe verse así:
+### Error: "ModuleNotFoundError"
 ```bash
-# Configuración ACRCloud para reconocimiento de música
-ACRCLOUD_HOST="identify-eu-west-1.acrcloud.com"
-ACRCLOUD_ACCESS_KEY="tu_access_key_aqui"
-ACRCLOUD_ACCESS_SECRET="tu_access_secret_aqui"
-
-# Configuraciones opcionales (mantener como están)
-PROCESAR_CADA_N_FRAMES=30
-DURACION_CLIP_AUDIO=15
+pip install -r requirements.txt
 ```
 
-## 🔗 Enlaces Útiles
+### Error: "YouTube API key invalid"
+1. Verifica que la clave esté en `.env`
+2. Confirma que YouTube Data API v3 esté habilitada
+3. Revisa los límites de cuota
 
-- **ACRCloud Console**: https://console.acrcloud.com/
-- **Documentación API**: https://docs.acrcloud.com/
-- **Límites gratuitos**: 500 identificaciones/mes
+### Error: "Google Vision credentials"
+1. Descarga el archivo JSON de credenciales
+2. Guárdalo en `config/gcp_credentials.json`
+3. Verifica la variable `GOOGLE_APPLICATION_CREDENTIALS`
 
-### Formatos de video soportados
-- MP4, MOV, AVI, MKV, WMV, FLV, WebM
+### Error: "DeepFace model download"
+- Los modelos se descargan automáticamente en el primer uso
+- Requiere conexión a internet estable
+- Se guardan en `data/deepface_models/`
 
-### Formatos de imagen para caras
-- JPG, PNG, JPEG
+### Rendimiento Lento
+- Reduce `MAX_CONCURRENT_PROCESSING`
+- Desactiva `USE_GPU_DEEPFACE` si hay problemas con GPU
+- Usa SSD para mejor rendimiento de thumbnails
 
-## 🐛 Solución de Problemas
+## 🚧 Desarrollo Futuro
 
-### Error: "face_recognition no funciona"
-```bash
-# Windows: Instalar Visual C++ Build Tools
-# Luego reinstalar:
-pip uninstall face_recognition
-pip install face_recognition
-```
+### Funcionalidades Planeadas
+- [ ] Exportación a Excel/CSV
+- [ ] API REST completa
+- [ ] Dashboard de estadísticas
+- [ ] Backup automático de base de datos
+- [ ] Reconocimiento de música offline
+- [ ] Integración con más plataformas
+- [ ] Sistema de etiquetas personalizadas
+- [ ] Análisis de tendencias
 
-### Error: "No se puede cargar el video"
-- Verifica que la ruta no tenga caracteres especiales
-- Prueba mover el video a una carpeta con ruta más corta
-- Asegúrate de que el formato sea compatible
-
-### Videos no aparecen en la aplicación
-1. Ejecuta primero `python 1_script_analisis.py`
-2. Verifica que se haya creado `data/videos.csv`
-3. Recarga la página web de Streamlit
-
-### API de música no funciona
-- Verifica que la clave API en `.env` sea correcta
-- Comprueba que no hayas superado tu límite de consultas
-- El sistema funciona sin API, solo mostrará "API no configurada"
-
-## ✨ Nuevas Características
-
-- [x] **✏️ Editor integrado**: Modifica datos directamente desde la web (¡YA DISPONIBLE!)
-  - Edita creador, personajes, música y dificultad sin reprocesar
-  - Validación inteligente y guardado automático
-  - Historial de ediciones con timestamps
-  - Ver [EDITOR_INTEGRADO.md](EDITOR_INTEGRADO.md) para guía completa
-
-## 📈 Mejoras Futuras
-
-- [ ] **Exportación**: Generar reportes en PDF/Excel
-- [ ] **Análisis de sentimientos**: Detectar emociones en videos
-- [ ] **Tags personalizados**: Sistema de etiquetas libres
-- [ ] **Comparación de creadores**: Análisis estadístico avanzado
-
-## 🤝 Contribuir
-
-¿Ideas para mejorar Tag-Flow? 
-1. Crea un issue con tu sugerencia
-2. Fork el proyecto
-3. Crea tu feature branch
-4. Envía un pull request
+### Contribuir
+1. Fork el proyecto
+2. Crea una rama para tu feature (`git checkout -b feature/AmazingFeature`)
+3. Commit tus cambios (`git commit -m 'Add some AmazingFeature'`)
+4. Push a la rama (`git push origin feature/AmazingFeature`)
+5. Abre un Pull Request
 
 ## 📄 Licencia
 
-Este proyecto está bajo licencia MIT. Ver archivo `LICENSE` para más detalles.
+Este proyecto está bajo la licencia MIT - ver el archivo [LICENSE](LICENSE) para detalles.
 
-## 🆘 Soporte
+## 🤝 Soporte
 
-Si tienes problemas:
-1. Revisa esta documentación
-2. Verifica la sección de solución de problemas
-3. Crea un issue con detalles del error
+- **Documentación**: Este README
+- **Issues**: Abre un issue en GitHub
+- **Logs**: Revisa `tag_flow_processing.log`
 
 ---
-**¡Disfruta clasificando y explorando tu colección de videos con Tag-Flow! 🎬✨**
+
+**¡Disfruta gestionando tus videos de TikTok y MMDs con Tag-Flow V2! 🎬✨**
