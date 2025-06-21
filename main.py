@@ -3,6 +3,10 @@ Tag-Flow V2 - Script Principal de Procesamiento
 Motor que analiza videos nuevos y alimenta la base de datos
 """
 
+import os
+# Ocultar logs de TensorFlow y Keras antes de cualquier import relacionado
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+
 import sys
 import logging
 from pathlib import Path
