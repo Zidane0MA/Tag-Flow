@@ -4,13 +4,14 @@
 
 ## 🚀 Características Principales
 
+- **Múltiples Fuentes de Datos**: Integración con 4K Video Downloader+, 4K Tokkit, 4K Stogram y carpetas organizadas
 - **Reconocimiento Musical Híbrido**: YouTube API + Spotify API + ACRCloud
 - **Reconocimiento Facial Avanzado**: Google Vision (famosos) + DeepFace GPU (personajes anime/gaming)
 - **Interfaz Web Moderna**: Flask + Bootstrap 5 con edición en tiempo real
-- **Integración 4K Downloader**: Importa automáticamente metadatos de creadores
+- **Procesamiento Específico**: Análisis por plataforma (YouTube, TikTok, Instagram)
+- **Gestión Granular**: Poblado y mantenimiento de BD y thumbnails por fuente/plataforma
 - **Thumbnails Automáticos**: Generación optimizada con watermarks
 - **Gestión de Estados**: Seguimiento del progreso de edición de videos
-- **Filtros Avanzados**: Búsqueda inteligente y filtrado en tiempo real
 
 ## 📋 Requisitos
 
@@ -24,9 +25,15 @@
 - **Spotify Web API** - [Crear app](https://developer.spotify.com/dashboard/)
 - **Google Vision API** - [Configurar proyecto](https://console.cloud.google.com/)
 
+### Fuentes de Datos Soportadas
+- **4K Video Downloader+**: Videos de YouTube
+- **4K Tokkit**: Videos de TikTok
+- **4K Stogram**: Contenido de Instagram
+- **Carpetas Organizadas**: `D:\4K All\{Youtube|Tiktok|Instagram}\{Creador}\`
+
 ## 🛠️ Instalación
 
-### 🚀 Opción 1: Instalación Automática (Recomendada)
+### 🚀 Instalación Rápida (Recomendada)
 
 ```bash
 cd Tag-Flow-V2
@@ -35,286 +42,180 @@ cd Tag-Flow-V2
 python quickstart.py
 ```
 
-**El script te preguntará:**
-- ¿Crear entorno virtual? (Recomendado: sí)
-- Configuración de APIs paso a paso
-- Creación de datos de ejemplo
-
-### ⚡ Opción 2: Sin Entorno Virtual (Más Simple)
-
-Si tienes Python limpio y quieres máxima simplicidad:
+### ⚡ Instalación Manual
 
 ```bash
 cd Tag-Flow-V2
 pip install -r requirements.txt
-python setup.py          # Configurar APIs
-python generate_demo.py  # Datos de ejemplo
-python app.py            # Lanzar interfaz
+
+# Copiar plantilla de configuración
+copy .env.example .env
+
+# Editar .env con tus claves de API
+# Ver COMANDOS.md para configuración detallada
 ```
 
-**➜ Abrir:** http://localhost:5000
+## 🎯 Uso Básico
 
-### 🔧 Opción 3: Manual Completa
+### Comandos Principales
 
 ```bash
-cd Tag-Flow-V2
+# Ver estadísticas de todas las fuentes
+python maintenance.py show-stats
 
-# Crear entorno virtual (recomendado)
-python -m venv tag-flow-env
-tag-flow-env\Scripts\activate  # Windows
-# source tag-flow-env/bin/activate  # Linux/Mac
+# Poblar BD desde fuentes externas
+python maintenance.py populate-db --source all --limit 10
 
-# Instalar dependencias
-pip install -r requirements.txt
-```
+# Generar thumbnails
+python maintenance.py populate-thumbnails
 
-### 3. Configurar APIs
+# Procesar videos específicos por plataforma
+python main.py 5 YT    # 5 videos de YouTube
+python main.py 3 TT    # 3 videos de TikTok
+python main.py 2 IG    # 2 videos de Instagram
 
-**Automático:**
-```bash
-python setup.py  # Configuración guiada interactiva
-```
-
-**Manual:**
-Edita el archivo `.env` con tus claves de API:
-
-```env
-# YouTube Data API (GRATIS - 10k consultas/día)
-YOUTUBE_API_KEY="tu_clave_youtube_aqui"
-
-# Google Vision API  
-GOOGLE_APPLICATION_CREDENTIALS="config/gcp_credentials.json"
-
-# Spotify API (GRATIS)
-SPOTIFY_CLIENT_ID="tu_spotify_client_id"
-SPOTIFY_CLIENT_SECRET="tu_spotify_client_secret"
-
-# Rutas de trabajo (actualizar según tu configuración)
-YOUTUBE_BASE_PATH="D:/Videos_TikTok"
-EXTERNAL_YOUTUBE_DB="C:/Users/tuuser/AppData/Local/4kdownload.com/..."
-```
-
-### 4. Configurar caras conocidas (opcional)
-
-Añade fotos de referencia de personajes en:
-```
-caras_conocidas/
-├── genshin/
-│   ├── zhongli.jpg
-│   └── raiden.jpg
-└── honkai/
-    ├── firefly.jpg
-    └── blade.jpg
-```
-
-## 🎯 Uso
-
-### Procesamiento de Videos
-
-1. **Analizar videos nuevos:**
-```bash
-python main.py
-```
-
-Este comando:
-- Escanea carpetas configuradas
-- Extrae metadatos de videos
-- Genera thumbnails automáticos
-- Reconoce música con múltiples APIs
-- Detecta personajes/caras conocidas
-- Actualiza la base de datos
-
-### Interfaz Web
-
-2. **Lanzar aplicación web:**
-```bash
+# Lanzar interfaz web
 python app.py
 ```
 
-Accede a: http://localhost:5000
+### Códigos de Plataforma
 
-### Funcionalidades Web
+- **YT**: YouTube (4K Video Downloader+)
+- **TT**: TikTok (4K Tokkit)
+- **IG**: Instagram (4K Stogram)
+- **O**: Carpetas organizadas (`D:\4K All`)
 
-- **Galería Visual**: Vista en grid con thumbnails y filtros
-- **Edición Inline**: Click para editar música, personajes, estado
-- **Filtros Avanzados**: Por creador, plataforma, estado, dificultad
-- **Búsqueda Inteligente**: Texto libre en múltiples campos
-- **Gestión de Estados**: Marcar como pendiente/en proceso/completado
-- **Abrir Carpetas**: Botón para abrir la ubicación del video
+## 📊 Flujo de Trabajo Recomendado
 
-## 📊 Estructura del Proyecto
+### 1️⃣ Configuración Inicial
+```bash
+# 1. Ver fuentes disponibles
+python maintenance.py show-stats
+
+# 2. Poblar con algunos videos de prueba
+python maintenance.py populate-db --source db --platform youtube --limit 10
+
+# 3. Generar thumbnails
+python maintenance.py populate-thumbnails --platform youtube
+```
+
+### 2️⃣ Uso Diario
+```bash
+# Procesar videos nuevos por plataforma
+python main.py 10 YT
+
+# Gestionar en interfaz web
+python app.py  # → http://localhost:5000
+```
+
+### 3️⃣ Mantenimiento
+```bash
+# Backup periódico
+python maintenance.py backup
+
+# Optimizar base de datos
+python maintenance.py optimize-db
+```
+
+## 📂 Estructura del Proyecto
 
 ```
 Tag-Flow-V2/
-├── config.py                    # Configuración central
-├── main.py                      # Script de procesamiento
-├── app.py                       # Aplicación Flask
-├── requirements.txt             # Dependencias
-├── .env                         # Configuración de APIs
+├── 📄 DOCUMENTACIÓN
+│   ├── README.md                    # Esta guía
+│   ├── PROYECTO_ESTADO.md          # Estado y roadmap
+│   ├── COMANDOS.md                 # Referencia completa de comandos
+│   └── .env.example                # Plantilla de configuración
 │
-├── src/                         # Código fuente
-│   ├── database.py              # Gestión SQLite
-│   ├── video_processor.py       # Procesamiento videos
-│   ├── music_recognition.py     # APIs musicales
-│   ├── face_recognition.py      # Reconocimiento facial
-│   ├── thumbnail_generator.py   # Generación thumbnails
-│   └── downloader_integration.py # 4K Downloader
+├── 🚀 SCRIPTS PRINCIPALES
+│   ├── main.py                     # Procesamiento de videos
+│   ├── app.py                      # Interfaz web Flask
+│   └── maintenance.py              # Herramientas de mantenimiento
 │
-├── templates/                   # Templates HTML
-│   ├── base.html               # Template base
-│   ├── gallery.html            # Galería principal
-│   └── error.html              # Páginas de error
+├── 🧠 CÓDIGO FUENTE
+│   └── src/
+│       ├── database.py             # Gestión SQLite
+│       ├── external_sources.py     # Fuentes externas (NUEVO)
+│       ├── video_processor.py      # Procesamiento videos
+│       ├── music_recognition.py    # APIs musicales
+│       ├── face_recognition.py     # Reconocimiento facial
+│       └── thumbnail_generator.py  # Generación thumbnails
 │
-├── static/                     # Archivos estáticos
-│   ├── css/                    # Estilos CSS
-│   ├── js/                     # JavaScript
-│   └── icons/                  # Iconos
+├── 🌐 INTERFAZ WEB
+│   ├── templates/                  # HTML templates
+│   └── static/                     # CSS, JS, iconos
 │
-├── data/                       # Datos de la aplicación
-│   ├── videos.db              # Base de datos principal
-│   └── thumbnails/            # Thumbnails generados
+├── 💾 DATOS
+│   └── data/
+│       ├── videos.db              # Base de datos SQLite
+│       └── thumbnails/            # Thumbnails generados
 │
-├── caras_conocidas/           # Fotos de referencia
-│   ├── Genshin/               # Personajes Genshin Impact
-│   ├── Honkai/                # Personajes Honkai Star Rail
-│   ├── Zzz/                   # Personajes Zenless Zone Zero
-│   ├── Personas/              # Personas de la vida real
-│   └── Manual/                # Personajes manuales
-│
-└── videos_procesados/         # Videos organizados (salida)
+└── 🎭 RECONOCIMIENTO FACIAL
+    └── caras_conocidas/           # Fotos de referencia por categoría
 ```
 
-## 🎛️ Configuración Avanzada
+## ⚙️ Configuración
 
-### Variables de Entorno Disponibles
+### Variables de Entorno Principales
+
+Copia `.env.example` a `.env` y configura:
 
 ```env
-# Procesamiento
-THUMBNAIL_SIZE="320x180"              # Tamaño de thumbnails
-MAX_CONCURRENT_PROCESSING=3           # Videos en paralelo
-USE_GPU_DEEPFACE=true                 # Usar GPU para DeepFace
-DEEPFACE_MODEL="ArcFace"              # Modelo de reconocimiento
+# APIs (obligatorias)
+YOUTUBE_API_KEY="tu_clave_aqui"
+SPOTIFY_CLIENT_ID="tu_client_id"
+SPOTIFY_CLIENT_SECRET="tu_client_secret"
 
-# Flask
-FLASK_ENV="development"               # Modo de desarrollo
-FLASK_DEBUG=true                      # Debug activado
-FLASK_HOST="localhost"                # Host de la aplicación
-FLASK_PORT=5000                       # Puerto de la aplicación
-
-# Rutas personalizadas
-YOUTUBE_BASE_PATH="D:/Videos_TikTok"   # Carpeta de videos a analizar
-THUMBNAILS_PATH="D:/Tag-Flow/data/thumbnails"
-PROCESSED_VIDEOS_PATH="D:/Tag-Flow/videos_procesados"
+# Fuentes externas (automáticas)
+EXTERNAL_YOUTUBE_DB="C:/Users/.../4K Video Downloader+/.../xxx.sqlite"
+EXTERNAL_TIKTOK_DB="D:/4K Tokkit/data.sqlite"
+EXTERNAL_INSTAGRAM_DB="D:/4K Stogram/.stogram.sqlite"
+ORGANIZED_BASE_PATH="D:/4K All"
 ```
-
-### Integración con 4K Video Downloader
-
-Para usar la integración automática:
-
-1. Instala 4K Video Downloader
-2. Encuentra la ruta de su base de datos SQLite
-3. Configura `EXTERNAL_YOUTUBE_DB` en `.env`
-4. Los creadores y metadatos se importarán automáticamente
-
-Rutas típicas:
-- **Windows**: `C:/Users/username/AppData/Local/4kdownload.com/...`
-- **macOS**: `~/Library/Application Support/4kdownload.com/...`
-
-## 🧪 Testing y Desarrollo
-
-### Verificar Configuración
-
-```bash
-python -c "from config import config; print('✅ Configuración cargada correctamente')"
-```
-
-### Probar APIs
-
-```bash
-# Probar reconocimiento musical
-python -c "from src.music_recognition import music_recognizer; print('✅ APIs musicales:', music_recognizer.youtube is not None)"
-
-# Probar reconocimiento facial  
-python -c "from src.face_recognition import face_recognizer; print('✅ APIs faciales:', face_recognizer.vision_client is not None)"
-```
-
-### Logs de Debugging
-
-Los logs se guardan en:
-- `tag_flow_processing.log` - Procesamiento de videos
-- Consola de Flask - Aplicación web
 
 ## 📈 Costos y Límites
 
 ### APIs Gratuitas
-- **YouTube API**: 10,000 consultas/día (GRATIS)
-- **Spotify API**: Rate limits generosos (GRATIS)
-- **ACRCloud**: 3,000 consultas/mes (GRATIS)
+- **YouTube API**: 10,000 consultas/día
+- **Spotify API**: Rate limits generosos
+- **ACRCloud**: 3,000 consultas/mes
 
-### APIs de Pago
+### APIs de Pago (Opcionales)
 - **Google Vision**: $1.50 por 1,000 detecciones
-- **Estimado mensual**: $3-5 para 200 videos/mes
-
-### Hardware Local (GRATIS)
-- **DeepFace**: Usa tu GPU local
-- **SQLite**: Base de datos local
-- **FFmpeg**: Procesamiento local
+- **Estimado mensual**: $0-5 para uso moderado
 
 ## 🔧 Solución de Problemas
 
-### Error: "ModuleNotFoundError"
+### Verificar Configuración
+```bash
+python verify_config.py
+```
+
+### Problemas Comunes
+
+**Error: "ModuleNotFoundError"**
 ```bash
 pip install -r requirements.txt
 ```
 
-### Error: "YouTube API key invalid"
-1. Verifica que la clave esté en `.env`
-2. Confirma que YouTube Data API v3 esté habilitada
-3. Revisa los límites de cuota
+**No se encuentran videos**
+- Verifica que las rutas en `.env` sean correctas
+- Usa `python maintenance.py show-stats` para verificar fuentes
 
-### Error: "Google Vision credentials"
-1. Descarga el archivo JSON de credenciales
-2. Guárdalo en `config/gcp_credentials.json`
-3. Verifica la variable `GOOGLE_APPLICATION_CREDENTIALS`
+**APIs no funcionan**
+- Verifica claves en `.env`
+- Confirma que las APIs estén habilitadas en sus respectivas consolas
 
-### Error: "DeepFace model download"
-- Los modelos se descargan automáticamente en el primer uso
-- Requiere conexión a internet estable
-- Se guardan en `data/deepface_models/`
+## 📚 Documentación Adicional
 
-### Rendimiento Lento
-- Reduce `MAX_CONCURRENT_PROCESSING`
-- Desactiva `USE_GPU_DEEPFACE` si hay problemas con GPU
-- Usa SSD para mejor rendimiento de thumbnails
-
-## 🚧 Desarrollo Futuro
-
-### Funcionalidades Planeadas
-- [ ] Exportación a Excel/CSV
-- [ ] API REST completa
-- [ ] Dashboard de estadísticas
-- [ ] Backup automático de base de datos
-- [ ] Reconocimiento de música offline
-- [ ] Integración con más plataformas
-- [ ] Sistema de etiquetas personalizadas
-- [ ] Análisis de tendencias
-
-### Contribuir
-1. Fork el proyecto
-2. Crea una rama para tu feature (`git checkout -b feature/AmazingFeature`)
-3. Commit tus cambios (`git commit -m 'Add some AmazingFeature'`)
-4. Push a la rama (`git push origin feature/AmazingFeature`)
-5. Abre un Pull Request
-
-## 📄 Licencia
-
-Este proyecto está bajo la licencia MIT - ver el archivo [LICENSE](LICENSE) para detalles.
+- **[COMANDOS.md](COMANDOS.md)**: Referencia completa de todos los comandos
+- **[PROYECTO_ESTADO.md](PROYECTO_ESTADO.md)**: Estado actual y roadmap del proyecto
 
 ## 🤝 Soporte
 
-- **Documentación**: Este README
-- **Issues**: Abre un issue en GitHub
-- **Logs**: Revisa `tag_flow_processing.log`
+- **Documentación**: Ver archivos .md en el proyecto
+- **Logs**: Revisa `tag_flow_processing.log` para errores
+- **Configuración**: Usa `python verify_config.py` para diagnosticar
 
 ---
 
