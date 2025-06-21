@@ -102,55 +102,25 @@ class DownloaderIntegration:
         return result
     
     def _get_downloads_data(self, conn: sqlite3.Connection) -> List[sqlite3.Row]:
-        """Obtener datos de descargas desde 4K Downloader"""
+        """Obtener datos de descargas desde 4K Downloader+ (YouTube)"""
         try:
-            # Esta query puede necesitar ajustes según la estructura exacta de 4K Downloader
-            # Estructura típica incluye tablas como: downloads, items, etc.
             query = """
                 SELECT 
-                    id,
-                    title,
-                    url,
-                    file_path,
-                    creator_name,
-                    download_date,
-                    file_size,
-                    duration,
-                    platform
-                FROM downloads 
-                WHERE file_path IS NOT NULL 
-                AND file_path != ''
-                ORDER BY download_date DESC
+                    di.id,
+                    di.filename AS file_path,
+                    dsi.value AS creator_name
+                FROM download_item di
+                LEFT JOIN downloader_subscription_info dsi
+                    ON di.id = dsi.download_item_id AND dsi.type = 0
+                WHERE di.filename IS NOT NULL
+                    AND di.filename != ''
+                ORDER BY di.id DESC
             """
-            
             cursor = conn.execute(query)
             return cursor.fetchall()
-            
         except sqlite3.Error as e:
             logger.error(f"Error consultando 4K Downloader DB: {e}")
-            
-            # Intentar estructura alternativa
-            try:
-                # Estructura alternativa más simple
-                query_alt = """
-                    SELECT 
-                        rowid as id,
-                        * 
-                    FROM downloads 
-                    LIMIT 10
-                """
-                cursor = conn.execute(query_alt)
-                rows = cursor.fetchall()
-                
-                if rows:
-                    logger.info("Estructura de 4K Downloader DB detectada")
-                    # Aquí se puede adaptar la query según la estructura real
-                    
-                return []
-                
-            except Exception as e2:
-                logger.error(f"Error con query alternativa: {e2}")
-                return []
+            return []
     
     def _process_download_item(self, download_item: sqlite3.Row) -> bool:
         """Procesar un item de descarga individual"""

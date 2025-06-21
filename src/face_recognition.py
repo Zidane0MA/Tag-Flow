@@ -11,6 +11,10 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 import io
+from config import config
+
+# Configurar logger primero
+logger = logging.getLogger(__name__)
 
 # Google Vision API
 try:
@@ -27,10 +31,6 @@ try:
 except ImportError:
     DEEPFACE_AVAILABLE = False
     logger.warning("DeepFace no disponible")
-
-from config import config
-
-logger = logging.getLogger(__name__)
 
 class FaceRecognizer:
     """Reconocedor facial híbrido para TikTokers y personajes de anime/gaming"""
