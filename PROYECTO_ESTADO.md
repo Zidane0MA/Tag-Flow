@@ -34,9 +34,6 @@ Tag-Flow V2 ha sido completamente implementado con todas las funcionalidades esp
 
 #### 🛠️ **Herramientas Auxiliares**
 - ✅ **Configuración Guiada**: Script interactivo de setup
-- ✅ **Verificación de Sistema**: Diagnósticos automáticos
-- ✅ **Suite de Tests**: Pruebas unitarias e integración
-- ✅ **Generador de Demo**: Datos de ejemplo para pruebas
 - ✅ **Utilidades de Mantenimiento**: Backup, limpieza, optimización
 - ✅ **Documentación Completa**: README detallado y guías
 
@@ -48,8 +45,7 @@ Tag-Flow V2 ha sido completamente implementado con todas las funcionalidades esp
 Tag-Flow-V2/ (✅ COMPLETO)
 ├── 📄 DOCUMENTACIÓN
 │   ├── README.md                    # Guía completa del usuario
-│   ├── tag_flow_v2_plan.md          # Plan original de desarrollo
-│   └── PROYECTO_COMPLETO.md         # Este archivo de resumen
+│   └── PROYECTO_ESTADO.md         # Este archivo de resumen
 │
 ├── ⚙️ CONFIGURACIÓN
 │   ├── .env                         # Variables de entorno (APIs)
@@ -60,16 +56,11 @@ Tag-Flow-V2/ (✅ COMPLETO)
 ├── 🚀 SCRIPTS PRINCIPALES
 │   ├── main.py                      # Motor de procesamiento
 │   ├── app.py                       # Aplicación web Flask
-│   ├── setup.py                     # Configuración guiada
-│   ├── quickstart.py                # Inicio rápido paso a paso
-│   └── migrate.py                   # Migración desde V1
+│   └── quickstart.py                # Inicio rápido paso a paso
 │
 ├── 🧪 HERRAMIENTAS AUXILIARES
 │   ├── check_installation.py        # Verificación de sistema
-│   ├── test_suite.py                # Suite de pruebas
-│   ├── maintenance.py               # Utilidades de mantenimiento
-│   ├── generate_demo.py             # Datos de demostración
-│   └── create_example_characters.py # Personajes de ejemplo
+│   └── maintenance.py               # Utilidades de mantenimiento
 │
 ├── 🧠 CÓDIGO FUENTE
 │   └── src/
@@ -83,11 +74,13 @@ Tag-Flow-V2/ (✅ COMPLETO)
 │
 ├── 🌐 INTERFAZ WEB
 │   ├── templates/
+º   │   ├── components/
 │   │   ├── base.html               # Template base Bootstrap 5
 │   │   ├── gallery.html            # Galería principal
 │   │   ├── video_detail.html       # Vista detallada de video
 │   │   └── error.html              # Páginas de error
 │   └── static/
+│       ├── icons/
 │       ├── css/
 │       │   ├── main.css            # Estilos principales
 │       │   └── gallery.css         # Estilos específicos galería
@@ -103,10 +96,13 @@ Tag-Flow-V2/ (✅ COMPLETO)
 │
 ├── 🎭 RECONOCIMIENTO FACIAL
 │   └── caras_conocidas/
-│       ├── README_PLACEHOLDERS.md  # Información sobre ejemplos
-│       ├── genshin/                # Personajes Genshin Impact
+│       ├── Manual/                 # Personajes manuales
+│       ├── Personas/               # Personajes de la vida real
+│       ├── Genshin/                # Personajes Genshin Impact
 │       │   └── README.md
-│       └── honkai/                 # Personajes Honkai Star Rail
+│       ├── Zzz/                    # Personajes Zenless Zone Zero
+│       │   └── README.md
+│       └── Honkai/                 # Personajes Honkai Star Rail
 │           └── README.md
 │
 └── 📁 ORGANIZACIÓN
@@ -121,9 +117,6 @@ Tag-Flow-V2/ (✅ COMPLETO)
 ```bash
 # Configuración inicial paso a paso
 python quickstart.py
-
-# Configuración manual de APIs
-python setup.py
 
 # Procesar videos nuevos
 python main.py
@@ -157,21 +150,6 @@ python maintenance.py optimize-db
 python maintenance.py report
 ```
 
-### 🧪 **Desarrollo y Testing**
-```bash
-# Ejecutar suite de tests
-python test_suite.py
-
-# Generar datos de demostración
-python generate_demo.py
-
-# Crear personajes de ejemplo
-python create_example_characters.py
-
-# Migrar desde Tag-Flow V1
-python migrate.py
-```
-
 ---
 
 ## 💰 **COSTOS DE OPERACIÓN**
@@ -186,6 +164,8 @@ python migrate.py
 - **Estimado mensual**: $3-5 para 200 videos/mes
 
 ### 🖥️ **Procesamiento Local (Gratis)**
+- **4K Video Downloader**: Integración local ➜ **GRATIS**
+- **Google Vision**: Usado localmente con clave API ➜ **GRATIS**
 - **DeepFace**: Usa tu GPU local ➜ **GRATIS**
 - **FFmpeg**: Procesamiento local ➜ **GRATIS**
 - **SQLite**: Base de datos local ➜ **GRATIS**

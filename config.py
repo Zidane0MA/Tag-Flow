@@ -40,7 +40,7 @@ class Config:
     SPOTIFY_CLIENT_SECRET = os.getenv('SPOTIFY_CLIENT_SECRET')
     
     # 4K Video Downloader Integration
-    DOWNLOADER_DB_PATH = os.getenv('DOWNLOADER_DB_PATH')
+    YOUTUBE_DB_PATH = os.getenv('YOUTUBE_DB_PATH')
     
     # Procesamiento
     THUMBNAIL_SIZE = tuple(map(int, os.getenv('THUMBNAIL_SIZE', '320x180').split('x')))
@@ -84,8 +84,8 @@ class Config:
         if not cls.SPOTIFY_CLIENT_ID or not cls.SPOTIFY_CLIENT_SECRET:
             warnings.append("Credenciales de Spotify no configuradas")
             
-        if cls.DOWNLOADER_DB_PATH and not Path(cls.DOWNLOADER_DB_PATH).exists():
-            warnings.append(f"Base de datos de 4K Downloader no encontrada: {cls.DOWNLOADER_DB_PATH}")
+        if cls.YOUTUBE_DB_PATH and not Path(cls.YOUTUBE_DB_PATH).exists():
+            warnings.append(f"Base de datos de 4K Downloader no encontrada: {cls.YOUTUBE_DB_PATH}")
         
         return warnings
 
