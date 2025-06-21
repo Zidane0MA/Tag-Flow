@@ -91,7 +91,7 @@ SPOTIFY_CLIENT_SECRET="tu_spotify_client_secret"
 
 # Rutas de trabajo (actualizar según tu configuración)
 YOUTUBE_BASE_PATH="D:/Videos_TikTok"
-YOUTUBE_DB_PATH="C:/Users/tuuser/AppData/Local/4kdownload.com/..."
+EXTERNAL_YOUTUBE_DB="C:/Users/tuuser/AppData/Local/4kdownload.com/..."
 ```
 
 ### 4. Configurar caras conocidas (opcional)
@@ -213,7 +213,7 @@ Para usar la integración automática:
 
 1. Instala 4K Video Downloader
 2. Encuentra la ruta de su base de datos SQLite
-3. Configura `YOUTUBE_DB_PATH` en `.env`
+3. Configura `EXTERNAL_YOUTUBE_DB` en `.env`
 4. Los creadores y metadatos se importarán automáticamente
 
 Rutas típicas:

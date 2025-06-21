@@ -27,6 +27,7 @@ from src.music_recognition import music_recognizer
 from src.face_recognition import face_recognizer
 from src.thumbnail_generator import thumbnail_generator
 from src.downloader_integration import downloader_integration
+from src.external_sources import external_sources
 
 # Configurar logging
 file_handler = logging.FileHandler('tag_flow_processing.log', encoding='utf-8')
@@ -70,8 +71,14 @@ class VideoAnalyzer:
             for warning in warnings:
                 logger.warning(f"  - {warning}")
     
-    def find_new_videos(self) -> List[Path]:
-        """Encontrar videos que no están en la base de datos"""
+    def find_new_videos(self, platform_filter=None, use_external_sources=False) -> List[Path]:
+        """
+        Encontrar videos que no están en la base de datos
+        
+        Args:
+            platform_filter: 'youtube', 'tiktok', 'instagram' o None para todas
+            use_external_sources: si usar fuentes externas en lugar de escaneo local
+        """
         logger.info("Buscando videos nuevos...")
         
         # Obtener videos ya procesados de la BD
@@ -83,30 +90,59 @@ class VideoAnalyzer:
         except Exception as e:
             logger.error(f"Error consultando BD: {e}")
         
-        # Buscar archivos de video en las rutas configuradas
         new_videos = []
-        total_found = 0
         
-        for scan_path in self.scan_paths:
-            if not scan_path.exists():
-                logger.warning(f"Ruta de escaneo no existe: {scan_path}")
-                continue
-                
-            logger.info(f"Escaneando: {scan_path}")
+        if use_external_sources:
+            # Usar fuentes externas (bases de datos y carpetas organizadas)
+            logger.info("Usando fuentes externas para búsqueda de videos...")
             
-            # Buscar recursivamente
-            for video_file in scan_path.rglob('*'):
-                if video_file.is_file() and video_file.suffix.lower() in self.video_extensions:
-                    total_found += 1
-                    
-                    # Verificar si es válido y no está en BD
-                    if str(video_file) not in existing_videos:
-                        if video_processor.is_valid_video(video_file):
-                            new_videos.append(video_file)
-                        else:
-                            logger.warning(f"Video inválido: {video_file}")
+            # Mapear códigos de plataforma
+            platform_map = {
+                'YT': 'youtube',
+                'TT': 'tiktok', 
+                'IG': 'instagram',
+                'O': None  # Carpetas organizadas, todas las plataformas
+            }
+            
+            actual_platform = platform_map.get(platform_filter, platform_filter)
+            
+            # Obtener videos de fuentes externas
+            external_videos = external_sources.get_all_videos_from_source('all', actual_platform)
+            
+            # Convertir a Path objects y filtrar nuevos
+            for video_data in external_videos:
+                video_path = Path(video_data['file_path'])
+                if str(video_path) not in existing_videos and video_path.exists():
+                    # Solo videos, no imágenes para el procesamiento principal
+                    if video_data.get('content_type', 'video') == 'video':
+                        new_videos.append(video_path)
         
-        logger.info(f"Videos encontrados: {total_found}, Nuevos: {len(new_videos)}")
+        else:
+            # Búsqueda local tradicional
+            total_found = 0
+            
+            for scan_path in self.scan_paths:
+                if not scan_path.exists():
+                    logger.warning(f"Ruta de escaneo no existe: {scan_path}")
+                    continue
+                    
+                logger.info(f"Escaneando: {scan_path}")
+                
+                # Buscar recursivamente
+                for video_file in scan_path.rglob('*'):
+                    if video_file.is_file() and video_file.suffix.lower() in self.video_extensions:
+                        total_found += 1
+                        
+                        # Verificar si es válido y no está en BD
+                        if str(video_file) not in existing_videos:
+                            if video_processor.is_valid_video(video_file):
+                                new_videos.append(video_file)
+                            else:
+                                logger.warning(f"Video inválido: {video_file}")
+            
+            logger.info(f"Videos encontrados: {total_found}, Nuevos: {len(new_videos)}")
+        
+        logger.info(f"Videos nuevos para procesar: {len(new_videos)}")
         return new_videos    
     def process_video(self, video_path: Path) -> Dict:
         """Procesar un video individual completamente"""
@@ -283,20 +319,30 @@ class VideoAnalyzer:
         
         return results
     
-    def run(self, limit=None):
+    def run(self, limit=None, platform=None):
         """Ejecutar el análisis completo
         
         Args:
             limit (int, optional): Número máximo de videos a procesar. Si es None, procesa todos.
+            platform (str, optional): Plataforma específica a procesar ('YT', 'TT', 'IG', 'O')
         """
         logger.info("=== INICIANDO TAG-FLOW V2 ANALYSIS ===")
         
         if limit:
-            logger.info(f"MODO LIMITADO: Procesando maximo {limit} videos")
+            logger.info(f"MODO LIMITADO: Procesando máximo {limit} videos")
+        
+        if platform:
+            platform_names = {
+                'YT': 'YouTube', 
+                'TT': 'TikTok', 
+                'IG': 'Instagram', 
+                'O': 'Carpetas Organizadas (D:\\4K All)'
+            }
+            logger.info(f"PLATAFORMA ESPECÍFICA: {platform_names.get(platform, platform)}")
         
         try:
-            # 0. Importar desde 4K Downloader si está disponible
-            if downloader_integration.is_available:
+            # 0. Importar desde 4K Downloader si está disponible (solo si no hay filtro de plataforma)
+            if not platform and downloader_integration.is_available:
                 logger.info("Importando desde 4K Video Downloader...")
                 import_result = downloader_integration.import_creators_and_videos()
                 if import_result['success']:
@@ -305,7 +351,8 @@ class VideoAnalyzer:
                     logger.warning(f"Importación falló: {import_result.get('error', 'Error desconocido')}")
             
             # 1. Buscar videos nuevos
-            new_videos = self.find_new_videos()
+            use_external = platform is not None  # Si hay filtro de plataforma, usar fuentes externas
+            new_videos = self.find_new_videos(platform_filter=platform, use_external_sources=use_external)
             
             if not new_videos:
                 logger.info("No hay videos nuevos para procesar")
@@ -330,6 +377,12 @@ class VideoAnalyzer:
             for status, count in stats['by_status'].items():
                 logger.info(f"Estado '{status}': {count}")
             
+            # Por plataforma si es relevante
+            if stats['by_platform']:
+                logger.info("Por plataforma:")
+                for platform_name, count in stats['by_platform'].items():
+                    logger.info(f"  {platform_name}: {count}")
+            
         except Exception as e:
             logger.error(f"Error en ejecución principal: {e}")
             raise
@@ -341,15 +394,24 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Ejemplos de uso:
-  python main.py           # Procesar todos los videos nuevos
-  python main.py 10        # Procesar solo 10 videos
-  python main.py 50        # Procesar solo 50 videos
-  python main.py --limit 25 # Procesar solo 25 videos
+  python main.py                    # Procesar todos los videos nuevos
+  python main.py 10                 # Procesar solo 10 videos
+  python main.py 5 YT               # Procesar 5 videos de YouTube
+  python main.py 3 TT               # Procesar 3 videos de TikTok  
+  python main.py 2 IG               # Procesar 2 videos de Instagram
+  python main.py 10 O               # Procesar 10 videos de carpetas organizadas (D:\\4K All)
+
+Códigos de plataforma:
+  YT  = YouTube (desde 4K Video Downloader+)
+  TT  = TikTok (desde 4K Tokkit)  
+  IG  = Instagram (desde 4K Stogram)
+  O   = Otros (carpetas organizadas en D:\\4K All)
 
 Notas:
   - Sin límite: procesa todos los videos encontrados
   - Con límite: selecciona los primeros N videos de la lista
   - Los videos ya procesados se omiten automáticamente
+  - Con código de plataforma: usa fuentes externas específicas
         """)
     
     parser.add_argument(
@@ -358,6 +420,13 @@ Notas:
         nargs='?', 
         default=None,
         help='Número máximo de videos a procesar (opcional)'
+    )
+    
+    parser.add_argument(
+        'platform',
+        nargs='?',
+        choices=['YT', 'TT', 'IG', 'O'],
+        help='Código de plataforma específica (YT=YouTube, TT=TikTok, IG=Instagram, O=Carpetas organizadas)'
     )
     
     parser.add_argument(
@@ -371,14 +440,28 @@ Notas:
     
     # Determinar el límite (prioridad al argumento posicional)
     limit = args.limit or args.limit_alt
+    platform = args.platform
     
     if limit is not None and limit <= 0:
-        print("Error: El limite debe ser un numero positivo")
+        print("Error: El límite debe ser un número positivo")
         sys.exit(1)
     
     # Mostrar información de configuración
-    if limit:
-        print(f"Tag-Flow V2 - Modo Limitado ({limit} videos maximo)")
+    platform_names = {
+        'YT': 'YouTube', 
+        'TT': 'TikTok', 
+        'IG': 'Instagram', 
+        'O': 'Carpetas Organizadas'
+    }
+    
+    if platform:
+        print(f"Tag-Flow V2 - Plataforma: {platform_names[platform]}")
+        if limit:
+            print(f"Máximo {limit} videos")
+        else:
+            print("Todos los videos disponibles")
+    elif limit:
+        print(f"Tag-Flow V2 - Modo Limitado ({limit} videos máximo)")
     else:
         print("Tag-Flow V2 - Modo Completo (todos los videos)")
     
@@ -387,7 +470,7 @@ Notas:
     
     try:
         analyzer = VideoAnalyzer()
-        analyzer.run(limit=limit)
+        analyzer.run(limit=limit, platform=platform)
         
         print("-" * 50)
         print("Procesamiento completado exitosamente")

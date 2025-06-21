@@ -18,7 +18,7 @@ class DownloaderIntegration:
     """Integración con 4K Video Downloader para importar metadatos"""
     
     def __init__(self):
-        self.youtube_db_path = config.YOUTUBE_DB_PATH
+        self.external_youtube_db = config.EXTERNAL_YOUTUBE_DB
         self.is_available = self._check_availability()
         
         if self.is_available:
@@ -28,10 +28,10 @@ class DownloaderIntegration:
     
     def _check_availability(self) -> bool:
         """Verificar si la base de datos de 4K Downloader está disponible"""
-        if not self.youtube_db_path:
+        if not self.external_youtube_db:
             return False
             
-        db_path = Path(self.youtube_db_path)
+        db_path = Path(self.external_youtube_db)
         return db_path.exists() and db_path.is_file()
     
     def get_downloader_connection(self) -> Optional[sqlite3.Connection]:
@@ -40,7 +40,7 @@ class DownloaderIntegration:
             return None
             
         try:
-            conn = sqlite3.connect(self.youtube_db_path)
+            conn = sqlite3.connect(self.external_youtube_db)
             conn.row_factory = sqlite3.Row
             return conn
         except Exception as e:
