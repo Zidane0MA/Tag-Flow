@@ -127,6 +127,13 @@ class DatabaseManager:
             row = cursor.fetchone()
             return dict(row) if row else None
     
+    def get_video_by_path(self, file_path: str) -> Optional[Dict]:
+        """Obtener un video por su file_path (ruta absoluta)"""
+        with self.get_connection() as conn:
+            cursor = conn.execute('SELECT * FROM videos WHERE file_path = ?', (file_path,))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+
     def get_videos(self, filters: Dict = None, limit: int = None, offset: int = 0) -> List[Dict]:
         """Obtener lista de videos con filtros opcionales"""
         query = "SELECT * FROM videos WHERE 1=1"
@@ -176,7 +183,7 @@ class DatabaseManager:
         """Actualizar un video con nuevos datos"""
         if not updates:
             return False
-            
+        
         # Construir query de actualización dinámica
         set_clauses = []
         params = []
@@ -184,7 +191,8 @@ class DatabaseManager:
         allowed_fields = [
             'final_music', 'final_music_artist', 'final_characters', 'difficulty_level',
             'edit_status', 'edited_video_path', 'notes', 'processing_status', 'error_message',
-            'thumbnail_path'
+            'thumbnail_path',
+            'detected_music', 'detected_music_artist', 'detected_music_confidence', 'music_source', 'detected_characters'
         ]
         
         for field, value in updates.items():
@@ -197,7 +205,7 @@ class DatabaseManager:
         
         if not set_clauses:
             return False
-            
+        
         # Agregar timestamp de actualización
         set_clauses.append("last_updated = CURRENT_TIMESTAMP")
         params.append(video_id)

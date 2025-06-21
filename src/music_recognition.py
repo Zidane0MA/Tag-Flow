@@ -67,19 +67,7 @@ class MusicRecognizer:
             'error': None
         }
         
-        # Estrategia 1: YouTube API (para trends virales)
-        if self.youtube:
-            try:
-                youtube_result = self._recognize_with_youtube(audio_path)
-                if youtube_result['detected_music']:
-                    results.update(youtube_result)
-                    results['music_source'] = 'youtube'
-                    logger.info(f"Música detectada con YouTube: {results['detected_music']}")
-                    return results
-            except Exception as e:
-                logger.warning(f"Error con YouTube API: {e}")
-        
-        # Estrategia 2: Spotify API (para metadatos musicales)
+        # Estrategia 1: Spotify API (para metadatos musicales)
         if self.spotify:
             try:
                 spotify_result = self._recognize_with_spotify(audio_path)
@@ -90,6 +78,18 @@ class MusicRecognizer:
                     return results
             except Exception as e:
                 logger.warning(f"Error con Spotify API: {e}")
+        
+        # Estrategia 2: YouTube API (para trends virales)
+        if self.youtube:
+            try:
+                youtube_result = self._recognize_with_youtube(audio_path)
+                if youtube_result['detected_music']:
+                    results.update(youtube_result)
+                    results['music_source'] = 'youtube'
+                    logger.info(f"Música detectada con YouTube: {results['detected_music']}")
+                    return results
+            except Exception as e:
+                logger.warning(f"Error con YouTube API: {e}")
         
         # Estrategia 3: ACRCloud (fallback confiable)
         if self.acrcloud_config:
@@ -180,19 +180,20 @@ class MusicRecognizer:
                     type='playlist',
                     limit=5
                 )
-                
+                if not search_results or 'playlists' not in search_results or 'items' not in search_results['playlists']:
+                    continue
                 for playlist in search_results['playlists']['items']:
                     # Obtener tracks del playlist
                     tracks = self.spotify.playlist_tracks(playlist['id'], limit=20)
-                    
+                    if not tracks or 'items' not in tracks:
+                        continue
                     for track_item in tracks['items']:
-                        if track_item['track']:
+                        if track_item and 'track' in track_item and track_item['track']:
                             track = track_item['track']
-                            name = track['name']
-                            artists = ', '.join([artist['name'] for artist in track['artists']])
-                            
+                            name = track.get('name')
+                            artists = ', '.join([artist['name'] for artist in track.get('artists', [])])
                             # Heurística: si encontramos algo, usar el primer resultado relevante
-                            if track['popularity'] > 70:  # Solo tracks populares
+                            if track.get('popularity', 0) > 70 and name:
                                 results['detected_music'] = name
                                 results['detected_music_artist'] = artists
                                 results['detected_music_confidence'] = 0.6

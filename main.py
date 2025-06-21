@@ -25,12 +25,21 @@ from src.thumbnail_generator import thumbnail_generator
 from src.downloader_integration import downloader_integration
 
 # Configurar logging
+file_handler = logging.FileHandler('tag_flow_processing.log', encoding='utf-8')
+stream_handler = logging.StreamHandler()
+try:
+    # Python 3.9+ permite encoding en StreamHandler
+    stream_handler = logging.StreamHandler()
+    stream_handler.setStream(open(1, 'w', encoding='utf-8', closefd=False))
+except Exception:
+    # Fallback para versiones antiguas
+    pass
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('tag_flow_processing.log'),
-        logging.StreamHandler()
+        file_handler,
+        stream_handler
     ]
 )
 logger = logging.getLogger(__name__)
@@ -111,24 +120,28 @@ class VideoAnalyzer:
             # 1. Extraer metadatos básicos
             logger.info(f"  Extrayendo metadatos...")
             metadata = video_processor.extract_metadata(video_path)
-            
             if 'error' in metadata:
                 result['error'] = f"Error en metadatos: {metadata['error']}"
                 return result
-            
-            # 2. Inferir creador desde la ruta del archivo
-            creator_name = self._infer_creator_name(video_path)
-            metadata['creator_name'] = creator_name
-            
-            # 3. Generar thumbnail
-            logger.info(f"  Generando thumbnail...")
-            thumbnail_path = thumbnail_generator.generate_thumbnail(video_path, timestamp=2.0)
-            if thumbnail_path:
-                metadata['thumbnail_path'] = str(thumbnail_path)
-            
-            # 4. Agregar a la base de datos (estado pendiente)
-            metadata['processing_status'] = 'procesando'
-            video_id = db.add_video(metadata)
+
+            # Buscar si el video ya existe en la BD usando el nuevo método
+            existing_video = db.get_video_by_path(str(video_path))
+            if existing_video:
+                # Ya existe: usar los metadatos originales y NO modificar el creador
+                video_id = existing_video['id']
+                metadata['creator_name'] = existing_video['creator_name']
+                metadata['file_name'] = existing_video['file_name']
+                metadata['file_path'] = existing_video['file_path']
+                logger.info(f"  Video ya existe en BD, se conservará el creador: {metadata['creator_name']}")
+            else:
+                # Nuevo: inferir creador
+                creator_name = self._infer_creator_name(video_path)
+                metadata['creator_name'] = creator_name
+                metadata['file_name'] = video_path.name
+                metadata['file_path'] = str(video_path)
+                # Agregar a la base de datos (estado pendiente)
+                metadata['processing_status'] = 'procesando'
+                video_id = db.add_video(metadata)
             result['video_id'] = video_id
             
             # 5. Reconocimiento musical (si hay audio)

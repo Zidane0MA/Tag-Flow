@@ -150,7 +150,7 @@ class VideoProcessor:
                 str(audio_path)
             ]
             
-            result = subprocess.run(cmd, capture_output=True, text=True)
+            result = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8', errors='replace')
             
             if result.returncode == 0 and audio_path.exists():
                 logger.info(f"Audio extraído: {audio_path}")
