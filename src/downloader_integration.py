@@ -80,12 +80,10 @@ class DownloaderIntegration:
                         processed = self._process_download_item(download)
                         if processed:
                             result['imported_videos'] += 1
-                            
                             # Agregar creador si es nuevo
-                            creator = download.get('creator_name', '').strip()
+                            creator = download['creator_name'].strip() if 'creator_name' in download.keys() and download['creator_name'] else ''
                             if creator and creator not in result['creators']:
                                 result['creators'].append(creator)
-                                
                     except Exception as e:
                         logger.warning(f"Error procesando item de descarga: {e}")
                         result['errors'].append(str(e))
@@ -108,10 +106,10 @@ class DownloaderIntegration:
                 SELECT 
                     di.id,
                     di.filename AS file_path,
-                    dsi.value AS creator_name
+                    mim.value AS creator_name
                 FROM download_item di
-                LEFT JOIN downloader_subscription_info dsi
-                    ON di.id = dsi.download_item_id AND dsi.type = 0
+                LEFT JOIN media_item_metadata mim
+                    ON di.id = mim.download_item_id AND mim.type = 0
                 WHERE di.filename IS NOT NULL
                     AND di.filename != ''
                 ORDER BY di.id DESC
@@ -126,7 +124,7 @@ class DownloaderIntegration:
         """Procesar un item de descarga individual"""
         try:
             # Extraer información del item
-            file_path = download_item.get('file_path', '')
+            file_path = download_item['file_path'] if 'file_path' in download_item.keys() else ''
             if not file_path:
                 return False
             
@@ -147,8 +145,8 @@ class DownloaderIntegration:
                 'file_name': file_path_obj.name,
                 'creator_name': self._extract_creator_name(download_item),
                 'platform': self._detect_platform(download_item),
-                'file_size': download_item.get('file_size'),
-                'duration_seconds': download_item.get('duration'),
+                'file_size': download_item['file_size'] if 'file_size' in download_item.keys() else None,
+                'duration_seconds': download_item['duration'] if 'duration' in download_item.keys() else None,
                 'processing_status': 'pendiente'
             }
             
@@ -164,11 +162,11 @@ class DownloaderIntegration:
                     VALUES (?, ?, ?, ?)
                 """, (
                     video_id,
-                    download_item.get('id'),
-                    download_item.get('title', ''),
-                    download_item.get('creator_name', '')
+                    download_item['id'],
+                    download_item['title'] if 'title' in download_item.keys() else '',
+                    download_item['creator_name'] if 'creator_name' in download_item.keys() else ''
                 ))
-            
+        
             logger.info(f"Video importado desde 4K Downloader: {file_path_obj.name}")
             return True
             
@@ -179,21 +177,20 @@ class DownloaderIntegration:
     def _extract_creator_name(self, download_item: sqlite3.Row) -> str:
         """Extraer nombre del creador desde los datos de descarga"""
         # Estrategias para extraer el creador:
-        
         # 1. Campo directo
-        creator = download_item.get('creator_name', '').strip()
+        creator = download_item['creator_name'].strip() if 'creator_name' in download_item.keys() and download_item['creator_name'] else ''
         if creator:
             return creator
         
         # 2. Desde URL (para TikTok/Instagram)
-        url = download_item.get('url', '')
+        url = download_item['url'] if 'url' in download_item.keys() and download_item['url'] else ''
         if url:
             creator = self._extract_creator_from_url(url)
             if creator:
                 return creator
         
         # 3. Desde título del video
-        title = download_item.get('title', '')
+        title = download_item['title'] if 'title' in download_item.keys() and download_item['title'] else ''
         if title:
             creator = self._extract_creator_from_title(title)
             if creator:
@@ -254,8 +251,7 @@ class DownloaderIntegration:
     
     def _detect_platform(self, download_item: sqlite3.Row) -> str:
         """Detectar plataforma desde los datos de descarga"""
-        url = download_item.get('url', '').lower()
-        
+        url = download_item['url'].lower() if 'url' in download_item.keys() and download_item['url'] else ''
         if 'tiktok.com' in url:
             return 'tiktok'
         elif 'instagram.com' in url:

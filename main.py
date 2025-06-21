@@ -11,6 +11,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import tempfile
 import os
+import argparse
 
 # Agregar el directorio src al path para imports
 sys.path.append(str(Path(__file__).parent / 'src'))
@@ -265,9 +266,16 @@ class VideoAnalyzer:
         
         return results
     
-    def run(self):
-        """Ejecutar el análisis completo"""
+    def run(self, limit=None):
+        """Ejecutar el análisis completo
+        
+        Args:
+            limit (int, optional): Número máximo de videos a procesar. Si es None, procesa todos.
+        """
         logger.info("=== INICIANDO TAG-FLOW V2 ANALYSIS ===")
+        
+        if limit:
+            logger.info(f"MODO LIMITADO: Procesando maximo {limit} videos")
         
         try:
             # 0. Importar desde 4K Downloader si está disponible
@@ -286,10 +294,15 @@ class VideoAnalyzer:
                 logger.info("No hay videos nuevos para procesar")
                 return
             
-            # 2. Procesar videos en lotes
+            # 2. Aplicar límite si se especifica
+            if limit and len(new_videos) > limit:
+                logger.info(f"Limitando procesamiento: {len(new_videos)} videos encontrados -> {limit} seleccionados")
+                new_videos = new_videos[:limit]
+            
+            # 3. Procesar videos en lotes
             batch_results = self.process_videos_batch(new_videos)
             
-            # 3. Mostrar estadísticas finales
+            # 4. Mostrar estadísticas finales
             stats = db.get_stats()
             logger.info("=== ESTADÍSTICAS FINALES ===")
             logger.info(f"Total videos en BD: {stats['total_videos']}")
@@ -306,8 +319,69 @@ class VideoAnalyzer:
 
 def main():
     """Función principal"""
-    analyzer = VideoAnalyzer()
-    analyzer.run()
+    parser = argparse.ArgumentParser(
+        description='Tag-Flow V2 - Procesador de Videos TikTok/MMD',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Ejemplos de uso:
+  python main.py           # Procesar todos los videos nuevos
+  python main.py 10        # Procesar solo 10 videos
+  python main.py 50        # Procesar solo 50 videos
+  python main.py --limit 25 # Procesar solo 25 videos
+
+Notas:
+  - Sin límite: procesa todos los videos encontrados
+  - Con límite: selecciona los primeros N videos de la lista
+  - Los videos ya procesados se omiten automáticamente
+        """)
+    
+    parser.add_argument(
+        'limit', 
+        type=int, 
+        nargs='?', 
+        default=None,
+        help='Número máximo de videos a procesar (opcional)'
+    )
+    
+    parser.add_argument(
+        '--limit', 
+        type=int, 
+        dest='limit_alt',
+        help='Número máximo de videos a procesar (formato alternativo)'
+    )
+    
+    args = parser.parse_args()
+    
+    # Determinar el límite (prioridad al argumento posicional)
+    limit = args.limit or args.limit_alt
+    
+    if limit is not None and limit <= 0:
+        print("Error: El limite debe ser un numero positivo")
+        sys.exit(1)
+    
+    # Mostrar información de configuración
+    if limit:
+        print(f"Tag-Flow V2 - Modo Limitado ({limit} videos maximo)")
+    else:
+        print("Tag-Flow V2 - Modo Completo (todos los videos)")
+    
+    print("Iniciando procesamiento...")
+    print("-" * 50)
+    
+    try:
+        analyzer = VideoAnalyzer()
+        analyzer.run(limit=limit)
+        
+        print("-" * 50)
+        print("Procesamiento completado exitosamente")
+        
+    except KeyboardInterrupt:
+        print("\nProcesamiento interrumpido por el usuario")
+        sys.exit(1)
+    except Exception as e:
+        print(f"\nError durante el procesamiento: {e}")
+        logger.error(f"Error fatal: {e}")
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()
