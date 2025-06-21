@@ -52,7 +52,7 @@ class VideoAnalyzer:
         config.ensure_directories()
         
         # Configurar rutas de escaneo
-        self.scan_paths = [config.VIDEOS_BASE_PATH]
+        self.scan_paths = [config.YOUTUBE_BASE_PATH]
         
         # Extensiones de video soportadas
         self.video_extensions = {'.mp4', '.avi', '.mov', '.mkv', '.wmv', '.flv', '.webm', '.m4v'}
@@ -210,7 +210,7 @@ class VideoAnalyzer:
         
         # Estrategia 1: Usar nombre de la carpeta padre
         parent_folder = video_path.parent.name
-        if parent_folder and parent_folder != str(config.VIDEOS_BASE_PATH.name):
+        if parent_folder and parent_folder != str(config.YOUTUBE_BASE_PATH.name):
             # Limpiar nombre de carpeta
             creator = parent_folder.replace('_', ' ').replace('-', ' ').title()
             return creator

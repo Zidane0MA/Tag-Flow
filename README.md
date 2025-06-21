@@ -90,7 +90,7 @@ SPOTIFY_CLIENT_ID="tu_spotify_client_id"
 SPOTIFY_CLIENT_SECRET="tu_spotify_client_secret"
 
 # Rutas de trabajo (actualizar según tu configuración)
-VIDEOS_BASE_PATH="D:/Videos_TikTok"
+YOUTUBE_BASE_PATH="D:/Videos_TikTok"
 DOWNLOADER_DB_PATH="C:/Users/tuuser/AppData/Local/4kdownload.com/..."
 ```
 
@@ -199,7 +199,7 @@ FLASK_HOST="localhost"                # Host de la aplicación
 FLASK_PORT=5000                       # Puerto de la aplicación
 
 # Rutas personalizadas
-VIDEOS_BASE_PATH="D:/Videos_TikTok"   # Carpeta de videos a analizar
+YOUTUBE_BASE_PATH="D:/Videos_TikTok"   # Carpeta de videos a analizar
 THUMBNAILS_PATH="D:/Tag-Flow/data/thumbnails"
 PROCESSED_VIDEOS_PATH="D:/Tag-Flow/videos_procesados"
 ```

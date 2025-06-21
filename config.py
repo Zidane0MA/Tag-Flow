@@ -49,7 +49,7 @@ class Config:
     DEEPFACE_MODEL = os.getenv('DEEPFACE_MODEL', 'ArcFace')
     
     # Rutas de archivos
-    VIDEOS_BASE_PATH = Path(os.getenv('VIDEOS_BASE_PATH', BASE_DIR / 'videos_input'))
+    YOUTUBE_BASE_PATH = Path(os.getenv('YOUTUBE_BASE_PATH', BASE_DIR / 'videos_input'))
     THUMBNAILS_PATH = Path(os.getenv('THUMBNAILS_PATH', DATA_DIR / 'thumbnails'))
     PROCESSED_VIDEOS_PATH = Path(os.getenv('PROCESSED_VIDEOS_PATH', BASE_DIR / 'videos_procesados'))
     KNOWN_FACES_PATH = BASE_DIR / 'caras_conocidas'
@@ -66,7 +66,7 @@ class Config:
             cls.DATA_DIR,
             cls.THUMBNAILS_PATH,
             cls.PROCESSED_VIDEOS_PATH,
-            cls.VIDEOS_BASE_PATH,
+            cls.YOUTUBE_BASE_PATH,
             cls.KNOWN_FACES_PATH
         ]
         

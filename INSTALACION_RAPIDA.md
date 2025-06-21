@@ -70,7 +70,7 @@ YOUTUBE_API_KEY="tu_clave_aqui"
 SPOTIFY_CLIENT_ID="tu_client_id"
 SPOTIFY_CLIENT_SECRET="tu_client_secret"
 GOOGLE_APPLICATION_CREDENTIALS="config/gcp_credentials.json"
-VIDEOS_BASE_PATH="D:/Videos_TikTok"
+YOUTUBE_BASE_PATH="D:/Videos_TikTok"
 ```
 
 ---
@@ -119,7 +119,7 @@ pip install -r requirements.txt
 - Revisar límites de cuota
 
 ### No se procesan videos
-- Verificar ruta en VIDEOS_BASE_PATH
+- Verificar ruta en YOUTUBE_BASE_PATH
 - Formatos soportados: MP4, AVI, MOV, MKV, WebM
 - Revisar logs: tag_flow_processing.log
 
