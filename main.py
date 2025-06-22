@@ -196,41 +196,49 @@ class VideoAnalyzer:
                 result['error'] = f"Error en metadatos: {metadata['error']}"
                 return result
 
-            # Buscar si el video ya existe en la BD con múltiples estrategias
+            # Determinar si es un video existente (pendiente) o nuevo
             existing_video = None
+            video_id = None
             
-            # Estrategia 1: Ruta exacta
-            existing_video = db.get_video_by_path(str(video_path))
-            
-            # Estrategia 2: Por nombre de archivo si no se encontró por ruta exacta
-            if not existing_video:
-                videos_in_db = db.get_videos()
-                for db_video in videos_in_db:
-                    if Path(db_video['file_path']).name == video_path.name:
-                        existing_video = db_video
-                        logger.info(f"  Video encontrado por nombre de archivo: {video_path.name}")
-                        break
-            
-            if existing_video:
-                # Ya existe: usar los metadatos originales y NO modificar información clave
-                video_id = existing_video['id']
-                logger.info(f"  Video ya existe en BD (ID: {video_id}), se conservarán los datos originales")
-            else:
-                # Nuevo: usar información de external_sources
-                metadata.update({
-                    'creator_name': video_data.get('creator_name', 'Desconocido'),
-                    'platform': video_data.get('platform', 'tiktok'),
-                    'file_name': video_data.get('file_name', video_path.name),
-                    'file_path': video_data.get('file_path', str(video_path)),
-                    'processing_status': 'procesando'
-                })
+            # Caso 1: Video pendiente marcado explícitamente
+            if 'existing_video_id' in video_data:
+                video_id = video_data['existing_video_id']
+                logger.info(f"  Procesando video pendiente (ID: {video_id})")
                 
-                # Agregar información adicional si está disponible
-                if 'title' in video_data:
-                    metadata['title'] = video_data['title']
+            else:
+                # Caso 2: Buscar si el video ya existe en la BD
+                # Estrategia 1: Ruta exacta
+                existing_video = db.get_video_by_path(str(video_path))
+                
+                # Estrategia 2: Por nombre de archivo si no se encontró por ruta exacta
+                if not existing_video:
+                    videos_in_db = db.get_videos()
+                    for db_video in videos_in_db:
+                        if Path(db_video['file_path']).name == video_path.name:
+                            existing_video = db_video
+                            logger.info(f"  Video encontrado por nombre de archivo: {video_path.name}")
+                            break
+                
+                if existing_video:
+                    # Ya existe: usar los metadatos originales
+                    video_id = existing_video['id']
+                    logger.info(f"  Video ya existe en BD (ID: {video_id}), se conservarán los datos originales")
+                else:
+                    # Nuevo: usar información de external_sources y crear en BD
+                    metadata.update({
+                        'creator_name': video_data.get('creator_name', 'Desconocido'),
+                        'platform': video_data.get('platform', 'tiktok'),
+                        'file_name': video_data.get('file_name', video_path.name),
+                        'file_path': video_data.get('file_path', str(video_path)),
+                        'processing_status': 'procesando'
+                    })
                     
-                logger.info(f"  Creando nuevo video: plataforma={metadata['platform']}, creador={metadata['creator_name']}")
-                video_id = db.add_video(metadata)
+                    # Agregar información adicional si está disponible
+                    if 'title' in video_data:
+                        metadata['title'] = video_data['title']
+                        
+                    logger.info(f"  Creando nuevo video: plataforma={metadata['platform']}, creador={metadata['creator_name']}")
+                    video_id = db.add_video(metadata)
             
             result['video_id'] = video_id
             
@@ -243,7 +251,9 @@ class VideoAnalyzer:
                     # Extraer audio temporal
                     audio_path = video_processor.extract_audio(video_path, duration=30)
                     if audio_path:
-                        music_result = music_recognizer.recognize_music(audio_path)
+                        # Pasar filename para extracción de música del nombre
+                        filename = video_path.name if hasattr(video_path, 'name') else str(video_path).split('\\')[-1]
+                        music_result = music_recognizer.recognize_music(audio_path, filename)
                         # Limpiar archivo temporal
                         if audio_path.exists():
                             audio_path.unlink()
@@ -267,6 +277,8 @@ class VideoAnalyzer:
                 'detected_music_artist': music_result.get('detected_music_artist'),
                 'detected_music_confidence': music_result.get('detected_music_confidence'),
                 'music_source': music_result.get('music_source'),
+                'final_music': music_result.get('final_music'),
+                'final_music_artist': music_result.get('final_music_artist'),
                 'detected_characters': faces_result.get('detected_characters', []),
                 'processing_status': 'completado'
             }
@@ -277,7 +289,7 @@ class VideoAnalyzer:
             processing_time = time.time() - start_time
             result['processing_time'] = processing_time
             
-            logger.info(f"  ✓ Completado en {processing_time:.1f}s - Música: {music_result.get('detected_music', 'N/A')} - Caras: {len(faces_result.get('detected_characters', []))}")
+            logger.info(f"  ✓ Completado en {processing_time:.1f}s - Música: {music_result.get('final_music') or music_result.get('detected_music', 'N/A')} - Caras: {len(faces_result.get('detected_characters', []))}")
             
         except Exception as e:
             logger.error(f"  ✗ Error procesando {video_path.name}: {e}")
@@ -374,6 +386,61 @@ class VideoAnalyzer:
         
         return results
     
+    def get_pending_videos(self, platform_filter=None, limit=None) -> List[Dict]:
+        """
+        Obtener videos pendientes de la base de datos para procesamiento
+        
+        Args:
+            platform_filter: 'YT', 'TT', 'IG', 'O' o None para todas las plataformas
+            limit: número máximo de videos a retornar
+            
+        Returns:
+            List[Dict]: Lista de diccionarios con información completa del video
+        """
+        logger.info("Buscando videos pendientes en la base de datos...")
+        
+        # Mapear códigos de plataforma a nombres reales
+        platform_map = {
+            'YT': 'youtube',
+            'TT': 'tiktok', 
+            'IG': 'instagram',
+            'O': None  # Para carpetas organizadas, puede ser cualquier plataforma
+        }
+        
+        # Construir filtros
+        filters = {'processing_status': 'pendiente'}
+        
+        if platform_filter:
+            actual_platform = platform_map.get(platform_filter, platform_filter)
+            if actual_platform:  # Solo filtrar si no es 'O' (None)
+                filters['platform'] = actual_platform
+        
+        # Obtener videos pendientes de la BD
+        pending_videos_db = db.get_videos(filters, limit=limit)
+        
+        logger.info(f"Videos pendientes encontrados: {len(pending_videos_db)}")
+        
+        # Convertir a formato compatible con process_video
+        pending_videos = []
+        for video in pending_videos_db:
+            video_data = {
+                'file_path': video['file_path'],
+                'file_name': video['file_name'],
+                'creator_name': video['creator_name'],
+                'platform': video['platform'],
+                'content_type': 'video',
+                'existing_video_id': video['id']  # Marcador para identificar que ya existe
+            }
+            
+            # Verificar que el archivo aún existe
+            if Path(video['file_path']).exists():
+                pending_videos.append(video_data)
+            else:
+                logger.warning(f"Archivo no encontrado: {video['file_path']}")
+        
+        logger.info(f"Videos pendientes válidos: {len(pending_videos)}")
+        return pending_videos
+
     def run(self, limit=None, platform=None):
         """Ejecutar el análisis completo
         
@@ -405,21 +472,44 @@ class VideoAnalyzer:
                 else:
                     logger.warning(f"Importación falló: {import_result.get('error', 'Error desconocido')}")
             
-            # 1. Buscar videos nuevos
-            use_external = platform is not None  # Si hay filtro de plataforma, usar fuentes externas
-            new_videos = self.find_new_videos(platform_filter=platform, use_external_sources=use_external)
+            # 1. Buscar videos pendientes primero
+            videos_to_process = []
             
-            if not new_videos:
-                logger.info("No hay videos nuevos para procesar")
+            # 1a. Obtener videos pendientes de la BD
+            pending_videos = self.get_pending_videos(platform_filter=platform, limit=limit)
+            videos_to_process.extend(pending_videos)
+            
+            # 1b. Si no hay suficientes videos pendientes, buscar videos nuevos
+            remaining_limit = None
+            if limit:
+                remaining_limit = limit - len(videos_to_process)
+                if remaining_limit <= 0:
+                    logger.info(f"Límite alcanzado con videos pendientes: {len(videos_to_process)}")
+                else:
+                    logger.info(f"Videos pendientes: {len(videos_to_process)}, buscando {remaining_limit} videos nuevos...")
+            else:
+                logger.info(f"Videos pendientes: {len(videos_to_process)}, buscando videos nuevos adicionales...")
+            
+            # Solo buscar videos nuevos si no hemos alcanzado el límite
+            if not limit or remaining_limit > 0:
+                use_external = platform is not None  # Si hay filtro de plataforma, usar fuentes externas
+                new_videos = self.find_new_videos(platform_filter=platform, use_external_sources=use_external)
+                
+                # Aplicar límite restante a videos nuevos
+                if remaining_limit and len(new_videos) > remaining_limit:
+                    logger.info(f"Limitando videos nuevos: {len(new_videos)} encontrados -> {remaining_limit} seleccionados")
+                    new_videos = new_videos[:remaining_limit]
+                
+                videos_to_process.extend(new_videos)
+            
+            if not videos_to_process:
+                logger.info("No hay videos para procesar (ni pendientes ni nuevos)")
                 return
             
-            # 2. Aplicar límite si se especifica
-            if limit and len(new_videos) > limit:
-                logger.info(f"Limitando procesamiento: {len(new_videos)} videos encontrados -> {limit} seleccionados")
-                new_videos = new_videos[:limit]
+            logger.info(f"Total de videos a procesar: {len(videos_to_process)}")
             
-            # 3. Procesar videos en lotes
-            batch_results = self.process_videos_batch(new_videos)
+            # 2. Procesar videos en lotes
+            batch_results = self.process_videos_batch(videos_to_process)
             
             # 4. Mostrar estadísticas finales
             stats = db.get_stats()

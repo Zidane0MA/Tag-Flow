@@ -42,6 +42,8 @@ def index():
             filters['platform'] = request.args.get('platform')
         if request.args.get('status'):
             filters['edit_status'] = request.args.get('status')
+        if request.args.get('processing_status'):
+            filters['processing_status'] = request.args.get('processing_status')
         if request.args.get('difficulty'):
             filters['difficulty_level'] = request.args.get('difficulty')
         
@@ -123,14 +125,22 @@ def view_video(video_id):
         logger.error(f"Error mostrando video {video_id}: {e}")
         abort(500)
 
-@app.route('/thumbnail/<filename>')
+@app.route('/thumbnail/<path:filename>')
 def serve_thumbnail(filename):
-    """Servir thumbnails generados"""
+    """Servir thumbnails generados con manejo de caracteres especiales"""
     try:
-        thumbnail_path = config.THUMBNAILS_PATH / filename
+        import urllib.parse
+        # Decodificar URL para manejar caracteres especiales
+        decoded_filename = urllib.parse.unquote(filename)
+        thumbnail_path = config.THUMBNAILS_PATH / decoded_filename
+        
         if thumbnail_path.exists():
             return send_file(thumbnail_path)
         else:
+            # Si no existe, buscar archivos similares
+            similar_files = list(config.THUMBNAILS_PATH.glob(f"*{Path(decoded_filename).stem}*"))
+            if similar_files:
+                return send_file(similar_files[0])
             abort(404)
     except Exception as e:
         logger.error(f"Error sirviendo thumbnail {filename}: {e}")
@@ -142,7 +152,7 @@ def api_videos():
     try:
         # Obtener parámetros
         filters = {}
-        for key in ['creator_name', 'platform', 'edit_status', 'difficulty_level']:
+        for key in ['creator_name', 'platform', 'edit_status', 'processing_status', 'difficulty_level']:
             value = request.args.get(key)
             if value:
                 filters[key] = value
@@ -181,9 +191,60 @@ def api_videos():
         logger.error(f"Error en API videos: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@app.route('/api/video/<int:video_id>/play')
+def api_play_video(video_id):
+    """API para obtener información de reproducción del video"""
+    try:
+        video = db.get_video(video_id)
+        if not video:
+            return jsonify({'success': False, 'error': 'Video not found'}), 404
+        
+        video_path = Path(video['file_path'])
+        if not video_path.exists():
+            return jsonify({'success': False, 'error': 'Video file not found'}), 404
+        
+        # Verificar que el archivo sea accesible
+        import mimetypes
+        mime_type, _ = mimetypes.guess_type(str(video_path))
+        
+        return jsonify({
+            'success': True,
+            'video_path': str(video_path),
+            'file_name': video['file_name'],
+            'mime_type': mime_type,
+            'file_size': video.get('file_size', 0),
+            'duration': video.get('duration_seconds', 0)
+        })
+        
+    except Exception as e:
+        logger.error(f"Error obteniendo info de reproducción para video {video_id}: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/video-stream/<int:video_id>')
+def stream_video(video_id):
+    """Servir video para streaming (para reproducción en navegador)"""
+    try:
+        video = db.get_video(video_id)
+        if not video:
+            abort(404)
+        
+        video_path = Path(video['file_path'])
+        if not video_path.exists():
+            abort(404)
+        
+        # Servir archivo de video con soporte para streaming
+        return send_file(
+            video_path,
+            as_attachment=False,
+            mimetype='video/mp4'  # Ajustar según el tipo de archivo
+        )
+        
+    except Exception as e:
+        logger.error(f"Error streaming video {video_id}: {e}")
+        abort(500)
 @app.route('/api/video/<int:video_id>/update', methods=['POST'])
 def api_update_video(video_id):
-    """API para actualizar un video (edición inline)"""
+    """API para actualizar un video (edición inline mejorada)"""
     try:
         data = request.get_json()
         if not data:
@@ -192,16 +253,25 @@ def api_update_video(video_id):
         # Validar campos permitidos
         allowed_fields = {
             'final_music', 'final_music_artist', 'final_characters', 
-            'difficulty_level', 'edit_status', 'notes'
+            'difficulty_level', 'edit_status', 'notes', 'processing_status'
         }
         
         updates = {}
         for field, value in data.items():
             if field in allowed_fields:
-                updates[field] = value
+                # Procesar listas/arrays especialmente
+                if field == 'final_characters' and isinstance(value, list):
+                    import json
+                    updates[field] = json.dumps(value)
+                else:
+                    updates[field] = value
         
         if not updates:
             return jsonify({'success': False, 'error': 'No valid fields to update'}), 400
+        
+        # Actualizar timestamp
+        from datetime import datetime
+        updates['last_updated'] = datetime.now().isoformat()
         
         # Actualizar en BD
         success = db.update_video(video_id, updates)
@@ -209,10 +279,20 @@ def api_update_video(video_id):
         if success:
             # Obtener video actualizado
             updated_video = db.get_video(video_id)
+            
+            # Procesar datos JSON para respuesta
+            if updated_video.get('final_characters'):
+                try:
+                    import json
+                    updated_video['final_characters'] = json.loads(updated_video['final_characters'])
+                except:
+                    updated_video['final_characters'] = []
+            
             return jsonify({
                 'success': True,
                 'video': updated_video,
-                'message': 'Video actualizado exitosamente'
+                'message': 'Video actualizado exitosamente',
+                'updated_fields': list(updates.keys())
             })
         else:
             return jsonify({'success': False, 'error': 'Failed to update video'}), 500

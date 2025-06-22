@@ -74,7 +74,7 @@ function setupGalleryEventListeners() {
  * Event listeners para filtros
  */
 function setupFilterEventListeners() {
-    const filterSelects = ['filter-creator', 'filter-platform', 'filter-status', 'filter-difficulty'];
+    const filterSelects = ['filter-creator', 'filter-platform', 'filter-status', 'filter-processing', 'filter-difficulty'];
     
     filterSelects.forEach(selectId => {
         const select = document.getElementById(selectId);
@@ -95,6 +95,7 @@ function applyInitialFilters() {
         'creator': 'filter-creator',
         'platform': 'filter-platform', 
         'status': 'filter-status',
+        'processing_status': 'filter-processing',
         'difficulty': 'filter-difficulty',
         'search': 'search-input'
     };
@@ -116,6 +117,7 @@ function applyFilters() {
         creator: document.getElementById('filter-creator')?.value || '',
         platform: document.getElementById('filter-platform')?.value || '',
         status: document.getElementById('filter-status')?.value || '',
+        processing_status: document.getElementById('filter-processing')?.value || '',
         difficulty: document.getElementById('filter-difficulty')?.value || '',
         search: document.getElementById('search-input')?.value || ''
     };
@@ -147,6 +149,10 @@ function filterVideosVisually(filters) {
         }
         
         if (filters.status && card.dataset.status !== filters.status) {
+            shouldShow = false;
+        }
+        
+        if (filters.processing_status && card.dataset.processingStatus !== filters.processing_status) {
             shouldShow = false;
         }
         
@@ -213,7 +219,7 @@ function updateURL(filters) {
     const url = new URL(window.location);
     
     // Limpiar parámetros existentes
-    ['creator', 'platform', 'status', 'difficulty', 'search'].forEach(param => {
+    ['creator', 'platform', 'status', 'processing_status', 'difficulty', 'search'].forEach(param => {
         url.searchParams.delete(param);
     });
     
@@ -244,6 +250,7 @@ function clearAllFilters() {
     document.getElementById('filter-creator').value = '';
     document.getElementById('filter-platform').value = '';
     document.getElementById('filter-status').value = '';
+    document.getElementById('filter-processing').value = '';
     document.getElementById('filter-difficulty').value = '';
     
     // Aplicar filtros vacíos
@@ -252,18 +259,79 @@ function clearAllFilters() {
     TagFlow.utils.showNotification('Filtros limpiados', 'info');
 }
 /**
- * Reproducir video (abrir en el reproductor del sistema)
+ * Reproducir video en modal
  */
-function playVideo(videoPath) {
-    if (!videoPath) {
-        TagFlow.utils.showNotification('Ruta de video no válida', 'error');
+async function playVideo(videoId) {
+    if (!videoId) {
+        TagFlow.utils.showNotification('ID de video no válido', 'error');
         return;
     }
     
-    // En un entorno web real, esto podría abrir un modal con reproductor
-    // Por ahora, mostrar información del video
-    TagFlow.utils.showNotification('Función de reproducción - implementar según necesidades', 'info');
-    console.log('Reproducir video:', videoPath);
+    try {
+        // Obtener información del video
+        const response = await TagFlow.utils.apiRequest(`${TagFlow.apiBase}/video/${videoId}/play`);
+        
+        if (!response.success) {
+            TagFlow.utils.showNotification('Error obteniendo información del video', 'error');
+            return;
+        }
+        
+        // Configurar modal de video
+        const modal = new bootstrap.Modal(document.getElementById('videoPlayerModal'));
+        const videoPlayer = document.getElementById('video-player');
+        const videoSource = document.getElementById('video-source');
+        const videoInfo = document.getElementById('video-info');
+        
+        // Configurar fuente del video
+        videoSource.src = `/video-stream/${videoId}`;
+        videoPlayer.load();
+        
+        // Mostrar información del video
+        videoInfo.innerHTML = `
+            <div class="row text-start">
+                <div class="col-md-6">
+                    <strong>Archivo:</strong> ${response.file_name}<br>
+                    <strong>Tamaño:</strong> ${TagFlow.utils.formatFileSize(response.file_size)}<br>
+                </div>
+                <div class="col-md-6">
+                    <strong>Duración:</strong> ${TagFlow.utils.formatDuration(response.duration)}<br>
+                    <strong>Tipo:</strong> ${response.mime_type || 'Video'}
+                </div>
+            </div>
+        `;
+        
+        // Guardar ruta para función de abrir en sistema
+        window.currentVideoPath = response.video_path;
+        window.currentVideoId = videoId;
+        
+        // Mostrar modal
+        modal.show();
+        
+    } catch (error) {
+        console.error('Error reproduciendo video:', error);
+        TagFlow.utils.showNotification('Error al cargar el video', 'error');
+    }
+}
+
+/**
+ * Abrir video en reproductor del sistema
+ */
+async function openVideoInSystem() {
+    if (!window.currentVideoId) {
+        TagFlow.utils.showNotification('No hay video seleccionado', 'error');
+        return;
+    }
+    
+    try {
+        await TagFlow.utils.apiRequest(
+            `${TagFlow.apiBase}/video/${window.currentVideoId}/open-folder`,
+            { method: 'POST' }
+        );
+        TagFlow.utils.showNotification('Abriendo carpeta del video...', 'info');
+    } catch (error) {
+        console.error('Error abriendo video en sistema:', error);
+        TagFlow.utils.showNotification('Error abriendo carpeta', 'error');
+    }
 }
 
 /**
@@ -383,7 +451,7 @@ async function saveVideoChanges() {
             }
         );
         
-        // Actualizar UI
+        // Actualizar UI inmediatamente
         updateVideoCardInDOM(response.video);
         
         // Cerrar modal
@@ -391,6 +459,11 @@ async function saveVideoChanges() {
         currentVideoData = null;
         
         TagFlow.utils.showNotification('Video actualizado exitosamente', 'success');
+        
+        // Reapliar filtros para asegurar que los cambios se reflejen
+        setTimeout(() => {
+            applyFilters();
+        }, 100);
         
     } catch (error) {
         console.error('Error guardando cambios:', error);
@@ -404,38 +477,88 @@ async function saveVideoChanges() {
 function updateVideoCardInDOM(updatedVideo) {
     const videoCard = document.querySelector(`[data-video-id="${updatedVideo.id}"]`);
     if (videoCard) {
-        // Actualizar badges de estado
-        const statusBadge = videoCard.querySelector('.badge');
-        if (statusBadge) {
-            const statusMap = {
-                'nulo': { text: 'Sin procesar', class: 'bg-secondary' },
-                'en_proceso': { text: 'En proceso', class: 'bg-warning' },
-                'hecho': { text: 'Completado', class: 'bg-success' }
-            };
-            const status = statusMap[updatedVideo.edit_status] || statusMap['nulo'];
-            statusBadge.textContent = status.text;
-            statusBadge.className = `badge ${status.class}`;
-        }
+        // Actualizar badges de estado de edición
+        const statusBadges = videoCard.querySelectorAll('.badge');
+        statusBadges.forEach(badge => {
+            if (badge.textContent.includes('Sin procesar') || badge.textContent.includes('En proceso') || badge.textContent.includes('Completado')) {
+                const statusMap = {
+                    'nulo': { text: 'Sin procesar', class: 'bg-secondary' },
+                    'en_proceso': { text: 'En proceso', class: 'bg-warning' },
+                    'hecho': { text: 'Completado', class: 'bg-success' }
+                };
+                const status = statusMap[updatedVideo.edit_status] || statusMap['nulo'];
+                badge.textContent = status.text;
+                badge.className = `badge ${status.class}`;
+            }
+        });
         
         // Actualizar información de música
-        const musicInfo = videoCard.querySelector('.fa-music').parentElement;
+        const musicInfo = videoCard.querySelector('.fa-music')?.parentElement;
         if (musicInfo) {
             const music = updatedVideo.final_music || updatedVideo.detected_music;
             const artist = updatedVideo.final_music_artist || updatedVideo.detected_music_artist;
+            const isAutoDetected = !updatedVideo.final_music && updatedVideo.detected_music;
+            
             if (music) {
                 musicInfo.innerHTML = `
                     <i class="fas fa-music text-primary me-1"></i>
-                    <small><strong>${music}</strong>${artist ? ` - ${artist}` : ''}</small>
+                    <small>
+                        <strong>${music}</strong>
+                        ${artist ? ` - ${artist}` : ''}
+                        ${isAutoDetected ? ' <span class="text-muted">(auto)</span>' : ''}
+                    </small>
                 `;
             }
         }
         
-        // Actualizar atributos de datos para filtros
-        const wrapper = videoCard.closest('.video-card-wrapper');
-        if (wrapper) {
-            wrapper.dataset.status = updatedVideo.edit_status;
-            wrapper.dataset.difficulty = updatedVideo.difficulty_level || '';
+        // Actualizar información de personajes
+        const charactersInfo = videoCard.querySelector('.fa-user-friends')?.parentElement;
+        if (charactersInfo) {
+            const characters = updatedVideo.final_characters || updatedVideo.detected_characters || [];
+            if (characters.length > 0) {
+                const displayChars = characters.slice(0, 2).join(', ');
+                const moreText = characters.length > 2 ? `<span class="text-muted">+${characters.length - 2} más</span>` : '';
+                charactersInfo.innerHTML = `
+                    <i class="fas fa-user-friends text-success me-1"></i>
+                    <small>${displayChars} ${moreText}</small>
+                `;
+            }
         }
+        
+        // Actualizar notas si existen
+        const notesInfo = videoCard.querySelector('.fa-sticky-note')?.parentElement;
+        if (updatedVideo.notes && updatedVideo.notes.trim()) {
+            if (!notesInfo) {
+                // Crear elemento de notas si no existe
+                const cardBody = videoCard.querySelector('.card-body');
+                const notesDiv = document.createElement('div');
+                notesDiv.className = 'mt-2';
+                notesDiv.innerHTML = `
+                    <small class="text-info">
+                        <i class="fas fa-sticky-note me-1"></i>${updatedVideo.notes.substring(0, 50)}...
+                    </small>
+                `;
+                cardBody.appendChild(notesDiv);
+            } else {
+                notesInfo.innerHTML = `
+                    <i class="fas fa-sticky-note me-1"></i>${updatedVideo.notes.substring(0, 50)}...
+                `;
+            }
+        } else if (notesInfo) {
+            // Remover notas si están vacías
+            notesInfo.parentElement.remove();
+        }
+        
+        // Actualizar atributos de datos para filtros
+        videoCard.dataset.status = updatedVideo.edit_status || 'nulo';
+        videoCard.dataset.processingStatus = updatedVideo.processing_status || 'pendiente';
+        videoCard.dataset.difficulty = updatedVideo.difficulty_level || '';
+        
+        // Animar actualización
+        videoCard.style.transform = 'scale(0.98)';
+        setTimeout(() => {
+            videoCard.style.transform = 'scale(1)';
+        }, 200);
     }
 }
 
@@ -452,11 +575,11 @@ async function quickUpdateStatus(videoId, newStatus) {
             }
         );
         
-        // Actualizar UI
+        // Actualizar UI completa
         updateVideoCardInDOM(response.video);
         
-        // Actualizar botones de estado
-        const wrapper = document.querySelector(`[data-video-id="${videoId}"]`)?.closest('.video-card-wrapper');
+        // Actualizar botones de estado activo
+        const wrapper = document.querySelector(`[data-video-id="${videoId}"]`);
         if (wrapper) {
             const statusButtons = wrapper.querySelectorAll('.btn-group .btn');
             statusButtons.forEach(btn => btn.classList.remove('active'));
@@ -466,6 +589,9 @@ async function quickUpdateStatus(videoId, newStatus) {
             if (buttonIndex !== undefined && statusButtons[buttonIndex]) {
                 statusButtons[buttonIndex].classList.add('active');
             }
+            
+            // Actualizar datasets para filtros
+            wrapper.dataset.status = newStatus;
         }
         
         const statusLabels = {
@@ -478,6 +604,15 @@ async function quickUpdateStatus(videoId, newStatus) {
             `Estado actualizado: ${statusLabels[newStatus]}`, 
             'success'
         );
+        
+        // Reapliar filtros si hay alguno activo
+        const hasActiveFilters = document.getElementById('filter-status')?.value || 
+                               document.getElementById('filter-processing')?.value ||
+                               document.getElementById('search-input')?.value;
+        
+        if (hasActiveFilters) {
+            setTimeout(() => applyFilters(), 100);
+        }
         
     } catch (error) {
         console.error('Error actualizando estado:', error);
