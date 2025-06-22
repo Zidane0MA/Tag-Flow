@@ -191,6 +191,38 @@ def api_videos():
         logger.error(f"Error en API videos: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@app.route('/api/video/<int:video_id>')
+def api_get_video(video_id):
+    """API para obtener un video específico"""
+    try:
+        video = db.get_video(video_id)
+        if not video:
+            return jsonify({'success': False, 'error': 'Video not found'}), 404
+        
+        # Procesar datos JSON
+        if video.get('detected_characters'):
+            try:
+                import json
+                video['detected_characters'] = json.loads(video['detected_characters'])
+            except:
+                video['detected_characters'] = []
+        
+        if video.get('final_characters'):
+            try:
+                import json
+                video['final_characters'] = json.loads(video['final_characters'])
+            except:
+                video['final_characters'] = []
+        
+        return jsonify({
+            'success': True,
+            'video': video
+        })
+        
+    except Exception as e:
+        logger.error(f"Error obteniendo video {video_id}: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @app.route('/api/video/<int:video_id>/play')
 def api_play_video(video_id):
     """API para obtener información de reproducción del video"""
@@ -246,9 +278,14 @@ def stream_video(video_id):
 def api_update_video(video_id):
     """API para actualizar un video (edición inline mejorada)"""
     try:
+        logger.info(f"Actualizando video {video_id}")
+        
         data = request.get_json()
         if not data:
+            logger.error(f"No data provided for video {video_id}")
             return jsonify({'success': False, 'error': 'No data provided'}), 400
+        
+        logger.info(f"Datos recibidos para video {video_id}: {data}")
         
         # Validar campos permitidos
         allowed_fields = {
@@ -265,13 +302,18 @@ def api_update_video(video_id):
                     updates[field] = json.dumps(value)
                 else:
                     updates[field] = value
+            else:
+                logger.warning(f"Campo no permitido ignorado: {field}")
         
         if not updates:
+            logger.error(f"No valid fields to update for video {video_id}")
             return jsonify({'success': False, 'error': 'No valid fields to update'}), 400
         
         # Actualizar timestamp
         from datetime import datetime
         updates['last_updated'] = datetime.now().isoformat()
+        
+        logger.info(f"Actualizando video {video_id} con campos: {list(updates.keys())}")
         
         # Actualizar en BD
         success = db.update_video(video_id, updates)
@@ -279,6 +321,10 @@ def api_update_video(video_id):
         if success:
             # Obtener video actualizado
             updated_video = db.get_video(video_id)
+            
+            if not updated_video:
+                logger.error(f"Video {video_id} not found after update")
+                return jsonify({'success': False, 'error': 'Video not found after update'}), 404
             
             # Procesar datos JSON para respuesta
             if updated_video.get('final_characters'):
@@ -288,6 +334,15 @@ def api_update_video(video_id):
                 except:
                     updated_video['final_characters'] = []
             
+            if updated_video.get('detected_characters'):
+                try:
+                    import json
+                    updated_video['detected_characters'] = json.loads(updated_video['detected_characters'])
+                except:
+                    updated_video['detected_characters'] = []
+            
+            logger.info(f"Video {video_id} actualizado exitosamente")
+            
             return jsonify({
                 'success': True,
                 'video': updated_video,
@@ -295,10 +350,11 @@ def api_update_video(video_id):
                 'updated_fields': list(updates.keys())
             })
         else:
-            return jsonify({'success': False, 'error': 'Failed to update video'}), 500
+            logger.error(f"Failed to update video {video_id} in database")
+            return jsonify({'success': False, 'error': 'Failed to update video in database'}), 500
             
     except Exception as e:
-        logger.error(f"Error actualizando video {video_id}: {e}")
+        logger.error(f"Error actualizando video {video_id}: {e}", exc_info=True)
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/video/<int:video_id>/open-folder', methods=['POST'])

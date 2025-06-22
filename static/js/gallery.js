@@ -268,8 +268,15 @@ async function playVideo(videoId) {
     }
     
     try {
+        // Convertir videoId a número si es string
+        const numericVideoId = parseInt(videoId);
+        if (isNaN(numericVideoId)) {
+            TagFlow.utils.showNotification('ID de video inválido', 'error');
+            return;
+        }
+        
         // Obtener información del video
-        const response = await TagFlow.utils.apiRequest(`${TagFlow.apiBase}/video/${videoId}/play`);
+        const response = await TagFlow.utils.apiRequest(`${TagFlow.apiBase}/video/${numericVideoId}/play`);
         
         if (!response.success) {
             TagFlow.utils.showNotification('Error obteniendo información del video', 'error');
@@ -283,7 +290,7 @@ async function playVideo(videoId) {
         const videoInfo = document.getElementById('video-info');
         
         // Configurar fuente del video
-        videoSource.src = `/video-stream/${videoId}`;
+        videoSource.src = `/video-stream/${numericVideoId}`;
         videoPlayer.load();
         
         // Mostrar información del video
@@ -302,7 +309,7 @@ async function playVideo(videoId) {
         
         // Guardar ruta para función de abrir en sistema
         window.currentVideoPath = response.video_path;
-        window.currentVideoId = videoId;
+        window.currentVideoId = numericVideoId;
         
         // Mostrar modal
         modal.show();
@@ -323,8 +330,14 @@ async function openVideoInSystem() {
     }
     
     try {
+        const numericVideoId = parseInt(window.currentVideoId);
+        if (isNaN(numericVideoId)) {
+            TagFlow.utils.showNotification('ID de video inválido', 'error');
+            return;
+        }
+        
         await TagFlow.utils.apiRequest(
-            `${TagFlow.apiBase}/video/${window.currentVideoId}/open-folder`,
+            `${TagFlow.apiBase}/video/${numericVideoId}/open-folder`,
             { method: 'POST' }
         );
         TagFlow.utils.showNotification('Abriendo carpeta del video...', 'info');
@@ -344,21 +357,27 @@ async function editVideo(videoId) {
     }
     
     try {
-        // Obtener datos del video
-        const response = await TagFlow.utils.apiRequest(`${TagFlow.apiBase}/videos`);
-        const video = response.videos.find(v => v.id === videoId);
+        // Convertir videoId a número si es string
+        const numericVideoId = parseInt(videoId);
+        if (isNaN(numericVideoId)) {
+            TagFlow.utils.showNotification('ID de video inválido', 'error');
+            return;
+        }
         
-        if (!video) {
+        // Obtener datos del video específico
+        const response = await TagFlow.utils.apiRequest(`${TagFlow.apiBase}/video/${numericVideoId}`);
+        
+        if (!response.success || !response.video) {
             TagFlow.utils.showNotification('Video no encontrado', 'error');
             return;
         }
         
         // Cargar datos en el modal
-        loadVideoDataInModal(video);
+        loadVideoDataInModal(response.video);
         
         // Mostrar modal
         editModal.show();
-        currentVideoData = video;
+        currentVideoData = response.video;
         
     } catch (error) {
         console.error('Error cargando video para edición:', error);
@@ -567,19 +586,39 @@ function updateVideoCardInDOM(updatedVideo) {
  */
 async function quickUpdateStatus(videoId, newStatus) {
     try {
+        // Convertir videoId a número si es string
+        const numericVideoId = parseInt(videoId);
+        if (isNaN(numericVideoId)) {
+            TagFlow.utils.showNotification('ID de video inválido', 'error');
+            return;
+        }
+        
+        // Validar estado
+        const validStatuses = ['nulo', 'en_proceso', 'hecho'];
+        if (!validStatuses.includes(newStatus)) {
+            TagFlow.utils.showNotification('Estado inválido', 'error');
+            return;
+        }
+        
+        console.log(`Actualizando video ${numericVideoId} a estado: ${newStatus}`);
+        
         const response = await TagFlow.utils.apiRequest(
-            `${TagFlow.apiBase}/video/${videoId}/update`,
+            `${TagFlow.apiBase}/video/${numericVideoId}/update`,
             {
                 method: 'POST',
                 body: JSON.stringify({ edit_status: newStatus })
             }
         );
         
+        if (!response.success) {
+            throw new Error(response.error || 'Error desconocido actualizando video');
+        }
+        
         // Actualizar UI completa
         updateVideoCardInDOM(response.video);
         
         // Actualizar botones de estado activo
-        const wrapper = document.querySelector(`[data-video-id="${videoId}"]`);
+        const wrapper = document.querySelector(`[data-video-id="${numericVideoId}"]`);
         if (wrapper) {
             const statusButtons = wrapper.querySelectorAll('.btn-group .btn');
             statusButtons.forEach(btn => btn.classList.remove('active'));
@@ -616,7 +655,7 @@ async function quickUpdateStatus(videoId, newStatus) {
         
     } catch (error) {
         console.error('Error actualizando estado:', error);
-        TagFlow.utils.showNotification('Error actualizando estado', 'error');
+        TagFlow.utils.showNotification(`Error: ${error.message}`, 'error');
     }
 }
 
@@ -625,8 +664,15 @@ async function quickUpdateStatus(videoId, newStatus) {
  */
 async function openVideoFolder(videoId) {
     try {
+        // Convertir videoId a número si es string
+        const numericVideoId = parseInt(videoId);
+        if (isNaN(numericVideoId)) {
+            TagFlow.utils.showNotification('ID de video inválido', 'error');
+            return;
+        }
+        
         const response = await TagFlow.utils.apiRequest(
-            `${TagFlow.apiBase}/video/${videoId}/open-folder`,
+            `${TagFlow.apiBase}/video/${numericVideoId}/open-folder`,
             { method: 'POST' }
         );
         
