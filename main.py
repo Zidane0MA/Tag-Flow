@@ -71,13 +71,16 @@ class VideoAnalyzer:
             for warning in warnings:
                 logger.warning(f"  - {warning}")
     
-    def find_new_videos(self, platform_filter=None, use_external_sources=False) -> List[Path]:
+    def find_new_videos(self, platform_filter=None, use_external_sources=False) -> List[Dict]:
         """
         Encontrar videos que no están en la base de datos
         
         Args:
             platform_filter: 'youtube', 'tiktok', 'instagram' o None para todas
             use_external_sources: si usar fuentes externas en lugar de escaneo local
+            
+        Returns:
+            List[Dict]: Lista de diccionarios con información completa del video
         """
         logger.info("Buscando videos nuevos...")
         
@@ -109,13 +112,29 @@ class VideoAnalyzer:
             # Obtener videos de fuentes externas
             external_videos = external_sources.get_all_videos_from_source('all', actual_platform)
             
-            # Convertir a Path objects y filtrar nuevos
+            # Filtrar nuevos y verificar existencia
             for video_data in external_videos:
                 video_path = Path(video_data['file_path'])
-                if str(video_path) not in existing_videos and video_path.exists():
+                
+                # Verificar duplicados con múltiples estrategias
+                is_duplicate = False
+                
+                # Estrategia 1: Ruta exacta
+                if str(video_path) in existing_videos:
+                    is_duplicate = True
+                
+                # Estrategia 2: Nombre de archivo (para rutas normalizadas)
+                if not is_duplicate:
+                    for existing_path in existing_videos:
+                        if Path(existing_path).name == video_path.name:
+                            is_duplicate = True
+                            break
+                
+                # Si no es duplicado y existe el archivo físico
+                if not is_duplicate and video_path.exists():
                     # Solo videos, no imágenes para el procesamiento principal
                     if video_data.get('content_type', 'video') == 'video':
-                        new_videos.append(video_path)
+                        new_videos.append(video_data)  # Retornar datos completos
         
         else:
             # Búsqueda local tradicional
@@ -136,7 +155,15 @@ class VideoAnalyzer:
                         # Verificar si es válido y no está en BD
                         if str(video_file) not in existing_videos:
                             if video_processor.is_valid_video(video_file):
-                                new_videos.append(video_file)
+                                # Para compatibilidad, crear estructura de datos
+                                video_data = {
+                                    'file_path': str(video_file),
+                                    'file_name': video_file.name,
+                                    'creator_name': self._infer_creator_name(video_file),
+                                    'platform': 'tiktok',  # Valor por defecto para escaneo local
+                                    'content_type': 'video'
+                                }
+                                new_videos.append(video_data)
                             else:
                                 logger.warning(f"Video inválido: {video_file}")
             
@@ -144,8 +171,13 @@ class VideoAnalyzer:
         
         logger.info(f"Videos nuevos para procesar: {len(new_videos)}")
         return new_videos    
-    def process_video(self, video_path: Path) -> Dict:
-        """Procesar un video individual completamente"""
+    def process_video(self, video_data: Dict) -> Dict:
+        """Procesar un video individual completamente
+        
+        Args:
+            video_data: Diccionario con información completa del video
+        """
+        video_path = Path(video_data['file_path'])
         logger.info(f"Procesando: {video_path.name}")
         
         start_time = time.time()
@@ -164,24 +196,42 @@ class VideoAnalyzer:
                 result['error'] = f"Error en metadatos: {metadata['error']}"
                 return result
 
-            # Buscar si el video ya existe en la BD usando el nuevo método
+            # Buscar si el video ya existe en la BD con múltiples estrategias
+            existing_video = None
+            
+            # Estrategia 1: Ruta exacta
             existing_video = db.get_video_by_path(str(video_path))
+            
+            # Estrategia 2: Por nombre de archivo si no se encontró por ruta exacta
+            if not existing_video:
+                videos_in_db = db.get_videos()
+                for db_video in videos_in_db:
+                    if Path(db_video['file_path']).name == video_path.name:
+                        existing_video = db_video
+                        logger.info(f"  Video encontrado por nombre de archivo: {video_path.name}")
+                        break
+            
             if existing_video:
-                # Ya existe: usar los metadatos originales y NO modificar el creador
+                # Ya existe: usar los metadatos originales y NO modificar información clave
                 video_id = existing_video['id']
-                metadata['creator_name'] = existing_video['creator_name']
-                metadata['file_name'] = existing_video['file_name']
-                metadata['file_path'] = existing_video['file_path']
-                logger.info(f"  Video ya existe en BD, se conservará el creador: {metadata['creator_name']}")
+                logger.info(f"  Video ya existe en BD (ID: {video_id}), se conservarán los datos originales")
             else:
-                # Nuevo: inferir creador
-                creator_name = self._infer_creator_name(video_path)
-                metadata['creator_name'] = creator_name
-                metadata['file_name'] = video_path.name
-                metadata['file_path'] = str(video_path)
-                # Agregar a la base de datos (estado pendiente)
-                metadata['processing_status'] = 'procesando'
+                # Nuevo: usar información de external_sources
+                metadata.update({
+                    'creator_name': video_data.get('creator_name', 'Desconocido'),
+                    'platform': video_data.get('platform', 'tiktok'),
+                    'file_name': video_data.get('file_name', video_path.name),
+                    'file_path': video_data.get('file_path', str(video_path)),
+                    'processing_status': 'procesando'
+                })
+                
+                # Agregar información adicional si está disponible
+                if 'title' in video_data:
+                    metadata['title'] = video_data['title']
+                    
+                logger.info(f"  Creando nuevo video: plataforma={metadata['platform']}, creador={metadata['creator_name']}")
                 video_id = db.add_video(metadata)
+            
             result['video_id'] = video_id
             
             # 5. Reconocimiento musical (si hay audio)
@@ -266,12 +316,16 @@ class VideoAnalyzer:
         # Fallback: usar "Desconocido"
         return "Desconocido"
     
-    def process_videos_batch(self, video_paths: List[Path]) -> Dict:
-        """Procesar múltiples videos con threading"""
-        logger.info(f"Procesando {len(video_paths)} videos...")
+    def process_videos_batch(self, video_data_list: List[Dict]) -> Dict:
+        """Procesar múltiples videos con threading
+        
+        Args:
+            video_data_list: Lista de diccionarios con información completa de videos
+        """
+        logger.info(f"Procesando {len(video_data_list)} videos...")
         
         results = {
-            'total': len(video_paths),
+            'total': len(video_data_list),
             'successful': 0,
             'failed': 0,
             'errors': [],
@@ -281,18 +335,19 @@ class VideoAnalyzer:
         start_time = time.time()
         
         # Procesar con threading
-        max_workers = min(config.MAX_CONCURRENT_PROCESSING, len(video_paths))
+        max_workers = min(config.MAX_CONCURRENT_PROCESSING, len(video_data_list))
         
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             # Enviar todos los trabajos
             future_to_video = {
-                executor.submit(self.process_video, video_path): video_path 
-                for video_path in video_paths
+                executor.submit(self.process_video, video_data): video_data 
+                for video_data in video_data_list
             }
             
             # Recopilar resultados
             for future in as_completed(future_to_video):
-                video_path = future_to_video[future]
+                video_data = future_to_video[future]
+                video_path = Path(video_data['file_path'])
                 try:
                     result = future.result()
                     if result['success']:
