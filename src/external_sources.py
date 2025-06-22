@@ -129,6 +129,11 @@ class ExternalSourcesManager:
             
             for row in rows:
                 relative_path = row['relative_path']
+                
+                # Manejar paths que empiezan con "/" (eliminar para hacer verdaderamente relativo)
+                if relative_path.startswith('/'):
+                    relative_path = relative_path[1:]  # Remover el "/" inicial
+                
                 file_path = tiktok_base / relative_path
                 
                 # Verificar que el archivo exista y sea un video

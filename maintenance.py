@@ -392,6 +392,21 @@ class MaintenanceUtils:
             except Exception as e:
                 logger.error(f"Error eliminando video {video['id']}: {e}")
         
+        # Resetear secuencia AUTOINCREMENT si se eliminaron todos los videos
+        if not platform:  # Solo si se limpió toda la BD
+            try:
+                with db.get_connection() as conn:
+                    # Verificar si quedan videos
+                    cursor = conn.execute("SELECT COUNT(*) FROM videos")
+                    remaining_videos = cursor.fetchone()[0]
+                    
+                    # Si no quedan videos, resetear la secuencia
+                    if remaining_videos == 0:
+                        conn.execute("DELETE FROM sqlite_sequence WHERE name='videos'")
+                        logger.info("✓ Secuencia AUTOINCREMENT reseteada")
+            except Exception as e:
+                logger.error(f"Error reseteando secuencia: {e}")
+        
         logger.info(f"✅ Eliminados {deleted} videos de la base de datos")
     
     def populate_thumbnails(self, platform=None, limit=None, force=False):
