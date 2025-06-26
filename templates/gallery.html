@@ -17,14 +17,15 @@
                 </h5>
             </div>
             <div class="card-body">
-                <form id="filter-form" class="row g-3">
+                <form id="filter-form" class="row g-3" method="GET">
                     <!-- Búsqueda por texto -->
                     <div class="col-md-3">
                         <label for="search-input" class="form-label">Búsqueda</label>
                         <div class="input-group">
-                            <input type="text" class="form-control" id="search-input" 
-                                   placeholder="Buscar videos..." value="{{ request.args.get('search', '') }}">
-                            <button type="button" class="btn btn-outline-secondary" id="search-btn">
+                            <input type="text" class="form-control" id="search-input" name="search"
+                                   placeholder="Buscar en videos, música, personajes..." 
+                                   value="{{ request.args.get('search', '') }}">
+                            <button type="submit" class="btn btn-outline-secondary" id="search-btn">
                                 <i class="fas fa-search"></i>
                             </button>
                         </div>
@@ -33,11 +34,11 @@
                     <!-- Filtro por creador -->
                     <div class="col-md-2">
                         <label for="filter-creator" class="form-label">Creador</label>
-                        <select class="form-select" id="filter-creator" name="creator">
+                        <select class="form-select" id="filter-creator" name="creator" onchange="this.form.submit()">
                             <option value="">Todos</option>
                             {% for creator in creators %}
                             <option value="{{ creator }}" 
-                                    {% if current_filters.get('creator_name') == creator %}selected{% endif %}>
+                                    {% if request.args.get('creator') == creator %}selected{% endif %}>
                                 {{ creator }}
                             </option>
                             {% endfor %}
@@ -47,60 +48,95 @@
                     <!-- Filtro por plataforma -->
                     <div class="col-md-1">
                         <label for="filter-platform" class="form-label">Plataforma</label>
-                        <select class="form-select" id="filter-platform" name="platform">
+                        <select class="form-select" id="filter-platform" name="platform" onchange="this.form.submit()">
                             <option value="">Todas</option>
-                            <option value="tiktok" {% if current_filters.get('platform') == 'tiktok' %}selected{% endif %}>TikTok</option>
-                            <option value="instagram" {% if current_filters.get('platform') == 'instagram' %}selected{% endif %}>Instagram</option>
-                            <option value="youtube" {% if current_filters.get('platform') == 'youtube' %}selected{% endif %}>YouTube</option>
+                            <option value="tiktok" {% if request.args.get('platform') == 'tiktok' %}selected{% endif %}>TikTok</option>
+                            <option value="instagram" {% if request.args.get('platform') == 'instagram' %}selected{% endif %}>Instagram</option>
+                            <option value="youtube" {% if request.args.get('platform') == 'youtube' %}selected{% endif %}>YouTube</option>
                         </select>
                     </div>
                     
                     <!-- Filtro por estado de edición -->
                     <div class="col-md-2">
                         <label for="filter-status" class="form-label">Estado de Edición</label>
-                        <select class="form-select" id="filter-status" name="status">
+                        <select class="form-select" id="filter-status" name="status" onchange="this.form.submit()">
                             <option value="">Todos</option>
-                            <option value="nulo" {% if current_filters.get('edit_status') == 'nulo' %}selected{% endif %}>Sin procesar</option>
-                            <option value="en_proceso" {% if current_filters.get('edit_status') == 'en_proceso' %}selected{% endif %}>En proceso</option>
-                            <option value="hecho" {% if current_filters.get('edit_status') == 'hecho' %}selected{% endif %}>Completado</option>
+                            <option value="nulo" {% if request.args.get('status') == 'nulo' %}selected{% endif %}>Sin procesar</option>
+                            <option value="en_proceso" {% if request.args.get('status') == 'en_proceso' %}selected{% endif %}>En proceso</option>
+                            <option value="hecho" {% if request.args.get('status') == 'hecho' %}selected{% endif %}>Completado</option>
                         </select>
                     </div>
                     
                     <!-- Filtro por estado de procesamiento -->
                     <div class="col-md-2">
                         <label for="filter-processing" class="form-label">Estado de Procesamiento</label>
-                        <select class="form-select" id="filter-processing" name="processing_status">
+                        <select class="form-select" id="filter-processing" name="processing_status" onchange="this.form.submit()">
                             <option value="">Todos</option>
-                            <option value="pendiente" {% if current_filters.get('processing_status') == 'pendiente' %}selected{% endif %}>Pendiente</option>
-                            <option value="procesando" {% if current_filters.get('processing_status') == 'procesando' %}selected{% endif %}>Procesando</option>
-                            <option value="completado" {% if current_filters.get('processing_status') == 'completado' %}selected{% endif %}>Completado</option>
-                            <option value="error" {% if current_filters.get('processing_status') == 'error' %}selected{% endif %}>Error</option>
+                            <option value="pendiente" {% if request.args.get('processing_status') == 'pendiente' %}selected{% endif %}>Pendiente</option>
+                            <option value="procesando" {% if request.args.get('processing_status') == 'procesando' %}selected{% endif %}>Procesando</option>
+                            <option value="completado" {% if request.args.get('processing_status') == 'completado' %}selected{% endif %}>Completado</option>
+                            <option value="error" {% if request.args.get('processing_status') == 'error' %}selected{% endif %}>Error</option>
                         </select>
                     </div>
                     
                     <!-- Filtro por dificultad -->
                     <div class="col-md-1">
                         <label for="filter-difficulty" class="form-label">Dificultad</label>
-                        <select class="form-select" id="filter-difficulty" name="difficulty">
+                        <select class="form-select" id="filter-difficulty" name="difficulty" onchange="this.form.submit()">
                             <option value="">Todas</option>
-                            <option value="bajo" {% if current_filters.get('difficulty_level') == 'bajo' %}selected{% endif %}>Bajo</option>
-                            <option value="medio" {% if current_filters.get('difficulty_level') == 'medio' %}selected{% endif %}>Medio</option>
-                            <option value="alto" {% if current_filters.get('difficulty_level') == 'alto' %}selected{% endif %}>Alto</option>
+                            <option value="bajo" {% if request.args.get('difficulty') == 'bajo' %}selected{% endif %}>Bajo</option>
+                            <option value="medio" {% if request.args.get('difficulty') == 'medio' %}selected{% endif %}>Medio</option>
+                            <option value="alto" {% if request.args.get('difficulty') == 'alto' %}selected{% endif %}>Alto</option>
                         </select>
                     </div>
                     
                     <!-- Botón limpiar filtros -->
                     <div class="col-md-1">
                         <label class="form-label">&nbsp;</label>
-                        <button type="button" class="btn btn-outline-danger d-block" id="clear-filters">
+                        <a href="{{ url_for('index') }}" class="btn btn-outline-danger d-block" title="Limpiar filtros">
                             <i class="fas fa-times"></i>
-                        </button>
+                        </a>
                     </div>
                 </form>
             </div>
         </div>
     </div>
 </div>
+
+<!-- Filtros activos -->
+{% if request.args.get('search') or request.args.get('creator') or request.args.get('platform') or request.args.get('status') or request.args.get('processing_status') or request.args.get('difficulty') %}
+<div class="row mb-3">
+    <div class="col-12">
+        <div class="alert alert-info d-flex justify-content-between align-items-center">
+            <div>
+                <i class="fas fa-filter me-2"></i>
+                <strong>Filtros activos:</strong>
+                {% if request.args.get('search') %}
+                    <span class="badge bg-primary ms-1">Búsqueda: "{{ request.args.get('search') }}"</span>
+                {% endif %}
+                {% if request.args.get('creator') %}
+                    <span class="badge bg-secondary ms-1">Creador: {{ request.args.get('creator') }}</span>
+                {% endif %}
+                {% if request.args.get('platform') %}
+                    <span class="badge bg-info ms-1">Plataforma: {{ request.args.get('platform').title() }}</span>
+                {% endif %}
+                {% if request.args.get('status') %}
+                    <span class="badge bg-warning ms-1">Estado: {{ {'nulo': 'Sin procesar', 'en_proceso': 'En proceso', 'hecho': 'Completado'}.get(request.args.get('status'), request.args.get('status')) }}</span>
+                {% endif %}
+                {% if request.args.get('processing_status') %}
+                    <span class="badge bg-success ms-1">Procesamiento: {{ request.args.get('processing_status').title() }}</span>
+                {% endif %}
+                {% if request.args.get('difficulty') %}
+                    <span class="badge bg-danger ms-1">Dificultad: {{ request.args.get('difficulty').title() }}</span>
+                {% endif %}
+            </div>
+            <a href="{{ url_for('index') }}" class="btn btn-outline-secondary btn-sm">
+                <i class="fas fa-times me-1"></i>Limpiar
+            </a>
+        </div>
+    </div>
+</div>
+{% endif %}
 
 <!-- Estadísticas -->
 {% if stats %}
@@ -305,34 +341,133 @@
         </div>
         {% endfor %}
     {% else %}
-        <!-- Estado vacío -->
+        <!-- Estado vacío mejorado -->
         <div class="col-12 text-center py-5">
-            <i class="fas fa-video fa-4x text-muted mb-3"></i>
-            <h4 class="text-muted">No se encontraron videos</h4>
-            <p class="text-muted">Ejecuta el script de procesamiento para analizar videos nuevos.</p>
-            <code>python main.py</code>
+            {% if request.args.get('search') or request.args.get('creator') or request.args.get('platform') or request.args.get('status') %}
+                <!-- No hay resultados de búsqueda -->
+                <i class="fas fa-search fa-4x text-muted mb-3"></i>
+                <h4 class="text-muted">No se encontraron videos</h4>
+                <p class="text-muted">
+                    No hay videos que coincidan con los filtros aplicados.
+                    {% if request.args.get('search') %}
+                        <br>Búsqueda: "<strong>{{ request.args.get('search') }}</strong>"
+                    {% endif %}
+                </p>
+                <div class="mt-3">
+                    <a href="{{ url_for('index') }}" class="btn btn-outline-primary me-2">
+                        <i class="fas fa-times me-1"></i>Limpiar Filtros
+                    </a>
+                    <button onclick="history.back()" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-1"></i>Volver
+                    </button>
+                </div>
+                
+                <!-- Consejos de búsqueda -->
+                <div class="card mt-4 mx-auto" style="max-width: 600px;">
+                    <div class="card-body text-start">
+                        <h6 class="card-title"><i class="fas fa-lightbulb text-warning me-2"></i>Consejos de búsqueda</h6>
+                        <ul class="card-text small mb-0">
+                            <li>Busca por <strong>nombre del creador</strong>: "free", "mimizu"</li>
+                            <li>Busca por <strong>música</strong>: "gangnam style", "industry baby"</li>
+                            <li>Busca por <strong>personajes</strong>: "miku", "kirby", "mario"</li>
+                            <li>Busca por <strong>notas</strong>: cualquier texto que hayas agregado</li>
+                            <li>Combina filtros usando los desplegables de arriba</li>
+                        </ul>
+                    </div>
+                </div>
+            {% else %}
+                <!-- Base de datos vacía -->
+                <i class="fas fa-video fa-4x text-muted mb-3"></i>
+                <h4 class="text-muted">No hay videos en la base de datos</h4>
+                <p class="text-muted">Ejecuta el script de procesamiento para analizar videos nuevos.</p>
+                <div class="mt-3">
+                    <code class="bg-light p-2 rounded">python main.py</code>
+                </div>
+                <p class="text-muted mt-2 small">
+                    O usa: <code>python maintenance.py populate-db</code> para importar desde fuentes externas
+                </p>
+            {% endif %}
         </div>
     {% endif %}
 </div>
 
-<!-- Paginación -->
-{% if videos and videos|length >= per_page %}
-<nav aria-label="Paginación de videos">
-    <ul class="pagination justify-content-center">
-        <li class="page-item {% if page <= 1 %}disabled{% endif %}">
-            <a class="page-link" href="?page={{ page - 1 }}&{% for key, value in request.args.items() %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}">
-                Anterior
-            </a>
-        </li>
-        <li class="page-item active">
-            <span class="page-link">{{ page }}</span>
-        </li>
-        <li class="page-item">
-            <a class="page-link" href="?page={{ page + 1 }}&{% for key, value in request.args.items() %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}">
-                Siguiente
-            </a>
-        </li>
-    </ul>
+<!-- Paginación mejorada -->
+{% if total_videos > per_page %}
+<nav aria-label="Paginación de videos" class="mt-4">
+    <div class="row align-items-center">
+        <div class="col-md-6">
+            <p class="text-muted mb-0">
+                Mostrando {{ ((page - 1) * per_page) + 1 }} - {{ [total_videos, page * per_page] | min }} 
+                de {{ total_videos }} videos
+                {% if request.args.get('search') or request.args.get('creator') or request.args.get('platform') or request.args.get('status') %}
+                    (filtrados)
+                {% endif %}
+            </p>
+        </div>
+        <div class="col-md-6">
+            <ul class="pagination justify-content-end mb-0">
+                <!-- Primera página -->
+                {% if page > 2 %}
+                <li class="page-item">
+                    <a class="page-link" href="?page=1&{% for key, value in request.args.items() %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}">
+                        <i class="fas fa-angle-double-left"></i>
+                    </a>
+                </li>
+                {% endif %}
+                
+                <!-- Página anterior -->
+                <li class="page-item {% if page <= 1 %}disabled{% endif %}">
+                    {% if page > 1 %}
+                    <a class="page-link" href="?page={{ page - 1 }}&{% for key, value in request.args.items() %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}">
+                        <i class="fas fa-angle-left"></i> Anterior
+                    </a>
+                    {% else %}
+                    <span class="page-link">
+                        <i class="fas fa-angle-left"></i> Anterior
+                    </span>
+                    {% endif %}
+                </li>
+                
+                <!-- Páginas numéricas -->
+                {% set start_page = [1, page - 2] | max %}
+                {% set end_page = [total_pages, page + 2] | min %}
+                
+                {% for p in range(start_page, end_page + 1) %}
+                <li class="page-item {% if p == page %}active{% endif %}">
+                    {% if p == page %}
+                    <span class="page-link">{{ p }}</span>
+                    {% else %}
+                    <a class="page-link" href="?page={{ p }}&{% for key, value in request.args.items() %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}">
+                        {{ p }}
+                    </a>
+                    {% endif %}
+                </li>
+                {% endfor %}
+                
+                <!-- Página siguiente -->
+                <li class="page-item {% if page >= total_pages %}disabled{% endif %}">
+                    {% if page < total_pages %}
+                    <a class="page-link" href="?page={{ page + 1 }}&{% for key, value in request.args.items() %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}">
+                        Siguiente <i class="fas fa-angle-right"></i>
+                    </a>
+                    {% else %}
+                    <span class="page-link">
+                        Siguiente <i class="fas fa-angle-right"></i>
+                    </span>
+                    {% endif %}
+                </li>
+                
+                <!-- Última página -->
+                {% if page < total_pages - 1 %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ total_pages }}&{% for key, value in request.args.items() %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}">
+                        <i class="fas fa-angle-double-right"></i>
+                    </a>
+                </li>
+                {% endif %}
+            </ul>
+        </div>
+    </div>
 </nav>
 {% endif %}
 

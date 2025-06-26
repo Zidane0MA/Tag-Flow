@@ -42,221 +42,98 @@ function initializeGallery() {
  * Event listeners específicos de la galería
  */
 function setupGalleryEventListeners() {
-    // Filtros en tiempo real
+    // Búsqueda mejorada - enviar al servidor
     const searchInput = document.getElementById('search-input');
-    if (searchInput) {
-        searchInput.addEventListener('input', TagFlow.utils.debounce(performSearch, 300));
-    }
+    const searchForm = document.getElementById('filter-form');
     
-    // Botón de búsqueda
-    const searchBtn = document.getElementById('search-btn');
-    if (searchBtn) {
-        searchBtn.addEventListener('click', performSearch);
-    }
-    
-    // Enter en búsqueda
-    if (searchInput) {
+    if (searchInput && searchForm) {
+        // Enviar formulario al presionar Enter
         searchInput.addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
-                performSearch();
+                e.preventDefault();
+                searchForm.submit();
+            }
+        });
+        
+        // Limpiar búsqueda con Escape
+        searchInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                searchInput.value = '';
+                searchForm.submit();
             }
         });
     }
     
-    // Limpiar filtros
-    const clearFiltersBtn = document.getElementById('clear-filters');
-    if (clearFiltersBtn) {
-        clearFiltersBtn.addEventListener('click', clearAllFilters);
+    // Auto-submit en filtros con debounce para búsqueda
+    if (searchInput) {
+        let searchTimeout;
+        searchInput.addEventListener('input', function() {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(function() {
+                if (searchInput.value.length === 0 || searchInput.value.length >= 3) {
+                    searchForm.submit();
+                }
+            }, 500); // Esperar 500ms después de que el usuario deje de escribir
+        });
     }
 }
 
 /**
- * Event listeners para filtros
+ * Event listeners para filtros - simplificados
  */
 function setupFilterEventListeners() {
-    const filterSelects = ['filter-creator', 'filter-platform', 'filter-status', 'filter-processing', 'filter-difficulty'];
-    
-    filterSelects.forEach(selectId => {
-        const select = document.getElementById(selectId);
-        if (select) {
-            select.addEventListener('change', applyFilters);
-        }
-    });
+    // Los filtros se manejan automáticamente con onchange="this.form.submit()" en el HTML
+    console.log('✅ Filtros configurados para envío automático al servidor');
 }
 
 /**
- * Aplicar filtros iniciales desde URL
+ * Aplicar filtros iniciales desde URL - ya no necesario
  */
 function applyInitialFilters() {
-    const urlParams = new URLSearchParams(window.location.search);
-    
-    // Aplicar filtros desde URL
-    const filterMap = {
-        'creator': 'filter-creator',
-        'platform': 'filter-platform', 
-        'status': 'filter-status',
-        'processing_status': 'filter-processing',
-        'difficulty': 'filter-difficulty',
-        'search': 'search-input'
-    };
-    
-    Object.entries(filterMap).forEach(([param, elementId]) => {
-        const value = urlParams.get(param);
-        const element = document.getElementById(elementId);
-        if (value && element) {
-            element.value = value;
-        }
-    });
+    // Los filtros se aplican automáticamente desde el servidor
+    console.log('✅ Filtros iniciales aplicados desde el servidor');
 }
 
 /**
- * Aplicar filtros a los videos
+ * Aplicar filtros - simplificado para recargar página
  */
 function applyFilters() {
-    const filters = {
-        creator: document.getElementById('filter-creator')?.value || '',
-        platform: document.getElementById('filter-platform')?.value || '',
-        status: document.getElementById('filter-status')?.value || '',
-        processing_status: document.getElementById('filter-processing')?.value || '',
-        difficulty: document.getElementById('filter-difficulty')?.value || '',
-        search: document.getElementById('search-input')?.value || ''
-    };
-    
-    // Actualizar URL sin recargar página
-    updateURL(filters);
-    
-    // Filtrar videos visualmente
-    filterVideosVisually(filters);
-}
-
-/**
- * Filtrar videos visualmente (client-side)
- */
-function filterVideosVisually(filters) {
-    const videoCards = document.querySelectorAll('.video-card-wrapper');
-    let visibleCount = 0;
-    
-    videoCards.forEach(card => {
-        let shouldShow = true;
-        
-        // Verificar cada filtro
-        if (filters.creator && !card.dataset.creator.toLowerCase().includes(filters.creator.toLowerCase())) {
-            shouldShow = false;
-        }
-        
-        if (filters.platform && card.dataset.platform !== filters.platform) {
-            shouldShow = false;
-        }
-        
-        if (filters.status && card.dataset.status !== filters.status) {
-            shouldShow = false;
-        }
-        
-        if (filters.processing_status && card.dataset.processingStatus !== filters.processing_status) {
-            shouldShow = false;
-        }
-        
-        if (filters.difficulty && card.dataset.difficulty !== filters.difficulty) {
-            shouldShow = false;
-        }
-        
-        // Búsqueda por texto
-        if (filters.search) {
-            const searchText = filters.search.toLowerCase();
-            const cardText = card.textContent.toLowerCase();
-            if (!cardText.includes(searchText)) {
-                shouldShow = false;
-            }
-        }
-        
-        // Aplicar filtro visual
-        if (shouldShow) {
-            card.classList.remove('filtered-out');
-            card.style.display = '';
-            visibleCount++;
-        } else {
-            card.classList.add('filtered-out');
-            setTimeout(() => {
-                if (card.classList.contains('filtered-out')) {
-                    card.style.display = 'none';
-                }
-            }, 300);
-        }
-    });
-    
-    // Mostrar mensaje si no hay resultados
-    showNoResultsMessage(visibleCount === 0);
-}
-
-/**
- * Mostrar/ocultar mensaje de sin resultados
- */
-function showNoResultsMessage(show) {
-    let noResultsDiv = document.getElementById('no-results-message');
-    
-    if (show && !noResultsDiv) {
-        noResultsDiv = document.createElement('div');
-        noResultsDiv.id = 'no-results-message';
-        noResultsDiv.className = 'col-12 text-center py-5';
-        noResultsDiv.innerHTML = `
-            <i class="fas fa-search fa-3x text-muted mb-3"></i>
-            <h4 class="text-muted">No se encontraron videos</h4>
-            <p class="text-muted">Intenta ajustar los filtros de búsqueda</p>
-            <button onclick="clearAllFilters()" class="btn btn-outline-primary">
-                <i class="fas fa-times me-2"></i>Limpiar Filtros
-            </button>
-        `;
-        document.getElementById('videos-container').appendChild(noResultsDiv);
-    } else if (!show && noResultsDiv) {
-        noResultsDiv.remove();
+    const form = document.getElementById('filter-form');
+    if (form) {
+        form.submit();
     }
 }
 
 /**
- * Actualizar URL con parámetros de filtro
+ * Filtrar videos visualmente - removido, ahora se maneja en el servidor
  */
-function updateURL(filters) {
-    const url = new URL(window.location);
-    
-    // Limpiar parámetros existentes
-    ['creator', 'platform', 'status', 'processing_status', 'difficulty', 'search'].forEach(param => {
-        url.searchParams.delete(param);
-    });
-    
-    // Agregar parámetros no vacíos
-    Object.entries(filters).forEach(([key, value]) => {
-        if (value) {
-            url.searchParams.set(key, value);
-        }
-    });
-    
-    // Actualizar URL sin recargar
-    window.history.pushState({}, '', url);
+function filterVideosVisually() {
+    // Esta función ya no es necesaria
+    console.log('ℹ️ Filtros manejados por el servidor');
 }
 
 /**
- * Realizar búsqueda
+ * Actualizar URL - ya no es necesario
+ */
+function updateURL() {
+    // El formulario maneja la URL automáticamente
+}
+
+/**
+ * Realizar búsqueda - simplificado
  */
 function performSearch() {
-    applyFilters();
+    const form = document.getElementById('filter-form');
+    if (form) {
+        form.submit();
+    }
 }
 
 /**
- * Limpiar todos los filtros
+ * Limpiar todos los filtros - redirigir a página limpia
  */
 function clearAllFilters() {
-    // Limpiar campos de filtro
-    document.getElementById('search-input').value = '';
-    document.getElementById('filter-creator').value = '';
-    document.getElementById('filter-platform').value = '';
-    document.getElementById('filter-status').value = '';
-    document.getElementById('filter-processing').value = '';
-    document.getElementById('filter-difficulty').value = '';
-    
-    // Aplicar filtros vacíos
-    applyFilters();
-    
-    TagFlow.utils.showNotification('Filtros limpiados', 'info');
+    window.location.href = window.location.pathname;
 }
 /**
  * Reproducir video en modal

@@ -46,14 +46,18 @@ def index():
             filters['processing_status'] = request.args.get('processing_status')
         if request.args.get('difficulty'):
             filters['difficulty_level'] = request.args.get('difficulty')
+        if request.args.get('search'):
+            filters['search'] = request.args.get('search')
         
         # Paginación
         page = int(request.args.get('page', 1))
         per_page = int(request.args.get('per_page', 20))
         offset = (page - 1) * per_page
         
-        # Obtener videos
+        # Obtener videos y contar totales
         videos = db.get_videos(filters=filters, limit=per_page, offset=offset)
+        total_videos = db.count_videos(filters=filters)
+        total_pages = (total_videos + per_page - 1) // per_page  # Redondear hacia arriba
         
         # Obtener datos para filtros
         creators = db.get_unique_creators()
@@ -92,7 +96,9 @@ def index():
                              stats=stats,
                              current_filters=filters,
                              page=page,
-                             per_page=per_page)
+                             per_page=per_page,
+                             total_pages=total_pages,
+                             total_videos=total_videos)
         
     except Exception as e:
         logger.error(f"Error en página principal: {e}")
@@ -159,13 +165,13 @@ def api_videos():
         
         search_query = request.args.get('search')
         if search_query:
-            # Implementar búsqueda por texto (simplificada)
             filters['search'] = search_query
         
         limit = int(request.args.get('limit', 20))
         offset = int(request.args.get('offset', 0))
         
         videos = db.get_videos(filters=filters, limit=limit, offset=offset)
+        total_videos = db.count_videos(filters=filters)
         
         # Procesar para JSON
         for video in videos:
@@ -184,7 +190,9 @@ def api_videos():
         return jsonify({
             'success': True,
             'videos': videos,
-            'total': len(videos)
+            'total': total_videos,
+            'limit': limit,
+            'offset': offset
         })
         
     except Exception as e:

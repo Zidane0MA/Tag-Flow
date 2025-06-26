@@ -36,7 +36,7 @@
 ### 🚀 Instalación Rápida (Recomendada)
 
 ```bash
-cd Tag-Flow-V2
+cd Tag-Flow
 
 # Instalación completamente automática
 python quickstart.py
@@ -45,7 +45,7 @@ python quickstart.py
 ### ⚡ Instalación Manual
 
 ```bash
-cd Tag-Flow-V2
+cd Tag-Flow
 pip install -r requirements.txt
 
 # Copiar plantilla de configuración
@@ -53,6 +53,17 @@ copy .env.example .env
 
 # Editar .env con tus claves de API
 # Ver COMANDOS.md para configuración detallada
+```
+
+### 🛡️ Instalacion Segura Con Entorno Virtual
+```bash
+cd Tag-Flow
+python -m venv tag-flow-env
+tag-flow-env\Scripts\activate
+pip install --upgrade pip
+pip install -r requirements.txt
+python main.py
+python app.py
 ```
 
 ## 🎯 Uso Básico

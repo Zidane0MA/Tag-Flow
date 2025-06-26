@@ -152,6 +152,10 @@ class DatabaseManager:
             if filters.get('edit_status'):
                 query += " AND edit_status = ?"
                 params.append(filters['edit_status'])
+            
+            if filters.get('processing_status'):
+                query += " AND processing_status = ?"
+                params.append(filters['processing_status'])
                 
             if filters.get('difficulty_level'):
                 query += " AND difficulty_level = ?"
@@ -162,6 +166,23 @@ class DatabaseManager:
                     query += " AND (detected_music IS NOT NULL OR final_music IS NOT NULL)"
                 else:
                     query += " AND detected_music IS NULL AND final_music IS NULL"
+            
+            # Búsqueda de texto libre en múltiples campos
+            if filters.get('search'):
+                search_term = f"%{filters['search']}%"
+                query += """ AND (
+                    creator_name LIKE ? OR
+                    file_name LIKE ? OR
+                    detected_music LIKE ? OR
+                    final_music LIKE ? OR
+                    detected_music_artist LIKE ? OR
+                    final_music_artist LIKE ? OR
+                    detected_characters LIKE ? OR
+                    final_characters LIKE ? OR
+                    notes LIKE ?
+                )"""
+                # Agregar el término de búsqueda para cada campo
+                params.extend([search_term] * 9)
         
         # Ordenar por fecha de creación (más recientes primero)
         query += " ORDER BY created_at DESC"
@@ -178,6 +199,60 @@ class DatabaseManager:
             cursor = conn.execute(query, params)
             rows = cursor.fetchall()
             return [dict(row) for row in rows]
+    
+    def count_videos(self, filters: Dict = None) -> int:
+        """Contar videos que coinciden con los filtros"""
+        query = "SELECT COUNT(*) FROM videos WHERE 1=1"
+        params = []
+        
+        # Aplicar los mismos filtros que get_videos
+        if filters:
+            if filters.get('creator_name'):
+                query += " AND creator_name LIKE ?"
+                params.append(f"%{filters['creator_name']}%")
+            
+            if filters.get('platform'):
+                query += " AND platform = ?"
+                params.append(filters['platform'])
+                
+            if filters.get('edit_status'):
+                query += " AND edit_status = ?"
+                params.append(filters['edit_status'])
+            
+            if filters.get('processing_status'):
+                query += " AND processing_status = ?"
+                params.append(filters['processing_status'])
+                
+            if filters.get('difficulty_level'):
+                query += " AND difficulty_level = ?"
+                params.append(filters['difficulty_level'])
+                
+            if filters.get('has_music'):
+                if filters['has_music']:
+                    query += " AND (detected_music IS NOT NULL OR final_music IS NOT NULL)"
+                else:
+                    query += " AND detected_music IS NULL AND final_music IS NULL"
+            
+            # Búsqueda de texto libre en múltiples campos
+            if filters.get('search'):
+                search_term = f"%{filters['search']}%"
+                query += """ AND (
+                    creator_name LIKE ? OR
+                    file_name LIKE ? OR
+                    detected_music LIKE ? OR
+                    final_music LIKE ? OR
+                    detected_music_artist LIKE ? OR
+                    final_music_artist LIKE ? OR
+                    detected_characters LIKE ? OR
+                    final_characters LIKE ? OR
+                    notes LIKE ?
+                )"""
+                # Agregar el término de búsqueda para cada campo
+                params.extend([search_term] * 9)
+        
+        with self.get_connection() as conn:
+            cursor = conn.execute(query, params)
+            return cursor.fetchone()[0]
     
     def update_video(self, video_id: int, updates: Dict) -> bool:
         """Actualizar un video con nuevos datos"""
