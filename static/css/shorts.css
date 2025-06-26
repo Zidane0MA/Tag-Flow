@@ -353,7 +353,8 @@
 /* Instrucciones de uso */
 .shorts-instructions {
     position: fixed;
-    bottom: 1rem;
+    top: 1rem;
+    bottom: auto;
     left: 50%;
     transform: translateX(-50%);
     z-index: 1060;
