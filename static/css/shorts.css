@@ -1,0 +1,620 @@
+/* Tag-Flow V2 - Estilos para Modal TikTok/Shorts */
+
+/* Modal fullscreen para shorts */
+#videoShortsModal .modal-content {
+    border-radius: 0;
+    border: none;
+    height: 100vh;
+    overflow: hidden;
+    position: relative;
+}
+
+/* Header del modal shorts */
+.shorts-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1060;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    background: linear-gradient(180deg, rgba(0,0,0,0.7) 0%, transparent 100%);
+    pointer-events: none;
+}
+
+.shorts-header > * {
+    pointer-events: auto;
+}
+
+.header-info {
+    font-weight: 600;
+    font-size: 0.9rem;
+    letter-spacing: 0.5px;
+}
+
+/* Contenedor principal de videos */
+.shorts-container {
+    width: 100%;
+    height: 100vh;
+    overflow: hidden;
+    position: relative;
+    scroll-behavior: smooth;
+}
+
+/* Video individual en el contenedor */
+.shorts-video-item {
+    width: 100%;
+    height: 100vh;
+    position: absolute;
+    top: 0;
+    left: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #000;
+    transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.shorts-video-item video {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    background: #000;
+    width: auto;
+    height: auto;
+}
+
+/* Overlay de información */
+.video-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1050;
+    pointer-events: none;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    padding: 2rem 1.5rem 2rem 1.5rem;
+}
+
+/* Información del lado derecho */
+.overlay-right {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    pointer-events: auto;
+}
+
+.overlay-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    align-items: center;
+}
+
+.action-btn {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
+    cursor: pointer;
+}
+
+.action-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: scale(1.1);
+    color: white;
+}
+
+.action-btn:active {
+    transform: scale(0.95);
+}
+
+.action-btn i {
+    font-size: 1.2rem;
+}
+
+/* Información del lado izquierdo/inferior */
+.overlay-info {
+    flex: 1;
+    max-width: 60%;
+    color: white;
+    pointer-events: auto;
+}
+
+.creator-info {
+    margin-bottom: 0.5rem;
+}
+
+.creator-name {
+    font-weight: 700;
+    font-size: 1.1rem;
+    margin-bottom: 0.25rem;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.7);
+}
+
+.video-title {
+    font-size: 0.9rem;
+    line-height: 1.4;
+    margin-bottom: 0.5rem;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.7);
+}
+
+.music-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    font-size: 0.85rem;
+    opacity: 0.9;
+    overflow: hidden;
+    max-width: 100%;
+}
+
+.music-text {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    max-width: 200px;
+    flex: 1;
+    animation: scrollText 10s linear infinite;
+}
+
+@keyframes scrollText {
+    0% { transform: translateX(0); }
+    25% { transform: translateX(0); }
+    75% { transform: translateX(calc(-100% + 200px)); }
+    100% { transform: translateX(calc(-100% + 200px)); }
+}
+
+.video-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.video-tag {
+    background: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(10px);
+    padding: 0.25rem 0.75rem;
+    border-radius: 15px;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+.video-metadata {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    font-size: 0.8rem;
+    opacity: 0.8;
+}
+
+.metadata-item {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+/* Navegación */
+.shorts-navigation {
+    position: fixed;
+    right: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 1055;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    pointer-events: auto;
+}
+
+.nav-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
+    cursor: pointer;
+}
+
+.nav-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: scale(1.1);
+    color: white;
+}
+
+.nav-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.nav-btn:disabled:hover {
+    transform: none;
+}
+
+/* Indicador de carga */
+.shorts-loading {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 1070;
+}
+
+/* Instrucciones de uso */
+.shorts-instructions {
+    position: fixed;
+    bottom: 1rem;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1060;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(10px);
+    padding: 0.75rem 1.5rem;
+    border-radius: 10px;
+    color: white;
+    font-size: 0.8rem;
+    text-align: center;
+    opacity: 0;
+    animation: fadeInOut 4s ease-in-out;
+    pointer-events: none;
+}
+
+@keyframes fadeInOut {
+    0%, 100% { opacity: 0; }
+    10%, 90% { opacity: 1; }
+}
+
+/* Estados de video */
+.shorts-video-item.active {
+    z-index: 10;
+}
+
+.shorts-video-item.prev {
+    transform: translateY(-100%);
+}
+
+.shorts-video-item.next {
+    transform: translateY(100%);
+}
+
+/* Transiciones suaves */
+.shorts-video-item {
+    transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .overlay-info {
+        max-width: 70%;
+    }
+    
+    .action-btn {
+        width: 42px;
+        height: 42px;
+    }
+    
+    .action-btn i {
+        font-size: 1.1rem;
+    }
+    
+    .nav-btn {
+        width: 36px;
+        height: 36px;
+    }
+    
+    .creator-name {
+        font-size: 1rem;
+    }
+    
+    .video-title {
+        font-size: 0.85rem;
+    }
+    
+    .video-overlay {
+        padding: 1.5rem 1rem 1.5rem 1rem;
+    }
+    
+    .music-text {
+        max-width: 150px;
+    }
+}
+
+@media (max-width: 480px) {
+    .video-overlay {
+        padding: 1rem 0.75rem 1rem 0.75rem;
+    }
+    
+    .overlay-info {
+        max-width: 75%;
+    }
+    
+    .music-text {
+        max-width: 120px;
+    }
+    
+    .shorts-header {
+        padding: 0.75rem 1rem;
+    }
+    
+    .action-btn {
+        width: 38px;
+        height: 38px;
+    }
+    
+    .action-btn i {
+        font-size: 1rem;
+    }
+    
+    .shorts-navigation {
+        right: 0.5rem;
+    }
+    
+    .nav-btn {
+        width: 32px;
+        height: 32px;
+    }
+    
+    .nav-btn i {
+        font-size: 0.9rem;
+    }
+}
+
+/* Modo landscape en móviles */
+@media (max-width: 896px) and (orientation: landscape) {
+    .video-overlay {
+        padding: 1rem 1rem 1rem 1rem;
+    }
+    
+    .overlay-info {
+        max-width: 50%;
+    }
+    
+    .creator-name {
+        font-size: 0.9rem;
+    }
+    
+    .video-title {
+        font-size: 0.8rem;
+    }
+    
+    .music-info {
+        font-size: 0.75rem;
+    }
+    
+    .music-text {
+        max-width: 120px;
+    }
+    
+    .video-metadata {
+        font-size: 0.7rem;
+    }
+    
+    .shorts-navigation {
+        right: 0.5rem;
+        top: 40%;
+    }
+}
+
+/* Estilos para el indicador de progreso */
+.video-progress {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: rgba(255, 255, 255, 0.3);
+    z-index: 1051;
+}
+
+.video-progress-bar {
+    height: 100%;
+    background: #fff;
+    width: 0%;
+    transition: width 0.1s ease;
+}
+
+/* Animaciones de entrada */
+.shorts-fade-in {
+    animation: shortsSlideUp 0.4s ease-out;
+}
+
+@keyframes shortsSlideUp {
+    from {
+        opacity: 0;
+        transform: translateY(50px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Efectos de hover mejorados */
+.action-btn:hover i {
+    animation: bounce 0.6s ease;
+}
+
+@keyframes bounce {
+    0%, 20%, 60%, 100% { transform: translateY(0); }
+    40% { transform: translateY(-4px); }
+    80% { transform: translateY(-2px); }
+}
+
+/* Estado de like activado */
+.action-btn.liked {
+    background: rgba(255, 59, 92, 0.8);
+    color: white;
+}
+
+.action-btn.liked:hover {
+    background: rgba(255, 59, 92, 0.9);
+}
+
+/* Mejoras de accesibilidad */
+.action-btn:focus,
+.nav-btn:focus {
+    outline: 2px solid rgba(255, 255, 255, 0.5);
+    outline-offset: 2px;
+}
+
+/* Mejoras adicionales de UX */
+
+/* Efecto de glassmorphism para elementos flotantes */
+.action-btn,
+.nav-btn,
+.shorts-header,
+.shorts-instructions {
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Animación para los elementos del overlay */
+.overlay-right {
+    animation: slideInRight 0.6s ease-out;
+}
+
+.overlay-info {
+    animation: slideInLeft 0.6s ease-out;
+}
+
+@keyframes slideInRight {
+    from {
+        opacity: 0;
+        transform: translateX(50px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes slideInLeft {
+    from {
+        opacity: 0;
+        transform: translateX(-50px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* Efecto de pulsación para botones activos */
+.action-btn:active,
+.nav-btn:active {
+    animation: pulse 0.3s ease;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(0.9); }
+    100% { transform: scale(1); }
+}
+
+/* Mejora del indicador de progreso */
+.video-progress {
+    background: linear-gradient(90deg, 
+        rgba(255,255,255,0.2) 0%, 
+        rgba(255,255,255,0.1) 100%);
+}
+
+.video-progress-bar {
+    background: linear-gradient(90deg, #ff6b6b, #4ecdc4, #45b7d1);
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+}
+
+/* Estilos para modo oscuro automático */
+@media (prefers-color-scheme: dark) {
+    .video-tag {
+        background: rgba(255, 255, 255, 0.15);
+        color: rgba(255, 255, 255, 0.9);
+    }
+}
+
+/* Mejoras de rendimiento */
+.shorts-video-item video {
+    will-change: transform;
+    transform: translateZ(0);
+}
+
+/* Animación del texto de música */
+.music-text {
+    max-width: 200px;
+}
+
+@media (max-width: 768px) {
+    .music-text {
+        max-width: 150px;
+    }
+}
+
+/* Estados de carga mejorados */
+.video-preloader {
+    background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+}
+
+/* Efectos de hover más suaves */
+.action-btn,
+.nav-btn {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.action-btn:hover,
+.nav-btn:hover {
+    background: rgba(255, 255, 255, 0.25);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+}
+
+/* Mejora de legibilidad del texto */
+.creator-name,
+.video-title,
+.music-text {
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+}
+
+/* Animación de aparición para el modal */
+#videoShortsModal .modal-content {
+    animation: modalSlideIn 0.4s ease-out;
+}
+
+@keyframes modalSlideIn {
+    from {
+        opacity: 0;
+        transform: scale(0.9);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* Optimización para dispositivos de alta resolución */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+    .action-btn i,
+    .nav-btn i {
+        transform: translateZ(0);
+    }
+}

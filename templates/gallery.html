@@ -4,6 +4,7 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/gallery.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/shorts.css') }}">
 {% endblock %}
 
 {% block content %}
@@ -208,8 +209,8 @@
                     <div class="card-overlay">
                         <div class="overlay-buttons">
                             <button class="btn btn-primary btn-sm" 
-                                    title="Reproducir video" 
-                                    onclick="playVideo('{{ video.id }}')">
+                                    title="Ver en modo Shorts" 
+                                    onclick="playVideoShorts('{{ video.id }}')">
                                 <i class="fas fa-play"></i>
                             </button>
                             <button class="btn btn-success btn-sm" 
@@ -471,7 +472,104 @@
 </nav>
 {% endif %}
 
-<!-- Modal de reproducción de video -->
+<!-- Modal de reproducción tipo TikTok/Shorts -->
+<div class="modal fade" id="videoShortsModal" tabindex="-1" aria-labelledby="videoShortsModalLabel" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-fullscreen">
+        <div class="modal-content bg-black">
+            <!-- Header con controles -->
+            <div class="shorts-header">
+                <button type="button" class="btn btn-link text-white" data-bs-dismiss="modal" aria-label="Close">
+                    <i class="fas fa-times fs-4"></i>
+                </button>
+                <div class="header-info text-white">
+                    <span id="current-video-position">1</span> / <span id="total-videos-count">{{ total_videos or videos|length }}</span>
+                </div>
+                <button type="button" class="btn btn-link text-white" onclick="openCurrentVideoInSystem()">
+                    <i class="fas fa-external-link-alt fs-5"></i>
+                </button>
+            </div>
+
+            <!-- Contenedor principal de videos -->
+            <div class="shorts-container" id="shorts-container">
+                <!-- Los videos se cargarán dinámicamente aquí -->
+            </div>
+
+            <!-- Overlay de información del video -->
+            <div class="video-overlay" id="video-overlay">
+                <!-- Información del lado derecho -->
+                <div class="overlay-right">
+                    <div class="overlay-actions">
+                        <button class="action-btn" onclick="toggleVideoLike()" title="Me gusta">
+                            <i class="fas fa-heart"></i>
+                        </button>
+                        <button class="action-btn" onclick="editCurrentVideo()" title="Editar">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="action-btn" onclick="shareCurrentVideo()" title="Compartir">
+                            <i class="fas fa-share"></i>
+                        </button>
+                        <button class="action-btn" onclick="openCurrentVideoFolder()" title="Abrir carpeta">
+                            <i class="fas fa-folder-open"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Información del lado izquierdo/inferior -->
+                <div class="overlay-info">
+                    <div class="creator-info" id="current-creator-info">
+                        <div class="creator-name">@creador</div>
+                        <div class="video-title">Título del video</div>
+                    </div>
+                    
+                    <div class="music-info" id="current-music-info">
+                        <i class="fas fa-music"></i>
+                        <span class="music-text">Música original</span>
+                    </div>
+                    
+                    <div class="video-tags" id="current-video-tags">
+                        <!-- Tags/personajes dinámicos -->
+                    </div>
+                    
+                    <div class="video-metadata" id="current-video-metadata">
+                        <span class="metadata-item"><i class="fas fa-clock"></i> <span id="video-duration">0:00</span></span>
+                        <span class="metadata-item"><i class="fas fa-eye"></i> <span id="video-platform">TikTok</span></span>
+                        <span class="metadata-item"><i class="fas fa-calendar"></i> <span id="video-date">Fecha</span></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Navegación -->
+            <div class="shorts-navigation">
+                <button class="nav-btn nav-prev" onclick="previousVideo()" title="Video anterior (↑)">
+                    <i class="fas fa-chevron-up"></i>
+                </button>
+                <button class="nav-btn nav-next" onclick="nextVideo()" title="Siguiente video (↓)">
+                    <i class="fas fa-chevron-down"></i>
+                </button>
+            </div>
+
+            <!-- Indicador de carga -->
+            <div class="shorts-loading" id="shorts-loading" style="display: none;">
+                <div class="spinner-border text-light" role="status">
+                    <span class="visually-hidden">Cargando video...</span>
+                </div>
+            </div>
+
+            <!-- Instrucciones de uso -->
+            <div class="shorts-instructions" id="shorts-instructions">
+                <div class="instruction-text">
+                    <i class="fas fa-arrow-up"></i> / <i class="fas fa-arrow-down"></i> Navegar videos
+                    <br>
+                    <i class="fas fa-space-bar"></i> Pausar/Reproducir
+                    <br>
+                    <i class="fas fa-times"></i> ESC para salir
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de reproducción tradicional (mantener para compatibilidad) -->
 <div class="modal fade" id="videoPlayerModal" tabindex="-1" aria-labelledby="videoPlayerModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-xl">
         <div class="modal-content">
@@ -651,4 +749,5 @@
 
 {% block extra_js %}
 <script src="{{ url_for('static', filename='js/gallery.js') }}"></script>
+<script src="{{ url_for('static', filename='js/shorts.js') }}"></script>
 {% endblock %}
