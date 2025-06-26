@@ -484,9 +484,6 @@
                 <div class="header-info text-white">
                     <span id="current-video-position">1</span> / <span id="total-videos-count">{{ total_videos or videos|length }}</span>
                 </div>
-                <button type="button" class="btn btn-link text-white" onclick="openCurrentVideoInSystem()">
-                    <i class="fas fa-external-link-alt fs-5"></i>
-                </button>
             </div>
 
             <!-- Contenedor principal de videos -->
@@ -496,24 +493,6 @@
 
             <!-- Overlay de información del video -->
             <div class="video-overlay" id="video-overlay">
-                <!-- Información del lado derecho -->
-                <div class="overlay-right">
-                    <div class="overlay-actions">
-                        <button class="action-btn" onclick="toggleVideoLike()" title="Me gusta">
-                            <i class="fas fa-heart"></i>
-                        </button>
-                        <button class="action-btn" onclick="editCurrentVideo()" title="Editar">
-                            <i class="fas fa-edit"></i>
-                        </button>
-                        <button class="action-btn" onclick="shareCurrentVideo()" title="Compartir">
-                            <i class="fas fa-share"></i>
-                        </button>
-                        <button class="action-btn" onclick="openCurrentVideoFolder()" title="Abrir carpeta">
-                            <i class="fas fa-folder-open"></i>
-                        </button>
-                    </div>
-                </div>
-
                 <!-- Información del lado izquierdo/inferior -->
                 <div class="overlay-info">
                     <div class="creator-info" id="current-creator-info">
@@ -534,6 +513,24 @@
                         <span class="metadata-item"><i class="fas fa-clock"></i> <span id="video-duration">0:00</span></span>
                         <span class="metadata-item"><i class="fas fa-eye"></i> <span id="video-platform">TikTok</span></span>
                         <span class="metadata-item"><i class="fas fa-calendar"></i> <span id="video-date">Fecha</span></span>
+                    </div>
+                </div>
+
+                <!-- Información del lado derecho -->
+                <div class="overlay-right">
+                    <div class="overlay-actions">
+                        <button class="action-btn" onclick="toggleVideoLike()" title="Me gusta">
+                            <i class="fas fa-heart"></i>
+                        </button>
+                        <button class="action-btn" onclick="editCurrentVideo()" title="Editar">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="action-btn" onclick="shareCurrentVideo()" title="Compartir">
+                            <i class="fas fa-share"></i>
+                        </button>
+                        <button class="action-btn" onclick="openCurrentVideoFolder()" title="Abrir carpeta">
+                            <i class="fas fa-folder-open"></i>
+                        </button>
                     </div>
                 </div>
             </div>

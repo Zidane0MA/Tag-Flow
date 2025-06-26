@@ -12,26 +12,65 @@
 /* Header del modal shorts */
 .shorts-header {
     position: fixed;
-    top: 0;
+    top: 1rem;
     left: 0;
     right: 0;
     z-index: 1060;
     display: flex;
-    justify-content: space-between;
     align-items: center;
     padding: 1rem 1.5rem;
-    background: linear-gradient(180deg, rgba(0,0,0,0.7) 0%, transparent 100%);
+    background: transparent;
     pointer-events: none;
+    opacity: 1;
+    transition: opacity 0.5s ease-in-out;
+}
+
+/* Auto-hide del header después de 3 segundos */
+.shorts-header.auto-hide {
+    opacity: 0.3;
+}
+
+.shorts-header:hover {
+    opacity: 1;
 }
 
 .shorts-header > * {
     pointer-events: auto;
 }
 
+/* Botón de cerrar - posicionado a la izquierda */
+.shorts-header .btn-link {
+    position: absolute;
+    left: 1.5rem;
+    top: 50%;
+    transform: translateY(-50%);
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+    transition: all 0.3s ease;
+    pointer-events: auto;
+    z-index: 2;
+}
+
+.shorts-header .btn-link:hover {
+    color: white;
+    transform: translateY(-50%) scale(1.1);
+}
+
 .header-info {
     font-weight: 600;
     font-size: 0.9rem;
     letter-spacing: 0.5px;
+    text-align: center;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+    background: rgba(0, 0, 0, 0.4);
+    padding: 0.3rem 0.8rem;
+    border-radius: 15px;
+    backdrop-filter: blur(5px);
+    font-size: 0.85rem;
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: auto;
 }
 
 /* Contenedor principal de videos */
@@ -108,19 +147,36 @@
     bottom: 0;
     z-index: 1050;
     pointer-events: none;
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-end;
-    padding: 2rem 1.5rem 2rem 1.5rem;
+    /* Contenedor simple para elementos posicionados absolutamente */
 }
 
-/* Información del lado derecho */
+/* Información del lado izquierdo/inferior - posicionada como TikTok */
+.overlay-info {
+    position: absolute;
+    left: 35.6rem;
+    bottom: 0.8rem;
+    max-width: min(395px, calc(100vw - 120px));
+    min-width: 50px;
+    color: white;
+    pointer-events: auto;
+    text-align: left;
+    text-shadow: 2px 2px 6px rgba(0, 0, 0, 0.999); /* Sombra negra para el texto */
+    /* Asegurar que no se superponga con botones del lado derecho */
+}
+
+/* Información del lado derecho - posicionada absolutamente */
 .overlay-right {
+    position: absolute;
+    right: 1.6rem;
+    bottom: 1.6rem;
+    top: auto;
+    transform: none;
     display: flex;
     flex-direction: column;
-    align-items: center;
+    align-items: flex-end;
     gap: 1rem;
     pointer-events: auto;
+    padding-top: 0;
 }
 
 .overlay-actions {
@@ -159,14 +215,6 @@
     font-size: 1.2rem;
 }
 
-/* Información del lado izquierdo/inferior */
-.overlay-info {
-    flex: 1;
-    max-width: 60%;
-    color: white;
-    pointer-events: auto;
-}
-
 .creator-info {
     margin-bottom: 0.5rem;
 }
@@ -183,6 +231,9 @@
     line-height: 1.4;
     margin-bottom: 0.5rem;
     text-shadow: 1px 1px 2px rgba(0,0,0,0.7);
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    max-width: 100%;
 }
 
 .music-info {
@@ -246,7 +297,7 @@
 .shorts-navigation {
     position: fixed;
     right: 1rem;
-    top: 50%;
+    top: 47%;
     transform: translateY(-50%);
     z-index: 1055;
     display: flex;
@@ -256,33 +307,38 @@
 }
 
 .nav-btn {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.2);
-    border: none;
+    width: auto;
+    height: auto;
+    background: none !important;
+    border: none !important;
+    box-shadow: none !important;
     color: white;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all 0.3s ease;
-    backdrop-filter: blur(10px);
+    transition: color 0.2s;
+    padding: 0;
+    margin-right: 0.6rem;
+    font-size: 2.2rem;
     cursor: pointer;
 }
 
+.nav-btn i {
+    font-size: 2.2rem;
+    margin: 0;
+    padding: 0;
+    line-height: 1;
+}
+
+.nav-btn:focus {
+    outline: 2px solid #fff;
+    outline-offset: 2px;
+}
+
 .nav-btn:hover {
-    background: rgba(255, 255, 255, 0.3);
-    transform: scale(1.1);
-    color: white;
-}
-
-.nav-btn:disabled {
-    opacity: 0.3;
-    cursor: not-allowed;
-}
-
-.nav-btn:disabled:hover {
-    transform: none;
+    color: #ffd700;
+    background: none;
+    transform: scale(1.12);
 }
 
 /* Indicador de carga */
@@ -339,7 +395,17 @@
 /* Responsive */
 @media (max-width: 768px) {
     .overlay-info {
-        max-width: 70%;
+        left: 1rem;
+        bottom: 1.5rem;
+        max-width: 350px;
+        min-width: 220px;
+        max-width: calc(100vw - 100px); /* Espacio para botones más pequeños */
+    }
+    
+    .overlay-right {
+        right: 1rem;
+        gap: 0.8rem;
+        padding-top: 1.5rem;
     }
     
     .action-btn {
@@ -364,22 +430,33 @@
         font-size: 0.85rem;
     }
     
-    .video-overlay {
-        padding: 1.5rem 1rem 1.5rem 1rem;
-    }
-    
     .music-text {
         max-width: 150px;
+    }
+    
+    .shorts-header .btn-link {
+        left: 1rem;
+    }
+    
+    .header-info {
+        padding: 0.25rem 0.6rem;
+        font-size: 0.8rem;
     }
 }
 
 @media (max-width: 480px) {
-    .video-overlay {
-        padding: 1rem 0.75rem 1rem 0.75rem;
+    .overlay-info {
+        left: 0.75rem;
+        bottom: 1rem;
+        max-width: 280px;
+        min-width: 180px;
+        max-width: calc(100vw - 80px); /* Más ajustado para pantallas pequeñas */
     }
     
-    .overlay-info {
-        max-width: 75%;
+    .overlay-right {
+        right: 0.75rem;
+        gap: 0.7rem;
+        padding-top: 1rem;
     }
     
     .music-text {
@@ -388,6 +465,15 @@
     
     .shorts-header {
         padding: 0.75rem 1rem;
+    }
+    
+    .shorts-header .btn-link {
+        left: 0.75rem;
+    }
+    
+    .header-info {
+        padding: 0.2rem 0.5rem;
+        font-size: 0.75rem;
     }
     
     .action-btn {
@@ -415,12 +501,19 @@
 
 /* Modo landscape en móviles */
 @media (max-width: 896px) and (orientation: landscape) {
-    .video-overlay {
-        padding: 1rem 1rem 1rem 1rem;
+    .overlay-info {
+        left: 1rem;
+        bottom: 1rem;
+        max-width: 350px;
+        min-width: 200px;
+        max-width: calc(100vw - 120px);
     }
     
-    .overlay-info {
-        max-width: 50%;
+    .overlay-right {
+        right: 1rem;
+        bottom: 1rem;
+        top: auto;
+        padding-top: 0;
     }
     
     .creator-name {
@@ -515,8 +608,6 @@
 
 /* Efecto de glassmorphism para elementos flotantes */
 .action-btn,
-.nav-btn,
-.shorts-header,
 .shorts-instructions {
     backdrop-filter: blur(20px) saturate(180%);
     -webkit-backdrop-filter: blur(20px) saturate(180%);

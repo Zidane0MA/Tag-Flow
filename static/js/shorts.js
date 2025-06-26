@@ -63,6 +63,15 @@ function setupShortsEventListeners() {
     document.addEventListener('keydown', function(e) {
         if (!modalElement.classList.contains('show')) return;
         
+        // Mostrar header al usar teclado
+        const header = document.querySelector('.shorts-header');
+        if (header) {
+            header.classList.remove('auto-hide');
+            setTimeout(() => {
+                header.classList.add('auto-hide');
+            }, 3000);
+        }
+        
         switch(e.key) {
             case 'ArrowUp':
                 e.preventDefault();
@@ -87,10 +96,35 @@ function setupShortsEventListeners() {
     // Gestos táctiles para dispositivos móviles
     let startY = 0;
     let startTime = 0;
+    let headerHideTimeout;
+    
+    // Mostrar header al mover el mouse
+    modalElement.addEventListener('mousemove', function() {
+        const header = document.querySelector('.shorts-header');
+        if (header) {
+            header.classList.remove('auto-hide');
+            
+            // Limpiar timeout anterior y crear uno nuevo
+            clearTimeout(headerHideTimeout);
+            headerHideTimeout = setTimeout(() => {
+                header.classList.add('auto-hide');
+            }, 3000);
+        }
+    });
     
     modalElement.addEventListener('touchstart', function(e) {
         startY = e.touches[0].clientY;
         startTime = Date.now();
+        
+        // Mostrar header al tocar
+        const header = document.querySelector('.shorts-header');
+        if (header) {
+            header.classList.remove('auto-hide');
+            clearTimeout(headerHideTimeout);
+            headerHideTimeout = setTimeout(() => {
+                header.classList.add('auto-hide');
+            }, 3000);
+        }
     });
     
     modalElement.addEventListener('touchend', function(e) {
@@ -116,6 +150,14 @@ function setupShortsEventListeners() {
             const instructions = document.getElementById('shorts-instructions');
             if (instructions) {
                 instructions.style.display = 'none';
+            }
+        }, 4000);
+        
+        // Auto-hide del header después de 4 segundos
+        setTimeout(() => {
+            const header = document.querySelector('.shorts-header');
+            if (header) {
+                header.classList.add('auto-hide');
             }
         }, 4000);
     });
