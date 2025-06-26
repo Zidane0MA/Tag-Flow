@@ -133,36 +133,38 @@ python maintenance.py optimize-db
 ```
 Tag-Flow-V2/
 ├── 📄 DOCUMENTACIÓN
-│   ├── README.md                    # Esta guía
-│   ├── PROYECTO_ESTADO.md          # Estado y roadmap
-│   ├── COMANDOS.md                 # Referencia completa de comandos
-│   └── .env.example                # Plantilla de configuración
+│   ├── README.md                      # Esta guía
+│   ├── PROYECTO_ESTADO.md             # Estado y roadmap
+│   ├── COMANDOS.md                    # Referencia completa de comandos
+│   └── .env.example                   # Plantilla de configuración
 │
 ├── 🚀 SCRIPTS PRINCIPALES
-│   ├── main.py                     # Procesamiento de videos
-│   ├── app.py                      # Interfaz web Flask
-│   └── maintenance.py              # Herramientas de mantenimiento
+│   ├── main.py                        # Procesamiento de videos
+│   ├── app.py                         # Interfaz web Flask
+│   └── maintenance.py                 # Herramientas de mantenimiento
 │
 ├── 🧠 CÓDIGO FUENTE
 │   └── src/
-│       ├── database.py             # Gestión SQLite
-│       ├── external_sources.py     # Fuentes externas (NUEVO)
-│       ├── video_processor.py      # Procesamiento videos
-│       ├── music_recognition.py    # APIs musicales
-│       ├── face_recognition.py     # Reconocimiento facial
-│       └── thumbnail_generator.py  # Generación thumbnails
+│       ├── __init__.py                # Inicialización del paquete
+│       ├── database.py                # Gestión SQLite
+│       ├── downloader_integration.py  # Integración con 4K Video Downloader+
+│       ├── external_sources.py        # Fuentes externas (NUEVO)
+│       ├── video_processor.py         # Procesamiento videos
+│       ├── music_recognition.py       # APIs musicales
+│       ├── face_recognition.py        # Reconocimiento facial
+│       └── thumbnail_generator.py     # Generación thumbnails
 │
 ├── 🌐 INTERFAZ WEB
-│   ├── templates/                  # HTML templates
-│   └── static/                     # CSS, JS, iconos
+│   ├── templates/                     # HTML templates
+│   └── static/                        # CSS, JS, iconos
 │
 ├── 💾 DATOS
 │   └── data/
-│       ├── videos.db              # Base de datos SQLite
-│       └── thumbnails/            # Thumbnails generados
+│       ├── videos.db                  # Base de datos SQLite
+│       └── thumbnails/                # Thumbnails generados
 │
 └── 🎭 RECONOCIMIENTO FACIAL
-    └── caras_conocidas/           # Fotos de referencia por categoría
+    └── caras_conocidas/               # Fotos de referencia por categoría
 ```
 
 ## ⚙️ Configuración

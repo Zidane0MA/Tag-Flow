@@ -171,12 +171,40 @@ async function playVideoShorts(videoId) {
         
         // Esperar un momento para que el modal se muestre completamente
         setTimeout(async () => {
-            // Reproducir video inicial automáticamente
-            await playVideoAtIndex(videoIndex);
+            // Asegurar posicionamiento inicial
+            scrollToVideo(videoIndex);
             
-            // Precargar videos adyacentes
-            preloadAdjacentVideos();
-        }, 300);
+            // Dar tiempo para que el DOM se actualice y forzar reflow
+            setTimeout(async () => {
+                // Verificar que el video esté listo antes de reproducir
+                const initialVideo = document.getElementById(`shorts-video-${videoIndex}`);
+                if (initialVideo) {
+                    console.log(`🎬 Estado del video inicial: readyState=${initialVideo.readyState}`);
+                    
+                    // Forzar que el video sea visible
+                    initialVideo.style.opacity = '1';
+                    initialVideo.style.display = 'block';
+                    
+                    // Si el video no está listo, mostrar loader hasta que lo esté
+                    if (initialVideo.readyState < 3) {
+                        showVideoLoader(videoIndex);
+                        console.log(`⏳ Video inicial no listo, esperando...`);
+                    } else {
+                        hideVideoLoader(videoIndex);
+                        console.log(`✅ Video inicial listo para reproducir`);
+                    }
+                    
+                    // SOLO reproducir si aún es el video actual
+                    if (videoIndex === ShortsPlayer.currentIndex) {
+                        // Reproducir video inicial automáticamente
+                        await playVideoAtIndex(videoIndex);
+                    }
+                }
+                
+                // Precargar videos adyacentes
+                preloadAdjacentVideos();
+            }, 300);
+        }, 600);
         
     } catch (error) {
         console.error('Error abriendo shorts:', error);
@@ -300,11 +328,11 @@ async function createVideoElements() {
         videoElement.dataset.videoId = video.id;
         videoElement.dataset.index = index;
         
-        // Placeholder inicial
+        // Placeholder inicial con preloader
         videoElement.innerHTML = `
             <div class="video-preloader">
                 <div class="spinner-border text-light" role="status">
-                    <span class="visually-hidden">Cargando...</span>
+                    <span class="visually-hidden">Cargando video...</span>
                 </div>
             </div>
             <div class="video-progress">
@@ -313,7 +341,15 @@ async function createVideoElements() {
         `;
         
         ShortsPlayer.container.appendChild(videoElement);
+        
+        // Posicionar inicialmente
+        const offset = index * 100;
+        videoElement.style.transform = `translateY(${offset}vh)`;
+        
+        console.log(`📦 Elemento creado para video ${index}: ID=${video.id}`);
     });
+    
+    console.log(`✅ ${ShortsPlayer.videos.length} elementos de video creados`);
 }
 
 /**
@@ -352,13 +388,14 @@ async function loadVideoAtIndex(index) {
                 preload="metadata"
                 loop
                 playsinline
-                onloadeddata="console.log('Video ${index} loaded successfully')"
+                onloadeddata="onVideoDataLoaded(${index})"
+                oncanplay="onVideoCanPlay(${index})"
                 onloadedmetadata="console.log('Video ${index} metadata loaded'); updateVideoProgress(${index})"
                 ontimeupdate="updateVideoProgress(${index})"
                 onended="nextVideo()"
                 onclick="handleVideoClick(${index})"
                 onerror="console.error('Video ${index} error:', event)"
-                oncanplay="console.log('Video ${index} can play')"
+                onloadstart="console.log('Video ${index} load started')"
             >
                 <source src="/video-stream/${video.id}" type="video/mp4">
                 Tu navegador no soporta este formato de video.
@@ -448,32 +485,47 @@ async function navigateToVideo(index) {
     const previousIndex = ShortsPlayer.currentIndex;
     ShortsPlayer.currentIndex = index;
     
+    console.log(`🎯 Navegando de video ${previousIndex} a ${index}`);
+    
     // Pausar video anterior
     pauseVideoAtIndex(previousIndex);
     
-    // Cargar video actual si no está cargado
+    // Verificar si el video ya está cargado y listo
+    const videoElement = document.getElementById(`shorts-video-${index}`);
+    const isVideoReady = videoElement && videoElement.readyState >= 3; // HAVE_FUTURE_DATA
+    
     if (!ShortsPlayer.videos[index].loaded) {
+        console.log(`📥 Video ${index} no cargado, cargando...`);
         showShortsLoading(true);
         await loadVideoAtIndex(index);
         showShortsLoading(false);
+    } else if (!isVideoReady) {
+        console.log(`⏳ Video ${index} cargado pero no listo, esperando...`);
+        showVideoLoader(index);
+    } else {
+        console.log(`✅ Video ${index} ya está listo para reproducir`);
+        hideVideoLoader(index);
     }
     
-    // Reproducir video actual
-    await playVideoAtIndex(index);
-    
-    // Actualizar UI
+    // Actualizar UI primero (scroll)
+    scrollToVideo(index);
     updateShortsUI();
     
-    // Precargar videos adyacentes
-    preloadAdjacentVideos();
-    
-    // Scroll suave al video
-    scrollToVideo(index);
-    
-    // Permitir nuevas transiciones después de un breve delay
-    setTimeout(() => {
-        ShortsPlayer.isTransitioning = false;
-    }, 300);
+    // Esperar un momento antes de reproducir para evitar conflictos
+    setTimeout(async () => {
+        // Reproducir video actual solo si sigue siendo el video actual
+        if (index === ShortsPlayer.currentIndex) {
+            await playVideoAtIndex(index);
+        }
+        
+        // Precargar videos adyacentes
+        preloadAdjacentVideos();
+        
+        // Permitir nuevas transiciones después de un breve delay
+        setTimeout(() => {
+            ShortsPlayer.isTransitioning = false;
+        }, 300);
+    }, 200);
 }
 
 /**
@@ -486,16 +538,61 @@ async function playVideoAtIndex(index) {
         return;
     }
     
+    // Evitar múltiples llamadas simultáneas al mismo video
+    if (videoElement.dataset.isPlaying === 'true') {
+        console.log(`⚠️ Video ${index} ya está en proceso de reproducción`);
+        return;
+    }
+    
     console.log(`▶️ Intentando reproducir video ${index}`);
+    videoElement.dataset.isPlaying = 'true';
+    
+    // Esperar hasta que el video esté listo si no lo está
+    if (videoElement.readyState < 3) { // HAVE_FUTURE_DATA
+        console.log(`⏳ Video ${index} no está listo, esperando...`);
+        showVideoLoader(index);
+        
+        return new Promise((resolve) => {
+            const onCanPlay = () => {
+                console.log(`✅ Video ${index} ahora está listo`);
+                videoElement.removeEventListener('canplay', onCanPlay);
+                hideVideoLoader(index);
+                // Usar setTimeout para evitar llamadas recursivas inmediatas
+                setTimeout(() => {
+                    playVideoAtIndex(index).then(resolve);
+                }, 100);
+            };
+            
+            videoElement.addEventListener('canplay', onCanPlay);
+            
+            // Timeout de seguridad
+            setTimeout(() => {
+                videoElement.removeEventListener('canplay', onCanPlay);
+                hideVideoLoader(index);
+                console.warn(`⚠️ Timeout esperando video ${index}, intentando reproducir anyway`);
+                setTimeout(() => {
+                    playVideoAtIndex(index).then(resolve);
+                }, 100);
+            }, 3000);
+        });
+    }
     
     try {
         // Pausar video anterior si existe
         if (ShortsPlayer.currentVideo && ShortsPlayer.currentVideo !== videoElement) {
             ShortsPlayer.currentVideo.pause();
+            ShortsPlayer.currentVideo.dataset.isPlaying = 'false';
             console.log(`⏸️ Video anterior pausado`);
         }
         
-        videoElement.currentTime = 0;
+        // Asegurar que el loader esté oculto
+        hideVideoLoader(index);
+        
+        // SOLO reiniciar si el video no está cerca del inicio
+        // Esto evita el reinicio constante que causa el problema
+        if (videoElement.currentTime > 2) {
+            videoElement.currentTime = 0;
+        }
         
         // Intentar reproducir con audio primero
         videoElement.muted = false;
@@ -511,7 +608,11 @@ async function playVideoAtIndex(index) {
             try {
                 await videoElement.play();
                 console.log(`✅ Video ${index} reproduciéndose sin audio`);
-                TagFlow.utils.showNotification('Haz clic en el video para activar el audio', 'info');
+                
+                // Solo mostrar notificación la primera vez
+                if (index === ShortsPlayer.currentIndex) {
+                    TagFlow.utils.showNotification('Haz clic en el video para activar el audio', 'info');
+                }
             } catch (mutedError) {
                 console.error(`❌ Error reproduciendo video ${index} incluso sin audio:`, mutedError);
                 throw mutedError;
@@ -536,7 +637,13 @@ async function playVideoAtIndex(index) {
         
     } catch (error) {
         console.error(`❌ Error crítico reproduciendo video ${index}:`, error);
+        hideVideoLoader(index);
         TagFlow.utils.showNotification(`Error reproduciendo video ${index}`, 'error');
+    } finally {
+        // Limpiar flag después de un breve delay
+        setTimeout(() => {
+            videoElement.dataset.isPlaying = 'false';
+        }, 1000);
     }
 }
 
@@ -547,6 +654,63 @@ function pauseVideoAtIndex(index) {
     const videoElement = document.getElementById(`shorts-video-${index}`);
     if (videoElement) {
         videoElement.pause();
+        videoElement.dataset.isPlaying = 'false';
+    }
+}
+
+/**
+ * Callback cuando el video tiene datos cargados
+ */
+function onVideoDataLoaded(index) {
+    console.log(`📊 Video ${index} data loaded`);
+    hideVideoLoader(index);
+}
+
+/**
+ * Callback cuando el video puede reproducirse
+ */
+function onVideoCanPlay(index) {
+    console.log(`▶️ Video ${index} can play - ready for playback`);
+    hideVideoLoader(index);
+    
+    // Solo auto-iniciar si es el video actual Y aún no se está reproduciendo
+    if (index === ShortsPlayer.currentIndex) {
+        const videoElement = document.getElementById(`shorts-video-${index}`);
+        if (videoElement && videoElement.paused && videoElement.dataset.isPlaying !== 'true') {
+            console.log(`🎬 Auto-starting video ${index} since it's current and not playing`);
+            // Pequeño delay para evitar conflictos
+            setTimeout(() => {
+                playVideoAtIndex(index);
+            }, 150);
+        }
+    }
+}
+
+/**
+ * Ocultar loader específico de un video
+ */
+function hideVideoLoader(index) {
+    const videoElement = ShortsPlayer.container.querySelector(`[data-index="${index}"]`);
+    if (videoElement) {
+        const loader = videoElement.querySelector('.video-preloader');
+        if (loader) {
+            loader.style.display = 'none';
+            console.log(`🎯 Loader oculto para video ${index}`);
+        }
+    }
+}
+
+/**
+ * Mostrar loader específico de un video
+ */
+function showVideoLoader(index) {
+    const videoElement = ShortsPlayer.container.querySelector(`[data-index="${index}"]`);
+    if (videoElement) {
+        const loader = videoElement.querySelector('.video-preloader');
+        if (loader) {
+            loader.style.display = 'flex';
+            console.log(`⏳ Loader mostrado para video ${index}`);
+        }
     }
 }
 
@@ -601,6 +765,11 @@ function scrollToVideo(index) {
         
         if (i === index) {
             el.classList.add('active');
+            // Asegurar que el video esté visible
+            const video = el.querySelector('video');
+            if (video) {
+                video.style.opacity = '1';
+            }
             console.log(`✅ Video ${i} marcado como activo`);
         } else if (i < index) {
             el.classList.add('prev');
@@ -611,6 +780,9 @@ function scrollToVideo(index) {
         // Logging para debug
         console.log(`📍 Video ${i}: transform=${el.style.transform}, classes=${el.className}`);
     });
+    
+    // Forzar reflow para asegurar que las transformaciones se apliquen
+    ShortsPlayer.container.offsetHeight;
 }
 
 /**
@@ -776,18 +948,25 @@ function cleanupShortsPlayer() {
         pauseVideoAtIndex(index);
     });
     
+    // Ocultar todos los loaders
+    showShortsLoading(false);
+    ShortsPlayer.videos.forEach((video, index) => {
+        hideVideoLoader(index);
+    });
+    
     // Limpiar variables
     ShortsPlayer.currentIndex = 0;
     ShortsPlayer.videos = [];
     ShortsPlayer.currentVideo = null;
     ShortsPlayer.loadedVideos.clear();
+    ShortsPlayer.isTransitioning = false;
     
     // Limpiar contenedor
     if (ShortsPlayer.container) {
         ShortsPlayer.container.innerHTML = '';
     }
     
-    console.log('🧹 Reproductor de shorts limpiado');
+    console.log('🧹 Reproductor de shorts limpiado completamente');
 }
 
 /**
