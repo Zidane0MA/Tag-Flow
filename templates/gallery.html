@@ -62,7 +62,7 @@
                         <label for="filter-status" class="form-label">Estado de Edición</label>
                         <select class="form-select" id="filter-status" name="status" onchange="this.form.submit()">
                             <option value="">Todos</option>
-                            <option value="nulo" {% if request.args.get('status') == 'nulo' %}selected{% endif %}>Sin procesar</option>
+                            <option value="nulo" {% if request.args.get('status') == 'nulo' %}selected{% endif %}>Sin Edición</option>
                             <option value="en_proceso" {% if request.args.get('status') == 'en_proceso' %}selected{% endif %}>En proceso</option>
                             <option value="hecho" {% if request.args.get('status') == 'hecho' %}selected{% endif %}>Completado</option>
                         </select>
@@ -122,7 +122,7 @@
                     <span class="badge bg-info ms-1">Plataforma: {{ request.args.get('platform').title() }}</span>
                 {% endif %}
                 {% if request.args.get('status') %}
-                    <span class="badge bg-warning ms-1">Estado: {{ {'nulo': 'Sin procesar', 'en_proceso': 'En proceso', 'hecho': 'Completado'}.get(request.args.get('status'), request.args.get('status')) }}</span>
+                    <span class="badge bg-warning ms-1">Estado: {{ {'nulo': 'Sin Edición', 'en_proceso': 'En proceso', 'hecho': 'Completado'}.get(request.args.get('status'), request.args.get('status')) }}</span>
                 {% endif %}
                 {% if request.args.get('processing_status') %}
                     <span class="badge bg-success ms-1">Procesamiento: {{ request.args.get('processing_status').title() }}</span>
@@ -229,7 +229,7 @@
                     <!-- Badges de estado -->
                     <div class="card-badges">
                         <span class="badge bg-{{ 'success' if video.edit_status == 'hecho' else 'warning' if video.edit_status == 'en_proceso' else 'secondary' }}">
-                            {{ {'nulo': 'Sin procesar', 'en_proceso': 'En proceso', 'hecho': 'Completado'}.get(video.edit_status, video.edit_status) }}
+                            {{ {'nulo': 'Sin Edición', 'en_proceso': 'En proceso', 'hecho': 'Completado'}.get(video.edit_status, video.edit_status) }}
                         </span>
                         
                         {% if video.processing_status %}
@@ -320,9 +320,9 @@
                         
                         <!-- Botones de edición rápida de estado -->
                         <div class="btn-group btn-group-sm" role="group">
-                            <button type="button" class="btn btn-outline-secondary {{ 'active' if video.edit_status == 'nulo' else '' }}"
+                            <button type="button" class="btn  btn-outline-secondary {{ 'active' if video.edit_status == 'nulo' else '' }}"
                                     onclick="quickUpdateStatus('{{ video.id }}', 'nulo')"
-                                    title="Marcar como sin procesar">
+                                    title="Marcar como sin edición">
                                 <i class="fas fa-circle"></i>
                             </button>
                             <button type="button" class="btn btn-outline-warning {{ 'active' if video.edit_status == 'en_proceso' else '' }}"
@@ -670,7 +670,7 @@
                     <div class="mb-3">
                         <label for="edit-status" class="form-label">Estado de Edición</label>
                         <select class="form-select" id="edit-status" name="edit_status">
-                            <option value="nulo">Sin procesar</option>
+                            <option value="nulo">Sin Edición</option>
                             <option value="en_proceso">En proceso</option>
                             <option value="hecho">Completado</option>
                         </select>

@@ -91,7 +91,7 @@
                     
                     <!-- Estado del video -->
                     <span class="badge bg-{{ 'success' if video.edit_status == 'hecho' else 'warning' if video.edit_status == 'en_proceso' else 'secondary' }} fs-6">
-                        {{ {'nulo': 'Sin procesar', 'en_proceso': 'En proceso', 'hecho': 'Completado'}.get(video.edit_status, video.edit_status) }}
+                        {{ {'nulo': 'Sin Edición', 'en_proceso': 'En proceso', 'hecho': 'Completado'}.get(video.edit_status, video.edit_status) }}
                     </span>
                 </div>
                 
@@ -155,7 +155,7 @@
                         <div class="btn-group" role="group">
                             <button type="button" class="btn btn-outline-secondary {{ 'active' if video.edit_status == 'nulo' else '' }}"
                                     onclick="quickUpdateStatus('{{ video.id }}', 'nulo')">
-                                <i class="fas fa-circle me-1"></i>Sin procesar
+                                <i class="fas fa-circle me-1"></i>Sin Edición
                             </button>
                             <button type="button" class="btn btn-outline-warning {{ 'active' if video.edit_status == 'en_proceso' else '' }}"
                                     onclick="quickUpdateStatus('{{ video.id }}', 'en_proceso')">

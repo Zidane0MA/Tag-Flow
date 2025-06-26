@@ -376,9 +376,9 @@ function updateVideoCardInDOM(updatedVideo) {
         // Actualizar badges de estado de edición
         const statusBadges = videoCard.querySelectorAll('.badge');
         statusBadges.forEach(badge => {
-            if (badge.textContent.includes('Sin procesar') || badge.textContent.includes('En proceso') || badge.textContent.includes('Completado')) {
+            if (badge.textContent.includes('Sin Edición') || badge.textContent.includes('En proceso') || badge.textContent.includes('Completado')) {
                 const statusMap = {
-                    'nulo': { text: 'Sin procesar', class: 'bg-secondary' },
+                    'nulo': { text: 'Sin Edición', class: 'bg-secondary' },
                     'en_proceso': { text: 'En proceso', class: 'bg-warning' },
                     'hecho': { text: 'Completado', class: 'bg-success' }
                 };
@@ -511,7 +511,7 @@ async function quickUpdateStatus(videoId, newStatus) {
         }
         
         const statusLabels = {
-            'nulo': 'Sin procesar',
+            'nulo': 'Sin Edición',
             'en_proceso': 'En proceso', 
             'hecho': 'Completado'
         };
