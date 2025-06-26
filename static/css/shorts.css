@@ -34,6 +34,21 @@
     opacity: 1;
 }
 
+/* Auto-hide del overlay-info después de 3 segundos */
+.overlay-info.auto-hide {
+    opacity: 0.3;
+    transition: opacity 0.5s ease-in-out;
+}
+
+.overlay-info:hover {
+    opacity: 1 !important;
+}
+
+.overlay-info {
+    transition: opacity 0.5s ease-in-out;
+    cursor: default;
+}
+
 .shorts-header > * {
     pointer-events: auto;
 }

@@ -63,13 +63,22 @@ function setupShortsEventListeners() {
     document.addEventListener('keydown', function(e) {
         if (!modalElement.classList.contains('show')) return;
         
-        // Mostrar header al usar teclado
+        // Mostrar header y overlay-info al usar teclado
         const header = document.querySelector('.shorts-header');
+        const overlayInfo = document.querySelector('.overlay-info');
+        
         if (header) {
             header.classList.remove('auto-hide');
             setTimeout(() => {
                 header.classList.add('auto-hide');
-            }, 3000);
+            }, 2000);
+        }
+        
+        if (overlayInfo) {
+            overlayInfo.classList.remove('auto-hide');
+            setTimeout(() => {
+                overlayInfo.classList.add('auto-hide');
+            }, 2000);
         }
         
         switch(e.key) {
@@ -93,22 +102,87 @@ function setupShortsEventListeners() {
         }
     });
     
+    // Variables para throttling del scroll
+    let scrollTimeout = null;
+    let lastScrollTime = 0;
+    const scrollThreshold = 150; // ms entre scrolls
+    
+    // Navegación con scroll del mouse (wheel)
+    modalElement.addEventListener('wheel', function(e) {
+        if (!modalElement.classList.contains('show')) return;
+        
+        e.preventDefault(); // Prevenir scroll de página
+        
+        // Throttling para evitar scroll demasiado sensible
+        const currentTime = Date.now();
+        if (currentTime - lastScrollTime < scrollThreshold) {
+            return;
+        }
+        lastScrollTime = currentTime;
+        
+        // Mostrar header y overlay-info al usar wheel
+        const header = document.querySelector('.shorts-header');
+        const overlayInfo = document.querySelector('.overlay-info');
+        
+        if (header) {
+            header.classList.remove('auto-hide');
+            clearTimeout(headerHideTimeout);
+            headerHideTimeout = setTimeout(() => {
+                header.classList.add('auto-hide');
+            }, 2000);
+        }
+        
+        if (overlayInfo) {
+            overlayInfo.classList.remove('auto-hide');
+            clearTimeout(overlayInfoHideTimeout);
+            overlayInfoHideTimeout = setTimeout(() => {
+                overlayInfo.classList.add('auto-hide');
+            }, 2000);
+        }
+        
+        // Detectar dirección del scroll con umbral mínimo
+        const deltaThreshold = 10; // Umbral mínimo para activar scroll
+        
+        if (e.deltaY > deltaThreshold) {
+            // Scroll hacia abajo = siguiente video
+            console.log('🖱️ Scroll down: siguiente video');
+            nextVideo();
+        } else if (e.deltaY < -deltaThreshold) {
+            // Scroll hacia arriba = video anterior
+            console.log('🖱️ Scroll up: video anterior');
+            previousVideo();
+        }
+    }, { passive: false }); // passive: false para poder usar preventDefault
+    
     // Gestos táctiles para dispositivos móviles
     let startY = 0;
     let startTime = 0;
     let headerHideTimeout;
+    let overlayInfoHideTimeout;
     
-    // Mostrar header al mover el mouse
+    // Mostrar header y overlay-info al mover el mouse
     modalElement.addEventListener('mousemove', function() {
         const header = document.querySelector('.shorts-header');
+        const overlayInfo = document.querySelector('.overlay-info');
+        
         if (header) {
             header.classList.remove('auto-hide');
             
-            // Limpiar timeout anterior y crear uno nuevo
+            // Limpiar timeout anterior y crear uno nuevo para header
             clearTimeout(headerHideTimeout);
             headerHideTimeout = setTimeout(() => {
                 header.classList.add('auto-hide');
-            }, 3000);
+            }, 2000);
+        }
+        
+        if (overlayInfo) {
+            overlayInfo.classList.remove('auto-hide');
+            
+            // Limpiar timeout anterior y crear uno nuevo para overlay-info
+            clearTimeout(overlayInfoHideTimeout);
+            overlayInfoHideTimeout = setTimeout(() => {
+                overlayInfo.classList.add('auto-hide');
+            }, 2000);
         }
     });
     
@@ -116,14 +190,24 @@ function setupShortsEventListeners() {
         startY = e.touches[0].clientY;
         startTime = Date.now();
         
-        // Mostrar header al tocar
+        // Mostrar header y overlay-info al tocar
         const header = document.querySelector('.shorts-header');
+        const overlayInfo = document.querySelector('.overlay-info');
+        
         if (header) {
             header.classList.remove('auto-hide');
             clearTimeout(headerHideTimeout);
             headerHideTimeout = setTimeout(() => {
                 header.classList.add('auto-hide');
-            }, 3000);
+            }, 2000);
+        }
+        
+        if (overlayInfo) {
+            overlayInfo.classList.remove('auto-hide');
+            clearTimeout(overlayInfoHideTimeout);
+            overlayInfoHideTimeout = setTimeout(() => {
+                overlayInfo.classList.add('auto-hide');
+            }, 2000);
         }
     });
     
@@ -151,15 +235,41 @@ function setupShortsEventListeners() {
             if (instructions) {
                 instructions.style.display = 'none';
             }
-        }, 4000);
+        }, 3000);
         
-        // Auto-hide del header después de 4 segundos
+        // Auto-hide del header después de 2.5 segundos
         setTimeout(() => {
             const header = document.querySelector('.shorts-header');
             if (header) {
                 header.classList.add('auto-hide');
             }
-        }, 4000);
+        }, 2500);
+        
+        // Auto-hide del overlay-info después de 2.5 segundos
+        setTimeout(() => {
+            const overlayInfo = document.querySelector('.overlay-info');
+            if (overlayInfo) {
+                overlayInfo.classList.add('auto-hide');
+            }
+        }, 2500);
+        
+        // Agregar event listeners específicos para overlay-info hover
+        setTimeout(() => {
+            const overlayInfo = document.querySelector('.overlay-info');
+            if (overlayInfo) {
+                overlayInfo.addEventListener('mouseenter', function() {
+                    this.classList.remove('auto-hide');
+                    clearTimeout(overlayInfoHideTimeout);
+                });
+                
+                overlayInfo.addEventListener('mouseleave', function() {
+                    clearTimeout(overlayInfoHideTimeout);
+                    overlayInfoHideTimeout = setTimeout(() => {
+                        this.classList.add('auto-hide');
+                    }, 1500); // Más corto después del hover
+                });
+            }
+        }, 100); // Pequeño delay para asegurar que el elemento existe
     });
     
     // Cleanup al cerrar modal
@@ -1007,6 +1117,13 @@ function cleanupShortsPlayer() {
     if (ShortsPlayer.container) {
         ShortsPlayer.container.innerHTML = '';
     }
+    
+    // Limpiar clases auto-hide para reset
+    const headerElements = document.querySelectorAll('.shorts-header');
+    const overlayInfoElements = document.querySelectorAll('.overlay-info');
+    
+    headerElements.forEach(header => header.classList.remove('auto-hide'));
+    overlayInfoElements.forEach(overlay => overlay.classList.remove('auto-hide'));
     
     console.log('🧹 Reproductor de shorts limpiado completamente');
 }
