@@ -1,0 +1,113 @@
+{
+  "creator_to_character": {
+    "hutao_cosplayer": "Hu Tao",
+    "raiden_official": "Raiden Shogun",
+    "miku_dancer": "Hatsune Miku",
+    "genshin_hutao_main": "Hutao",
+    "elysia_honkai_fan": "Elysia",
+    "nezuko_cosplay_girl": "Nezuko",
+    "hutao_main_fan": "Hutao",
+    "burnice_zzz_main": "Burnice",
+    "firefly_hsr_cosplayer": "Firefly",
+    "hutao_genshin_fan": "Hutao",
+    "elysia_hi3_dancer": "Elysia",
+    "nezuko_demon_slayer": "Nezuko",
+    "burnice_zzz_official": "Burnice"
+  },
+  "character_to_creators": {
+    "Hu Tao": [
+      "hutao_cosplayer",
+      "hutao_main"
+    ],
+    "Raiden Shogun": [
+      "raiden_official",
+      "ei_cosplay"
+    ],
+    "Hatsune Miku": [
+      "miku_dancer",
+      "miku_official"
+    ],
+    "Hutao": [
+      "genshin_hutao_main",
+      "hutao_main_fan",
+      "hutao_genshin_fan"
+    ],
+    "Elysia": [
+      "elysia_honkai_fan",
+      "elysia_hi3_dancer"
+    ],
+    "Nezuko": [
+      "nezuko_cosplay_girl",
+      "nezuko_demon_slayer"
+    ],
+    "Burnice": [
+      "burnice_zzz_main",
+      "burnice_zzz_official"
+    ],
+    "Firefly": [
+      "firefly_hsr_cosplayer"
+    ]
+  },
+  "auto_detected": {
+    "genshin_hutao_main": {
+      "character": "Hutao",
+      "game": "genshin_impact",
+      "detected_at": 1750982328.1016502,
+      "confidence": 0.7
+    },
+    "elysia_honkai_fan": {
+      "character": "Elysia",
+      "game": "honkai_impact",
+      "detected_at": 1750982328.1026478,
+      "confidence": 0.7
+    },
+    "nezuko_cosplay_girl": {
+      "character": "Nezuko",
+      "game": "other_popular",
+      "detected_at": 1750982328.1026478,
+      "confidence": 0.7
+    },
+    "hutao_main_fan": {
+      "character": "Hutao",
+      "game": "genshin_impact",
+      "detected_at": 1750982328.1026478,
+      "confidence": 0.7
+    },
+    "burnice_zzz_main": {
+      "character": "Burnice",
+      "game": "zenless_zone_zero",
+      "detected_at": 1750982825.068079,
+      "confidence": 0.7
+    },
+    "firefly_hsr_cosplayer": {
+      "character": "Firefly",
+      "game": "honkai_star_rail",
+      "detected_at": 1750982825.069357,
+      "confidence": 0.7
+    },
+    "hutao_genshin_fan": {
+      "character": "Hutao",
+      "game": "genshin_impact",
+      "detected_at": 1750982825.069357,
+      "confidence": 0.7
+    },
+    "elysia_hi3_dancer": {
+      "character": "Elysia",
+      "game": "honkai_impact",
+      "detected_at": 1750982825.069357,
+      "confidence": 0.7
+    },
+    "nezuko_demon_slayer": {
+      "character": "Nezuko",
+      "game": "other_popular",
+      "detected_at": 1750982825.070357,
+      "confidence": 0.7
+    },
+    "burnice_zzz_official": {
+      "character": "Burnice",
+      "game": "zenless_zone_zero",
+      "detected_at": 1750982825.070357,
+      "confidence": 0.7
+    }
+  }
+}

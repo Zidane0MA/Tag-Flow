@@ -19,6 +19,7 @@ from config import config
 from src.database import db
 from src.external_sources import external_sources
 from src.thumbnail_generator import thumbnail_generator
+from src.character_intelligence import character_intelligence
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -637,13 +638,193 @@ class MaintenanceUtils:
             logger.error(f"Error generando reporte: {e}")
             return None
 
+    def show_character_stats(self):
+        """Mostrar estadísticas del sistema de inteligencia de personajes"""
+        logger.info("Obteniendo estadísticas de Character Intelligence...")
+        
+        stats = character_intelligence.get_stats()
+        
+        print("\nINTELIGENCIA DE PERSONAJES")
+        print("=" * 50)
+        print(f"Personajes conocidos: {stats['total_characters']}")
+        print(f"Juegos/Series: {stats['total_games']}")
+        print(f"Mapeos creador->personaje: {stats['creator_mappings']}")
+        print(f"Auto-detectados: {stats['auto_detected_mappings']}")
+        print(f"BD Personajes: {stats['database_file']}")
+        print(f"BD Mapeos: {stats['mapping_file']}")
+        
+        # Mostrar personajes por juego
+        print(f"\nPersonajes por juego:")
+        for game, game_data in character_intelligence.character_db.items():
+            count = len(game_data['characters'])
+            print(f"  {game.replace('_', ' ').title()}: {count}")
+        
+        # Mostrar mapeos recientes
+        auto_detected = character_intelligence.creator_mapping.get('auto_detected', {})
+        if auto_detected:
+            print(f"\nMapeos Auto-Detectados Recientes:")
+            for creator, data in list(auto_detected.items())[-5:]:  # Últimos 5
+                print(f"  {creator} -> {data['character']} ({data['game']})")
+    
+    def add_custom_character(self, character_name: str, game: str, aliases: list = None):
+        """Agregar un personaje personalizado"""
+        logger.info(f"Agregando personaje personalizado: {character_name} ({game})")
+        
+        success = character_intelligence.add_custom_character(character_name, game, aliases)
+        
+        if success:
+            print(f"[OK] Personaje agregado: {character_name}")
+            if aliases:
+                print(f"   Aliases: {', '.join(aliases)}")
+        else:
+            print(f"[ERROR] Error agregando personaje: {character_name}")
+    
+    def download_character_images(self, character_name: str = None, game: str = None, limit: int = None):
+        """Descargar imágenes de referencia para personajes"""
+        if character_name:
+            # Descargar para un personaje específico
+            logger.info(f"Descargando imagen para {character_name}...")
+            image_path = character_intelligence.download_character_reference_image(character_name, game)
+            if image_path:
+                print(f"[OK] Imagen descargada: {image_path}")
+            else:
+                print(f"[ERROR] No se pudo descargar imagen para {character_name}")
+        else:
+            # Descargar para personajes sin imagen
+            logger.info("Descargando imágenes para personajes sin referencia...")
+            
+            # Encontrar personajes sin imagen en caras_conocidas
+            missing_count = 0
+            processed = 0
+            
+            for game, game_data in character_intelligence.character_db.items():
+                if limit and processed >= limit:
+                    break
+                    
+                for character in game_data['characters']:
+                    if limit and processed >= limit:
+                        break
+                    
+                    # Verificar si ya tiene imagen
+                    game_dir = character_intelligence.known_faces_path / game.replace('_', ' ').title()
+                    image_extensions = ['.jpg', '.jpeg', '.png', '.bmp', '.webp']
+                    has_image = any((game_dir / f"{character}{ext}").exists() for ext in image_extensions)
+                    
+                    if not has_image:
+                        logger.info(f"Descargando imagen para {character}...")
+                        image_path = character_intelligence.download_character_reference_image(character, game)
+                        if image_path:
+                            print(f"[OK] {character}")
+                        else:
+                            print(f"[ERROR] {character}")
+                        missing_count += 1
+                    
+                    processed += 1
+            
+            print(f"\nProcesados: {processed}, Sin imagen: {missing_count}")
+            print("Nota: La descarga automatica requiere configurar APIs de busqueda de imagenes")
+    
+    def analyze_existing_titles(self, limit: int = None):
+        """Analizar títulos existentes para detectar personajes"""
+        logger.info("Analizando títulos existentes para detectar personajes...")
+        
+        # Obtener videos sin personajes detectados
+        videos = db.get_videos({'no_characters': True}, limit=limit)
+        
+        if not videos:
+            print("No hay videos sin personajes para analizar")
+            return
+        
+        analyzed = 0
+        detected = 0
+        
+        for video in videos:
+            title = video.get('title', '')
+            if not title:
+                continue
+            
+            # Analizar título
+            suggestions = character_intelligence.analyze_video_title(title)
+            
+            if suggestions:
+                # Actualizar base de datos con sugerencias
+                detected_chars = [s['name'] for s in suggestions]
+                db.update_video(video['id'], {'detected_characters': detected_chars})
+                
+                print(f"[OK] {video['file_name'][:50]}... -> {', '.join(detected_chars)}")
+                detected += 1
+            
+            analyzed += 1
+        
+        print(f"\nAnalizados: {analyzed}, Con personajes detectados: {detected}")
+    
+    def update_creator_mappings(self, limit: int = None):
+        """Actualizar mapeos de creadores basado en videos existentes"""
+        logger.info("Actualizando mapeos creador → personaje...")
+        
+        # Obtener todos los creadores únicos
+        videos = db.get_videos(limit=limit)
+        creator_stats = {}
+        
+        for video in videos:
+            creator = video.get('creator_name', '')
+            if not creator:
+                continue
+            
+            if creator not in creator_stats:
+                creator_stats[creator] = {
+                    'total_videos': 0,
+                    'characters_detected': [],
+                    'platforms': set()
+                }
+            
+            creator_stats[creator]['total_videos'] += 1
+            creator_stats[creator]['platforms'].add(video.get('platform', 'unknown'))
+            
+            # Agregar personajes detectados
+            detected_chars = video.get('detected_characters', [])
+            if isinstance(detected_chars, str):
+                import json
+                try:
+                    detected_chars = json.loads(detected_chars)
+                except:
+                    detected_chars = []
+            
+            for char in detected_chars:
+                if char not in creator_stats[creator]['characters_detected']:
+                    creator_stats[creator]['characters_detected'].append(char)
+        
+        # Analizar patrones y sugerir mapeos
+        suggested_mappings = 0
+        
+        print("\nANALISIS DE CREADORES")
+        print("=" * 40)
+        
+        for creator, stats in creator_stats.items():
+            if stats['total_videos'] >= 3:  # Al menos 3 videos para sugerir mapeo
+                chars = stats['characters_detected']
+                if len(chars) == 1:  # Siempre el mismo personaje
+                    # Sugerir mapeo automático
+                    character = chars[0]
+                    suggestion = character_intelligence.analyze_creator_name(creator)
+                    
+                    if not suggestion:  # Si no existe mapeo
+                        print(f"Sugerencia de mapeo: {creator} -> {character}")
+                        print(f"   Videos: {stats['total_videos']}, Plataformas: {', '.join(stats['platforms'])}")
+                        suggested_mappings += 1
+        
+        print(f"\nCreadores analizados: {len(creator_stats)}")
+        print(f"Mapeos sugeridos: {suggested_mappings}")
+        print("Para aplicar mapeos automaticamente, edita creator_character_mapping.json")
+
 def main():
     """Función principal con CLI"""
     parser = argparse.ArgumentParser(description='Tag-Flow V2 - Utilidades de Mantenimiento')
     parser.add_argument('action', choices=[
         'backup', 'clean-thumbnails', 'verify', 'regenerate-thumbnails', 
         'optimize-db', 'report', 'populate-db', 'clear-db', 'populate-thumbnails',
-        'clear-thumbnails', 'show-stats'
+        'clear-thumbnails', 'show-stats', 'character-stats', 'add-character',
+        'download-character-images', 'analyze-titles', 'update-creator-mappings'
     ], help='Acción a realizar')
     
     # Argumentos generales
@@ -655,6 +836,11 @@ def main():
                         help='Fuente de datos (db=bases datos externas, organized=carpetas organizadas, all=ambas)')
     parser.add_argument('--platform', choices=['youtube', 'tiktok', 'instagram'],
                         help='Plataforma específica (opcional)')
+    
+    # Argumentos específicos para gestión de personajes
+    parser.add_argument('--character', type=str, help='Nombre del personaje')
+    parser.add_argument('--game', type=str, help='Juego o serie del personaje')
+    parser.add_argument('--aliases', nargs='*', help='Nombres alternativos del personaje')
     
     args = parser.parse_args()
     
@@ -691,6 +877,19 @@ def main():
         utils.clear_thumbnails(platform=args.platform, force=args.force)
     elif args.action == 'show-stats':
         utils.show_sources_stats()
+    elif args.action == 'character-stats':
+        utils.show_character_stats()
+    elif args.action == 'add-character':
+        if not args.character or not args.game:
+            logger.error("Se requiere --character y --game para agregar personaje")
+            return
+        utils.add_custom_character(args.character, args.game, args.aliases)
+    elif args.action == 'download-character-images':
+        utils.download_character_images(args.character, args.game, args.limit)
+    elif args.action == 'analyze-titles':
+        utils.analyze_existing_titles(args.limit)
+    elif args.action == 'update-creator-mappings':
+        utils.update_creator_mappings(args.limit)
 
 if __name__ == '__main__':
     main()

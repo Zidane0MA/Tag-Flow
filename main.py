@@ -161,6 +161,7 @@ class VideoAnalyzer:
                                     'file_name': video_file.name,
                                     'creator_name': self._infer_creator_name(video_file),
                                     'platform': 'tiktok',  # Valor por defecto para escaneo local
+                                    'title': video_file.stem,  # ✅ Agregar título desde nombre de archivo
                                     'content_type': 'video'
                                 }
                                 new_videos.append(video_data)
@@ -260,16 +261,31 @@ class VideoAnalyzer:
                 except Exception as e:
                     logger.warning(f"  Error en reconocimiento musical: {e}")
             
-            # 6. Reconocimiento facial (frame del segundo 2)
-            faces_result = {'detected_characters': [], 'recognition_source': None}
+            # 6. Reconocimiento facial inteligente (combina visual + título + creador)
+            faces_result = {'detected_characters': [], 'recognition_sources': []}
             
-            logger.info(f"  Analizando caras/personajes...")
+            logger.info(f"  Analizando personajes con IA mejorada...")
             try:
                 frame_data = video_processor.get_video_frame(video_path, timestamp=2.0)
                 if frame_data:
-                    faces_result = face_recognizer.recognize_faces(frame_data)
+                    # Preparar datos del video para análisis inteligente
+                    video_data_for_recognition = {
+                        'title': video_data.get('title', ''),
+                        'creator_name': video_data.get('creator_name', ''),
+                        'platform': video_data.get('platform', 'unknown')
+                    }
+                    
+                    # Usar reconocimiento inteligente que combina todas las estrategias
+                    faces_result = face_recognizer.recognize_faces_intelligent(frame_data, video_data_for_recognition)
+                    
+                    if faces_result.get('detected_characters'):
+                        logger.info(f"  ✅ Personajes detectados: {', '.join(faces_result['detected_characters'])}")
+                        logger.info(f"  📊 Fuentes: {', '.join(faces_result.get('recognition_sources', []))}")
+                    else:
+                        logger.info(f"  ℹ️ No se detectaron personajes conocidos")
+                        
             except Exception as e:
-                logger.warning(f"  Error en reconocimiento facial: {e}")
+                logger.warning(f"  Error en reconocimiento de personajes: {e}")
             
             # 7. Actualizar base de datos con resultados
             updates = {
@@ -423,11 +439,20 @@ class VideoAnalyzer:
         # Convertir a formato compatible con process_video
         pending_videos = []
         for video in pending_videos_db:
+            # Usar file_name como título, limpiando numeración inicial
+            raw_title = video['file_name']
+            # Remover extensión
+            title = Path(raw_title).stem
+            # Limpiar numeración inicial (ej: "501. " -> "")
+            if '. ' in title:
+                title = title.split('. ', 1)[1]
+            
             video_data = {
                 'file_path': video['file_path'],
                 'file_name': video['file_name'],
                 'creator_name': video['creator_name'],
                 'platform': video['platform'],
+                'title': title,  # ✅ Título derivado de file_name
                 'content_type': 'video',
                 'existing_video_id': video['id']  # Marcador para identificar que ya existe
             }

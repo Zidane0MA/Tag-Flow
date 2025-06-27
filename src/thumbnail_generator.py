@@ -28,7 +28,7 @@ class ThumbnailGenerator:
         self.add_watermark = True
         self.watermark_text = "Tag-Flow"
         
-    def generate_thumbnail(self, video_path: Path, timestamp: float = 1.0, 
+    def generate_thumbnail(self, video_path: Path, timestamp: float = 3.0, 
                           force_regenerate: bool = False) -> Optional[Path]:
         """
         Generar thumbnail optimizado de un video

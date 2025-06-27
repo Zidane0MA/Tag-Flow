@@ -8,7 +8,7 @@
 config/tag-flow-0268193d12b4.json
 
 # Base de datos y datos generados
-data/
+!data/
 *.db
 *.sqlite
 *.sqlite3
@@ -16,7 +16,8 @@ datos_videos.json
 videos.db
 
 # Thumbnails y archivos generados
-thumbnails/
+thumbnails/*
+!thumbnails/.gitkeep
 static/uploads/
 temp/
 tmp/
@@ -39,6 +40,7 @@ caras_conocidas/**/*.webp
 *.m4v
 *.wav
 *.mp3
+*.jpe
 
 # Directorios de videos
 videos_input/
