@@ -202,32 +202,51 @@ class CharacterIntelligence:
                             'source': 'database_alias'
                         })
         
-        # Patrones genéricos para detección por cosplay/hashtags (MÁS RESTRICTIVOS)
+        # Patrones genéricos MEJORADOS - Solo para casos específicos y validados
         generic_patterns = [
+            # DESHABILITADOS los patrones genéricos problemáticos
+            # Solo mantener patrones muy específicos que ya estén en la base de datos
+            
+            # Patrón para hashtags de personajes específicos (solo si están en BD)
             {
-                'pattern': r'(\w{3,})\s*(cosplay|コスプレ|cos)\b',  # Mínimo 3 caracteres
-                'character': 'extract_name',
+                'pattern': r'#([A-Z][a-zA-Z]{2,}(?:\s+[A-Z][a-zA-Z]+)*)\s*(?:cos|cosplay|コスプレ)',
+                'character': 'extract_hashtag_verified_only', 
                 'game': 'unknown',
-                'source': 'generic_cosplay'
+                'source': 'verified_hashtag_cosplay'
             },
+            # Patrón para títulos claros con nombres conocidos
             {
-                'pattern': r'#(\w{3,})(cos|cosplay|コスプレ)',  # Mínimo 3 caracteres
-                'character': 'extract_hashtag', 
+                'pattern': r'\b([A-Z][a-zA-Z]{2,}(?:\s+[A-Z][a-zA-Z]+)*)\s*-\s*\w+',  # "Personaje - algo"
+                'character': 'extract_title_prefix_verified_only',
                 'game': 'unknown',
-                'source': 'generic_hashtag'
-            },
-            {
-                'pattern': r'(\w{4,})\s*(dance|ダンス|댄스)\b',  # Mínimo 4 caracteres para dance
-                'character': 'extract_name',
-                'game': 'unknown', 
-                'source': 'generic_dance'
-            },
-            {
-                'pattern': r'(\w{4,})\s*(MMD|mmd)\b',  # Mínimo 4 caracteres para MMD
-                'character': 'extract_name',
-                'game': 'unknown',
-                'source': 'generic_mmd'
+                'source': 'verified_title_prefix'
             }
+            
+            # COMENTAMOS los patrones problemáticos:
+            # {
+            #     'pattern': r'(\w{3,})\s*(cosplay|コスプレ|cos)\b',  # DEMASIADO GENÉRICO
+            #     'character': 'extract_name',
+            #     'game': 'unknown',
+            #     'source': 'generic_cosplay'
+            # },
+            # {
+            #     'pattern': r'#(\w{3,})(cos|cosplay|コスプレ)',  # CAPTURA FRAGMENTOS
+            #     'character': 'extract_hashtag', 
+            #     'game': 'unknown',
+            #     'source': 'generic_hashtag'
+            # },
+            # {
+            #     'pattern': r'(\w{4,})\s*(dance|ダンス|댄스)\b',  # CAPTURA "forte", "MaMaMa"
+            #     'character': 'extract_name',
+            #     'game': 'unknown', 
+            #     'source': 'generic_dance'
+            # },
+            # {
+            #     'pattern': r'(\w{4,})\s*(MMD|mmd)\b',  # CAPTURA JUEGOS 
+            #     'character': 'extract_name',
+            #     'game': 'unknown',
+            #     'source': 'generic_mmd'
+            # }
         ]
         
         # Combinar patrones específicos + genéricos
@@ -245,14 +264,44 @@ class CharacterIntelligence:
 
         logger.info(f"Analizando título con {len(self.character_patterns)} patrones: {title}")
         
-        # Lista de palabras a excluir (no son nombres de personajes)
+        # Lista de palabras a excluir (no son nombres de personajes) - EXPANDIDA
         excluded_words = {
+            # Palabras comunes de videos
             'mmd', 'dance', 'cosplay', 'cos', 'shorts', 'tiktok', 'video', 'compilation', 
             'trending', 'viral', 'new', 'best', 'top', 'epic', 'amazing', 'cool', 'random',
+            'showcase', 'multiple', 'characters', 'with', 'and', 'the', 'for', 'from', 'by',
+            'made', 'using', 'model', 'models', 'animation', 'edit', 'edited', 'original',
+            'official', 'fanmade', 'fan', 'creator', 'artist', 'studio', 'team',
+            
+            # Nombres de juegos/franquicias
             'genshin', 'honkai', 'impact', 'zenless', 'zone', 'zero', 'star', 'rail',
             'hsr', 'hi3', 'zzz', 'genshinimpact', 'honkaiimpact', 'honkaistarrail',
-            'wuthering', 'waves', 'animegameycosplay', 'anime', 'game', 'gaming',
-            'shogun', 'showcase', 'multiple', 'characters', 'with', 'and', 'the'
+            'zenlesszonezero', 'wuthering', 'waves', 'wutheringwaves', 'vocaloid',
+            'mihoyo', 'hoyoverse', 'cognosphere',
+            
+            # Hashtags problemáticos y fragmentos 
+            'animegamey', 'animegameycosplay', 'anime', 'game', 'gaming', 'gamecos',
+            'gamecharacter', 'gamecosplay', 'animecos', 'animecosplay', 'otaku',
+            'weeb', 'kawaii', 'manga', 'manhwa', 'manhua',
+            
+            # Palabras de baile/música comunes
+            'forte', 'mamama', 'batte', 'dance', 'song', 'music', 'beat', 'rhythm',
+            'choreo', 'choreography', 'cover', 'remix', 'version', 'ver', 'mv',
+            'pv', 'theme', 'opening', 'ending', 'ost', 'bgm',
+            
+            # Términos técnicos
+            'fps', '60fps', '4k', 'hd', 'uhd', 'quality', 'high', 'low', 'medium',
+            'render', 'rendered', 'motion', 'capture', 'mocap', 'effect', 'effects',
+            'shader', 'lighting', 'camera', 'angle', 'view',
+            
+            # Palabras de redes sociales
+            'follow', 'like', 'subscribe', 'share', 'comment', 'hashtag', 'tag',
+            'trending', 'fyp', 'foryou', 'foryoupage', 'viral', 'explore',
+            
+            # Términos generales adicionales
+            'shogun', 'archon', 'element', 'electro', 'pyro', 'hydro', 'cryo', 'geo', 'anemo', 'dendro',
+            'physical', 'quantum', 'ice', 'fire', 'wind', 'earth', 'water', 'lightning',
+            'sword', 'bow', 'catalyst', 'claymore', 'polearm', 'weapon', 'weapons'
         }
         
         # Buscar patrones conocidos
@@ -306,6 +355,42 @@ class CharacterIntelligence:
                             if len(character_name) < 5:
                                 continue
                             source_type = f"hashtag_unverified_{source_type}"
+                    
+                    elif pattern_info['character'] == 'extract_hashtag_verified_only':
+                        # NUEVO: Solo aceptar si está verificado en BD
+                        character_name = match.group(1).strip()
+                        
+                        # Filtrar palabras excluidas
+                        if character_name.lower() in excluded_words:
+                            continue
+                        
+                        # OBLIGATORIO: Debe estar en la base de datos
+                        verified_character = self._verify_character_name(character_name)
+                        if verified_character:
+                            character_name = verified_character['name']
+                            game = verified_character['game']
+                            source_type = f"hashtag_verified_strict_{source_type}"
+                        else:
+                            # Si no está verificado, rechazarlo completamente
+                            continue
+                    
+                    elif pattern_info['character'] == 'extract_title_prefix_verified_only':
+                        # NUEVO: Solo extraer prefijos de título si están verificados
+                        character_name = match.group(1).strip()
+                        
+                        # Filtrar palabras excluidas
+                        if character_name.lower() in excluded_words:
+                            continue
+                        
+                        # OBLIGATORIO: Debe estar en la base de datos
+                        verified_character = self._verify_character_name(character_name)
+                        if verified_character:
+                            character_name = verified_character['name']
+                            game = verified_character['game'] 
+                            source_type = f"title_verified_strict_{source_type}"
+                        else:
+                            # Si no está verificado, rechazarlo completamente
+                            continue
                             
                     else:
                         # Patrón específico de la base de datos - ya está verificado

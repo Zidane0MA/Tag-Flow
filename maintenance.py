@@ -666,6 +666,83 @@ class MaintenanceUtils:
             for creator, data in list(auto_detected.items())[-5:]:  # Últimos 5
                 print(f"  {creator} -> {data['character']} ({data['game']})")
     
+    def clean_false_positives(self, force: bool = False):
+        """Limpiar falsos positivos del sistema de reconocimiento de personajes"""
+        logger.info("Iniciando limpieza de falsos positivos...")
+        
+        # Lista de falsos positivos conocidos
+        false_positives = {
+            'animegamey', 'zenlesszonezero', 'forte', 'mamama', 'batte',
+            'genshin', 'honkai', 'impact', 'zenless', 'zone', 'zero', 'star', 'rail',
+            'hsr', 'hi3', 'zzz', 'genshinimpact', 'honkaiimpact', 'honkaistarrail',
+            'wuthering', 'waves', 'anime', 'game', 'gaming', 'mmd', 'dance',
+            'cosplay', 'cos', 'shorts', 'tiktok', 'video', 'compilation'
+        }
+        
+        # Confirmar acción si no es force
+        if not force:
+            print(f"\n⚠️  Esta operación limpiará falsos positivos conocidos:")
+            print(f"   {', '.join(sorted(false_positives))}")
+            confirm = input("¿Continuar? (y/N): ").lower().strip()
+            if confirm != 'y':
+                logger.info("Operación cancelada")
+                return
+        
+        try:
+            # Obtener videos con personajes detectados
+            videos = db.get_videos()
+            updates_made = 0
+            total_false_positives_removed = 0
+            
+            for video in videos:
+                if not video.get('detected_characters'):
+                    continue
+                
+                try:
+                    # Parsear personajes detectados
+                    characters = json.loads(video['detected_characters'])
+                    original_count = len(characters)
+                    
+                    # Filtrar falsos positivos
+                    cleaned_characters = [
+                        char for char in characters 
+                        if char.lower().strip() not in false_positives
+                    ]
+                    
+                    # Si hay cambios, actualizar
+                    if len(cleaned_characters) != original_count:
+                        new_characters_json = json.dumps(cleaned_characters) if cleaned_characters else None
+                        
+                        # Actualizar en la base de datos
+                        db.update_video_characters(video['id'], new_characters_json)
+                        
+                        updates_made += 1
+                        removed_count = original_count - len(cleaned_characters)
+                        total_false_positives_removed += removed_count
+                        
+                        logger.info(f"Video {video['id']}: {removed_count} falsos positivos removidos")
+                        
+                except (json.JSONDecodeError, TypeError) as e:
+                    logger.warning(f"Error parseando personajes en video {video.get('id', 'unknown')}: {e}")
+                    continue
+            
+            logger.info(f"✅ Limpieza completada:")
+            logger.info(f"   - Videos actualizados: {updates_made}")
+            logger.info(f"   - Falsos positivos removidos: {total_false_positives_removed}")
+            
+            # Mostrar estadísticas post-limpieza
+            total_videos = len(videos)
+            videos_with_chars = len([v for v in videos if v.get('detected_characters')])
+            
+            logger.info(f"📊 Estadísticas post-limpieza:")
+            logger.info(f"   - Total videos: {total_videos}")
+            logger.info(f"   - Videos con personajes: {videos_with_chars}")
+            if total_videos > 0:
+                logger.info(f"   - Tasa de detección: {videos_with_chars/total_videos*100:.1f}%")
+            
+        except Exception as e:
+            logger.error(f"Error durante la limpieza: {e}")
+
     def add_custom_character(self, character_name: str, game: str, aliases: list = None):
         """Agregar un personaje personalizado"""
         logger.info(f"Agregando personaje personalizado: {character_name} ({game})")
@@ -824,7 +901,8 @@ def main():
         'backup', 'clean-thumbnails', 'verify', 'regenerate-thumbnails', 
         'optimize-db', 'report', 'populate-db', 'clear-db', 'populate-thumbnails',
         'clear-thumbnails', 'show-stats', 'character-stats', 'add-character',
-        'download-character-images', 'analyze-titles', 'update-creator-mappings'
+        'download-character-images', 'analyze-titles', 'update-creator-mappings',
+        'clean-false-positives'
     ], help='Acción a realizar')
     
     # Argumentos generales
@@ -890,6 +968,8 @@ def main():
         utils.analyze_existing_titles(args.limit)
     elif args.action == 'update-creator-mappings':
         utils.update_creator_mappings(args.limit)
+    elif args.action == 'clean-false-positives':
+        utils.clean_false_positives(force=args.force)
 
 if __name__ == '__main__':
     main()

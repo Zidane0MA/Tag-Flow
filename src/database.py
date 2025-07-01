@@ -294,6 +294,10 @@ class DatabaseManager:
                 logger.info(f"Video {video_id} actualizado exitosamente")
             return success
     
+    def update_video_characters(self, video_id: int, characters_json: str = None) -> bool:
+        """Actualizar solo los personajes detectados de un video"""
+        return self.update_video(video_id, {'detected_characters': characters_json})
+    
     def delete_video(self, video_id: int) -> bool:
         """Eliminar un video de la base de datos"""
         with self.get_connection() as conn:

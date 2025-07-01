@@ -249,6 +249,7 @@
       "Corin Wickes",
       "Ellen Joe",
       "Evelyn Chevalier",
+      "Evelyn",
       "Grace Howard",
       "Hoshimi Miyabi",
       "Jane Doe",
@@ -449,6 +450,7 @@
       "Fleurdelys",
       "Jinhsi",
       "Rover",
+      "漂泊者",
       "Shorekeeper",
       "Zani",
       "Phoebe",
@@ -456,6 +458,9 @@
       "Camellya"
     ],
     "aliases": {
+      "Rover": [
+        "漂泊者"
+      ],
       "Fleurdelys": [
         "Cartethyia"
       ]
