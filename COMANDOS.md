@@ -261,7 +261,7 @@ python maintenance.py add-character --character "Nahida" --game "genshin_impact"
 # Agregar con nombres alternativos (genera patrones jerárquicos)
 python maintenance.py add-character --character "Hu Tao" --game "genshin_impact" --aliases "HuTao" "胡桃" "Walnut"
 
-# Agregar personaje de nuevo juego
+# Agregar personaje de nuevo juego (NO SIRVE)
 python maintenance.py add-character --character "Stelle" --game "honkai_star_rail" --aliases "Trailblazer" "Caelus"
 ```
 
@@ -564,7 +564,7 @@ start = time.time()
 results = [ci.analyze_video_title(t) for t in titles]
 total = time.time() - start
 print(f'Throughput: {len(titles)/total:.0f} títulos/segundo')
-print(f'Cache hit rate: {ci.get_performance_report()[\"cache_hit_rate\"]}%')
+print(f'Cache hit rate: {ci.get_performance_report()['cache_hit_rate']}%')
 "
 ```
 

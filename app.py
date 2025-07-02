@@ -90,9 +90,17 @@ def index():
                 video['thumbnail_url'] = "/static/img/no-thumbnail.jpg"
             
             # Preparar título apropiado para el frontend
-            if video.get('platform') == 'tiktok' and video.get('description'):
-                # Para TikTok: usar descripción como título
-                video['display_title'] = video['description']
+            if video.get('platform') in ['tiktok', 'instagram'] and video.get('description'):
+                # Para TikTok e Instagram: usar descripción como título si está disponible
+                # Para Instagram: verificar que no sea solo el nombre del archivo
+                if (video.get('platform') == 'instagram' and 
+                    video.get('description') and 
+                    video.get('description') != video.get('file_name', '').replace('.mp4', '')):
+                    video['display_title'] = video['description']
+                elif video.get('platform') == 'tiktok':
+                    video['display_title'] = video['description']
+                else:
+                    video['display_title'] = video['file_name']
             else:
                 # Para otras plataformas: usar nombre del archivo
                 video['display_title'] = video['file_name']
@@ -136,9 +144,17 @@ def view_video(video_id):
             video['final_characters'] = []
         
         # Preparar título apropiado para el frontend
-        if video.get('platform') == 'tiktok' and video.get('description'):
-            # Para TikTok: usar descripción como título
-            video['display_title'] = video['description']
+        if video.get('platform') in ['tiktok', 'instagram'] and video.get('description'):
+            # Para TikTok e Instagram: usar descripción como título si está disponible
+            # Para Instagram: verificar que no sea solo el nombre del archivo
+            if (video.get('platform') == 'instagram' and 
+                video.get('description') and 
+                video.get('description') != video.get('file_name', '').replace('.mp4', '')):
+                video['display_title'] = video['description']
+            elif video.get('platform') == 'tiktok':
+                video['display_title'] = video['description']
+            else:
+                video['display_title'] = video['file_name']
         else:
             # Para otras plataformas: usar nombre del archivo
             video['display_title'] = video['file_name']
@@ -206,8 +222,17 @@ def api_videos():
                     video['final_characters'] = []
             
             # Preparar título apropiado para el frontend (mismo que en la galería)
-            if video.get('platform') == 'tiktok' and video.get('description'):
-                video['display_title'] = video['description']
+            if video.get('platform') in ['tiktok', 'instagram'] and video.get('description'):
+                # Para TikTok e Instagram: usar descripción como título si está disponible
+                # Para Instagram: verificar que no sea solo el nombre del archivo
+                if (video.get('platform') == 'instagram' and 
+                    video.get('description') and 
+                    video.get('description') != video.get('file_name', '').replace('.mp4', '')):
+                    video['display_title'] = video['description']
+                elif video.get('platform') == 'tiktok':
+                    video['display_title'] = video['description']
+                else:
+                    video['display_title'] = video['file_name']
             else:
                 video['display_title'] = video['file_name']
         
@@ -249,9 +274,19 @@ def api_get_video(video_id):
             video['final_characters'] = []
         
         # Preparar título apropiado para el frontend (mismo que en la galería)
-        if video.get('platform') == 'tiktok' and video.get('description'):
-            video['display_title'] = video['description']
+        if video.get('platform') in ['tiktok', 'instagram'] and video.get('description'):
+            # Para TikTok e Instagram: usar descripción como título si está disponible
+            # Para Instagram: verificar que no sea solo el nombre del archivo
+            if (video.get('platform') == 'instagram' and 
+                video.get('description') and 
+                video.get('description') != video.get('file_name', '').replace('.mp4', '')):
+                video['display_title'] = video['description']
+            elif video.get('platform') == 'tiktok':
+                video['display_title'] = video['description']
+            else:
+                video['display_title'] = video['file_name']
         else:
+            # Para otras plataformas: usar nombre del archivo
             video['display_title'] = video['file_name']
         
         return jsonify({

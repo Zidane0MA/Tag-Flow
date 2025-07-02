@@ -159,8 +159,13 @@ class OptimizedCharacterDetector:
         # Resolver conflictos entre detecciones
         resolved_detections = self._resolve_conflicts_advanced(all_detections, normalized_title)
         
+        # 🆕 DEDUPLICACIÓN FINAL POR NOMBRE CANÓNICO
+        # Esto soluciona el problema de detectar el mismo personaje múltiples veces
+        # en diferentes formas (ej: "Mita" y "mita" -> ambos resuelven a "Mita")
+        final_detections = self._deduplicate_by_canonical_name(resolved_detections)
+        
         # Convertir a formato de salida
-        result = [self._detection_to_dict(d) for d in resolved_detections]
+        result = [self._detection_to_dict(d) for d in final_detections]
         
         # Actualizar cache (LRU simple)
         if len(self.detection_cache) > 1000:  # Límite de cache
@@ -396,6 +401,64 @@ class OptimizedCharacterDetector:
             'context_bonus': round(detection.context_bonus, 3)
         }
     
+    def _deduplicate_by_canonical_name(self, detections: List[DetectionMatch]) -> List[DetectionMatch]:
+        """
+        🆕 DEDUPLICACIÓN FINAL por nombre canónico
+        Elimina duplicados del mismo personaje que aparecen múltiples veces
+        Prioriza por: 1) Mayor confianza, 2) Mejor tipo de match, 3) Posición más temprana
+        """
+        if len(detections) <= 1:
+            return detections
+        
+        # Agrupar por nombre canónico (case-insensitive)
+        canonical_groups = {}
+        for detection in detections:
+            canonical_key = detection.canonical_name.lower().strip()
+            
+            if canonical_key not in canonical_groups:
+                canonical_groups[canonical_key] = []
+            
+            canonical_groups[canonical_key].append(detection)
+        
+        # Para cada grupo, quedarse solo con la mejor detección
+        final_detections = []
+        for canonical_name, group in canonical_groups.items():
+            if len(group) == 1:
+                final_detections.append(group[0])
+            else:
+                # Seleccionar la mejor detección del grupo
+                best_detection = self._select_best_from_group(group)
+                final_detections.append(best_detection)
+        
+        # Ordenar por confianza descendente
+        final_detections.sort(key=lambda x: x.confidence, reverse=True)
+        
+        return final_detections
+    
+    def _select_best_from_group(self, group: List[DetectionMatch]) -> DetectionMatch:
+        """
+        Seleccionar la mejor detección de un grupo de duplicados del mismo personaje
+        Criterios: 1) Mayor confianza total, 2) Mejor tipo de match, 3) Posición más temprana
+        """
+        # Definir prioridad de tipos de match
+        match_type_priority = {
+            'exact': 4,
+            'native': 3,
+            'joined': 2,
+            'common': 1,
+            'abbreviations': 0
+        }
+        
+        def selection_score(detection: DetectionMatch) -> Tuple[float, int, int]:
+            total_confidence = detection.confidence + detection.context_bonus
+            type_priority = match_type_priority.get(detection.match_type, 0)
+            # Usar posición negativa para que las posiciones más tempranas tengan mayor prioridad
+            early_position_score = -detection.position
+            
+            return (total_confidence, type_priority, early_position_score)
+        
+        return max(group, key=selection_score)
+
     def get_performance_stats(self) -> Dict:
         """Obtener estadísticas de rendimiento del detector"""
         total_requests = self.performance_stats["cache_hits"] + self.performance_stats["cache_misses"]

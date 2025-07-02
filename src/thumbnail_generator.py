@@ -25,7 +25,7 @@ class ThumbnailGenerator:
         self.quality = 85  # Calidad JPEG
         
         # Configuración de watermark (opcional)
-        self.add_watermark = True
+        self.add_watermark = False
         self.watermark_text = "Tag-Flow"
         
     def generate_thumbnail(self, video_path: Path, timestamp: float = 3.0, 

@@ -449,7 +449,7 @@ class ConfigVerifier:
                 cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
                 tables = cursor.fetchall()
                 
-                expected_tables = ['videos', 'processing_status']
+                expected_tables = ['videos', 'downloader_mapping', 'sqlite_sequence']
                 found_tables = [table[0] for table in tables]
                 
                 for table in expected_tables:
