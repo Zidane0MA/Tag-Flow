@@ -2516,7 +2516,8 @@
         "variants": {
           "exact": [
             "Miyabi",
-            "Hoshimi Miyabi"
+            "Hoshimi Miyabi",
+            "Hoshimi"
           ],
           "joined": [
             "HoshimiMiyabi"
@@ -2527,7 +2528,8 @@
           ],
           "common": [
             "Miyabi",
-            "Hoshimi Miyabi"
+            "Hoshimi Miyabi",
+            "Hoshimi"
           ]
         },
         "detection_weight": 0.95,
@@ -4946,6 +4948,9 @@
         "variants": {
           "exact": [
             "Ruan Mei"
+          ],
+          "joined":[
+            "RuanMei"
           ],
           "native": [
             "阮梅",

@@ -58,9 +58,10 @@
 - **Búsqueda ultra-rápida**: Texto libre con detección optimizada
 - **Dashboard de métricas**: Estadísticas de rendimiento en tiempo real
 
-### 🔧 **Gestión Granular por Plataforma**
-- **Códigos específicos**: YT (YouTube), TT (TikTok), IG (Instagram), O (Organizadas)
-- **Procesamiento ultra-rápido**: `python main.py 1000` procesa 1000 videos en <8s
+### 🔧 **Gestión Granular por Plataforma con Flags Profesionales**
+- **Flags profesionales**: Sistema moderno con `--platform`, `--source`, `--limit`
+- **Procesamiento ultra-rápido**: `python main.py --limit 1000` procesa 1000 videos en <8s
+- **Control granular**: Separación clara entre fuentes (BD externa vs carpetas)
 - **Mantenimiento automático**: Poblado y limpieza con métricas enterprise
 - **Estadísticas en tiempo real**: Análisis completo por fuente de datos
 
@@ -147,25 +148,33 @@ python maintenance.py populate-db --platform youtube --limit 10
 python maintenance.py populate-thumbnails --platform youtube
 ```
 
-### 🎬 Procesamiento Ultra-Rápido
+### 🎬 Procesamiento Ultra-Rápido con Flags Profesionales
 
 ```bash
 # Procesamiento general (detector optimizado automático)
 python main.py
 
 # Procesamiento limitado por cantidad
-python main.py 10              # 10 videos en <1 segundo
+python main.py --limit 10                              # 10 videos en <1 segundo
 
 # Procesamiento específico por plataforma (ultra-rápido)
-python main.py 50 YT           # 50 videos de YouTube en <1 segundo
-python main.py 100 TT          # 100 videos de TikTok en <2 segundos
-python main.py 500 O           # 500 videos organizados en <4 segundos
+python main.py --platform youtube --limit 50           # 50 videos de YouTube en <1 segundo
+python main.py --platform tiktok --limit 100           # 100 videos de TikTok en <2 segundos
+python main.py --platform instagram --limit 50         # 50 videos de Instagram en <1 segundo
+
+# Control granular por fuente
+python main.py --source db --limit 100                 # Solo desde BD externas
+python main.py --source organized --limit 200          # Solo desde carpetas organizadas
+
+# Combinaciones avanzadas
+python main.py --platform youtube --source db --limit 30    # Solo YouTube desde BD externa
+python main.py --platform iwara --source organized --limit 20  # Solo Iwara desde carpetas
 
 # Procesamiento masivo
-python main.py 1000            # 1000 videos en <8 segundos
+python main.py --limit 1000                            # 1000 videos en <8 segundos
 
 # Lanzar interfaz web optimizada
-python app.py                  # → http://localhost:5000
+python app.py                                          # → http://localhost:5000
 ```
 
 ### 🎭 Gestión de Personajes Optimizada
@@ -268,12 +277,14 @@ FLASK_PORT=5000
 ENABLE_DEBUG_METRICS=true          # Dashboard de métricas
 ```
 
-### Códigos de Plataforma
+### Plataformas Disponibles
 
-- **YT**: YouTube (4K Video Downloader+) - 506 videos disponibles
-- **TT**: TikTok (4K Tokkit) - 417 videos disponibles
-- **IG**: Instagram (4K Stogram) - 92 elementos disponibles
-- **O**: Carpetas organizadas (`D:\4K All`) - 229 elementos disponibles
+- **youtube**: YouTube (4K Video Downloader+) - 506 videos disponibles
+- **tiktok**: TikTok (4K Tokkit) - 417 videos disponibles
+- **instagram**: Instagram (4K Stogram) - 92 elementos disponibles
+- **iwara**: Iwara (carpetas organizadas) - Plataforma adicional auto-detectada
+- **other**: Solo plataformas adicionales (no principales)
+- **all-platforms**: Todas las plataformas (principales + adicionales)
 
 ## 📈 Costos y Límites (Optimizados)
 
@@ -320,16 +331,16 @@ python maintenance.py populate-thumbnails --platform youtube
 python maintenance.py character-stats
 ```
 
-### 3️⃣ Procesamiento Ultra-Rápido
+### 3️⃣ Procesamiento Ultra-Rápido con Flags Profesionales
 ```bash
 # Procesar videos con detector optimizado
-python main.py 10 YT               # 10 videos en <1 segundo
+python main.py --platform youtube --limit 10          # 10 videos en <1 segundo
 
 # Procesamiento masivo
-python main.py 1000                # 1000 videos en <8 segundos
+python main.py --limit 1000                           # 1000 videos en <8 segundos
 
 # Abrir interfaz web optimizada
-python app.py                      # → http://localhost:5000
+python app.py                                         # → http://localhost:5000
 ```
 
 ### 4️⃣ Gestión Continua

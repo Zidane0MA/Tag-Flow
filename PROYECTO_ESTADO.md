@@ -114,13 +114,18 @@ Tag-Flow V2 ha completado exitosamente la **migración más ambiciosa de su hist
 
 ---
 
-## 🎮 COMANDOS OPTIMIZADOS
+## 🎮 COMANDOS OPTIMIZADOS (MODERNIZADOS)
 
-### **Procesamiento Ultra-Rápido**
+### **Procesamiento Ultra-Rápido con Flags Profesionales**
 ```bash
-python main.py [límite] [plataforma]   # Procesamiento con detector optimizado
+python main.py [opciones]              # Procesamiento con detector optimizado y flags modernos
 python app.py                          # Interfaz web con rendimiento mejorado
 ```
+
+**Sintaxis Profesional Implementada:**
+- `--limit N`: Número máximo de videos a procesar
+- `--source {db|organized|all}`: Control granular de fuentes de datos
+- `--platform {youtube|tiktok|instagram|iwara|other|all-platforms}`: Plataformas con nombres claros
 
 ### **Estadísticas Enterprise**
 ```bash
@@ -131,7 +136,7 @@ python maintenance.py character-stats  # Estadísticas completas del sistema opt
 ### **Mantenimiento Automatizado**
 ```bash
 python maintenance.py [acción] [opciones]
-# Ver COMANDOS.md para referencia completa actualizada
+# Ver COMANDOS.md para referencia completa actualizada con flags profesionales
 ```
 
 ### **Utilidades Optimizadas**
@@ -202,26 +207,33 @@ CharacterIntelligence (Híbrido)
 
 ---
 
-## 🎯 CASOS DE USO OPTIMIZADOS
+## 🎯 CASOS DE USO OPTIMIZADOS (MODERNIZADOS)
 
-### **Análisis Ultra-Rápido de YouTube**
+### **Análisis Ultra-Rápido de YouTube con Flags Profesionales**
 ```bash
 python maintenance.py populate-db --source db --platform youtube --limit 20
 python maintenance.py populate-thumbnails --platform youtube
-python main.py 10 YT    # 10 videos procesados en <1 segundo
+python main.py --platform youtube --limit 10    # 10 videos procesados en <1 segundo
 ```
 
-### **Procesamiento Masivo**
+### **Procesamiento Masivo con Sistema Moderno**
 ```bash
-python main.py 1000    # 1000 videos procesados en <8 segundos
+python main.py --limit 1000           # 1000 videos procesados en <8 segundos
 # Antes: 30 minutos | Después: 8 segundos = 225x más rápido
 ```
 
-### **Análisis de Colecciones Grandes**
+### **Análisis de Colecciones Grandes con Control Granular**
 ```bash
 python maintenance.py populate-db --source all
-python main.py 500 O   # 500 videos de carpetas organizadas
+python main.py --source organized --limit 500   # 500 videos de carpetas organizadas
 # Rendimiento: 126,367 títulos/segundo
+```
+
+### **Procesamiento de Plataformas Adicionales**
+```bash
+python main.py --platform iwara --limit 20      # Plataforma específica auto-detectada
+python main.py --platform other --limit 50      # Solo plataformas adicionales
+python main.py --platform all-platforms --limit 100  # Todas las plataformas
 ```
 
 ### **Monitoreo Enterprise**
@@ -328,10 +340,17 @@ python maintenance.py character-stats
 | **Escalabilidad** | "Miles de videos" | **Probado 100,000+** | **10x mejor** |
 | **Eficiencia** | "Optimizado" | **98% cache efficiency** | **Enterprise** |
 
+### **🆕 MODERNIZACIÓN DE COMANDOS COMPLETADA** ✅
+- ✅ **Sistema de Flags Profesionales**: Migración exitosa de argumentos posicionales a flags modernos
+- ✅ **Sintaxis Estándar**: `--limit`, `--source`, `--platform` siguiendo convenciones de la industria
+- ✅ **Compatibilidad Total**: Todas las funciones existentes preservadas
+- ✅ **Help Integrado**: `python main.py --help` con documentación completa
+- ✅ **Escalabilidad**: Sistema preparado para futuras opciones sin breaking changes
+
 ---
 
-*Última actualización: Diciembre 2024*  
-*Estado: **ENTERPRISE-READY CON RENDIMIENTO EXTRAORDINARIO***  
+*Última actualización: Julio 2025*  
+*Estado: **ENTERPRISE-READY CON COMANDOS MODERNIZADOS***  
 *Próxima revisión: Según necesidades de escalamiento*
 
-**🚀 Tag-Flow V2 está ahora listo para gestionar colecciones masivas de videos con rendimiento de clase mundial. ¡El futuro de la gestión de contenido está aquí! 🎬✨**
+**🚀 Tag-Flow V2 está ahora listo para gestionar colecciones masivas de videos con rendimiento de clase mundial y comandos profesionales modernos. ¡El futuro de la gestión de contenido está aquí! 🎬✨**

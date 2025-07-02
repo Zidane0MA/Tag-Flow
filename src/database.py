@@ -43,9 +43,13 @@ class DatabaseManager:
                     file_size INTEGER,
                     duration_seconds INTEGER,
                     
+                    -- Información del contenido
+                    description TEXT,  -- Título/descripción del video
+                    title TEXT,        -- Título alternativo
+                    
                     -- Creador (desde 4K Downloader + manual)
                     creator_name TEXT NOT NULL,
-                    platform TEXT DEFAULT 'tiktok' CHECK(platform IN ('tiktok', 'instagram', 'youtube')),
+                    platform TEXT DEFAULT 'tiktok' CHECK(platform IN ('tiktok', 'instagram', 'youtube', 'iwara', 'other')),
                     
                     -- Reconocimiento Automático
                     detected_music TEXT,
@@ -56,7 +60,8 @@ class DatabaseManager:
                     
                     -- Edición Manual (Frontend)
                     final_music TEXT,
-                    final_music_artist TEXT,                    final_characters TEXT, -- JSON array
+                    final_music_artist TEXT,
+                    final_characters TEXT, -- JSON array
                     difficulty_level TEXT CHECK(difficulty_level IN ('bajo', 'medio', 'alto')),
                     
                     -- Estados del Proyecto

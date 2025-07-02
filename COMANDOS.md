@@ -6,12 +6,24 @@
 
 ## 🚀 COMANDOS PRINCIPALES (OPTIMIZADOS)
 
-### `main.py` - Procesamiento Ultra-Rápido de Videos
+### `main.py` - Procesamiento Ultra-Rápido de Videos con Flags Profesionales
 
-**Sintaxis:**
+**Sintaxis Moderna:**
 ```bash
-python main.py [límite] [plataforma]
+python main.py [opciones]
 ```
+
+**Opciones Principales:**
+- `--limit N`: Número máximo de videos a procesar
+- `--source {db|organized|all}`: Fuente de datos
+  - `db`: Solo bases de datos externas (4K Apps)
+  - `organized`: Solo carpetas organizadas (`D:\4K All`)
+  - `all`: Ambas fuentes (por defecto)
+- `--platform {youtube|tiktok|instagram|iwara|other|all-platforms|NOMBRE}`: Plataforma específica
+  - `youtube`, `tiktok`, `instagram`: Plataformas principales
+  - `iwara`, `NOMBRE`: Plataforma específica por nombre (auto-detectada)
+  - `other`: Solo plataformas adicionales (no principales)
+  - `all-platforms`: Todas las plataformas (principales + adicionales)
 
 **Rendimiento Enterprise:**
 - **0.01ms promedio** por detección (2000x más rápido)
@@ -19,35 +31,42 @@ python main.py [límite] [plataforma]
 - **98% cache hit rate** (eficiencia máxima)
 - **Detector optimizado** automático con fallback legacy
 
-**Ejemplos de Rendimiento:**
+**Ejemplos de Uso Modernos:**
 ```bash
 # Procesamiento básico ultra-rápido
-python main.py                    # Todos los videos nuevos (<1s para 100 videos)
-python main.py 20                 # 20 videos procesados en ~0.2s
+python main.py                                    # Todos los videos nuevos (<1s para 100 videos)
+python main.py --limit 20                         # 20 videos procesados en ~0.2s
 
 # Procesamiento específico por plataforma (ultra-rápido)
-python main.py 50 YT              # 50 videos YouTube en <1 segundo
-python main.py 100 TT             # 100 videos TikTok en <2 segundos
-python main.py 500 IG             # 500 videos Instagram en <4 segundos
-python main.py 1000 O             # 1000 videos organizados en <8 segundos
+python main.py --platform youtube --limit 50      # 50 videos YouTube en <1 segundo
+python main.py --platform tiktok --limit 100      # 100 videos TikTok en <2 segundos
+python main.py --platform instagram --limit 50    # 50 videos Instagram en <1 segundo
+
+# Procesamiento por fuente específica
+python main.py --source db --limit 100            # 100 videos solo desde BD externas
+python main.py --source organized --limit 200     # 200 videos solo desde carpetas organizadas
 
 # 🆕 Procesamiento de plataformas adicionales (escalable)
-python main.py 10 IWARA           # 10 videos Iwara con detección optimizada
-python main.py 50 OTHER           # 50 videos de plataformas adicionales
-python main.py 100 ALL            # 100 videos de todas las plataformas
+python main.py --platform iwara --limit 10        # 10 videos Iwara con detección optimizada
+python main.py --platform other --limit 50        # 50 videos de plataformas adicionales
+python main.py --platform all-platforms --limit 100  # 100 videos de todas las plataformas
+
+# Combinaciones avanzadas
+python main.py --platform youtube --source db --limit 30    # Solo YouTube desde BD externa
+python main.py --platform other --source organized         # Solo adicionales desde carpetas
 
 # Procesamiento masivo enterprise
-python main.py 5000               # 5000 videos en <40 segundos
+python main.py --limit 5000                       # 5000 videos en <40 segundos
 ```
 
-**Códigos de Plataforma Actualizados (ESCALABLES):**
-- **YT**: YouTube (4K Video Downloader+) - **675 videos en BD + 278 en carpetas**
-- **TT**: TikTok (4K Tokkit) - **496 videos en BD + 0 en carpetas**
-- **IG**: Instagram (4K Stogram) - **100 videos en BD + 0 en carpetas**
-- **O**: Carpetas organizadas principales (`D:\4K All`) - **278 elementos**
-- **🆕 IWARA**: Iwara (`D:\4K All\Iwara`) - **89 videos disponibles**
-- **🆕 OTHER**: Solo plataformas adicionales (no principales)
-- **🆕 ALL**: Todas las plataformas (principales + adicionales)
+**Plataformas Disponibles (ESCALABLES):**
+- **youtube**: YouTube (4K Video Downloader+) - **675 videos en BD + 278 en carpetas**
+- **tiktok**: TikTok (4K Tokkit) - **496 videos en BD + 0 en carpetas**
+- **instagram**: Instagram (4K Stogram) - **100 videos en BD + 0 en carpetas**
+- **organized**: Carpetas organizadas principales (`D:\4K All`) - **278 elementos**
+- **🆕 iwara**: Iwara (`D:\4K All\Iwara`) - **89 videos disponibles**
+- **🆕 other**: Solo plataformas adicionales (no principales)
+- **🆕 all-platforms**: Todas las plataformas (principales + adicionales)
 
 **Nuevo Procesamiento Enterprise:**
 - ✅ **OptimizedCharacterDetector**: 1,208 patrones jerárquicos
@@ -552,7 +571,7 @@ python maintenance.py populate-db --source db --platform youtube --limit 50
 python maintenance.py populate-thumbnails --platform youtube --limit 50
 
 # 3. Procesar videos con detector optimizado (ultra-rápido)
-python main.py 50 YT    # 50 videos en <1 segundo
+python main.py --platform youtube --limit 50    # 50 videos en <1 segundo
 
 # 4. Analizar títulos restantes (sistema optimizado)
 python maintenance.py analyze-titles --limit 100
@@ -567,7 +586,7 @@ python app.py
 python maintenance.py populate-db --platform iwara --limit 20
 
 # 2. Procesar videos con detector optimizado (ultra-rápido)
-python main.py 10 IWARA  # 10 videos de Iwara procesados con IA
+python main.py --platform iwara --limit 10  # 10 videos de Iwara procesados con IA
 
 # 3. Analizar títulos específicos de Iwara
 python maintenance.py analyze-titles --limit 50
@@ -585,11 +604,11 @@ python app.py
 python maintenance.py populate-db --platform all-platforms --limit 100
 
 # 2. Procesar videos de todas las plataformas
-python main.py 50 ALL    # 50 videos de cualquier plataforma
+python main.py --platform all-platforms --limit 50    # 50 videos de cualquier plataforma
 
 # 3. Solo plataformas adicionales
 python maintenance.py populate-db --platform other --limit 30
-python main.py 20 OTHER  # 20 videos solo de plataformas no principales
+python main.py --platform other --limit 20  # 20 videos solo de plataformas no principales
 
 # 4. Ver estadísticas completas
 python maintenance.py list-platforms
@@ -601,7 +620,7 @@ python maintenance.py list-platforms
 python maintenance.py populate-db --source all --limit 1000
 
 # 2. Procesar masivamente con detector optimizado
-python main.py 1000     # 1000 videos en <8 segundos
+python main.py --limit 1000     # 1000 videos en <8 segundos
 
 # 3. Analizar títulos masivamente
 python maintenance.py analyze-titles --limit 5000  # 5000 títulos en ~40 segundos
@@ -625,7 +644,7 @@ python maintenance.py analyze-titles --limit 1000
 python maintenance.py update-creator-mappings
 
 # 5. Procesar videos con sistema actualizado
-python main.py 500      # 500 videos en <4 segundos
+python main.py --limit 500      # 500 videos en <4 segundos
 ```
 
 ### **Flujo de Mantenimiento Enterprise Semanal**
@@ -655,7 +674,7 @@ python maintenance.py report
 python maintenance.py populate-db --source all --limit 5000
 
 # 2. Benchmark de procesamiento masivo
-time python main.py 5000    # Medir tiempo de 5000 videos
+time python main.py --limit 5000    # Medir tiempo de 5000 videos
 
 # 3. Benchmark de análisis de títulos
 time python maintenance.py analyze-titles --limit 10000
@@ -928,25 +947,25 @@ python maintenance.py character-stats          # Ver sistema optimizado
 ```bash
 python maintenance.py populate-db --limit 100  # Importar videos nuevos
 python maintenance.py populate-db --platform iwara --limit 10  # 🆕 Importar plataforma específica
-python main.py 100                            # Procesar con detector optimizado
-python main.py 20 IWARA                       # 🆕 Procesar plataforma específica
-python app.py                                 # Interfaz web optimizada
+python main.py --limit 100                     # Procesar con detector optimizado
+python main.py --platform iwara --limit 20     # 🆕 Procesar plataforma específica
+python app.py                                  # Interfaz web optimizada
 ```
 
 ### **Procesamiento Masivo Enterprise Escalable**
 ```bash
-python main.py 1000                           # 1000 videos en <8 segundos
-python main.py 50 ALL                         # 🆕 50 videos de todas las plataformas
+python main.py --limit 1000                    # 1000 videos en <8 segundos
+python main.py --platform all-platforms --limit 50  # 🆕 50 videos de todas las plataformas
 python maintenance.py populate-db --platform all-platforms --limit 200  # 🆕 Poblar todas
-python maintenance.py analyze-titles --limit 5000  # 5000 títulos en ~40 segundos
-python maintenance.py character-stats          # Verificar métricas enterprise
+python maintenance.py analyze-titles --limit 5000   # 5000 títulos en ~40 segundos
+python maintenance.py character-stats               # Verificar métricas enterprise
 ```
 
 ### **🆕 Gestión de Plataformas Enterprise**
 ```bash
 python maintenance.py list-platforms           # Listar plataformas disponibles
 python maintenance.py populate-db --platform other  # Solo plataformas adicionales
-python main.py 30 OTHER                       # Procesar solo adicionales
+python main.py --platform other --limit 30     # Procesar solo adicionales
 python maintenance.py populate-db --platform iwara --limit 50  # Plataforma específica
 ```
 

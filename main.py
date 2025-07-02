@@ -71,13 +71,13 @@ class VideoAnalyzer:
             for warning in warnings:
                 logger.warning(f"  - {warning}")
     
-    def find_new_videos(self, platform_filter=None, use_external_sources=False) -> List[Dict]:
+    def find_new_videos(self, platform_filter=None, source_filter='all') -> List[Dict]:
         """
         Encontrar videos que no están en la base de datos
         
         Args:
-            platform_filter: 'youtube', 'tiktok', 'instagram' o None para todas
-            use_external_sources: si usar fuentes externas en lugar de escaneo local
+            platform_filter: 'youtube', 'tiktok', 'instagram', 'other', 'all-platforms' o None para todas
+            source_filter: 'db', 'organized', 'all' - determina las fuentes a usar
             
         Returns:
             List[Dict]: Lista de diccionarios con información completa del video
@@ -95,30 +95,48 @@ class VideoAnalyzer:
         
         new_videos = []
         
+        # Determinar qué fuentes usar basado en source_filter
+        use_external_sources = source_filter in ['db', 'all']
+        use_organized_folders = source_filter in ['organized', 'all']
+        
         if use_external_sources:
             # Usar fuentes externas (bases de datos y carpetas organizadas)
             logger.info("Usando fuentes externas para búsqueda de videos...")
             
-            # 🆕 Mapear códigos de plataforma dinámicamente
-            available_platforms = external_sources.get_available_platforms()
-            
+            # Mapear nombres de plataforma modernos a códigos legacy internos
             platform_map = {
-                'YT': 'youtube',
-                'TT': 'tiktok', 
-                'IG': 'instagram',
-                'O': None,  # Carpetas organizadas, todas las plataformas principales
-                'OTHER': 'other',  # Solo plataformas adicionales
-                'ALL': 'all-platforms'  # Todas las plataformas
+                'youtube': 'YT',
+                'tiktok': 'TT', 
+                'instagram': 'IG',
+                'other': 'OTHER',  # Solo plataformas adicionales
+                'all-platforms': 'ALL'  # Todas las plataformas
             }
             
-            # Agregar plataformas adicionales al mapa
-            for platform_key in available_platforms['additional'].keys():
-                platform_map[platform_key.upper()] = platform_key
+            # Obtener plataformas adicionales disponibles
+            available_platforms = external_sources.get_available_platforms()
             
-            actual_platform = platform_map.get(platform_filter, platform_filter)
+            # Agregar plataformas adicionales al mapa (nombre -> nombre)
+            for platform_key in available_platforms['additional'].keys():
+                platform_map[platform_key] = platform_key.upper()
+            
+            # Convertir nombre moderno a código interno
+            internal_platform_code = None
+            if platform_filter:
+                internal_platform_code = platform_map.get(platform_filter)
+                if not internal_platform_code:
+                    # Si no está en el mapa, asumir que es una plataforma adicional
+                    internal_platform_code = platform_filter.upper()
+            
+            # Determinar source para external_sources basado en source_filter
+            if source_filter == 'db':
+                external_source = 'db'  # Solo bases de datos externas
+            elif source_filter == 'organized':
+                external_source = 'organized'  # Solo carpetas organizadas
+            else:  # 'all'
+                external_source = 'all'  # Ambas fuentes
             
             # Obtener videos de fuentes externas
-            external_videos = external_sources.get_all_videos_from_source('all', actual_platform)
+            external_videos = external_sources.get_all_videos_from_source(external_source, internal_platform_code)
             
             # Filtrar nuevos y verificar existencia
             for video_data in external_videos:
@@ -143,9 +161,6 @@ class VideoAnalyzer:
                     # Solo videos, no imágenes para el procesamiento principal
                     if video_data.get('content_type', 'video') == 'video':
                         new_videos.append(video_data)  # Retornar datos completos
-        
-        # 🆕 MODERNIZADO: Sistema limpio - solo fuentes externas (configuradas en .env)
-        # Eliminado: escaneo legacy de carpetas locales
         
         logger.info(f"Videos nuevos para procesar: {len(new_videos)}")
         return new_videos    
@@ -379,7 +394,7 @@ class VideoAnalyzer:
         Obtener videos pendientes de la base de datos para procesamiento
         
         Args:
-            platform_filter: 'YT', 'TT', 'IG', 'O', 'IWARA', 'OTHER', 'ALL' o None para todas las plataformas
+            platform_filter: 'youtube', 'tiktok', 'instagram', 'other', 'all-platforms' o None para todas las plataformas
             limit: número máximo de videos a retornar
             
         Returns:
@@ -387,30 +402,15 @@ class VideoAnalyzer:
         """
         logger.info("Buscando videos pendientes en la base de datos...")
         
-        # 🆕 Mapear códigos de plataforma a nombres reales (dinámico)
+        # Obtener plataformas disponibles
         available_platforms = external_sources.get_available_platforms()
-        
-        platform_map = {
-            'YT': 'youtube',
-            'TT': 'tiktok', 
-            'IG': 'instagram',
-            'O': None,  # Para carpetas organizadas, puede ser cualquier plataforma
-            'OTHER': None,  # Para plataformas adicionales, puede ser cualquiera
-            'ALL': None  # Para todas las plataformas
-        }
-        
-        # Agregar plataformas adicionales al mapa
-        for platform_key in available_platforms['additional'].keys():
-            platform_map[platform_key.upper()] = platform_key
         
         # Construir filtros
         filters = {'processing_status': 'pendiente'}
         
         if platform_filter:
-            actual_platform = platform_map.get(platform_filter, platform_filter)
-            
-            # 🆕 Manejar casos especiales
-            if platform_filter == 'OTHER':
+            # Manejar casos especiales
+            if platform_filter == 'other':
                 # Solo plataformas adicionales - filtrar por todas las adicionales
                 additional_platforms = list(available_platforms['additional'].keys())
                 if additional_platforms:
@@ -418,11 +418,19 @@ class VideoAnalyzer:
                 else:
                     # Si no hay plataformas adicionales, no devolver nada
                     return []
-            elif platform_filter == 'ALL':
+            elif platform_filter == 'all-platforms':
                 # Todas las plataformas - no agregar filtro de plataforma
                 pass
-            elif actual_platform:  # Solo filtrar si no es 'O' (None) o casos especiales
-                filters['platform'] = actual_platform
+            elif platform_filter in ['youtube', 'tiktok', 'instagram']:
+                # Plataformas principales específicas
+                filters['platform'] = platform_filter
+            elif platform_filter in available_platforms['additional']:
+                # Plataforma adicional específica
+                filters['platform'] = platform_filter
+            else:
+                # Plataforma no reconocida
+                logger.warning(f"Plataforma no reconocida: {platform_filter}")
+                return []
         
         # Obtener videos pendientes de la BD
         pending_videos_db = db.get_videos(filters, limit=limit)
@@ -459,12 +467,13 @@ class VideoAnalyzer:
         logger.info(f"Videos pendientes válidos: {len(pending_videos)}")
         return pending_videos
 
-    def run(self, limit=None, platform=None):
+    def run(self, limit=None, platform=None, source='all'):
         """Ejecutar el análisis completo
         
         Args:
             limit (int, optional): Número máximo de videos a procesar. Si es None, procesa todos.
-            platform (str, optional): Plataforma específica a procesar ('YT', 'TT', 'IG', 'O')
+            platform (str, optional): Plataforma específica a procesar ('youtube', 'tiktok', 'instagram', 'other', 'all-platforms')
+            source (str, optional): Fuente de datos ('db', 'organized', 'all')
         """
         logger.info("=== INICIANDO TAG-FLOW V2 ANALYSIS ===")
         
@@ -472,23 +481,28 @@ class VideoAnalyzer:
             logger.info(f"MODO LIMITADO: Procesando máximo {limit} videos")
         
         if platform:
-            # 🆕 Nombres de plataformas dinámicos
-            available_platforms = external_sources.get_available_platforms()
-            
             platform_names = {
-                'YT': 'YouTube', 
-                'TT': 'TikTok', 
-                'IG': 'Instagram', 
-                'O': 'Carpetas Organizadas (D:\\4K All)',
-                'OTHER': 'Solo Plataformas Adicionales',
-                'ALL': 'Todas las Plataformas'
+                'youtube': 'YouTube (4K Video Downloader+)', 
+                'tiktok': 'TikTok (4K Tokkit)', 
+                'instagram': 'Instagram (4K Stogram)', 
+                'other': 'Solo Plataformas Adicionales',
+                'all-platforms': 'Todas las Plataformas'
             }
             
-            # Agregar plataformas adicionales a los nombres
+            # Agregar plataformas adicionales disponibles
+            available_platforms = external_sources.get_available_platforms()
             for platform_key, platform_info in available_platforms['additional'].items():
-                platform_names[platform_key.upper()] = f"{platform_info['folder_name']} (D:\\4K All\\{platform_info['folder_name']})"
+                platform_names[platform_key] = f"{platform_info['folder_name']} (D:\\4K All\\{platform_info['folder_name']})"
             
             logger.info(f"PLATAFORMA ESPECÍFICA: {platform_names.get(platform, platform)}")
+        
+        if source != 'all':
+            source_names = {
+                'db': 'Solo Bases de Datos Externas (4K Apps)',
+                'organized': 'Solo Carpetas Organizadas (D:\\4K All)',
+                'all': 'Todas las Fuentes'
+            }
+            logger.info(f"FUENTE ESPECÍFICA: {source_names.get(source, source)}")
         
         try:
             # 0. Importar desde 4K Downloader si está disponible (solo si no hay filtro de plataforma)
@@ -520,10 +534,8 @@ class VideoAnalyzer:
             
             # Solo buscar videos nuevos si no hemos alcanzado el límite
             if not limit or remaining_limit > 0:
-                # 🆕 MODERNIZADO: Usar siempre fuentes externas (configuradas en .env)
-                # Eliminado escaneo legacy - Todo viene de variables de entorno
-                use_external = True  # Siempre usar fuentes externas
-                new_videos = self.find_new_videos(platform_filter=platform, use_external_sources=use_external)
+                # Usar fuentes según source filter
+                new_videos = self.find_new_videos(platform_filter=platform, source_filter=source)
                 
                 # Aplicar límite restante a videos nuevos
                 if remaining_limit and len(new_videos) > remaining_limit:
@@ -565,112 +577,127 @@ class VideoAnalyzer:
 def main():
     """Función principal"""
     parser = argparse.ArgumentParser(
-        description='Tag-Flow V2 - Procesador de Videos TikTok/MMD',
+        description='Tag-Flow V2 - Procesador de Videos TikTok/MMD con Flags Profesionales',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Ejemplos de uso:
-  python main.py                    # Procesar todos los videos nuevos
-  python main.py 10                 # Procesar solo 10 videos
-  python main.py 5 YT               # Procesar 5 videos de YouTube
-  python main.py 3 TT               # Procesar 3 videos de TikTok  
-  python main.py 2 IG               # Procesar 2 videos de Instagram
-  python main.py 10 O               # Procesar 10 videos de carpetas organizadas (D:\\4K All)
+  python main.py                                    # Procesar todos los videos nuevos
+  python main.py --limit 10                        # Procesar solo 10 videos
+  python main.py --platform youtube --limit 5      # Procesar 5 videos de YouTube
+  python main.py --platform tiktok --source db     # Procesar TikTok solo desde BD externa
+  python main.py --source organized --limit 20     # Procesar 20 videos solo de carpetas organizadas
+  python main.py --platform other --limit 10       # Procesar 10 videos de plataformas adicionales
+  python main.py --platform all-platforms          # Procesar videos de todas las plataformas
 
-Códigos de plataforma:
-  YT  = YouTube (desde 4K Video Downloader+)
-  TT  = TikTok (desde 4K Tokkit)  
-  IG  = Instagram (desde 4K Stogram)
-  O   = Otros (carpetas organizadas en D:\\4K All)
+Opciones de source:
+  db        = Solo bases de datos externas (4K Apps)
+  organized = Solo carpetas organizadas (D:\\4K All)
+  all       = Ambas fuentes (por defecto)
+
+Opciones de platform:
+  youtube        = YouTube (4K Video Downloader+)
+  tiktok         = TikTok (4K Tokkit)
+  instagram      = Instagram (4K Stogram)  
+  other          = Solo plataformas adicionales
+  all-platforms  = Todas las plataformas
+  [NOMBRE]       = Plataforma específica (ej: iwara)
 
 Notas:
   - Sin límite: procesa todos los videos encontrados
   - Con límite: selecciona los primeros N videos de la lista
   - Los videos ya procesados se omiten automáticamente
-  - Con código de plataforma: usa fuentes externas específicas
         """)
     
-    parser.add_argument(
-        'limit', 
-        type=int, 
-        nargs='?', 
-        default=None,
-        help='Número máximo de videos a procesar (opcional)'
-    )
-    
-    # 🆕 Obtener plataformas disponibles dinámicamente
-    available_platforms = external_sources.get_available_platforms()
-    
-    # Crear lista de códigos de plataforma disponibles
-    platform_choices = ['YT', 'TT', 'IG', 'O']  # Códigos principales
-    platform_choices.extend([p.upper() for p in available_platforms['additional'].keys()])  # Adicionales
-    platform_choices.extend(['OTHER', 'ALL'])  # Opciones especiales
-    
-    parser.add_argument(
-        'platform',
-        nargs='?',
-        choices=platform_choices,
-        help=f'Código de plataforma específica: YT=YouTube, TT=TikTok, IG=Instagram, O=Carpetas organizadas, {", ".join([p.upper()+"="+p.title() for p in available_platforms["additional"].keys()])}, OTHER=Solo adicionales, ALL=Todas'
-    )
-    
+    # Opciones principales
     parser.add_argument(
         '--limit', 
-        type=int, 
-        dest='limit_alt',
-        help='Número máximo de videos a procesar (formato alternativo)'
+        type=int,
+        help='Número máximo de videos a procesar'
+    )
+    
+    parser.add_argument(
+        '--source',
+        choices=['db', 'organized', 'all'],
+        default='all',
+        help='Fuente de datos: db=bases externas, organized=carpetas D:\\4K All, all=ambas (por defecto)'
+    )
+    
+    # Obtener plataformas disponibles dinámicamente
+    available_platforms = external_sources.get_available_platforms()
+    
+    # Crear lista de opciones de plataforma
+    platform_choices = ['youtube', 'tiktok', 'instagram']  # Principales
+    platform_choices.extend(available_platforms['additional'].keys())  # Adicionales
+    platform_choices.extend(['other', 'all-platforms'])  # Especiales
+    
+    parser.add_argument(
+        '--platform',
+        choices=platform_choices,
+        help=f'Plataforma específica. Principales: youtube, tiktok, instagram. Adicionales: {", ".join(available_platforms["additional"].keys()) if available_platforms["additional"] else "ninguna"}. Especiales: other (solo adicionales), all-platforms (todas)'
     )
     
     args = parser.parse_args()
     
-    # Determinar el límite (prioridad al argumento posicional)
-    limit = args.limit or args.limit_alt
-    platform = args.platform
-    
-    if limit is not None and limit <= 0:
+    # Validaciones
+    if args.limit is not None and args.limit <= 0:
         print("Error: El límite debe ser un número positivo")
         sys.exit(1)
     
-    # 🆕 Mostrar información de configuración con plataformas dinámicas
-    available_platforms = external_sources.get_available_platforms()
+    # Mostrar información de configuración
+    print("Tag-Flow V2 - Procesador con Flags Profesionales")
+    print("=" * 60)
     
-    platform_names = {
-        'YT': 'YouTube', 
-        'TT': 'TikTok', 
-        'IG': 'Instagram', 
-        'O': 'Carpetas Organizadas',
-        'OTHER': 'Solo Plataformas Adicionales',
-        'ALL': 'Todas las Plataformas'
+    # Mostrar fuente
+    source_names = {
+        'db': 'Bases de Datos Externas (4K Apps)',
+        'organized': 'Carpetas Organizadas (D:\\4K All)',
+        'all': 'Todas las Fuentes'
     }
+    print(f"Fuente: {source_names[args.source]}")
     
-    # Agregar plataformas adicionales
-    for platform_key, platform_info in available_platforms['additional'].items():
-        platform_names[platform_key.upper()] = platform_info['folder_name']
-    
-    if platform:
-        print(f"Tag-Flow V2 - Plataforma: {platform_names[platform]}")
-        if limit:
-            print(f"Máximo {limit} videos")
-        else:
-            print("Todos los videos disponibles")
-    elif limit:
-        print(f"Tag-Flow V2 - Modo Limitado ({limit} videos máximo)")
+    # Mostrar plataforma
+    if args.platform:
+        platform_names = {
+            'youtube': 'YouTube (4K Video Downloader+)',
+            'tiktok': 'TikTok (4K Tokkit)', 
+            'instagram': 'Instagram (4K Stogram)',
+            'other': 'Solo Plataformas Adicionales',
+            'all-platforms': 'Todas las Plataformas'
+        }
+        
+        # Agregar plataformas adicionales
+        for platform_key, platform_info in available_platforms['additional'].items():
+            platform_names[platform_key] = f"{platform_info['folder_name']} (D:\\4K All\\{platform_info['folder_name']})"
+        
+        print(f"Plataforma: {platform_names.get(args.platform, args.platform.title())}")
     else:
-        print("Tag-Flow V2 - Modo Completo (todos los videos)")
+        print(f"Plataforma: Todas las Disponibles")
     
+    # Mostrar límite
+    if args.limit:
+        print(f"Limite: Maximo {args.limit} videos")
+    else:
+        print(f"Limite: Todos los videos disponibles")
+    
+    print("=" * 60)
     print("Iniciando procesamiento...")
-    print("-" * 50)
+    print()
     
     try:
         analyzer = VideoAnalyzer()
-        analyzer.run(limit=limit, platform=platform)
+        analyzer.run(limit=args.limit, platform=args.platform, source=args.source)
         
-        print("-" * 50)
+        print()
+        print("=" * 60)
         print("Procesamiento completado exitosamente")
         
     except KeyboardInterrupt:
-        print("\nProcesamiento interrumpido por el usuario")
+        print()
+        print("Procesamiento interrumpido por el usuario")
         sys.exit(1)
     except Exception as e:
-        print(f"\nError durante el procesamiento: {e}")
+        print()
+        print(f"Error durante el procesamiento: {e}")
         logger.error(f"Error fatal: {e}")
         sys.exit(1)
 
