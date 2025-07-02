@@ -18,6 +18,13 @@ import time
 
 from config import config
 
+# Importar detector optimizado
+try:
+    from .optimized_detector import OptimizedCharacterDetector
+    OPTIMIZED_DETECTOR_AVAILABLE = True
+except ImportError:
+    OPTIMIZED_DETECTOR_AVAILABLE = False
+
 logger = logging.getLogger(__name__)
 
 class CharacterIntelligence:
@@ -25,15 +32,26 @@ class CharacterIntelligence:
     
     def __init__(self):
         self.character_db_path = config.DATA_DIR / 'character_database.json'
-        self.creator_mapping_path = config.DATA_DIR / 'creator_character_mapping.json'
         self.known_faces_path = config.KNOWN_FACES_PATH
         
-        # Cargar bases de datos
+        # Cargar base de datos unificada
         self.character_db = self._load_character_database()
-        self.creator_mapping = self._load_creator_mapping()
+        self.creator_mapping = self._extract_creator_mapping_from_db()
         
-        # Patrones para extracción de nombres de títulos
+        # Patrones para extracción de nombres de títulos (legacy)
         self.character_patterns = self._init_character_patterns()
+        
+        # NUEVO: Inicializar detector optimizado si está disponible
+        self.optimized_detector = None
+        if OPTIMIZED_DETECTOR_AVAILABLE:
+            try:
+                self.optimized_detector = OptimizedCharacterDetector(self.character_db)
+                logger.info("Detector optimizado inicializado exitosamente")
+            except Exception as e:
+                logger.warning(f"Error inicializando detector optimizado: {e}")
+                logger.info("Usando detector legacy como fallback")
+        else:
+            logger.info("Detector optimizado no disponible, usando detector legacy")
         
         logger.info("Character Intelligence inicializado")
     
@@ -131,42 +149,80 @@ class CharacterIntelligence:
             }
         }
     
-    def _load_creator_mapping(self) -> Dict:
-        """Cargar mapeo de creadores → personajes"""
-        if self.creator_mapping_path.exists():
-            try:
-                with open(self.creator_mapping_path, 'r', encoding='utf-8') as f:
-                    return json.load(f)
-            except Exception as e:
-                logger.error(f"Error cargando creator_mapping.json: {e}")
-        
-        # Mapeo inicial de creadores conocidos que interpretan personajes
-        return {
-            "creator_to_character": {
-                # Ejemplos de creadores de TikTok que siempre hacen el mismo personaje
-                "hutao_cosplayer": "Hu Tao",
-                "raiden_official": "Raiden Shogun",
-                "miku_dancer": "Hatsune Miku",
-                # Se irá poblando automáticamente
-            },
-            "character_to_creators": {
-                # Mapeo inverso para encontrar creadores de un personaje
-                "Hu Tao": ["hutao_cosplayer", "hutao_main"],
-                "Raiden Shogun": ["raiden_official", "ei_cosplay"],
-                "Hatsune Miku": ["miku_dancer", "miku_official"]
-            },
-            "auto_detected": {
-                # Creadores detectados automáticamente
-            }
+    def _extract_creator_mapping_from_db(self) -> Dict:
+        """Extraer mapeo de creadores desde la base de datos unificada"""
+        creator_mapping = {
+            "creator_to_character": {},
+            "character_to_creators": {},
+            "auto_detected": {}
         }
-    
+        
+        # Buscar tiktoker_personas en la base de datos
+        if 'tiktoker_personas' in self.character_db:
+            tiktoker_data = self.character_db['tiktoker_personas']
+            
+            if isinstance(tiktoker_data.get('characters'), dict):
+                # Nueva estructura
+                for char_name, char_info in tiktoker_data['characters'].items():
+                    # Buscar mapeo automático de creador
+                    auto_creator = char_info.get('auto_detect_for_creator')
+                    if auto_creator:
+                        creator_mapping["creator_to_character"][auto_creator] = char_name
+                        
+                        # Mapeo inverso
+                        if char_name not in creator_mapping["character_to_creators"]:
+                            creator_mapping["character_to_creators"][char_name] = []
+                        creator_mapping["character_to_creators"][char_name].append(auto_creator)
+                        
+                        # Marcar como auto-detectado
+                        creator_mapping["auto_detected"][auto_creator] = {
+                            "character": char_name,
+                            "confidence": char_info.get('confidence', 0.9),
+                            "platform": char_info.get('platform_specific', 'tiktok')
+                        }
+        
+        return creator_mapping
+
+    def _get_characters_compatible(self, game_data):
+        """Wrapper para manejar ambas estructuras (nueva y antigua)"""
+        if isinstance(game_data.get('characters'), dict):
+            return list(game_data['characters'].keys())  # Nueva estructura
+        elif isinstance(game_data.get('characters'), list):
+            return game_data['characters']  # Estructura antigua
+        else:
+            return []
+
+    def _get_aliases_compatible(self, game_data):
+        """Wrapper para aliases/variants en ambas estructuras"""
+        if isinstance(game_data.get('characters'), dict):
+            # Nueva estructura: extraer de variants
+            aliases = {}
+            for canonical_name, char_data in game_data['characters'].items():
+                variants = char_data.get('variants', {})
+                all_variants = []
+                for variant_type, variant_list in variants.items():
+                    all_variants.extend(variant_list)
+                # Filtrar el nombre canónico para evitar duplicados
+                all_variants = [v for v in all_variants if v != canonical_name]
+                if all_variants:
+                    aliases[canonical_name] = all_variants
+            return aliases
+        elif 'aliases' in game_data:
+            return game_data['aliases']  # Estructura antigua
+        else:
+            return {}
+
     def _init_character_patterns(self) -> List[Dict]:
-        """Inicializar patrones dinámicos para reconocimiento en títulos basados en la BD completa"""
+        """ACTUALIZADO: Inicializar patrones dinámicos usando wrappers de compatibilidad"""
         patterns = []
         
         # Generar patrones dinámicos para TODOS los personajes en la base de datos
         for game, game_data in self.character_db.items():
-            for character in game_data['characters']:
+            # CAMBIO CRÍTICO: Usar wrappers de compatibilidad
+            characters = self._get_characters_compatible(game_data)
+            aliases = self._get_aliases_compatible(game_data)
+            
+            for character in characters:
                 # Crear patrón básico para el nombre del personaje
                 # Escapar caracteres especiales y manejar espacios
                 escaped_char = re.escape(character)
@@ -190,14 +246,13 @@ class CharacterIntelligence:
                         'source': 'database_nospace'
                     })
             
-            # Agregar patrones para aliases si existen
-            if 'aliases' in game_data:
-                for main_character, aliases in game_data['aliases'].items():
-                    for alias in aliases:
-                        escaped_alias = re.escape(alias)
-                        patterns.append({
-                            'pattern': rf'\b{escaped_alias}\b',
-                            'character': main_character,
+            # ACTUALIZADO: Agregar patrones para aliases usando wrapper de compatibilidad
+            for main_character, alias_list in aliases.items():
+                for alias in alias_list:
+                    escaped_alias = re.escape(alias)
+                    patterns.append({
+                        'pattern': rf'\b{escaped_alias}\b',
+                        'character': main_character,
                             'game': game,
                             'source': 'database_alias'
                         })
@@ -256,7 +311,26 @@ class CharacterIntelligence:
         return all_patterns
     
     def analyze_video_title(self, title: str) -> List[Dict]:
-        """Analizar título de video para extraer personajes usando patrones dinámicos mejorados"""
+        """HÍBRIDO: Usar detector optimizado si disponible, fallback a legacy"""
+        
+        if not title:
+            return []
+        
+        # Usar detector optimizado si está disponible
+        if self.optimized_detector:
+            try:
+                logger.info(f"Usando detector optimizado para título: {title}")
+                return self.optimized_detector.detect_in_title(title)
+            except Exception as e:
+                logger.error(f"Error en detector optimizado: {e}")
+                logger.info("Fallback a detector legacy")
+        
+        # Fallback a detector legacy
+        logger.info(f"Usando detector legacy para título: {title}")
+        return self._analyze_video_title_legacy(title)
+    
+    def _analyze_video_title_legacy(self, title: str) -> List[Dict]:
+        """Detector legacy para compatibilidad y fallback"""
         detected_characters = []
         
         if not title:
@@ -464,12 +538,27 @@ class CharacterIntelligence:
                 'creator': creator_name
             }
         
+        # NUEVO: Verificar si es un TikToker con persona propia
+        if 'tiktoker_personas' in self.creator_mapping:
+            if creator_name in self.creator_mapping['tiktoker_personas']:
+                tiktoker_info = self.creator_mapping['tiktoker_personas'][creator_name]
+                if tiktoker_info.get('auto_detect', False):
+                    return {
+                        'name': tiktoker_info['persona_name'],
+                        'game': tiktoker_info['game'],
+                        'confidence': tiktoker_info.get('confidence', 0.9),
+                        'source': 'tiktoker_persona',
+                        'creator': creator_name
+                    }
+        
         # Buscar patrones en el nombre del creador
         creator_lower = creator_name.lower()
         
         # Verificar si el nombre del creador contiene nombre de personaje
         for game, game_data in self.character_db.items():
-            for character in game_data['characters']:
+            # ARREGLADO: Usar wrapper de compatibilidad
+            characters = self._get_characters_compatible(game_data)
+            for character in characters:
                 if character.lower() in creator_lower:
                     # Auto-registrar este mapeo para el futuro
                     self._auto_register_creator_mapping(creator_name, character, game)
@@ -484,21 +573,45 @@ class CharacterIntelligence:
         
         return None
     
+    def _normalize_character_name(self, name: str) -> str:
+        """Normalizar nombre de personaje para mejor matching"""
+        import re
+        
+        # Remover espacios extra
+        name = re.sub(r'\s+', ' ', name.strip())
+        
+        # NUEVA FUNCIONALIDAD: Remover espacios en caracteres CJK (Chino, Japonés, Coreano)
+        # "胡 桃" -> "胡桃", "八 重 神 子" -> "八重神子"
+        name = re.sub(r'(?<=[\u4e00-\u9fff\u3040-\u309f\u30a0-\u30ff\uac00-\ud7af])\s+(?=[\u4e00-\u9fff\u3040-\u309f\u30a0-\u30ff\uac00-\ud7af])', '', name)
+        
+        return name
+    
     def _verify_character_name(self, name: str) -> Optional[Dict]:
         """Verificar si un nombre corresponde a un personaje conocido"""
-        name_lower = name.lower().strip()
+        # Normalizar nombre de entrada
+        normalized_name = self._normalize_character_name(name)
+        name_lower = normalized_name.lower().strip()
         
         for game, game_data in self.character_db.items():
-            # Buscar en lista principal
-            for character in game_data['characters']:
-                if character.lower() == name_lower:
+            # ARREGLADO: Usar wrapper de compatibilidad para lista principal
+            characters = self._get_characters_compatible(game_data)
+            for character in characters:
+                normalized_character = self._normalize_character_name(character)
+                if normalized_character.lower() == name_lower:
                     return {'name': character, 'game': game}
             
-            # Buscar en alias si existen
+            # Buscar en alias si existen (con normalización)
             if 'aliases' in game_data:
                 for main_name, aliases in game_data['aliases'].items():
-                    if name_lower in [alias.lower() for alias in aliases]:
+                    normalized_main = self._normalize_character_name(main_name)
+                    if normalized_main.lower() == name_lower:
                         return {'name': main_name, 'game': game}
+                    
+                    # Verificar aliases normalizados
+                    for alias in aliases:
+                        normalized_alias = self._normalize_character_name(alias)
+                        if normalized_alias.lower() == name_lower:
+                            return {'name': main_name, 'game': game}
         
         return None
     
@@ -658,19 +771,53 @@ class CharacterIntelligence:
             logger.error(f"Error guardando creator_mapping.json: {e}")
     
     def get_stats(self) -> Dict:
-        """Obtener estadísticas del sistema de inteligencia de personajes"""
-        total_characters = sum(len(game_data['characters']) for game_data in self.character_db.values())
+        """ACTUALIZADO: Obtener estadísticas del sistema usando wrappers de compatibilidad"""
+        total_characters = 0
+        
+        # Usar wrapper de compatibilidad para contar personajes
+        for game_data in self.character_db.values():
+            characters = self._get_characters_compatible(game_data)
+            total_characters += len(characters)
+        
         total_mappings = len(self.creator_mapping['creator_to_character'])
         auto_detected = len(self.creator_mapping.get('auto_detected', {}))
         
-        return {
+        stats = {
             'total_characters': total_characters,
             'total_games': len(self.character_db),
             'creator_mappings': total_mappings,
             'auto_detected_mappings': auto_detected,
             'database_file': str(self.character_db_path),
-            'mapping_file': str(self.creator_mapping_path)
+            'mapping_file': 'Integrado en character_database.json',  # Ya no existe archivo separado
+            'detector_type': 'optimized' if self.optimized_detector else 'legacy'
         }
+        
+        # Agregar estadísticas del detector optimizado si está disponible
+        if self.optimized_detector:
+            performance_stats = self.optimized_detector.get_performance_stats()
+            stats.update({
+                'optimized_patterns': performance_stats['total_patterns'],
+                'cache_hit_rate': performance_stats['cache_hit_rate'],
+                'avg_detection_time_ms': performance_stats['avg_detection_time_ms'],
+                'pattern_distribution': performance_stats['pattern_distribution']
+            })
+        
+        return stats
+    
+    def get_performance_report(self) -> Dict:
+        """Obtener reporte detallado de rendimiento"""
+        if not self.optimized_detector:
+            return {"error": "Detector optimizado no disponible"}
+        
+        return self.optimized_detector.get_performance_stats()
+    
+    def clear_detection_cache(self):
+        """Limpiar cache de detección si existe"""
+        if self.optimized_detector:
+            self.optimized_detector.clear_cache()
+            logger.info("Cache del detector optimizado limpiado")
+        else:
+            logger.info("No hay cache que limpiar (detector legacy)")
 
 # Instancia global
 character_intelligence = CharacterIntelligence()

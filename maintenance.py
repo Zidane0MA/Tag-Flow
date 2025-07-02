@@ -639,32 +639,78 @@ class MaintenanceUtils:
             return None
 
     def show_character_stats(self):
-        """Mostrar estadísticas del sistema de inteligencia de personajes"""
+        """FINAL: Mostrar estadísticas completas del sistema optimizado"""
         logger.info("Obteniendo estadísticas de Character Intelligence...")
         
         stats = character_intelligence.get_stats()
         
-        print("\nINTELIGENCIA DE PERSONAJES")
-        print("=" * 50)
+        print("\nINTELIGENCIA DE PERSONAJES - SISTEMA OPTIMIZADO")
+        print("=" * 60)
         print(f"Personajes conocidos: {stats['total_characters']}")
         print(f"Juegos/Series: {stats['total_games']}")
+        print(f"Detector: {stats['detector_type'].upper()}")
         print(f"Mapeos creador->personaje: {stats['creator_mappings']}")
         print(f"Auto-detectados: {stats['auto_detected_mappings']}")
         print(f"BD Personajes: {stats['database_file']}")
         print(f"BD Mapeos: {stats['mapping_file']}")
         
-        # Mostrar personajes por juego
+        # Estadísticas específicas del detector optimizado
+        if stats['detector_type'] == 'optimized':
+            print(f"\nRENDIMIENTO OPTIMIZADO:")
+            print(f"  Patrones jerárquicos: {stats.get('optimized_patterns', 'N/A')}")
+            print(f"  Cache hit rate: {stats.get('cache_hit_rate', 'N/A')}%")
+            print(f"  Tiempo promedio detección: {stats.get('avg_detection_time_ms', 'N/A')}ms")
+            
+            # Distribución de patrones por categoría
+            pattern_dist = stats.get('pattern_distribution', {})
+            if pattern_dist:
+                print(f"  Distribución de patrones:")
+                for category, count in pattern_dist.items():
+                    print(f"    {category}: {count}")
+        
+        # Mostrar personajes por juego usando métodos públicos
         print(f"\nPersonajes por juego:")
         for game, game_data in character_intelligence.character_db.items():
-            count = len(game_data['characters'])
-            print(f"  {game.replace('_', ' ').title()}: {count}")
+            if isinstance(game_data.get('characters'), dict):
+                count = len(game_data['characters'])
+                print(f"  {game.replace('_', ' ').title()}: {count}")
+                
+                # Mostrar algunos ejemplos
+                examples = list(game_data['characters'].keys())[:3]
+                print(f"    Ejemplos: {', '.join(examples)}")
+                if count > 3:
+                    print(f"    ... y {count - 3} mas")
         
-        # Mostrar mapeos recientes
+        # Mostrar mapeos de TikToker Personas
         auto_detected = character_intelligence.creator_mapping.get('auto_detected', {})
         if auto_detected:
-            print(f"\nMapeos Auto-Detectados Recientes:")
-            for creator, data in list(auto_detected.items())[-5:]:  # Últimos 5
-                print(f"  {creator} -> {data['character']} ({data['game']})")
+            print(f"\nTikToker Personas configurados:")
+            for creator, data in auto_detected.items():
+                character = data.get('character', 'N/A')
+                confidence = data.get('confidence', 'N/A')
+                platform = data.get('platform', 'N/A')
+                print(f"  {creator} -> {character} (confidence: {confidence}, platform: {platform})")
+        else:
+            print(f"\nTikToker Personas: Ninguno configurado")
+            print("    Usa 'python maintenance.py add-tiktoker --creator NOMBRE' para agregar")
+        
+        # Reporte de rendimiento si está disponible
+        if stats['detector_type'] == 'optimized':
+            try:
+                performance = character_intelligence.get_performance_report()
+                if performance and 'total_patterns' in performance:
+                    print(f"\nESTADISTICAS DETALLADAS DE RENDIMIENTO:")
+                    print(f"  Total consultas: {performance.get('cache_size', 0)} en cache")
+                    
+                    # Mostrar métricas de eficiencia si están disponibles
+                    for category, count in performance.get('pattern_distribution', {}).items():
+                        efficiency = count / performance.get('total_patterns', 1) * 100
+                        print(f"  {category.title()}: {count} patrones ({efficiency:.1f}%)")
+            except Exception as e:
+                logger.debug(f"Error obteniendo estadísticas detalladas: {e}")
+        
+        print(f"\nSistema listo para procesamiento optimizado de videos!")
+        print(f"Usa 'python main.py 10' para procesar videos con detector optimizado")
     
     def clean_false_positives(self, force: bool = False):
         """Limpiar falsos positivos del sistema de reconocimiento de personajes"""
@@ -756,6 +802,63 @@ class MaintenanceUtils:
         else:
             print(f"[ERROR] Error agregando personaje: {character_name}")
     
+    def add_tiktoker_persona(self, creator_name: str, persona_name: str = None, confidence: float = 0.9):
+        """Agregar un TikToker como personaje (para filtrado en frontend)"""
+        logger.info(f"Agregando TikToker como personaje: {creator_name}")
+        
+        # Si no se especifica persona_name, usar el nombre del creador limpio
+        if not persona_name:
+            # Limpiar nombre del creador (remover .cos, @, etc.)
+            persona_name = creator_name.replace('.cos', '').replace('@', '').replace('_', ' ').title()
+        
+        try:
+            # Agregar a character_database.json
+            if 'tiktoker_personas' not in character_intelligence.character_db:
+                character_intelligence.character_db['tiktoker_personas'] = {
+                    'characters': [],
+                    'aliases': {}
+                }
+            
+            tiktoker_game = character_intelligence.character_db['tiktoker_personas']
+            
+            # Agregar personaje si no existe
+            if persona_name not in tiktoker_game['characters']:
+                tiktoker_game['characters'].append(persona_name)
+            
+            # Agregar aliases
+            if 'aliases' not in tiktoker_game:
+                tiktoker_game['aliases'] = {}
+            tiktoker_game['aliases'][persona_name] = [creator_name, f"{persona_name} Cosplay"]
+            
+            # Agregar a creator_character_mapping.json
+            if 'tiktoker_personas' not in character_intelligence.creator_mapping:
+                character_intelligence.creator_mapping['tiktoker_personas'] = {}
+            
+            character_intelligence.creator_mapping['tiktoker_personas'][creator_name] = {
+                'persona_name': persona_name,
+                'game': 'tiktoker_personas',
+                'auto_detect': True,
+                'confidence': confidence,
+                'description': f"TikToker cosplayer con persona propia"
+            }
+            
+            # Guardar cambios
+            character_intelligence._save_character_database()
+            character_intelligence._save_creator_mapping()
+            
+            print(f"[OK] TikToker agregado como personaje:")
+            print(f"   Creador: {creator_name}")
+            print(f"   Personaje: {persona_name}")
+            print(f"   Confianza: {confidence}")
+            print(f"   Ahora aparecerá como personaje en todos los videos de {creator_name}")
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error agregando TikToker como personaje: {e}")
+            print(f"[ERROR] Error agregando TikToker: {e}")
+            return False
+
     def download_character_images(self, character_name: str = None, game: str = None, limit: int = None):
         """Descargar imágenes de referencia para personajes"""
         if character_name:
@@ -777,8 +880,10 @@ class MaintenanceUtils:
             for game, game_data in character_intelligence.character_db.items():
                 if limit and processed >= limit:
                     break
-                    
-                for character in game_data['characters']:
+                
+                # ARREGLADO: Usar wrapper de compatibilidad
+                characters = character_intelligence._get_characters_compatible(game_data)
+                for character in characters:
                     if limit and processed >= limit:
                         break
                     
@@ -902,7 +1007,7 @@ def main():
         'optimize-db', 'report', 'populate-db', 'clear-db', 'populate-thumbnails',
         'clear-thumbnails', 'show-stats', 'character-stats', 'add-character',
         'download-character-images', 'analyze-titles', 'update-creator-mappings',
-        'clean-false-positives'
+        'clean-false-positives', 'add-tiktoker'
     ], help='Acción a realizar')
     
     # Argumentos generales
@@ -919,6 +1024,11 @@ def main():
     parser.add_argument('--character', type=str, help='Nombre del personaje')
     parser.add_argument('--game', type=str, help='Juego o serie del personaje')
     parser.add_argument('--aliases', nargs='*', help='Nombres alternativos del personaje')
+    
+    # Argumentos específicos para TikTokers como personajes
+    parser.add_argument('--creator', type=str, help='Nombre del creador/TikToker')
+    parser.add_argument('--persona', type=str, help='Nombre del personaje/persona (opcional)')
+    parser.add_argument('--confidence', type=float, default=0.9, help='Nivel de confianza (0.0-1.0)')
     
     args = parser.parse_args()
     
@@ -970,6 +1080,11 @@ def main():
         utils.update_creator_mappings(args.limit)
     elif args.action == 'clean-false-positives':
         utils.clean_false_positives(force=args.force)
+    elif args.action == 'add-tiktoker':
+        if not args.creator:
+            logger.error("Se requiere --creator para agregar TikToker como personaje")
+            return
+        utils.add_tiktoker_persona(args.creator, args.persona, args.confidence)
 
 if __name__ == '__main__':
     main()
