@@ -49,7 +49,7 @@ class Config:
     DEEPFACE_MODEL = os.getenv('DEEPFACE_MODEL', 'ArcFace')
     
     # Rutas de archivos
-    YOUTUBE_BASE_PATH = Path(os.getenv('YOUTUBE_BASE_PATH', BASE_DIR / 'videos_input'))
+    # 🆕 LIMPIEZA: Eliminado YOUTUBE_BASE_PATH (legacy) - Sistema usa únicamente variables .env
     THUMBNAILS_PATH = Path(os.getenv('THUMBNAILS_PATH', DATA_DIR / 'thumbnails'))
     PROCESSED_VIDEOS_PATH = Path(os.getenv('PROCESSED_VIDEOS_PATH', BASE_DIR / 'videos_procesados'))
     KNOWN_FACES_PATH = BASE_DIR / 'caras_conocidas'
@@ -73,12 +73,12 @@ class Config:
     @classmethod
     def ensure_directories(cls):
         """Crear directorios necesarios si no existen"""
+        # 🆕 LIMPIEZA: Crear solo directorios esenciales (sin rutas legacy)
         dirs_to_create = [
             cls.DATA_DIR,
             cls.THUMBNAILS_PATH,
             cls.PROCESSED_VIDEOS_PATH,
-            cls.YOUTUBE_BASE_PATH,
-            cls.KNOWN_FACES_PATH
+            cls.KNOWN_FACES_PATH  # Eliminado: YOUTUBE_BASE_PATH (legacy)
         ]
         
         for directory in dirs_to_create:

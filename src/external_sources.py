@@ -125,7 +125,12 @@ class ExternalSourcesManager:
             cursor = conn.execute(query)
             rows = cursor.fetchall()
             
-            tiktok_base = Path(r"D:\4K Tokkit")
+            # 🆕 MEJORADO: Extraer ruta base dinámicamente de EXTERNAL_TIKTOK_DB
+            if not self.tiktok_db_path:
+                logger.warning("EXTERNAL_TIKTOK_DB no configurado en .env")
+                return []
+            
+            tiktok_base = Path(self.tiktok_db_path).parent  # D:/4K Tokkit/data.sqlite -> D:/4K Tokkit
             
             for row in rows:
                 relative_path = row['relative_path']
@@ -182,7 +187,12 @@ class ExternalSourcesManager:
             cursor = conn.execute(query)
             rows = cursor.fetchall()
             
-            instagram_base = Path(r"D:\4K Stogram")
+            # 🆕 MEJORADO: Extraer ruta base dinámicamente de EXTERNAL_INSTAGRAM_DB
+            if not self.instagram_db_path:
+                logger.warning("EXTERNAL_INSTAGRAM_DB no configurado en .env")
+                return []
+            
+            instagram_base = Path(self.instagram_db_path).parent  # D:/4K Stogram/.stogram.sqlite -> D:/4K Stogram
             
             for row in rows:
                 relative_path = row['relative_path']

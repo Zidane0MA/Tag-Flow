@@ -252,7 +252,7 @@
                 <div class="card-body">
                     <h6 class="card-title">{{ video.creator_name }}</h6>
                     <p class="card-text small text-muted mb-2" title="{{ video.display_title }}">
-                        {{ video.display_title[:80] }}{% if video.display_title|length > 80 %}...{% endif %}
+                        {{ video.display_title[:70] }}{% if video.display_title|length > 70 %}...{% endif %}
                     </p>
                     
                     <!-- Música -->

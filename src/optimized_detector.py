@@ -181,21 +181,55 @@ class OptimizedCharacterDetector:
         return result
     
     def _normalize_title_for_detection(self, title: str) -> str:
-        """Normalización optimizada para detección con filtrado de menciones"""
-        # Remover marcadores de video comunes
+        """Normalización optimizada para detección con extracción inteligente de hashtags"""
+        # 🆕 EXTRAER CONTENIDO DE HASHTAGS de forma inteligente
+        def extract_hashtag_content(match):
+            hashtag = match.group(0)
+            content = hashtag[1:]  # Quitar el #
+            
+            # Agregar el contenido original
+            result = f" {content} "
+            
+            # Separar palabras camelCase (EvelynChevalier -> Evelyn Chevalier)
+            if any(c.isupper() for c in content[1:]):  # Skip first char
+                camel_separated = re.sub(r'([a-z])([A-Z])', r'\1 \2', content)
+                result += f" {camel_separated} "
+            
+            # 🆕 Separar palabras si hay transiciones lowercase->uppercase seguidas de lowercase
+            # Esto maneja casos como "HuTaodance" -> "HuTao dance"
+            # Buscar patrones como "TaoD" donde la D inicia una nueva palabra
+            advanced_separated = re.sub(r'([A-Z][a-z]+)([A-Z][a-z])', r'\1 \2', content)
+            if advanced_separated != content:
+                result += f" {advanced_separated} "
+            
+            # 🆕 Intentar separar por palabras comunes al final
+            common_suffixes = ['dance', 'cosplay', 'mmd', 'edit', 'video', 'tiktok', 'short']
+            for suffix in common_suffixes:
+                if content.lower().endswith(suffix.lower()) and len(content) > len(suffix):
+                    base = content[:-len(suffix)]
+                    result += f" {base} {suffix} "
+                    # También separar camelCase en la base
+                    if any(c.isupper() for c in base[1:]):
+                        base_separated = re.sub(r'([a-z])([A-Z])', r'\1 \2', base)
+                        result += f" {base_separated} {suffix} "
+                    break
+            
+            return result
+        
+        # Extraer hashtags con lógica mejorada
+        normalized = re.sub(r'#\w+', extract_hashtag_content, title, flags=re.IGNORECASE)
+        
+        # Remover otros marcadores de video
         video_markers = [
             r'\[.*?\]',  # [4K], [MMD], [60FPS]
             r'【.*?】',   # 【Genshin Impact MMD】
-            r'#\w+',     # #shorts, #genshin
             r'^\d+\.',   # 501., 502. (numeración)
         ]
         
-        normalized = title
         for pattern in video_markers:
             normalized = re.sub(pattern, ' ', normalized, flags=re.IGNORECASE)
         
         # 🆕 FILTRAR MENCIONES DE CUENTAS (@usuario) para evitar falsos positivos
-        # Esto evita que "@Kaiser" se detecte como "Michael Kaiser"
         normalized = re.sub(r'@\w+', ' ', normalized)
         
         # Limpiar conectores
@@ -203,7 +237,7 @@ class OptimizedCharacterDetector:
         for connector in connectors:
             normalized = normalized.replace(connector, ' ')
         
-        # Normalizar espacios
+        # Normalizar espacios múltiples
         normalized = re.sub(r'\s+', ' ', normalized.strip())
         
         return normalized

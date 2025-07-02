@@ -56,8 +56,8 @@ class VideoAnalyzer:
         # Asegurar que los directorios existen
         config.ensure_directories()
         
-        # Configurar rutas de escaneo
-        self.scan_paths = [config.YOUTUBE_BASE_PATH]
+        # 🆕 LIMPIEZA: Sistema moderno usa únicamente fuentes externas configuradas en .env
+        # Eliminado: self.scan_paths (legacy) - Todo viene de variables de entorno
         
         # Extensiones de video soportadas
         self.video_extensions = {'.mp4', '.avi', '.mov', '.mkv', '.wmv', '.flv', '.webm', '.m4v'}
@@ -136,39 +136,8 @@ class VideoAnalyzer:
                     if video_data.get('content_type', 'video') == 'video':
                         new_videos.append(video_data)  # Retornar datos completos
         
-        else:
-            # Búsqueda local tradicional
-            total_found = 0
-            
-            for scan_path in self.scan_paths:
-                if not scan_path.exists():
-                    logger.warning(f"Ruta de escaneo no existe: {scan_path}")
-                    continue
-                    
-                logger.info(f"Escaneando: {scan_path}")
-                
-                # Buscar recursivamente
-                for video_file in scan_path.rglob('*'):
-                    if video_file.is_file() and video_file.suffix.lower() in self.video_extensions:
-                        total_found += 1
-                        
-                        # Verificar si es válido y no está en BD
-                        if str(video_file) not in existing_videos:
-                            if video_processor.is_valid_video(video_file):
-                                # Para compatibilidad, crear estructura de datos
-                                video_data = {
-                                    'file_path': str(video_file),
-                                    'file_name': video_file.name,
-                                    'creator_name': self._infer_creator_name(video_file),
-                                    'platform': 'tiktok',  # Valor por defecto para escaneo local
-                                    'title': video_file.stem,  # ✅ Agregar título desde nombre de archivo
-                                    'content_type': 'video'
-                                }
-                                new_videos.append(video_data)
-                            else:
-                                logger.warning(f"Video inválido: {video_file}")
-            
-            logger.info(f"Videos encontrados: {total_found}, Nuevos: {len(new_videos)}")
+        # 🆕 MODERNIZADO: Sistema limpio - solo fuentes externas (configuradas en .env)
+        # Eliminado: escaneo legacy de carpetas locales
         
         logger.info(f"Videos nuevos para procesar: {len(new_videos)}")
         return new_videos    
@@ -334,31 +303,10 @@ class VideoAnalyzer:
                     'error_message': str(e)
                 })
         
-        return result    
-    def _infer_creator_name(self, video_path: Path) -> str:
-        """Inferir nombre del creador desde la ruta del archivo"""
-        # Estrategias para inferir el creador:
-        # 1. Carpeta padre (si está organizado por creador)
-        # 2. Prefijo del archivo
-        # 3. Integración con 4K Downloader (futuro)
-        
-        # Estrategia 1: Usar nombre de la carpeta padre
-        parent_folder = video_path.parent.name
-        if parent_folder and parent_folder != str(config.YOUTUBE_BASE_PATH.name):
-            # Limpiar nombre de carpeta
-            creator = parent_folder.replace('_', ' ').replace('-', ' ').title()
-            return creator
-        
-        # Estrategia 2: Extraer del nombre del archivo si tiene patrón
-        filename = video_path.stem
-        if '_' in filename:
-            # Asumir formato: creador_titulo o similar
-            potential_creator = filename.split('_')[0]
-            if len(potential_creator) > 2:  # Filtrar abreviaciones muy cortas
-                return potential_creator.replace('-', ' ').title()
-        
-        # Fallback: usar "Desconocido"
-        return "Desconocido"
+        return result
+    
+    # 🆕 LIMPIEZA: Eliminada función _infer_creator_name (legacy)
+    # El sistema moderno obtiene creadores directamente de las BD externas
     
     def process_videos_batch(self, video_data_list: List[Dict]) -> Dict:
         """Procesar múltiples videos con threading
@@ -533,7 +481,9 @@ class VideoAnalyzer:
             
             # Solo buscar videos nuevos si no hemos alcanzado el límite
             if not limit or remaining_limit > 0:
-                use_external = platform is not None  # Si hay filtro de plataforma, usar fuentes externas
+                # 🆕 MODERNIZADO: Usar siempre fuentes externas (configuradas en .env)
+                # Eliminado escaneo legacy - Todo viene de variables de entorno
+                use_external = True  # Siempre usar fuentes externas
                 new_videos = self.find_new_videos(platform_filter=platform, use_external_sources=use_external)
                 
                 # Aplicar límite restante a videos nuevos
