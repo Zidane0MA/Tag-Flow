@@ -31,15 +31,23 @@ python main.py 100 TT             # 100 videos TikTok en <2 segundos
 python main.py 500 IG             # 500 videos Instagram en <4 segundos
 python main.py 1000 O             # 1000 videos organizados en <8 segundos
 
+# 🆕 Procesamiento de plataformas adicionales (escalable)
+python main.py 10 IWARA           # 10 videos Iwara con detección optimizada
+python main.py 50 OTHER           # 50 videos de plataformas adicionales
+python main.py 100 ALL            # 100 videos de todas las plataformas
+
 # Procesamiento masivo enterprise
 python main.py 5000               # 5000 videos en <40 segundos
 ```
 
-**Códigos de Plataforma Actualizados:**
-- **YT**: YouTube (4K Video Downloader+) - **506 videos disponibles**
-- **TT**: TikTok (4K Tokkit) - **417 videos disponibles**
-- **IG**: Instagram (4K Stogram) - **92 elementos disponibles**
-- **O**: Carpetas organizadas (`D:\4K All`) - **229 elementos disponibles**
+**Códigos de Plataforma Actualizados (ESCALABLES):**
+- **YT**: YouTube (4K Video Downloader+) - **675 videos en BD + 278 en carpetas**
+- **TT**: TikTok (4K Tokkit) - **496 videos en BD + 0 en carpetas**
+- **IG**: Instagram (4K Stogram) - **100 videos en BD + 0 en carpetas**
+- **O**: Carpetas organizadas principales (`D:\4K All`) - **278 elementos**
+- **🆕 IWARA**: Iwara (`D:\4K All\Iwara`) - **89 videos disponibles**
+- **🆕 OTHER**: Solo plataformas adicionales (no principales)
+- **🆕 ALL**: Todas las plataformas (principales + adicionales)
 
 **Nuevo Procesamiento Enterprise:**
 - ✅ **OptimizedCharacterDetector**: 1,208 patrones jerárquicos
@@ -58,7 +66,7 @@ python app.py
 - **NUEVO**: Detección ultra-rápida en búsquedas (98% cache hit rate)
 - **NUEVO**: Filtros optimizados con 1,208 patrones jerárquicos
 - Permite gestión visual y edición en tiempo real mejorada
-- Performance mejorado para colecciones masivas (1,244+ videos)
+- Performance mejorado para colecciones masivas (1,500+ videos disponibles)
 
 ---
 
@@ -80,9 +88,10 @@ python maintenance.py [acción] [opciones]
 python maintenance.py show-stats
 ```
 **Muestra:**
-- Videos disponibles en todas las fuentes externas (**1,244+ total**)
+- Videos disponibles en todas las fuentes externas (**1,500+ total incluyendo nuevas plataformas**)
 - Estado de la base de datos Tag-Flow (optimizada)
-- Distribución por plataforma (YouTube: 506, TikTok: 417, Instagram: 92, Organizadas: 229)
+- Distribución por plataforma (YouTube: 953, TikTok: 496, Instagram: 100, Iwara: 89, Organizadas: 278)
+- **🆕 Plataformas adicionales**: Auto-detectadas y listadas dinámicamente
 - Conexiones a fuentes externas y directorios
 - **NUEVO**: Métricas de rendimiento del sistema
 
@@ -125,6 +134,43 @@ TikToker Personas configurados:
 Sistema listo para procesamiento optimizado de videos!
 ```
 
+#### `list-platforms` - 🆕 Listar Plataformas Disponibles (ESCALABLE)
+```bash
+python maintenance.py list-platforms
+```
+**Funcionalidad:**
+- **Auto-detecta todas las plataformas** disponibles en `D:\4K All`
+- **Muestra estadísticas en tiempo real** de cada plataforma
+- **Diferencia entre principales y adicionales** (con o sin integración de BD)
+- **Proporciona ejemplos de uso** para cada plataforma encontrada
+
+**Output Ejemplo:**
+```
+PLATAFORMAS PRINCIPALES (con integración de BD):
+YOUTUBE (Youtube)
+  Base de datos externa: Disponible
+  Carpeta organizada:    Disponible
+  Videos en BD externa:  675
+  Videos en carpeta:     278
+  TOTAL DISPONIBLE:      953
+
+PLATAFORMAS ADICIONALES (solo carpetas):
+IWARA (Iwara)
+  Ruta: D:\4K All\Iwara
+  Videos disponibles: 89
+
+OPCIONES DE USO:
+  --platform youtube        -> Solo YouTube
+  --platform iwara          -> Solo Iwara
+  --platform other          -> Solo plataformas adicionales
+  --platform all-platforms  -> Todas las plataformas
+
+EJEMPLOS DE COMANDOS:
+  python maintenance.py populate-db --platform iwara --limit 50
+  python maintenance.py populate-db --platform other
+  python main.py 10 IWARA
+```
+
 ---
 
 ### 📥 **Poblado de Base de Datos Optimizado**
@@ -141,22 +187,35 @@ python maintenance.py populate-db [opciones]
   - `db`: Solo bases de datos externas (4K Apps)
   - `organized`: Solo carpetas organizadas (`D:\4K All`)
   - `all`: Ambas fuentes (por defecto)
-- `--platform {youtube|tiktok|instagram}`: Plataforma específica
+- `--platform {youtube|tiktok|instagram|other|all-platforms|NOMBRE}`: Plataforma específica (**🆕 ESCALABLE**)
+  - `youtube`, `tiktok`, `instagram`: Plataformas principales
+  - `iwara`, `NOMBRE`: Plataforma específica por nombre (auto-detectada)
+  - `other`: Solo plataformas adicionales (no principales)
+  - `all-platforms`: Todas las plataformas (principales + adicionales)
 - `--limit N`: Número máximo de videos a importar
 - `--force`: Forzar reimportación de videos existentes
 
-**Ejemplos Optimizados:**
+**Ejemplos Optimizados y Escalables:**
 ```bash
-# Poblar desde todas las fuentes disponibles (1,244+ videos)
+# Poblar desde todas las fuentes disponibles
 python maintenance.py populate-db --source all
 
-# Solo videos de YouTube (506 disponibles)
+# Solo videos de YouTube (953 total: 675 BD + 278 carpetas)
 python maintenance.py populate-db --source db --platform youtube --limit 50
 
-# Forzar actualización completa de TikTok (417 disponibles)
+# 🆕 Solo videos de Iwara (89 disponibles)
+python maintenance.py populate-db --platform iwara --limit 20
+
+# 🆕 Solo plataformas adicionales (Iwara, etc.)
+python maintenance.py populate-db --platform other --source organized
+
+# 🆕 Todas las plataformas (principales + adicionales)
+python maintenance.py populate-db --platform all-platforms --limit 100
+
+# Forzar actualización completa de TikTok (496 disponibles)
 python maintenance.py populate-db --platform tiktok --force
 
-# Solo desde carpetas organizadas (229 elementos)
+# Solo desde carpetas organizadas (278 elementos principales + adicionales)
 python maintenance.py populate-db --source organized --limit 100
 
 # Poblado masivo para testing de rendimiento
@@ -286,7 +345,7 @@ python maintenance.py analyze-titles [--limit N]
 **Ejemplos:**
 ```bash
 # Analizar todos los títulos pendientes (ultra-rápido)
-python analyze-titles
+python maintenance.py analyze-titles
 
 # Analizar los primeros 1000 videos
 python maintenance.py analyze-titles --limit 1000
@@ -455,6 +514,22 @@ python quickstart.py
 
 ## 📖 EJEMPLOS DE FLUJOS DE TRABAJO ENTERPRISE
 
+### **🆕 Flujo Inicial con Detección de Plataformas - Enterprise Escalable**
+```bash
+# 1. Configuración automática optimizada
+python quickstart.py
+
+# 2. Verificar configuración completa del sistema enterprise
+python verify_config.py
+
+# 3. Ver estadísticas de fuentes y sistema optimizado
+python maintenance.py show-stats
+python maintenance.py character-stats
+
+# 4. 🆕 Listar todas las plataformas disponibles (escalable)
+python maintenance.py list-platforms
+```
+
 ### **Flujo Inicial - Configuración Enterprise**
 ```bash
 # 1. Configuración automática optimizada
@@ -484,6 +559,40 @@ python maintenance.py analyze-titles --limit 100
 
 # 5. Ver resultados en interfaz web optimizada
 python app.py
+```
+
+### **🆕 Flujo de Procesamiento - Plataformas Adicionales (Iwara)**
+```bash
+# 1. Poblar con videos de Iwara (89 disponibles)
+python maintenance.py populate-db --platform iwara --limit 20
+
+# 2. Procesar videos con detector optimizado (ultra-rápido)
+python main.py 10 IWARA  # 10 videos de Iwara procesados con IA
+
+# 3. Analizar títulos específicos de Iwara
+python maintenance.py analyze-titles --limit 50
+
+# 4. Ver estadísticas de la nueva plataforma
+python maintenance.py list-platforms
+
+# 5. Ver resultados en interfaz web optimizada
+python app.py
+```
+
+### **🆕 Flujo Escalable - Todas las Plataformas**
+```bash
+# 1. Poblar desde todas las plataformas (principales + adicionales)
+python maintenance.py populate-db --platform all-platforms --limit 100
+
+# 2. Procesar videos de todas las plataformas
+python main.py 50 ALL    # 50 videos de cualquier plataforma
+
+# 3. Solo plataformas adicionales
+python maintenance.py populate-db --platform other --limit 30
+python main.py 20 OTHER  # 20 videos solo de plataformas no principales
+
+# 4. Ver estadísticas completas
+python maintenance.py list-platforms
 ```
 
 ### **Flujo de Procesamiento Masivo Enterprise**
@@ -807,25 +916,38 @@ python maintenance.py character-stats             # Verificar estado
 
 ## 🎯 **COMANDOS ESENCIALES PARA USUARIOS ENTERPRISE**
 
-### **Setup Inicial Enterprise**
+### **Setup Inicial Enterprise Escalable**
 ```bash
 python quickstart.py                           # Configuración automática enterprise
-python maintenance.py show-stats               # Ver 1,244+ videos disponibles
+python maintenance.py list-platforms           # 🆕 Ver todas las plataformas disponibles
+python maintenance.py show-stats               # Ver estadísticas de fuentes
 python maintenance.py character-stats          # Ver sistema optimizado
 ```
 
-### **Uso Diario Enterprise**
+### **Uso Diario Enterprise Escalable**
 ```bash
 python maintenance.py populate-db --limit 100  # Importar videos nuevos
+python maintenance.py populate-db --platform iwara --limit 10  # 🆕 Importar plataforma específica
 python main.py 100                            # Procesar con detector optimizado
+python main.py 20 IWARA                       # 🆕 Procesar plataforma específica
 python app.py                                 # Interfaz web optimizada
 ```
 
-### **Procesamiento Masivo Enterprise**
+### **Procesamiento Masivo Enterprise Escalable**
 ```bash
 python main.py 1000                           # 1000 videos en <8 segundos
+python main.py 50 ALL                         # 🆕 50 videos de todas las plataformas
+python maintenance.py populate-db --platform all-platforms --limit 200  # 🆕 Poblar todas
 python maintenance.py analyze-titles --limit 5000  # 5000 títulos en ~40 segundos
 python maintenance.py character-stats          # Verificar métricas enterprise
+```
+
+### **🆕 Gestión de Plataformas Enterprise**
+```bash
+python maintenance.py list-platforms           # Listar plataformas disponibles
+python maintenance.py populate-db --platform other  # Solo plataformas adicionales
+python main.py 30 OTHER                       # Procesar solo adicionales
+python maintenance.py populate-db --platform iwara --limit 50  # Plataforma específica
 ```
 
 ### **Mantenimiento Enterprise**
@@ -881,9 +1003,105 @@ python -c "[same benchmark code as above with 50000 titles]"
 
 ---
 
-*Referencia actualizada: Diciembre 2024*  
-*Versión: Tag-Flow V2 con Sistema Enterprise Post-Migración*  
-*Rendimiento: 749x mejora demostrada vs sistema anterior*  
+## 🆕 **ARQUITECTURA ESCALABLE DE PLATAFORMAS**
+
+### **🎯 Sistema de Auto-Detección**
+
+Tag-Flow V2 ahora incluye un **sistema completamente escalable** para manejar nuevas plataformas automáticamente:
+
+#### **Cómo Funciona:**
+1. **Auto-detección**: El sistema escanea `D:\4K All\` automáticamente
+2. **Clasificación inteligente**: Diferencia entre plataformas principales y adicionales
+3. **Integración automática**: Nuevas carpetas se reconocen sin código adicional
+4. **Compatibilidad total**: Mantiene funcionalidad de plataformas principales
+
+#### **Estructura Escalable:**
+```
+D:\4K All\
+├── Youtube\          (Principal - integración BD)
+├── Tiktok\           (Principal - integración BD)  
+├── Instagram\        (Principal - integración BD)
+├── Iwara\            (🆕 Adicional - solo carpetas)
+├── NuevaPlataforma\  (🆕 Se detecta automáticamente)
+└── ...               (🆕 Escalabilidad ilimitada)
+```
+
+### **📋 Opciones de Plataforma Escalables**
+
+#### **Plataformas Principales** (con BD externa):
+- `youtube`, `tiktok`, `instagram`
+- Integración completa con bases de datos de 4K Apps
+- Estadísticas en tiempo real de BD + carpetas
+
+#### **Plataformas Adicionales** (auto-detectadas):
+- `iwara` - **89 videos disponibles**
+- Cualquier nueva carpeta en `D:\4K All\`
+- Solo requiere estructura: `D:\4K All\NombrePlataforma\Creador\`
+
+#### **Opciones Especiales**:
+- `other` - Solo plataformas adicionales
+- `all-platforms` - Todas las plataformas (principales + adicionales)
+
+### **🛠️ Comandos Escalables**
+
+#### **Detección de Plataformas:**
+```bash
+python maintenance.py list-platforms    # Ver todas las disponibles
+```
+
+#### **Poblado Escalable:**
+```bash
+python maintenance.py populate-db --platform NOMBRE    # Plataforma específica
+python maintenance.py populate-db --platform other     # Solo adicionales
+python maintenance.py populate-db --platform all-platforms  # Todas
+```
+
+#### **Procesamiento Escalable:**
+```bash
+python main.py 10 NOMBRE     # Código específico (ej: IWARA)
+python main.py 20 OTHER      # Solo plataformas adicionales
+python main.py 50 ALL        # Todas las plataformas
+```
+
+### **🚀 Agregar Nueva Plataforma**
+
+**Proceso simplificado (0 código requerido):**
+
+1. **Crear estructura de carpetas:**
+   ```
+   D:\4K All\NuevaPlataforma\
+   ├── Creador1\
+   │   ├── video1.mp4
+   │   └── video2.mp4
+   └── Creador2\
+       └── video3.mp4
+   ```
+
+2. **Sistema detecta automáticamente:**
+   ```bash
+   python maintenance.py list-platforms  # Aparece "NuevaPlataforma"
+   ```
+
+3. **Usar inmediatamente:**
+   ```bash
+   python maintenance.py populate-db --platform nuevaplataforma
+   python main.py 5 NUEVAPLATAFORMA
+   ```
+
+### **🎯 Beneficios de la Escalabilidad**
+
+- **🔄 Zero Configuration**: Nuevas plataformas sin código
+- **📊 Estadísticas automáticas**: Conteo y métricas instantáneas  
+- **⚡ Rendimiento mantenido**: Detector optimizado para todas
+- **🧠 IA completa**: Reconocimiento de música y personajes
+- **🌐 Frontend integrado**: Interfaz web funciona automáticamente
+- **🔒 Compatibilidad total**: No rompe funcionalidad existente
+
+---
+
+*Referencia actualizada: Julio 2025*  
+*Versión: Tag-Flow V2 con Sistema Enterprise Escalable*  
+*Nuevas funcionalidades: Sistema de plataformas auto-escalable*  
 *Para más información: README.md y PROYECTO_ESTADO.md*
 
-**🚀 Tu Tag-Flow V2 está ahora optimizado con rendimiento enterprise de clase mundial. ¡Disfruta la velocidad y precisión extraordinarias! ⚡🎬**
+**🚀 Tu Tag-Flow V2 está ahora optimizado con arquitectura escalable para plataformas ilimitadas. ¡Agrega cualquier nueva plataforma sin código adicional! ⚡🎬🌟**

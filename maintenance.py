@@ -858,6 +858,91 @@ class MaintenanceUtils:
             logger.error(f"Error agregando TikToker como personaje: {e}")
             print(f"[ERROR] Error agregando TikToker: {e}")
             return False
+    
+    def list_available_platforms(self):
+        """
+        🆕 Listar todas las plataformas disponibles (principales + adicionales)
+        """
+        logger.info("Obteniendo plataformas disponibles...")
+        
+        try:
+            # Obtener plataformas disponibles
+            platforms = external_sources.get_available_platforms()
+            stats = external_sources.get_platform_stats_extended()
+            
+            print("\n" + "="*60)
+            print("PLATAFORMAS DISPONIBLES EN TAG-FLOW V2")
+            print("="*60)
+            
+            # Plataformas principales
+            print("\nPLATAFORMAS PRINCIPALES (con integración de BD):")
+            print("-" * 50)
+            
+            for platform_key, platform_info in platforms['main'].items():
+                print(f"\n{platform_key.upper()} ({platform_info['folder_name']})")
+                
+                # Estado de fuentes
+                db_status = "Disponible" if platform_info['has_db'] else "No encontrada"
+                folder_status = "Disponible" if platform_info['has_organized'] else "No encontrada"
+                
+                print(f"  Base de datos externa: {db_status}")
+                print(f"  Carpeta organizada:    {folder_status}")
+                
+                # Estadísticas
+                if platform_key in stats['main']:
+                    platform_stats = stats['main'][platform_key]
+                    print(f"  Videos en BD externa:  {platform_stats['db']}")
+                    print(f"  Videos en carpeta:     {platform_stats['organized']}")
+                    total = platform_stats['db'] + platform_stats['organized']
+                    print(f"  TOTAL DISPONIBLE:      {total}")
+            
+            # Plataformas adicionales
+            if platforms['additional']:
+                print("\nPLATAFORMAS ADICIONALES (solo carpetas):")
+                print("-" * 50)
+                
+                for platform_key, platform_info in platforms['additional'].items():
+                    print(f"\n{platform_key.upper()} ({platform_info['folder_name']})")
+                    print(f"  Ruta: {platform_info['folder_path']}")
+                    
+                    # Estadísticas
+                    if platform_key in stats['additional']:
+                        count = stats['additional'][platform_key]
+                        print(f"  Videos disponibles: {count}")
+                    else:
+                        print(f"  Videos disponibles: 0 (no escaneado)")
+            else:
+                print("\nPLATAFORMAS ADICIONALES:")
+                print("-" * 50)
+                print("  No se encontraron plataformas adicionales")
+                print("  Agrega carpetas en D:\\4K All\\ para nuevas plataformas")
+            
+            print("\n" + "="*60)
+            print("OPCIONES DE USO:")
+            print("="*60)
+            print("  --platform youtube        -> Solo YouTube")
+            print("  --platform tiktok         -> Solo TikTok") 
+            print("  --platform instagram      -> Solo Instagram")
+            if platforms['additional']:
+                for platform_key in platforms['additional'].keys():
+                    print(f"  --platform {platform_key:<14} -> Solo {platform_key.title()}")
+            print("  --platform other          -> Solo plataformas adicionales")
+            print("  --platform all-platforms  -> Todas las plataformas")
+            print("  (sin --platform)          -> Solo principales (YT+TT+IG)")
+            
+            print("\nEJEMPLOS DE COMANDOS:")
+            print("="*60)
+            print("  python maintenance.py populate-db --platform other")
+            print("  python maintenance.py populate-db --platform iwara --limit 50")
+            print("  python maintenance.py populate-db --platform all-platforms")
+            if platforms['additional']:
+                first_additional = list(platforms['additional'].keys())[0]
+                print(f"  python maintenance.py populate-db --platform {first_additional}")
+            
+            print("\nListado completado!")
+            
+        except Exception as e:
+            logger.error(f"Error listando plataformas: {e}")
 
     def download_character_images(self, character_name: str = None, game: str = None, limit: int = None):
         """Descargar imágenes de referencia para personajes"""
@@ -1007,7 +1092,7 @@ def main():
         'optimize-db', 'report', 'populate-db', 'clear-db', 'populate-thumbnails',
         'clear-thumbnails', 'show-stats', 'character-stats', 'add-character',
         'download-character-images', 'analyze-titles', 'update-creator-mappings',
-        'clean-false-positives', 'add-tiktoker'
+        'clean-false-positives', 'add-tiktoker', 'list-platforms'
     ], help='Acción a realizar')
     
     # Argumentos generales
@@ -1017,8 +1102,8 @@ def main():
     # Argumentos específicos para poblado de BD
     parser.add_argument('--source', choices=['db', 'organized', 'all'], default='all',
                         help='Fuente de datos (db=bases datos externas, organized=carpetas organizadas, all=ambas)')
-    parser.add_argument('--platform', choices=['youtube', 'tiktok', 'instagram'],
-                        help='Plataforma específica (opcional)')
+    parser.add_argument('--platform', 
+                        help='Plataforma específica: youtube|tiktok|instagram (principales), other (adicionales), all-platforms (todas), o nombre específico como "iwara"')
     
     # Argumentos específicos para gestión de personajes
     parser.add_argument('--character', type=str, help='Nombre del personaje')
@@ -1085,6 +1170,8 @@ def main():
             logger.error("Se requiere --creator para agregar TikToker como personaje")
             return
         utils.add_tiktoker_persona(args.creator, args.persona, args.confidence)
+    elif args.action == 'list-platforms':
+        utils.list_available_platforms()
 
 if __name__ == '__main__':
     main()
