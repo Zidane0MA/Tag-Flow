@@ -100,8 +100,8 @@ class DatabaseManager:
                 INSERT INTO videos (
                     file_path, file_name, creator_name, platform, file_size, duration_seconds,
                     detected_music, detected_music_artist, detected_music_confidence,
-                    detected_characters, music_source, processing_status
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    detected_characters, music_source, processing_status, description
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 video_data['file_path'],
                 video_data['file_name'], 
@@ -114,7 +114,8 @@ class DatabaseManager:
                 video_data.get('detected_music_confidence'),
                 json.dumps(video_data.get('detected_characters', [])),
                 video_data.get('music_source'),
-                video_data.get('processing_status', 'pendiente')
+                video_data.get('processing_status', 'pendiente'),
+                video_data.get('description')  # Nueva línea para descripción
             ))
             video_id = cursor.lastrowid
             logger.info(f"Video agregado con ID {video_id}: {video_data['file_name']}")
@@ -266,7 +267,7 @@ class DatabaseManager:
         allowed_fields = [
             'final_music', 'final_music_artist', 'final_characters', 'difficulty_level',
             'edit_status', 'edited_video_path', 'notes', 'processing_status', 'error_message',
-            'thumbnail_path',
+            'thumbnail_path', 'description',  # Agregar description
             'detected_music', 'detected_music_artist', 'detected_music_confidence', 'music_source', 'detected_characters'
         ]
         

@@ -196,6 +196,14 @@ class VideoAnalyzer:
             if 'error' in metadata:
                 result['error'] = f"Error en metadatos: {metadata['error']}"
                 return result
+            
+            # Enriquecer metadatos con información de fuentes externas (TikTok, etc.)
+            if 'title' in video_data and video_data['title']:
+                metadata['description'] = video_data['title']  # Descripción del TikTok
+            if 'creator_name' in video_data:
+                metadata['creator_name'] = video_data['creator_name']
+            if 'platform' in video_data:
+                metadata['platform'] = video_data['platform']
 
             # Determinar si es un video existente (pendiente) o nuevo
             existing_video = None
@@ -270,10 +278,18 @@ class VideoAnalyzer:
                 if frame_data:
                     # Preparar datos del video para análisis inteligente
                     video_data_for_recognition = {
-                        'title': video_data.get('title', ''),
                         'creator_name': video_data.get('creator_name', ''),
                         'platform': video_data.get('platform', 'unknown')
                     }
+                    
+                    # Para videos pendientes, usar descripción de la BD; para nuevos, usar título de video_data
+                    if video_id and 'existing_video_id' in video_data:
+                        # Video pendiente: obtener descripción de la BD
+                        existing_video = db.get_video(video_id)
+                        video_data_for_recognition['title'] = existing_video.get('description', '') or video_data.get('title', '')
+                    else:
+                        # Video nuevo: usar título de fuente externa
+                        video_data_for_recognition['title'] = video_data.get('title', '')
                     
                     # Usar reconocimiento inteligente que combina todas las estrategias
                     faces_result = face_recognizer.recognize_faces_intelligent(frame_data, video_data_for_recognition)

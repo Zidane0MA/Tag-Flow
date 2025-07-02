@@ -88,6 +88,14 @@ def index():
                 video['thumbnail_url'] = f"/thumbnail/{Path(video['thumbnail_path']).name}"
             else:
                 video['thumbnail_url'] = "/static/img/no-thumbnail.jpg"
+            
+            # Preparar título apropiado para el frontend
+            if video.get('platform') == 'tiktok' and video.get('description'):
+                # Para TikTok: usar descripción como título
+                video['display_title'] = video['description']
+            else:
+                # Para otras plataformas: usar nombre del archivo
+                video['display_title'] = video['file_name']
         
         return render_template('gallery.html',
                              videos=videos,
@@ -124,6 +132,16 @@ def view_video(video_id):
                 video['final_characters'] = json.loads(video['final_characters'])
             except:
                 video['final_characters'] = []
+        else:
+            video['final_characters'] = []
+        
+        # Preparar título apropiado para el frontend
+        if video.get('platform') == 'tiktok' and video.get('description'):
+            # Para TikTok: usar descripción como título
+            video['display_title'] = video['description']
+        else:
+            # Para otras plataformas: usar nombre del archivo
+            video['display_title'] = video['file_name']
         
         return render_template('video_detail.html', video=video)
         
@@ -186,6 +204,12 @@ def api_videos():
                     video['final_characters'] = json.loads(video['final_characters'])
                 except:
                     video['final_characters'] = []
+            
+            # Preparar título apropiado para el frontend (mismo que en la galería)
+            if video.get('platform') == 'tiktok' and video.get('description'):
+                video['display_title'] = video['description']
+            else:
+                video['display_title'] = video['file_name']
         
         return jsonify({
             'success': True,
@@ -221,6 +245,14 @@ def api_get_video(video_id):
                 video['final_characters'] = json.loads(video['final_characters'])
             except:
                 video['final_characters'] = []
+        else:
+            video['final_characters'] = []
+        
+        # Preparar título apropiado para el frontend (mismo que en la galería)
+        if video.get('platform') == 'tiktok' and video.get('description'):
+            video['display_title'] = video['description']
+        else:
+            video['display_title'] = video['file_name']
         
         return jsonify({
             'success': True,

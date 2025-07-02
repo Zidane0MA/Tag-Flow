@@ -378,11 +378,18 @@ class CharacterIntelligence:
             'sword', 'bow', 'catalyst', 'claymore', 'polearm', 'weapon', 'weapons'
         }
         
-        # Buscar patrones conocidos
+        # 🆕 FILTRAR MENCIONES DE CUENTAS (@usuario) ANTES DE BUSCAR PATRONES
+        # Esto evita falsos positivos como "@Kaiser" → "Michael Kaiser"
+        title_normalized = re.sub(r'@\w+', ' ', title)
+        title_normalized = re.sub(r'\s+', ' ', title_normalized.strip())
+        
+        logger.info(f"Título normalizado (sin menciones @): {title_normalized}")
+        
+        # Buscar patrones conocidos en el título normalizado (sin menciones @)
         raw_detections = []
         for pattern_info in self.character_patterns:
             try:
-                matches = re.finditer(pattern_info['pattern'], title, re.IGNORECASE)
+                matches = re.finditer(pattern_info['pattern'], title_normalized, re.IGNORECASE)
                 
                 for match in matches:
                     character_name = None

@@ -964,7 +964,7 @@ function updateOverlayInfo(video) {
     if (creatorInfo) {
         creatorInfo.innerHTML = `
             <div class="creator-name">@${video.creator_name}</div>
-            <div class="video-title">${video.file_name || 'Video sin título'}</div>
+            <div class="video-title">${video.display_title || video.file_name || 'Video sin título'}</div>
         `;
     }
     

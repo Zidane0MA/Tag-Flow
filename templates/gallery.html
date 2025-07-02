@@ -251,7 +251,9 @@
                 <!-- Información del video -->
                 <div class="card-body">
                     <h6 class="card-title">{{ video.creator_name }}</h6>
-                    <p class="card-text small text-muted mb-2">{{ video.file_name[:50] }}...</p>
+                    <p class="card-text small text-muted mb-2" title="{{ video.display_title }}">
+                        {{ video.display_title[:80] }}{% if video.display_title|length > 80 %}...{% endif %}
+                    </p>
                     
                     <!-- Música -->
                     <div class="mb-2">

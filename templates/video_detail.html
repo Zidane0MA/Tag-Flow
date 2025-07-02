@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}{{ video.creator_name }} - {{ video.file_name[:30] }}...{% endblock %}
+{% block title %}{{ video.creator_name }} - {{ video.display_title[:50] }}{% if video.display_title|length > 50 %}...{% endif %}{% endblock %}
 
 {% block extra_css %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/gallery.css') }}">
@@ -85,9 +85,14 @@
         <div class="col-lg-8 mb-4">
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">
-                        <i class="fas fa-video me-2"></i>{{ video.file_name }}
-                    </h5>
+                    <div>
+                        <h5 class="mb-0">
+                            <i class="fas fa-video me-2"></i>{{ video.display_title }}
+                        </h5>
+                        {% if video.platform == 'tiktok' and video.description %}
+                        <small class="text-muted">Archivo: {{ video.file_name }}</small>
+                        {% endif %}
+                    </div>
                     
                     <!-- Estado del video -->
                     <span class="badge bg-{{ 'success' if video.edit_status == 'hecho' else 'warning' if video.edit_status == 'en_proceso' else 'secondary' }} fs-6">

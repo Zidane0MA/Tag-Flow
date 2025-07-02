@@ -181,7 +181,7 @@ class OptimizedCharacterDetector:
         return result
     
     def _normalize_title_for_detection(self, title: str) -> str:
-        """Normalización optimizada para detección"""
+        """Normalización optimizada para detección con filtrado de menciones"""
         # Remover marcadores de video comunes
         video_markers = [
             r'\[.*?\]',  # [4K], [MMD], [60FPS]
@@ -193,6 +193,10 @@ class OptimizedCharacterDetector:
         normalized = title
         for pattern in video_markers:
             normalized = re.sub(pattern, ' ', normalized, flags=re.IGNORECASE)
+        
+        # 🆕 FILTRAR MENCIONES DE CUENTAS (@usuario) para evitar falsos positivos
+        # Esto evita que "@Kaiser" se detecte como "Michael Kaiser"
+        normalized = re.sub(r'@\w+', ' ', normalized)
         
         # Limpiar conectores
         connectors = [' - ', ' x ', ' & ', ' and ', ' with ', ' feat ', ' ft ']
