@@ -1254,15 +1254,96 @@ class MaintenanceUtils:
         
         print(f"\nAnalizados: {analyzed}, Con personajes detectados: {detected}")
     
-    def update_creator_mappings(self, limit: int = None):
-        """Analizar creadores y sugerir mapeos automáticos con estructura jerárquica"""
-        logger.info("Analizando creadores para mapeos automáticos...")
+    def _generate_persona_name(self, creator_name: str) -> str:
+        """Generar nombre de personaje basado en el nombre del creador"""
         
-        # Obtener todos los videos con personajes detectados
+        # Limpiar el nombre del creador
+        # Remover extensiones comunes
+        clean_name = creator_name.replace('.cos', '').replace('.cosplay', '')
+        clean_name = clean_name.replace('@', '').replace('_', ' ')
+        
+        # Si tiene punto, tomar solo la parte antes del punto
+        if '.' in clean_name and not clean_name.endswith('.cos'):
+            clean_name = clean_name.split('.')[0]
+        
+        # Capitalizar palabras
+        words = clean_name.split()
+        capitalized_words = []
+        
+        for word in words:
+            if len(word) > 0:
+                # Capitalizar primera letra y mantener el resto como está
+                capitalized_word = word[0].upper() + word[1:] if len(word) > 1 else word.upper()
+                capitalized_words.append(capitalized_word)
+        
+        persona_name = ' '.join(capitalized_words)
+        
+        # Si el resultado es muy corto o tiene caracteres extraños, usar nombre base
+        if len(persona_name) < 3 or not any(c.isalpha() for c in persona_name):
+            # Fallback: usar una versión más básica
+            basic_clean = ''.join(c for c in creator_name if c.isalnum())
+            if len(basic_clean) >= 3:
+                persona_name = basic_clean.capitalize()
+            else:
+                persona_name = creator_name.capitalize()
+        
+        return persona_name
+    
+    def update_creator_mappings(self, limit: int = None):
+        """Analizar creadores para detectar cosplayers/performers que deberían ser personajes de sí mismos
+        🆕 MEJORADO: Prioridad especial para TikTok e Instagram"""
+        logger.info("Analizando creadores para detectar cosplayers/performers...")
+        
+        # 🆕 CONFIGURACIÓN DE PLATAFORMAS CON PRIORIDAD
+        platform_weights = {
+            'tiktok': 2.5,      # 🔥 Prioridad ALTA - TikTok es principalmente cosplayers/performers
+            'instagram': 2.0,   # 🔥 Prioridad ALTA - Instagram es principalmente cosplayers/performers  
+            'youtube': 1.0,     # Prioridad NORMAL - YouTube tiene mix de contenido
+            'other': 1.2,       # Prioridad MEDIA - Otras plataformas tienden a ser cosplayers
+            'unknown': 0.8      # Prioridad BAJA - Plataforma desconocida
+        }
+        
+        # 🆕 BOOST DE CONFIANZA POR PLATAFORMA
+        platform_confidence_boost = {
+            'tiktok': 0.25,     # +25% confianza para TikTok
+            'instagram': 0.20,  # +20% confianza para Instagram
+            'youtube': 0.0,     # Sin boost para YouTube
+            'other': 0.10,      # +10% para otras plataformas
+            'unknown': -0.05    # -5% para plataformas desconocidas
+        }
+        
+        # Obtener todos los videos para análisis
         videos = db.get_videos(limit=limit)
         creator_stats = {}
         
-        # Analizar patrones de detección por creador
+        # Palabras clave que indican que es un cosplayer/performer (no creador de MMD)
+        cosplayer_keywords = {
+            'cosplay', 'cos', 'dance', 'dancing', 'trend', 'trending', 'challenge', 
+            'outfit', 'ootd', 'makeup', 'tutorial', 'transformation', 'acting',
+            'performance', 'cover', 'choreo', 'choreography', 'viral', 'fyp',
+            'tiktok', 'instagram', 'reel', 'short', 'shorts', 'live', 'stream',
+            'photoshoot', 'modeling', 'pose', 'poses', 'selfie', 'me as', 'as me',
+            'wearing', 'dressed', 'costume', 'wig', 'makeup', 'cosplaying', 'shorts'
+        }
+        
+        # Palabras que indican contenido MMD/no-cosplayer (a evitar)
+        mmd_keywords = {
+            'mmd', 'model', 'animation', 'render', 'blender', '3d', 'motion',
+            'camera', 'edit', 'editing', 'effects', 'compilation', 'pmx',
+            'vmd', 'stage', 'background', 'lighting', 'shader', 'texture'
+        }
+        
+        # 🆕 PALABRAS CLAVE ESPECÍFICAS PARA YOUTUBE (con hashtags)
+        # Los hashtags son más comunes en contenido de personas reales en YouTube
+        youtube_hashtag_keywords = {
+            '#cosplay', '#shorts', '#dance', '#dancing', '#trend', '#trending', 
+            '#challenge', '#outfit', '#ootd', '#makeup', '#tutorial', '#transformation',
+            '#acting', '#performance', '#cover', '#choreo', '#choreography', '#viral',
+            '#short', '#live', '#stream', '#photoshoot', '#modeling', '#pose', '#poses',
+            '#selfie', '#costume', '#wig', '#cosplaying', '#dancer', '#performer'
+        }
+        
+        # Analizar cada creador
         for video in videos:
             creator = video.get('creator_name', '')
             if not creator:
@@ -1271,22 +1352,86 @@ class MaintenanceUtils:
             if creator not in creator_stats:
                 creator_stats[creator] = {
                     'total_videos': 0,
-                    'characters_detected': {},  # Cambio: usar dict para contar frecuencia
+                    'cosplayer_indicators': 0,  # Videos que sugieren que es cosplayer
+                    'mmd_indicators': 0,        # Videos que sugieren que es creador MMD
                     'platforms': set(),
-                    'recent_videos': []
+                    'video_titles': [],
+                    'characters_detected': {},
+                    'recent_videos': [],
+                    # 🆕 NUEVAS MÉTRICAS POR PLATAFORMA
+                    'platform_videos': {},      # Conteo de videos por plataforma
+                    'platform_cosplayer_score': {},  # Score de cosplayer por plataforma
+                    'primary_platform': None,   # Plataforma principal del creador
+                    'weighted_cosplayer_score': 0.0,  # Score ponderado total
+                    'youtube_hashtag_bonus': 0  # 🆕 Bonus específico por hashtags de YouTube
                 }
             
             creator_stats[creator]['total_videos'] += 1
-            creator_stats[creator]['platforms'].add(video.get('platform', 'unknown'))
             
-            # Guardar info de videos recientes para análisis
+            # 🆕 TRACKING POR PLATAFORMA
+            platform = video.get('platform', 'unknown')
+            creator_stats[creator]['platforms'].add(platform)
+            
+            if platform not in creator_stats[creator]['platform_videos']:
+                creator_stats[creator]['platform_videos'][platform] = 0
+                creator_stats[creator]['platform_cosplayer_score'][platform] = 0
+            
+            creator_stats[creator]['platform_videos'][platform] += 1
+            
+            # Analizar título del video de forma segura
+            title = video.get('title') or ''
+            description = video.get('description') or ''  # 🆕 INCLUIR DESCRIPTIONS
+            filename = video.get('file_name') or ''
+            combined_text = f"{title.lower()} {description.lower()} {filename.lower()}"  # 🆕 INCLUIR DESCRIPTIONS
+            
+            creator_stats[creator]['video_titles'].append(title or '[sin titulo]')
             creator_stats[creator]['recent_videos'].append({
-                'title': video.get('title', ''),
-                'filename': video.get('file_name', ''),
-                'characters': video.get('detected_characters', [])
+                'title': title or '[sin titulo]',
+                'filename': filename or '[sin nombre]',
+                'characters': video.get('detected_characters', []),
+                'platform': platform
             })
             
-            # Contar frecuencia de personajes detectados
+            # Detectar indicadores de cosplayer CON PESO POR PLATAFORMA
+            cosplayer_score = 0
+            for keyword in cosplayer_keywords:
+                if keyword in combined_text:
+                    cosplayer_score += 1
+            
+            # 🆕 LÓGICA ESPECIAL PARA YOUTUBE: Boost por hashtags
+            youtube_hashtag_bonus = 0
+            if platform == 'youtube':
+                for hashtag_keyword in youtube_hashtag_keywords:
+                    if hashtag_keyword in combined_text:
+                        youtube_hashtag_bonus += 2  # Bonus extra por hashtag en YouTube
+                        # Los hashtags en YouTube son MUY indicativos de personas reales
+                
+                # Agregar el bonus al score de cosplayer
+                cosplayer_score += youtube_hashtag_bonus
+            
+            # 🆕 APLICAR PESO DE PLATAFORMA AL SCORE
+            platform_weight = platform_weights.get(platform, 1.0)
+            weighted_cosplayer_score = cosplayer_score * platform_weight
+            
+            if cosplayer_score > 0:
+                creator_stats[creator]['cosplayer_indicators'] += cosplayer_score
+                creator_stats[creator]['platform_cosplayer_score'][platform] += cosplayer_score
+                creator_stats[creator]['weighted_cosplayer_score'] += weighted_cosplayer_score
+                
+                # 🆕 Guardar bonus de hashtags de YouTube
+                if platform == 'youtube' and youtube_hashtag_bonus > 0:
+                    creator_stats[creator]['youtube_hashtag_bonus'] += youtube_hashtag_bonus
+            
+            # Detectar indicadores de MMD (sin cambio, pero con menos peso para TikTok/Instagram)
+            mmd_score = 0
+            for keyword in mmd_keywords:
+                if keyword in combined_text:
+                    mmd_score += 1
+            
+            if mmd_score > 0:
+                creator_stats[creator]['mmd_indicators'] += mmd_score
+            
+            # Contar personajes detectados (para contexto)
             detected_chars = video.get('detected_characters', [])
             if isinstance(detected_chars, str):
                 try:
@@ -1299,133 +1444,263 @@ class MaintenanceUtils:
                     creator_stats[creator]['characters_detected'][char] = 0
                 creator_stats[creator]['characters_detected'][char] += 1
         
-        # Analizar patrones y generar sugerencias inteligentes
-        high_confidence_suggestions = []
-        medium_confidence_suggestions = []
-        low_confidence_suggestions = []
+        # 🆕 CALCULAR PLATAFORMA PRINCIPAL PARA CADA CREADOR
+        for creator, stats in creator_stats.items():
+            if stats['platform_videos']:
+                # Encontrar la plataforma con más videos
+                primary_platform = max(stats['platform_videos'].items(), key=lambda x: x[1])[0]
+                stats['primary_platform'] = primary_platform
         
-        print("\nANALISIS AVANZADO DE CREADORES")
+        # Analizar y generar sugerencias para cosplayers/performers
+        cosplayer_suggestions = []
+        mmd_creators_filtered = []
+        
+        print("\nANALISIS DE COSPLAYERS/PERFORMERS")
         print("=" * 50)
         
         for creator, stats in creator_stats.items():
-            if stats['total_videos'] < 2:  # Mínimo 2 videos para análisis
+            if stats['total_videos'] < 2:  # Mínimo 2 videos
                 continue
             
-            # Verificar si ya tiene mapeo automático
+            # Verificar si ya tiene mapeo
             existing_mapping = character_intelligence.analyze_creator_name(creator)
             if existing_mapping and existing_mapping.get('source') in ['creator_mapping', 'tiktoker_persona']:
-                continue  # Ya tiene mapeo, saltear
+                continue  # Ya tiene mapeo
             
-            chars_detected = stats['characters_detected']
             total_videos = stats['total_videos']
+            cosplayer_indicators = stats['cosplayer_indicators']
+            mmd_indicators = stats['mmd_indicators']
+            primary_platform = stats['primary_platform']
+            weighted_score = stats['weighted_cosplayer_score']
             
-            # Análisis de consistencia
-            if chars_detected:
-                # Encontrar el personaje más frecuente
-                most_frequent_char = max(chars_detected.items(), key=lambda x: x[1])
-                char_name, char_frequency = most_frequent_char
+            # 🆕 CALCULAR RATIOS CON PESO POR PLATAFORMA
+            cosplayer_ratio = cosplayer_indicators / total_videos if total_videos > 0 else 0
+            weighted_cosplayer_ratio = weighted_score / total_videos if total_videos > 0 else 0
+            mmd_ratio = mmd_indicators / total_videos if total_videos > 0 else 0
+            
+            # 🆕 AJUSTE ESPECIAL PARA MMD: Reducir threshold para TikTok/Instagram
+            # (En TikTok/Instagram es menos probable que sean verdaderos creadores MMD)
+            mmd_threshold = 0.3  # Threshold base
+            if primary_platform in ['tiktok', 'instagram']:
+                mmd_threshold = 0.5  # Más tolerante con "mmd" en TikTok/Instagram
+            
+            # Determinar si es cosplayer o creador MMD
+            if mmd_ratio > mmd_threshold:
+                mmd_creators_filtered.append({
+                    'creator': creator,
+                    'mmd_ratio': mmd_ratio,
+                    'cosplayer_ratio': cosplayer_ratio,
+                    'videos': total_videos,
+                    'primary_platform': primary_platform,
+                    'reason': f'Alto contenido MMD ({mmd_ratio:.1%}) - No es cosplayer'
+                })
+                continue
+            
+            # 🆕 NUEVOS THRESHOLDS DIFERENCIADOS POR PLATAFORMA
+            cosplayer_threshold = 0.2  # Threshold base (20%)
+            if primary_platform == 'tiktok':
+                cosplayer_threshold = 0.1  # 🔥 Solo 10% para TikTok (más sensible)
+            elif primary_platform == 'instagram':
+                cosplayer_threshold = 0.15  # 🔥 Solo 15% para Instagram
+            elif primary_platform == 'youtube':
+                cosplayer_threshold = 0.25  # 25% para YouTube (más estricto)
+            
+            # Usar el ratio ponderado para la decisión final
+            effective_ratio = max(cosplayer_ratio, weighted_cosplayer_ratio)
+            
+            if effective_ratio >= cosplayer_threshold:
+                # Generar nombre de personaje basado en el creador
+                persona_name = self._generate_persona_name(creator)
                 
-                # Calcular ratio de consistencia
-                consistency_ratio = char_frequency / total_videos
+                # 🆕 CALCULAR CONFIANZA CON BOOST POR PLATAFORMA
+                base_confidence = min(0.85, 0.5 + effective_ratio * 0.35)
                 
-                # Categorizar sugerencias por confianza
-                if consistency_ratio >= 0.8 and char_frequency >= 3:
-                    # Alta confianza: 80%+ de consistencia, mínimo 3 videos
-                    suggestion = {
-                        'creator': creator,
-                        'character': char_name,
-                        'confidence': min(0.95, 0.7 + consistency_ratio * 0.3),
-                        'videos': total_videos,
-                        'frequency': char_frequency,
-                        'ratio': consistency_ratio,
-                        'platforms': list(stats['platforms']),
-                        'suggestion_type': 'high_confidence'
-                    }
-                    high_confidence_suggestions.append(suggestion)
-                    
-                elif consistency_ratio >= 0.6 and char_frequency >= 2:
-                    # Confianza media: 60%+ de consistencia, mínimo 2 videos
-                    suggestion = {
-                        'creator': creator,
-                        'character': char_name,
-                        'confidence': min(0.8, 0.5 + consistency_ratio * 0.3),
-                        'videos': total_videos,
-                        'frequency': char_frequency,
-                        'ratio': consistency_ratio,
-                        'platforms': list(stats['platforms']),
-                        'suggestion_type': 'medium_confidence'
-                    }
-                    medium_confidence_suggestions.append(suggestion)
-                    
-                elif consistency_ratio >= 0.4:
-                    # Baja confianza: 40%+ de consistencia para revisión manual
-                    suggestion = {
-                        'creator': creator,
-                        'character': char_name,
-                        'confidence': min(0.6, 0.3 + consistency_ratio * 0.3),
-                        'videos': total_videos,
-                        'frequency': char_frequency,
-                        'ratio': consistency_ratio,
-                        'platforms': list(stats['platforms']),
-                        'suggestion_type': 'low_confidence',
-                        'other_characters': {k: v for k, v in chars_detected.items() if k != char_name}
-                    }
-                    low_confidence_suggestions.append(suggestion)
+                # Aplicar boost por plataforma
+                platform_boost = platform_confidence_boost.get(primary_platform, 0.0)
+                confidence = min(0.98, base_confidence + platform_boost)
+                
+                # 🆕 CATEGORIZACIÓN AJUSTADA CON PLATAFORMA
+                if primary_platform in ['tiktok', 'instagram']:
+                    # Para TikTok/Instagram, ser más agresivo en la categorización
+                    if effective_ratio >= 0.3 or cosplayer_indicators >= 2:
+                        suggestion_type = 'high_confidence'
+                    elif effective_ratio >= 0.15 or cosplayer_indicators >= 1:
+                        suggestion_type = 'medium_confidence'
+                    else:
+                        suggestion_type = 'low_confidence'
+                else:
+                    # Para YouTube y otras, usar thresholds más conservadores
+                    if effective_ratio >= 0.5 and cosplayer_indicators >= 3:
+                        suggestion_type = 'high_confidence'
+                    elif effective_ratio >= 0.3 and cosplayer_indicators >= 2:
+                        suggestion_type = 'medium_confidence'
+                    else:
+                        suggestion_type = 'low_confidence'
+                
+                suggestion = {
+                    'creator': creator,
+                    'persona_name': persona_name,
+                    'confidence': confidence,
+                    'videos': total_videos,
+                    'cosplayer_indicators': cosplayer_indicators,
+                    'cosplayer_ratio': cosplayer_ratio,
+                    'weighted_ratio': weighted_cosplayer_ratio,  # 🆕 Nuevo campo
+                    'effective_ratio': effective_ratio,  # 🆕 Ratio usado para decisión
+                    'primary_platform': primary_platform,  # 🆕 Plataforma principal
+                    'platform_boost': platform_boost,  # 🆕 Boost aplicado
+                    'platforms': list(stats['platforms']),
+                    'suggestion_type': suggestion_type,
+                    'sample_titles': stats['video_titles'][:3],  # Primeros 3 títulos como muestra
+                    'youtube_hashtag_bonus': stats.get('youtube_hashtag_bonus', 0)  # 🆕 Bonus de hashtags de YouTube
+                }
+                cosplayer_suggestions.append(suggestion)
         
-        # Mostrar sugerencias por categoría
-        if high_confidence_suggestions:
-            print(f"\n[ALTA CONFIANZA] {len(high_confidence_suggestions)} sugerencias:")
+        # Mostrar sugerencias categorizadas
+        high_conf = [s for s in cosplayer_suggestions if s['suggestion_type'] == 'high_confidence']
+        medium_conf = [s for s in cosplayer_suggestions if s['suggestion_type'] == 'medium_confidence']
+        low_conf = [s for s in cosplayer_suggestions if s['suggestion_type'] == 'low_confidence']
+        
+        if high_conf:
+            print(f"\n[COSPLAYERS - ALTA CONFIANZA] {len(high_conf)} sugerencias:")
             print("-" * 60)
-            for suggestion in sorted(high_confidence_suggestions, key=lambda x: x['confidence'], reverse=True):
-                print(f"[OK] {suggestion['creator']} -> {suggestion['character']}")
-                print(f"   Confianza: {suggestion['confidence']:.1%}")
-                print(f"   Consistencia: {suggestion['frequency']}/{suggestion['videos']} videos ({suggestion['ratio']:.1%})")
-                print(f"   Plataformas: {', '.join(suggestion['platforms'])}")
-                print(f"   Comando: python maintenance.py add-tiktoker --creator \"{suggestion['creator']}\" --persona \"{suggestion['character']}\" --confidence {suggestion['confidence']:.2f}")
+            for suggestion in sorted(high_conf, key=lambda x: x['confidence'], reverse=True):
+                platform_indicator = "[PRIORIDAD ALTA]" if suggestion['primary_platform'] in ['tiktok', 'instagram'] else "[NORMAL]"
+                # Filtrar caracteres no ASCII para evitar errores de codificación en Windows
+                safe_creator = ''.join(c if ord(c) < 128 else '?' for c in suggestion['creator'])
+                safe_persona = ''.join(c if ord(c) < 128 else '?' for c in suggestion['persona_name'])
+                
+                print(f"[COSPLAYER] {safe_creator} -> {safe_persona} {platform_indicator}")
+                print(f"   Confianza: {suggestion['confidence']:.1%} (base: {suggestion['confidence'] - suggestion['platform_boost']:.1%} + boost: +{suggestion['platform_boost']:.1%})")
+                print(f"   Indicadores cosplay: {suggestion['cosplayer_indicators']} en {suggestion['videos']} videos")
+                print(f"   Ratio efectivo: {suggestion['effective_ratio']:.1%} (normal: {suggestion['cosplayer_ratio']:.1%}, ponderado: {suggestion['weighted_ratio']:.1%})")
+                print(f"   Plataforma principal: {suggestion['primary_platform'].upper()} ({', '.join(suggestion['platforms'])})")
+                
+                # 🆕 Mostrar bonus de hashtags de YouTube si existe
+                if suggestion['youtube_hashtag_bonus'] > 0:
+                    print(f"   *** BONUS YOUTUBE: +{suggestion['youtube_hashtag_bonus']} puntos por hashtags (#cosplay, #shorts, etc.)")
+                
+                # Filtrar títulos de ejemplo
+                safe_titles = []
+                for title in suggestion['sample_titles']:
+                    safe_title = ''.join(c if ord(c) < 128 else '?' for c in title)
+                    safe_titles.append(safe_title)
+                
+                print(f"   Ejemplos: {', '.join(safe_titles)}")
+                print(f"   Comando: python maintenance.py add-tiktoker --creator \"{suggestion['creator']}\" --persona \"{suggestion['persona_name']}\" --confidence {suggestion['confidence']:.2f}")
                 print()
         
-        if medium_confidence_suggestions:
-            print(f"\n[CONFIANZA MEDIA] {len(medium_confidence_suggestions)} sugerencias:")
+        if medium_conf:
+            print(f"\n[COSPLAYERS - CONFIANZA MEDIA] {len(medium_conf)} sugerencias:")
             print("-" * 60)
-            for suggestion in sorted(medium_confidence_suggestions, key=lambda x: x['confidence'], reverse=True):
-                print(f"[?] {suggestion['creator']} -> {suggestion['character']}")
-                print(f"   Confianza: {suggestion['confidence']:.1%}")
-                print(f"   Consistencia: {suggestion['frequency']}/{suggestion['videos']} videos ({suggestion['ratio']:.1%})")
-                print(f"   Comando (revisar manualmente): python maintenance.py add-tiktoker --creator \"{suggestion['creator']}\" --persona \"{suggestion['character']}\" --confidence {suggestion['confidence']:.2f}")
+            for suggestion in sorted(medium_conf, key=lambda x: x['confidence'], reverse=True):
+                platform_indicator = "[PRIORIDAD ALTA]" if suggestion['primary_platform'] in ['tiktok', 'instagram'] else "[NORMAL]"
+                safe_creator = ''.join(c if ord(c) < 128 else '?' for c in suggestion['creator'])
+                safe_persona = ''.join(c if ord(c) < 128 else '?' for c in suggestion['persona_name'])
+                
+                print(f"[POSIBLE COSPLAYER] {safe_creator} -> {safe_persona} {platform_indicator}")
+                print(f"   Confianza: {suggestion['confidence']:.1%} (base: {suggestion['confidence'] - suggestion['platform_boost']:.1%} + boost: +{suggestion['platform_boost']:.1%})")
+                print(f"   Indicadores cosplay: {suggestion['cosplayer_indicators']} en {suggestion['videos']} videos")
+                print(f"   Plataforma principal: {suggestion['primary_platform'].upper()}")
+                
+                # 🆕 Mostrar bonus de hashtags de YouTube si existe
+                if suggestion['youtube_hashtag_bonus'] > 0:
+                    print(f"   *** BONUS YOUTUBE: +{suggestion['youtube_hashtag_bonus']} puntos por hashtags (#cosplay, #shorts, etc.)")
+                
+                safe_titles = []
+                for title in suggestion['sample_titles']:
+                    safe_title = ''.join(c if ord(c) < 128 else '?' for c in title)
+                    safe_titles.append(safe_title)
+                
+                print(f"   Ejemplos: {', '.join(safe_titles)}")
+                print(f"   Comando (revisar manualmente): python maintenance.py add-tiktoker --creator \"{suggestion['creator']}\" --persona \"{suggestion['persona_name']}\" --confidence {suggestion['confidence']:.2f}")
                 print()
         
-        if low_confidence_suggestions:
-            print(f"\n[REVISION MANUAL] {len(low_confidence_suggestions)} sugerencias:")
+        if low_conf:
+            print(f"\n[COSPLAYERS - REVISION MANUAL] {len(low_conf)} sugerencias:")
             print("-" * 60)
-            for suggestion in sorted(low_confidence_suggestions, key=lambda x: x['confidence'], reverse=True):
-                print(f"[!] {suggestion['creator']} -> {suggestion['character']} (pero tambien: {list(suggestion['other_characters'].keys())})")
-                print(f"   Consistencia baja: {suggestion['frequency']}/{suggestion['videos']} videos ({suggestion['ratio']:.1%})")
-                print(f"   Requiere revision manual de videos")
+            for suggestion in sorted(low_conf, key=lambda x: x['confidence'], reverse=True):
+                platform_indicator = "[PRIORIDAD ALTA]" if suggestion['primary_platform'] in ['tiktok', 'instagram'] else "[NORMAL]"
+                safe_creator = ''.join(c if ord(c) < 128 else '?' for c in suggestion['creator'])
+                safe_persona = ''.join(c if ord(c) < 128 else '?' for c in suggestion['persona_name'])
+                
+                print(f"[REVISAR] {safe_creator} -> {safe_persona} {platform_indicator}")
+                print(f"   Indicadores limitados: {suggestion['cosplayer_indicators']} en {suggestion['videos']} videos ({suggestion['effective_ratio']:.1%})")
+                print(f"   Plataforma principal: {suggestion['primary_platform'].upper()}")
+                
+                # 🆕 Mostrar bonus de hashtags de YouTube si existe
+                if suggestion['youtube_hashtag_bonus'] > 0:
+                    print(f"   *** BONUS YOUTUBE: +{suggestion['youtube_hashtag_bonus']} puntos por hashtags (#cosplay, #shorts, etc.)")
+                
+                print(f"   Requiere revision manual de contenido")
                 print()
         
-        # Resumen y recomendaciones
-        total_suggestions = len(high_confidence_suggestions) + len(medium_confidence_suggestions) + len(low_confidence_suggestions)
+        # Mostrar creadores MMD filtrados
+        if mmd_creators_filtered:
+            print(f"\n[CREADORES MMD - FILTRADOS] {len(mmd_creators_filtered)} creadores:")
+            print("-" * 60)
+            for filtered in sorted(mmd_creators_filtered, key=lambda x: x['mmd_ratio'], reverse=True):
+                # Filtrar caracteres no ASCII para evitar errores de codificación en Windows
+                safe_creator = ''.join(c if ord(c) < 128 else '?' for c in filtered['creator'])
+                safe_reason = ''.join(c if ord(c) < 128 else '?' for c in filtered['reason'])
+                
+                print(f"[MMD] {safe_creator} - {safe_reason}")
+                print(f"   MMD ratio: {filtered['mmd_ratio']:.1%}, Cosplay ratio: {filtered['cosplayer_ratio']:.1%}")
+                print(f"   Plataforma: {filtered.get('primary_platform', 'unknown').upper()}")
+                print()
+        
+        # Resumen final
+        total_analyzed = len([c for c, s in creator_stats.items() if s['total_videos'] >= 2])
+        total_cosplayer_suggestions = len(cosplayer_suggestions)
+        total_filtered = len(mmd_creators_filtered)
+        
+        # 🆕 ESTADÍSTICAS POR PLATAFORMA
+        tiktok_suggestions = len([s for s in cosplayer_suggestions if s['primary_platform'] == 'tiktok'])
+        instagram_suggestions = len([s for s in cosplayer_suggestions if s['primary_platform'] == 'instagram'])
+        youtube_suggestions = len([s for s in cosplayer_suggestions if s['primary_platform'] == 'youtube'])
+        other_suggestions = len([s for s in cosplayer_suggestions if s['primary_platform'] not in ['tiktok', 'instagram', 'youtube']])
         
         print(f"\nRESUMEN DEL ANALISIS:")
-        print(f"   Creadores analizados: {len([c for c, s in creator_stats.items() if s['total_videos'] >= 2])}")
-        print(f"   Total sugerencias: {total_suggestions}")
-        print(f"   Alta confianza: {len(high_confidence_suggestions)} (aplicar automaticamente)")
-        print(f"   Confianza media: {len(medium_confidence_suggestions)} (revisar antes de aplicar)")
-        print(f"   Revision manual: {len(low_confidence_suggestions)} (analizar videos individuales)")
+        print(f"   Creadores analizados: {total_analyzed}")
+        print(f"   Cosplayers detectados: {total_cosplayer_suggestions}")
+        print(f"   - Alta confianza: {len(high_conf)} (aplicar automaticamente)")
+        print(f"   - Confianza media: {len(medium_conf)} (revisar manualmente)")
+        print(f"   - Revision manual: {len(low_conf)} (analizar contenido)")
+        print(f"   Creadores MMD filtrados: {total_filtered}")
         
-        if high_confidence_suggestions:
+        print(f"\n*** DISTRIBUCION POR PLATAFORMA:")
+        print(f"   [ALTA PRIORIDAD] TikTok: {tiktok_suggestions} cosplayers (boost +25%)")
+        print(f"   [ALTA PRIORIDAD] Instagram: {instagram_suggestions} cosplayers (boost +20%)")
+        print(f"   [PRIORIDAD NORMAL] YouTube: {youtube_suggestions} cosplayers (sin boost)")
+        print(f"   [PRIORIDAD MEDIA] Otras: {other_suggestions} cosplayers (boost +10%)")
+        
+        if high_conf:
+            # Mostrar estadísticas de boost aplicado
+            tiktok_high = len([s for s in high_conf if s['primary_platform'] == 'tiktok'])
+            instagram_high = len([s for s in high_conf if s['primary_platform'] == 'instagram'])
+            avg_boost_tiktok = sum([s['platform_boost'] for s in high_conf if s['primary_platform'] == 'tiktok']) / max(1, tiktok_high)
+            avg_boost_instagram = sum([s['platform_boost'] for s in high_conf if s['primary_platform'] == 'instagram']) / max(1, instagram_high)
+            
             print(f"\nRECOMENDACION:")
-            print(f"   Puedes aplicar automaticamente las {len(high_confidence_suggestions)} sugerencias de alta confianza")
-            print(f"   Ejemplo: python maintenance.py add-tiktoker --creator \"{high_confidence_suggestions[0]['creator']}\" --persona \"{high_confidence_suggestions[0]['character']}\"")
+            print(f"   Aplica automaticamente las {len(high_conf)} sugerencias de alta confianza")
+            if tiktok_high > 0:
+                print(f"   [ALTA PRIORIDAD] {tiktok_high} de TikTok (boost promedio: +{avg_boost_tiktok:.1%})")
+            if instagram_high > 0:
+                print(f"   [ALTA PRIORIDAD] {instagram_high} de Instagram (boost promedio: +{avg_boost_instagram:.1%})")
+            print(f"   Ejemplo: python maintenance.py add-tiktoker --creator \"{high_conf[0]['creator']}\" --persona \"{high_conf[0]['persona_name']}\"")
         
-        print(f"\nPara aplicar mapeos, usa:")
-        print(f"   python maintenance.py add-tiktoker --creator \"NOMBRE_CREADOR\" --persona \"NOMBRE_PERSONAJE\"")
+        print(f"\nNOTA:")
+        print(f"   - *** SISTEMA MEJORADO: TikTok/Instagram tienen +25%/+20% boost de confianza")
+        print(f"   - *** Thresholds ajustados: TikTok 10%, Instagram 15%, YouTube 25%")
+        print(f"   - *** NUEVO: YouTube hashtags (#cosplay, #shorts) dan +2 puntos extra por hashtag")
+        print(f"   - Los hashtags son mas indicativos de personas reales vs creadores MMD en YouTube")
+        print(f"   - Este analisis se enfoca en detectar COSPLAYERS/PERFORMERS reales")
+        print(f"   - Los creadores de MMD son filtrados automaticamente")
+        print(f"   - El objetivo es agregar personas como personajes de si mismos")
         
         return {
-            'high_confidence': high_confidence_suggestions,
-            'medium_confidence': medium_confidence_suggestions,
-            'low_confidence': low_confidence_suggestions,
-            'total_analyzed': len([c for c, s in creator_stats.items() if s['total_videos'] >= 2])
+            'cosplayer_suggestions': cosplayer_suggestions,
+            'mmd_creators_filtered': mmd_creators_filtered,
+            'total_analyzed': total_analyzed
         }
 
 def main():
