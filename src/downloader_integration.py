@@ -276,7 +276,8 @@ class DownloaderIntegration:
         elif 'youtube.com' in url or 'youtu.be' in url:
             return 'youtube'
         else:
-            return 'tiktok'  # Default para videos de TikTok
+            # 🔧 CORREGIDO: 4K Video Downloader es específicamente para YouTube
+            return 'youtube'  # Default para videos de YouTube (4K Video Downloader)
     
     def get_integration_stats(self) -> Dict:
         """Obtener estadísticas de la integración"""

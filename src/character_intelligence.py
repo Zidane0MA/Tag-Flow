@@ -740,26 +740,189 @@ class CharacterIntelligence:
             logger.error(f"Error en descarga simulada: {e}")
             return None
     
+    def _generate_context_hints(self, game: str, character_name: str) -> List[str]:
+        """Generar context_hints automáticamente basándose en el juego y personaje"""
+        hints = []
+        
+        # Context hints por juego/franquicia
+        game_hints = {
+            'genshin_impact': ['genshin', 'impact', 'mihoyo', 'hoyoverse', 'teyvat'],
+            'honkai_impact': ['honkai', 'impact', 'hi3', 'mihoyo', 'hoyoverse'],
+            'honkai_star_rail': ['honkai', 'star', 'rail', 'hsr', 'mihoyo', 'hoyoverse'],
+            'zenless_zone_zero': ['zenless', 'zone', 'zero', 'zzz', 'mihoyo', 'hoyoverse'],
+            'wuthering_waves': ['wuthering', 'waves', 'kuro', 'games'],
+            'blue_archive': ['blue', 'archive', 'ba', 'nexon'],
+            'vocaloid': ['vocaloid', 'miku', 'virtual', 'singer', 'crypton'],
+            'other_popular': ['anime', 'manga', 'character'],
+            'tiktoker_personas': ['cosplay', 'tiktok', 'dance', 'cos', 'tiktoker']
+        }
+        
+        # Agregar hints específicos del juego
+        if game in game_hints:
+            hints.extend(game_hints[game])
+        
+        # Context hints adicionales basados en el nombre del personaje
+        character_lower = character_name.lower()
+        
+        # Detectar elementos/tipos comunes en nombres
+        element_hints = {
+            'hydro': ['hydro', 'water', 'blue'],
+            'pyro': ['pyro', 'fire', 'red'],
+            'electro': ['electro', 'lightning', 'purple'],
+            'anemo': ['anemo', 'wind', 'green'],
+            'geo': ['geo', 'earth', 'yellow'],
+            'cryo': ['cryo', 'ice', 'light blue'],
+            'dendro': ['dendro', 'nature', 'green'],
+            'archon': ['archon', 'god', 'ruler'],
+            'shogun': ['shogun', 'general', 'leader'],
+            'miko': ['miko', 'shrine', 'priestess'],
+            'dancer': ['dance', 'performer', 'artist'],
+            'cosplay': ['cosplay', 'costume', 'performance']
+        }
+        
+        for element, element_hints_list in element_hints.items():
+            if element in character_lower:
+                hints.extend(element_hints_list)
+        
+        # Context hints para TikTokers
+        if game == 'tiktoker_personas' or 'cos' in character_lower:
+            hints.extend(['cosplay', 'cosplayer', 'costume', 'performance', 'creator'])
+        
+        # Hints generales para personajes de anime/gaming
+        if game in ['genshin_impact', 'honkai_impact', 'honkai_star_rail', 'zenless_zone_zero']:
+            hints.extend(['mmd', 'dance', 'character'])
+        
+        # Remover duplicados y retornar
+        return list(set(hints))
+    
     def add_custom_character(self, character_name: str, game: str, aliases: List[str] = None) -> bool:
-        """Agregar un personaje personalizado a la base de datos"""
+        """Agregar un personaje personalizado a la base de datos con estructura jerárquica optimizada"""
         try:
+            # Inicializar juego si no existe con estructura jerárquica
             if game not in self.character_db:
-                self.character_db[game] = {'characters': [], 'aliases': {}}
+                self.character_db[game] = {
+                    'characters': {}  # Nueva estructura jerárquica
+                }
             
-            # Agregar personaje si no existe
-            if character_name not in self.character_db[game]['characters']:
-                self.character_db[game]['characters'].append(character_name)
+            # Asegurar que el juego tiene la estructura jerárquica
+            game_data = self.character_db[game]
+            if not isinstance(game_data.get('characters'), dict):
+                # Migrar de estructura legacy a jerárquica si es necesario
+                legacy_chars = game_data.get('characters', [])
+                legacy_aliases = game_data.get('aliases', {})
+                
+                # Convertir a estructura jerárquica
+                game_data['characters'] = {}
+                for char in legacy_chars:
+                    game_data['characters'][char] = {
+                        'canonical_name': char,
+                        'priority': 1,
+                        'variants': {
+                            'exact': [char],
+                            'common': [char]
+                        },
+                        'detection_weight': 0.85
+                    }
+                    
+                    # Agregar aliases de la estructura legacy
+                    if char in legacy_aliases:
+                        char_aliases = legacy_aliases[char]
+                        game_data['characters'][char]['variants']['exact'].extend(char_aliases)
+                
+                # Limpiar estructura legacy
+                if 'aliases' in game_data:
+                    del game_data['aliases']
             
-            # Agregar aliases si se proporcionan
-            if aliases:
-                if 'aliases' not in self.character_db[game]:
-                    self.character_db[game]['aliases'] = {}
-                self.character_db[game]['aliases'][character_name] = aliases
+            # Agregar personaje con estructura jerárquica optimizada
+            if character_name not in game_data['characters']:
+                # Generar context_hints automáticamente basándose en el juego
+                context_hints = self._generate_context_hints(game, character_name)
+                
+                # Crear entrada jerárquica completa
+                character_entry = {
+                    'canonical_name': character_name,
+                    'priority': 1,  # Prioridad alta para personajes agregados manualmente
+                    'variants': {
+                        'exact': [character_name],  # Solo el nombre canónico en exact
+                        'common': [character_name]  # También en common para flexibilidad
+                    },
+                    'detection_weight': 0.95,  # Alta confianza para personajes agregados manualmente
+                    'context_hints': context_hints,
+                    'manually_added': True,  # Marcar como agregado manualmente
+                    'added_timestamp': time.time()
+                }
+                
+                # Agregar variantes automáticas
+                if ' ' in character_name:
+                    # Versión sin espacios
+                    no_space_version = character_name.replace(' ', '')
+                    character_entry['variants']['joined'] = [no_space_version]
+                
+                # Agregar aliases personalizados si se proporcionan - MEJORADO
+                if aliases:
+                    for alias in aliases:
+                        # Categorizar alias de forma más inteligente
+                        if len(alias) <= 3:
+                            # Aliases muy cortos van a abbreviations
+                            if 'abbreviations' not in character_entry['variants']:
+                                character_entry['variants']['abbreviations'] = []
+                            character_entry['variants']['abbreviations'].append(alias)
+                        elif alias == character_name:
+                            # Skip si es igual al nombre canónico (ya está en exact)
+                            continue
+                        else:
+                            # CORREGIDO: Aliases van a "common" en lugar de "exact"
+                            character_entry['variants']['common'].append(alias)
+                
+                # Agregar al juego
+                game_data['characters'][character_name] = character_entry
+                
+                # Regenerar patrones en el detector optimizado si existe
+                if self.optimized_detector:
+                    try:
+                        self.optimized_detector.reload_patterns(self.character_db)
+                        logger.info("Patrones del detector optimizado actualizados")
+                    except Exception as e:
+                        logger.warning(f"Error recargando patrones optimizados: {e}")
+                
+                # Actualizar patrones legacy para compatibilidad
+                self.character_patterns = self._init_character_patterns()
+                
+                logger.info(f"Personaje agregado con estructura jerárquica: {character_name} ({game})")
+                logger.info(f"Context hints generados: {context_hints}")
+                logger.info(f"Variantes generadas: {character_entry['variants']}")
+            else:
+                # Personaje ya existe, actualizar aliases y context_hints si se proporcionan
+                existing_character = game_data['characters'][character_name]
+                
+                if aliases:
+                    for alias in aliases:
+                        # Agregar a common si no existe (CORREGIDO)
+                        if 'common' not in existing_character['variants']:
+                            existing_character['variants']['common'] = [character_name]
+                        
+                        if alias not in existing_character['variants']['common'] and alias != character_name:
+                            if len(alias) <= 3:
+                                # Alias corto va a abbreviations
+                                if 'abbreviations' not in existing_character['variants']:
+                                    existing_character['variants']['abbreviations'] = []
+                                if alias not in existing_character['variants']['abbreviations']:
+                                    existing_character['variants']['abbreviations'].append(alias)
+                            else:
+                                # CORREGIDO: Alias normal va a common
+                                existing_character['variants']['common'].append(alias)
+                
+                # Actualizar context_hints si no existen o están vacíos
+                if not existing_character.get('context_hints'):
+                    existing_character['context_hints'] = self._generate_context_hints(game, character_name)
+                    logger.info(f"Context hints actualizados: {existing_character['context_hints']}")
+                
+                logger.info(f"Personaje existente actualizado: {character_name}")
+                logger.info(f"Variantes actualizadas: {existing_character['variants']}")
             
             # Guardar cambios
             self._save_character_database()
             
-            logger.info(f"Personaje personalizado agregado: {character_name} ({game})")
             return True
             
         except Exception as e:

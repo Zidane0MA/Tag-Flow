@@ -802,7 +802,10 @@
             "阿蕾奇諾"
           ],
           "common": [
-            "Arlecchino"
+            "Arlecchino",
+            "The Knave",
+            "Father",
+            "Fatui Harbinger"
           ]
         },
         "detection_weight": 0.95,
@@ -1237,7 +1240,12 @@
           ],
           "common": [
             "Xianyun",
-            "留云借风真君"
+            "留云借风真君",
+            "Cloud Retainer",
+            "Adeptus"
+          ],
+          "abbreviations": [
+            "CR"
           ]
         },
         "detection_weight": 0.95,
@@ -1416,7 +1424,8 @@
             "妮露"
           ],
           "common": [
-            "Nilou"
+            "Nilou",
+            "Padisarah"
           ]
         },
         "detection_weight": 0.95,
@@ -4229,6 +4238,29 @@
           "Football",
           "Anime"
         ]
+      },
+      "Frieren": {
+        "canonical_name": "Frieren",
+        "priority": 1,
+        "variants": {
+          "exact": [
+            "Frieren"
+          ],
+          "common": [
+            "Frieren",
+            "Sousou no frieren"
+          ]
+        },
+        "detection_weight": 0.95,
+        "context_hints": [
+          "manga",
+          "anime",
+          "character",
+          "Sousou no frieren",
+          "Frieren"
+        ],
+        "manually_added": true,
+        "added_timestamp": 1751506413.7178106
       }
     }
   },
@@ -4950,7 +4982,7 @@
           "exact": [
             "Ruan Mei"
           ],
-          "joined":[
+          "joined": [
             "RuanMei"
           ],
           "native": [

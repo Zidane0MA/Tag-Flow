@@ -551,8 +551,19 @@ class VideoAnalyzer:
             # 0. 🆕 MEJORADO: Importar desde 4K Downloader respetando límites y filtros
             imported_count = 0
             if downloader_integration.is_available:
-                # Solo importar si source permite BD externas
+                # Solo importar si source permite BD externas Y la plataforma es compatible
+                should_import_4k = False
+                
                 if source in ['db', 'all']:
+                    # 🔧 CORREGIDO: Solo importar de 4K Downloader si es YouTube o no hay filtro de plataforma
+                    if platform is None or platform in ['youtube', 'all-platforms']:
+                        should_import_4k = True
+                        logger.info(f"🔄 4K Video Downloader compatible con plataforma: {platform or 'todas'}")
+                    else:
+                        should_import_4k = False
+                        logger.info(f"⏭️ Saltando 4K Video Downloader (solo maneja YouTube, solicitado: {platform})")
+                
+                if should_import_4k:
                     # Determinar límite para importación
                     import_limit = None
                     if limit:
@@ -570,40 +581,29 @@ class VideoAnalyzer:
                     else:
                         logger.warning(f"⚠️ Importación falló: {import_result.get('error', 'Error desconocido')}")
                 else:
-                    logger.info(f"⏭️ Saltando importación 4K Downloader (source='{source}' no incluye BD externas)")
+                    logger.info(f"ℹ️ 4K Video Downloader no aplica para esta configuración")
             else:
                 logger.info(f"ℹ️ 4K Video Downloader no disponible")
             
             # 1. 🆕 MEJORADO: Buscar videos pendientes con límite ajustado
             videos_to_process = []
             
-            # 1a. 🆕 COORDINACIÓN INTELIGENTE: Ajustar límite considerando importación previa
+            # 1a. 🔧 CORREGIDO: Coordinación de límites - importar Y procesar dentro del límite
             remaining_limit_for_pending = limit
             if limit and imported_count > 0:
-                # Si se importaron videos y hay límite, reducir el límite para videos pendientes
-                remaining_limit_for_pending = max(0, limit - imported_count)
-                if remaining_limit_for_pending <= 0:
-                    logger.info(f"✅ Límite alcanzado con importación ({imported_count} videos importados)")
-                    logger.info(f"📊 Source '{source}' completamente cubierto con videos recién importados")
-                    logger.info(f"⏭️ No se buscarán videos pendientes adicionales (límite ya alcanzado)")
-                    # 🔧 CORREGIDO: Si límite alcanzado, no buscar pendientes
-                    pending_videos = []
-                else:
-                    logger.info(f"📊 Límite ajustado para pendientes: {limit} - {imported_count} = {remaining_limit_for_pending}")
-                    # 1b. Obtener videos pendientes que correspondan al source seleccionado
-                    pending_videos = self.get_pending_videos(
-                        platform_filter=platform, 
-                        source_filter=source, 
-                        limit=remaining_limit_for_pending
-                    )
-            else:
-                # 1b. Obtener videos pendientes que correspondan al source seleccionado
-                pending_videos = self.get_pending_videos(
-                    platform_filter=platform, 
-                    source_filter=source, 
-                    limit=remaining_limit_for_pending
-                )
+                # Si se importaron videos, SIEMPRE buscarlos como pendientes para procesarlos
+                logger.info(f"📥 Importados {imported_count} videos que necesitan procesamiento")
+                logger.info(f"📋 Buscando videos pendientes (incluidos recién importados) para procesar...")
+                
+                # El límite se aplica al TOTAL procesado, no solo importado
+                remaining_limit_for_pending = limit
             
+            # 1b. Obtener videos pendientes que correspondan al source seleccionado
+            pending_videos = self.get_pending_videos(
+                platform_filter=platform, 
+                source_filter=source, 
+                limit=remaining_limit_for_pending
+            )
             videos_to_process.extend(pending_videos)
             
             # 1c. 🆕 COORDINACIÓN FINAL: Calcular límite restante total

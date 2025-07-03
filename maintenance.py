@@ -7,6 +7,7 @@ import sys
 import argparse
 import shutil
 import json
+import time
 from pathlib import Path
 from datetime import datetime
 import sqlite3
@@ -614,10 +615,11 @@ class MaintenanceUtils:
         logger.info(f"✅ Eliminados {deleted} thumbnails")
     
     def show_sources_stats(self):
-        """Mostrar estadísticas de todas las fuentes de datos"""
+        """Mostrar estadísticas de todas las fuentes de datos (incluyendo plataformas adicionales)"""
         logger.info("Obteniendo estadísticas de fuentes externas...")
         
-        stats = external_sources.get_platform_stats()
+        # Usar stats extendidas que incluyen plataformas adicionales
+        stats = external_sources.get_platform_stats_extended()
         
         print("\nESTADISTICAS DE FUENTES EXTERNAS")
         print("=" * 50)
@@ -625,7 +627,8 @@ class MaintenanceUtils:
         total_db = 0
         total_organized = 0
         
-        for platform, counts in stats.items():
+        # Mostrar plataformas principales
+        for platform, counts in stats['main'].items():
             db_count = counts['db']
             org_count = counts['organized']
             total_db += db_count
@@ -636,6 +639,18 @@ class MaintenanceUtils:
             print(f"  [Carpetas]: {org_count}")
             print(f"  [Total]: {db_count + org_count}")
             print()
+        
+        # Mostrar plataformas adicionales si existen
+        if stats['additional']:
+            print("PLATAFORMAS ADICIONALES:")
+            print("-" * 30)
+            for platform, count in stats['additional'].items():
+                total_organized += count
+                print(f"{platform.upper()}:")
+                print(f"  [BD]: 0")
+                print(f"  [Carpetas]: {count}")
+                print(f"  [Total]: {count}")
+                print()
         
         print(f"TOTALES:")
         print(f"  [BD]: {total_db}")
@@ -864,20 +879,75 @@ class MaintenanceUtils:
             logger.error(f"Error durante la limpieza: {e}")
 
     def add_custom_character(self, character_name: str, game: str, aliases: list = None):
-        """Agregar un personaje personalizado"""
+        """Agregar un personaje personalizado con estructura jerárquica optimizada"""
         logger.info(f"Agregando personaje personalizado: {character_name} ({game})")
         
         success = character_intelligence.add_custom_character(character_name, game, aliases)
         
         if success:
-            print(f"[OK] Personaje agregado: {character_name}")
-            if aliases:
-                print(f"   Aliases: {', '.join(aliases)}")
+            # Obtener la entrada creada para mostrar detalles
+            if game in character_intelligence.character_db:
+                game_data = character_intelligence.character_db[game]
+                if isinstance(game_data.get('characters'), dict) and character_name in game_data['characters']:
+                    char_info = game_data['characters'][character_name]
+                    
+                    print(f"[OK] Personaje agregado: {character_name}")
+                    print(f"   Juego: {game}")
+                    if aliases:
+                        print(f"   Aliases: {', '.join(aliases)}")
+                    
+                    # Manejar context_hints de forma segura para evitar problemas de codificación
+                    try:
+                        context_hints = char_info.get('context_hints', [])
+                        print(f"   Context hints: {context_hints}")
+                    except UnicodeEncodeError:
+                        print(f"   Context hints: [hintsdetected]")
+                    
+                    # Manejar variants de forma segura
+                    try:
+                        exact_variants = char_info['variants'].get('exact', [])
+                        # Filtrar caracteres no imprimibles para Windows
+                        safe_exact = [v for v in exact_variants if all(ord(c) < 127 or c.isalnum() for c in v)]
+                        if safe_exact:
+                            print(f"   Exact: {safe_exact}")
+                    except (UnicodeEncodeError, UnicodeDecodeError):
+                        print(f"   Exact: [variants detected]")
+                    
+                    try:
+                        common_variants = char_info['variants'].get('common', [])
+                        # Filtrar caracteres seguros para Windows
+                        safe_common = [v for v in common_variants if all(ord(c) < 127 or c.isalnum() for c in v)]
+                        if safe_common:
+                            print(f"   Common: {safe_common}")
+                    except (UnicodeEncodeError, UnicodeDecodeError):
+                        print(f"   Common: [variants detected]")
+                    
+                    if 'joined' in char_info['variants']:
+                        try:
+                            joined = char_info['variants']['joined']
+                            print(f"   Joined: {joined}")
+                        except (UnicodeEncodeError, UnicodeDecodeError):
+                            print(f"   Joined: [variants detected]")
+                    
+                    if 'abbreviations' in char_info['variants']:
+                        try:
+                            abbrev = char_info['variants']['abbreviations']
+                            print(f"   Abbreviations: {abbrev}")
+                        except (UnicodeEncodeError, UnicodeDecodeError):
+                            print(f"   Abbreviations: [variants detected]")
+                else:
+                    print(f"[OK] Personaje agregado: {character_name}")
+                    if aliases:
+                        print(f"   Aliases: {', '.join(aliases)}")
+            else:
+                print(f"[OK] Personaje agregado: {character_name}")
+                if aliases:
+                    print(f"   Aliases: {', '.join(aliases)}")
         else:
             print(f"[ERROR] Error agregando personaje: {character_name}")
     
     def add_tiktoker_persona(self, creator_name: str, persona_name: str = None, confidence: float = 0.9):
-        """Agregar un TikToker como personaje (para filtrado en frontend)"""
+        """Agregar un TikToker como personaje con estructura jerárquica optimizada"""
         logger.info(f"Agregando TikToker como personaje: {creator_name}")
         
         # Si no se especifica persona_name, usar el nombre del creador limpio
@@ -886,45 +956,130 @@ class MaintenanceUtils:
             persona_name = creator_name.replace('.cos', '').replace('@', '').replace('_', ' ').title()
         
         try:
-            # Agregar a character_database.json
+            # Asegurar que existe tiktoker_personas con estructura jerárquica
             if 'tiktoker_personas' not in character_intelligence.character_db:
                 character_intelligence.character_db['tiktoker_personas'] = {
-                    'characters': [],
-                    'aliases': {}
+                    'characters': {}  # Nueva estructura jerárquica
                 }
             
             tiktoker_game = character_intelligence.character_db['tiktoker_personas']
             
-            # Agregar personaje si no existe
+            # Migrar a estructura jerárquica si es necesario
+            if not isinstance(tiktoker_game.get('characters'), dict):
+                # Convertir de lista legacy a estructura jerárquica
+                legacy_chars = tiktoker_game.get('characters', [])
+                legacy_aliases = tiktoker_game.get('aliases', {})
+                
+                tiktoker_game['characters'] = {}
+                for char in legacy_chars:
+                    tiktoker_game['characters'][char] = {
+                        'canonical_name': char,
+                        'priority': 2,  # Prioridad media para TikTokers
+                        'variants': {
+                            'exact': [char],
+                            'common': [char]
+                        },
+                        'detection_weight': 0.9,
+                        'context_hints': ['cosplay', 'tiktok', 'dance'],
+                        'platform_specific': 'tiktok'
+                    }
+                    
+                    # Migrar aliases
+                    if char in legacy_aliases:
+                        tiktoker_game['characters'][char]['variants']['exact'].extend(legacy_aliases[char])
+                
+                # Limpiar estructura legacy
+                if 'aliases' in tiktoker_game:
+                    del tiktoker_game['aliases']
+            
+            # Agregar nuevo TikToker con estructura jerárquica completa
             if persona_name not in tiktoker_game['characters']:
-                tiktoker_game['characters'].append(persona_name)
+                # Crear entrada jerárquica optimizada para TikToker
+                tiktoker_entry = {
+                    'canonical_name': persona_name,
+                    'priority': 2,  # Prioridad media para TikTokers
+                    'variants': {
+                        'exact': [persona_name],  # Solo el nombre canónico en exact
+                        'common': [persona_name, f"{persona_name} Cosplay"],  # CORREGIDO: Aliases en common
+                        'usernames': [creator_name]  # Nueva categoría para usernames
+                    },
+                    'detection_weight': 0.95,
+                    'context_hints': ['cosplay', 'tiktok', 'dance', 'cos', 'tiktoker', 'creator'],  # MEJORADO: Más context hints
+                    'auto_detect_for_creator': creator_name,  # Mapeo automático
+                    'confidence': confidence,
+                    'platform_specific': 'tiktok',
+                    'added_timestamp': time.time(),
+                    'tiktoker_persona': True  # Marcar como TikToker persona
+                }
+                
+                # Agregar variantes adicionales inteligentemente
+                if creator_name != persona_name and creator_name not in tiktoker_entry['variants']['common']:
+                    tiktoker_entry['variants']['common'].append(creator_name)
+                
+                # Si el creator tiene .cos, agregar también la versión base
+                if '.cos' in creator_name:
+                    base_name = creator_name.replace('.cos', '')
+                    if base_name not in tiktoker_entry['variants']['common']:
+                        tiktoker_entry['variants']['common'].append(base_name)
+                
+                tiktoker_game['characters'][persona_name] = tiktoker_entry
+                
+                logger.info(f"Nueva entrada TikToker creada: {persona_name}")
+                logger.info(f"Variantes generadas: {tiktoker_entry['variants']}")
+            else:
+                # Actualizar entrada existente con lógica mejorada
+                existing_entry = tiktoker_game['characters'][persona_name]
+                
+                # Actualizar auto_detect_for_creator si no existe
+                if 'auto_detect_for_creator' not in existing_entry:
+                    existing_entry['auto_detect_for_creator'] = creator_name
+                
+                # Asegurar que tiene la estructura de variants correcta
+                if 'variants' not in existing_entry:
+                    existing_entry['variants'] = {'exact': [persona_name], 'common': [persona_name]}
+                
+                # Agregar creator_name a variantes si no está (MEJORADO: common en lugar de exact)
+                if 'common' not in existing_entry['variants']:
+                    existing_entry['variants']['common'] = [persona_name]
+                
+                if creator_name not in existing_entry['variants']['common']:
+                    existing_entry['variants']['common'].append(creator_name)
+                
+                # Agregar a usernames si no está
+                if 'usernames' not in existing_entry['variants']:
+                    existing_entry['variants']['usernames'] = []
+                if creator_name not in existing_entry['variants']['usernames']:
+                    existing_entry['variants']['usernames'].append(creator_name)
+                
+                # Mejorar context_hints si no existen o están limitados
+                if not existing_entry.get('context_hints') or len(existing_entry['context_hints']) < 3:
+                    existing_entry['context_hints'] = ['cosplay', 'tiktok', 'dance', 'cos', 'tiktoker', 'creator']
+                
+                logger.info(f"Entrada TikToker actualizada: {persona_name}")
             
-            # Agregar aliases
-            if 'aliases' not in tiktoker_game:
-                tiktoker_game['aliases'] = {}
-            tiktoker_game['aliases'][persona_name] = [creator_name, f"{persona_name} Cosplay"]
+            # Regenerar patrones en el detector optimizado
+            if character_intelligence.optimized_detector:
+                try:
+                    character_intelligence.optimized_detector.reload_patterns(character_intelligence.character_db)
+                    logger.info("Patrones del detector optimizado actualizados")
+                except Exception as e:
+                    logger.warning(f"Error recargando patrones optimizados: {e}")
             
-            # Agregar a creator_character_mapping.json
-            if 'tiktoker_personas' not in character_intelligence.creator_mapping:
-                character_intelligence.creator_mapping['tiktoker_personas'] = {}
-            
-            character_intelligence.creator_mapping['tiktoker_personas'][creator_name] = {
-                'persona_name': persona_name,
-                'game': 'tiktoker_personas',
-                'auto_detect': True,
-                'confidence': confidence,
-                'description': f"TikToker cosplayer con persona propia"
-            }
+            # Actualizar patrones legacy para compatibilidad
+            character_intelligence.character_patterns = character_intelligence._init_character_patterns()
             
             # Guardar cambios
             character_intelligence._save_character_database()
-            character_intelligence._save_creator_mapping()
             
             print(f"[OK] TikToker agregado como personaje:")
             print(f"   Creador: {creator_name}")
             print(f"   Personaje: {persona_name}")
             print(f"   Confianza: {confidence}")
-            print(f"   Ahora aparecerá como personaje en todos los videos de {creator_name}")
+            print(f"   Context hints: {tiktoker_game['characters'][persona_name]['context_hints']}")
+            print(f"   Estructura: Jerarquica optimizada")
+            print(f"   Exact: {tiktoker_game['characters'][persona_name]['variants']['exact']}")
+            print(f"   Common: {tiktoker_game['characters'][persona_name]['variants']['common']}")
+            print(f"   Auto-deteccion: Habilitada para videos de {creator_name}")
             
             return True
             
@@ -1100,13 +1255,14 @@ class MaintenanceUtils:
         print(f"\nAnalizados: {analyzed}, Con personajes detectados: {detected}")
     
     def update_creator_mappings(self, limit: int = None):
-        """Actualizar mapeos de creadores basado en videos existentes"""
-        logger.info("Actualizando mapeos creador → personaje...")
+        """Analizar creadores y sugerir mapeos automáticos con estructura jerárquica"""
+        logger.info("Analizando creadores para mapeos automáticos...")
         
-        # Obtener todos los creadores únicos
+        # Obtener todos los videos con personajes detectados
         videos = db.get_videos(limit=limit)
         creator_stats = {}
         
+        # Analizar patrones de detección por creador
         for video in videos:
             creator = video.get('creator_name', '')
             if not creator:
@@ -1115,17 +1271,24 @@ class MaintenanceUtils:
             if creator not in creator_stats:
                 creator_stats[creator] = {
                     'total_videos': 0,
-                    'characters_detected': [],
-                    'platforms': set()
+                    'characters_detected': {},  # Cambio: usar dict para contar frecuencia
+                    'platforms': set(),
+                    'recent_videos': []
                 }
             
             creator_stats[creator]['total_videos'] += 1
             creator_stats[creator]['platforms'].add(video.get('platform', 'unknown'))
             
-            # Agregar personajes detectados
+            # Guardar info de videos recientes para análisis
+            creator_stats[creator]['recent_videos'].append({
+                'title': video.get('title', ''),
+                'filename': video.get('file_name', ''),
+                'characters': video.get('detected_characters', [])
+            })
+            
+            # Contar frecuencia de personajes detectados
             detected_chars = video.get('detected_characters', [])
             if isinstance(detected_chars, str):
-                import json
                 try:
                     detected_chars = json.loads(detected_chars)
                 except:
@@ -1133,30 +1296,137 @@ class MaintenanceUtils:
             
             for char in detected_chars:
                 if char not in creator_stats[creator]['characters_detected']:
-                    creator_stats[creator]['characters_detected'].append(char)
+                    creator_stats[creator]['characters_detected'][char] = 0
+                creator_stats[creator]['characters_detected'][char] += 1
         
-        # Analizar patrones y sugerir mapeos
-        suggested_mappings = 0
+        # Analizar patrones y generar sugerencias inteligentes
+        high_confidence_suggestions = []
+        medium_confidence_suggestions = []
+        low_confidence_suggestions = []
         
-        print("\nANALISIS DE CREADORES")
-        print("=" * 40)
+        print("\nANALISIS AVANZADO DE CREADORES")
+        print("=" * 50)
         
         for creator, stats in creator_stats.items():
-            if stats['total_videos'] >= 3:  # Al menos 3 videos para sugerir mapeo
-                chars = stats['characters_detected']
-                if len(chars) == 1:  # Siempre el mismo personaje
-                    # Sugerir mapeo automático
-                    character = chars[0]
-                    suggestion = character_intelligence.analyze_creator_name(creator)
+            if stats['total_videos'] < 2:  # Mínimo 2 videos para análisis
+                continue
+            
+            # Verificar si ya tiene mapeo automático
+            existing_mapping = character_intelligence.analyze_creator_name(creator)
+            if existing_mapping and existing_mapping.get('source') in ['creator_mapping', 'tiktoker_persona']:
+                continue  # Ya tiene mapeo, saltear
+            
+            chars_detected = stats['characters_detected']
+            total_videos = stats['total_videos']
+            
+            # Análisis de consistencia
+            if chars_detected:
+                # Encontrar el personaje más frecuente
+                most_frequent_char = max(chars_detected.items(), key=lambda x: x[1])
+                char_name, char_frequency = most_frequent_char
+                
+                # Calcular ratio de consistencia
+                consistency_ratio = char_frequency / total_videos
+                
+                # Categorizar sugerencias por confianza
+                if consistency_ratio >= 0.8 and char_frequency >= 3:
+                    # Alta confianza: 80%+ de consistencia, mínimo 3 videos
+                    suggestion = {
+                        'creator': creator,
+                        'character': char_name,
+                        'confidence': min(0.95, 0.7 + consistency_ratio * 0.3),
+                        'videos': total_videos,
+                        'frequency': char_frequency,
+                        'ratio': consistency_ratio,
+                        'platforms': list(stats['platforms']),
+                        'suggestion_type': 'high_confidence'
+                    }
+                    high_confidence_suggestions.append(suggestion)
                     
-                    if not suggestion:  # Si no existe mapeo
-                        print(f"Sugerencia de mapeo: {creator} -> {character}")
-                        print(f"   Videos: {stats['total_videos']}, Plataformas: {', '.join(stats['platforms'])}")
-                        suggested_mappings += 1
+                elif consistency_ratio >= 0.6 and char_frequency >= 2:
+                    # Confianza media: 60%+ de consistencia, mínimo 2 videos
+                    suggestion = {
+                        'creator': creator,
+                        'character': char_name,
+                        'confidence': min(0.8, 0.5 + consistency_ratio * 0.3),
+                        'videos': total_videos,
+                        'frequency': char_frequency,
+                        'ratio': consistency_ratio,
+                        'platforms': list(stats['platforms']),
+                        'suggestion_type': 'medium_confidence'
+                    }
+                    medium_confidence_suggestions.append(suggestion)
+                    
+                elif consistency_ratio >= 0.4:
+                    # Baja confianza: 40%+ de consistencia para revisión manual
+                    suggestion = {
+                        'creator': creator,
+                        'character': char_name,
+                        'confidence': min(0.6, 0.3 + consistency_ratio * 0.3),
+                        'videos': total_videos,
+                        'frequency': char_frequency,
+                        'ratio': consistency_ratio,
+                        'platforms': list(stats['platforms']),
+                        'suggestion_type': 'low_confidence',
+                        'other_characters': {k: v for k, v in chars_detected.items() if k != char_name}
+                    }
+                    low_confidence_suggestions.append(suggestion)
         
-        print(f"\nCreadores analizados: {len(creator_stats)}")
-        print(f"Mapeos sugeridos: {suggested_mappings}")
-        print("Para aplicar mapeos automaticamente, edita creator_character_mapping.json")
+        # Mostrar sugerencias por categoría
+        if high_confidence_suggestions:
+            print(f"\n[ALTA CONFIANZA] {len(high_confidence_suggestions)} sugerencias:")
+            print("-" * 60)
+            for suggestion in sorted(high_confidence_suggestions, key=lambda x: x['confidence'], reverse=True):
+                print(f"[OK] {suggestion['creator']} -> {suggestion['character']}")
+                print(f"   Confianza: {suggestion['confidence']:.1%}")
+                print(f"   Consistencia: {suggestion['frequency']}/{suggestion['videos']} videos ({suggestion['ratio']:.1%})")
+                print(f"   Plataformas: {', '.join(suggestion['platforms'])}")
+                print(f"   Comando: python maintenance.py add-tiktoker --creator \"{suggestion['creator']}\" --persona \"{suggestion['character']}\" --confidence {suggestion['confidence']:.2f}")
+                print()
+        
+        if medium_confidence_suggestions:
+            print(f"\n[CONFIANZA MEDIA] {len(medium_confidence_suggestions)} sugerencias:")
+            print("-" * 60)
+            for suggestion in sorted(medium_confidence_suggestions, key=lambda x: x['confidence'], reverse=True):
+                print(f"[?] {suggestion['creator']} -> {suggestion['character']}")
+                print(f"   Confianza: {suggestion['confidence']:.1%}")
+                print(f"   Consistencia: {suggestion['frequency']}/{suggestion['videos']} videos ({suggestion['ratio']:.1%})")
+                print(f"   Comando (revisar manualmente): python maintenance.py add-tiktoker --creator \"{suggestion['creator']}\" --persona \"{suggestion['character']}\" --confidence {suggestion['confidence']:.2f}")
+                print()
+        
+        if low_confidence_suggestions:
+            print(f"\n[REVISION MANUAL] {len(low_confidence_suggestions)} sugerencias:")
+            print("-" * 60)
+            for suggestion in sorted(low_confidence_suggestions, key=lambda x: x['confidence'], reverse=True):
+                print(f"[!] {suggestion['creator']} -> {suggestion['character']} (pero tambien: {list(suggestion['other_characters'].keys())})")
+                print(f"   Consistencia baja: {suggestion['frequency']}/{suggestion['videos']} videos ({suggestion['ratio']:.1%})")
+                print(f"   Requiere revision manual de videos")
+                print()
+        
+        # Resumen y recomendaciones
+        total_suggestions = len(high_confidence_suggestions) + len(medium_confidence_suggestions) + len(low_confidence_suggestions)
+        
+        print(f"\nRESUMEN DEL ANALISIS:")
+        print(f"   Creadores analizados: {len([c for c, s in creator_stats.items() if s['total_videos'] >= 2])}")
+        print(f"   Total sugerencias: {total_suggestions}")
+        print(f"   Alta confianza: {len(high_confidence_suggestions)} (aplicar automaticamente)")
+        print(f"   Confianza media: {len(medium_confidence_suggestions)} (revisar antes de aplicar)")
+        print(f"   Revision manual: {len(low_confidence_suggestions)} (analizar videos individuales)")
+        
+        if high_confidence_suggestions:
+            print(f"\nRECOMENDACION:")
+            print(f"   Puedes aplicar automaticamente las {len(high_confidence_suggestions)} sugerencias de alta confianza")
+            print(f"   Ejemplo: python maintenance.py add-tiktoker --creator \"{high_confidence_suggestions[0]['creator']}\" --persona \"{high_confidence_suggestions[0]['character']}\"")
+        
+        print(f"\nPara aplicar mapeos, usa:")
+        print(f"   python maintenance.py add-tiktoker --creator \"NOMBRE_CREADOR\" --persona \"NOMBRE_PERSONAJE\"")
+        
+        return {
+            'high_confidence': high_confidence_suggestions,
+            'medium_confidence': medium_confidence_suggestions,
+            'low_confidence': low_confidence_suggestions,
+            'total_analyzed': len([c for c, s in creator_stats.items() if s['total_videos'] >= 2])
+        }
 
 def main():
     """Función principal con CLI"""
