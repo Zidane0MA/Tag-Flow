@@ -540,6 +540,263 @@ class ExternalSourcesManager:
             logger.error(f"Error obteniendo estadísticas: {e}")
         
         return stats
+    
+    def extract_single_video_info(self, file_path: str) -> Optional[Dict]:
+        """
+        🆕 Extraer información de un video específico por ruta
+        
+        Args:
+            file_path: Ruta completa al archivo de video
+            
+        Returns:
+            Dict con información del video o None si no se encuentra
+        """
+        logger.info(f"Extrayendo información de video específico: {file_path}")
+        
+        file_path = Path(file_path)
+        
+        # Verificar que el archivo existe
+        if not file_path.exists():
+            logger.error(f"Archivo no existe: {file_path}")
+            return None
+        
+        # Verificar que es un archivo de video válido
+        is_video = file_path.suffix.lower() in self.video_extensions
+        is_image = file_path.suffix.lower() in self.image_extensions
+        
+        if not (is_video or is_image):
+            logger.error(f"El archivo no es un video o imagen válida: {file_path}")
+            return None
+        
+        # Intentar determinar la plataforma y fuente analizando la ruta
+        platform_info = self._detect_platform_from_path(file_path)
+        
+        # Buscar información adicional en las bases de datos si pertenece a alguna app 4K
+        db_info = self._search_file_in_databases(file_path)
+        
+        # Construir información del video
+        video_data = {
+            'file_path': str(file_path),
+            'file_name': file_path.name,
+            'platform': platform_info['platform'],
+            'source': platform_info['source'],
+            'content_type': 'video' if is_video else 'image'
+        }
+        
+        # Usar información de BD si está disponible
+        if db_info:
+            video_data.update({
+                'creator_name': db_info.get('creator_name', platform_info['creator_name']),
+                'title': db_info.get('title', file_path.stem),
+                'external_id': db_info.get('external_id')
+            })
+        else:
+            # Usar información inferida de la ruta
+            video_data.update({
+                'creator_name': platform_info['creator_name'],
+                'title': file_path.stem
+            })
+        
+        logger.info(f"✓ Video procesado: {video_data['platform']} - {video_data['creator_name']} - {video_data['file_name']}")
+        return video_data
+    
+    def _detect_platform_from_path(self, file_path: Path) -> Dict:
+        """
+        Detectar plataforma y creador analizando la ruta del archivo
+        """
+        file_path_str = str(file_path).replace('\\', '/')
+        
+        # Detectar si está en las rutas conocidas de apps 4K (mejorado)
+        
+        # YouTube (4K Video Downloader+) - detectar por nombre de aplicación
+        if '4K Video Downloader' in file_path_str or '4kdownload' in file_path_str.lower():
+            return {
+                'platform': 'youtube',
+                'source': 'youtube_db_manual',
+                'creator_name': 'Desconocido'
+            }
+        
+        # TikTok (4K Tokkit) - detectar por nombre de aplicación
+        if '4K Tokkit' in file_path_str or 'tokkit' in file_path_str.lower():
+            return {
+                'platform': 'tiktok', 
+                'source': 'tiktok_db_manual',
+                'creator_name': 'Desconocido'
+            }
+        
+        # Instagram (4K Stogram) - detectar por nombre de aplicación
+        if '4K Stogram' in file_path_str or 'stogram' in file_path_str.lower():
+            return {
+                'platform': 'instagram',
+                'source': 'instagram_db_manual', 
+                'creator_name': 'Desconocido'
+            }
+        
+        # Detectar si está en las rutas específicas configuradas (fallback)
+        
+        # YouTube (ruta específica configurada)
+        if self.external_youtube_db and str(self.external_youtube_db.parent) in file_path_str:
+            return {
+                'platform': 'youtube',
+                'source': 'youtube_db_manual',
+                'creator_name': 'Desconocido'
+            }
+        
+        # TikTok (ruta específica configurada)
+        if self.tiktok_db_path and str(self.tiktok_db_path.parent) in file_path_str:
+            return {
+                'platform': 'tiktok', 
+                'source': 'tiktok_db_manual',
+                'creator_name': 'Desconocido'
+            }
+        
+        # Instagram (ruta específica configurada)
+        if self.instagram_db_path and str(self.instagram_db_path.parent) in file_path_str:
+            return {
+                'platform': 'instagram',
+                'source': 'instagram_db_manual', 
+                'creator_name': 'Desconocido'
+            }
+        
+        # Carpetas organizadas
+        if self.organized_base_path and str(self.organized_base_path) in file_path_str:
+            # Analizar estructura de carpetas para determinar plataforma y creador
+            relative_path = file_path.relative_to(self.organized_base_path)
+            path_parts = relative_path.parts
+            
+            if len(path_parts) >= 2:
+                platform_folder = path_parts[0].lower()
+                creator_name = path_parts[1]
+                
+                # Mapear nombres de carpetas a plataformas
+                platform_mapping = {
+                    'youtube': 'youtube',
+                    'tiktok': 'tiktok', 
+                    'instagram': 'instagram',
+                    'iwara': 'iwara'
+                }
+                
+                platform = platform_mapping.get(platform_folder, platform_folder)
+                
+                return {
+                    'platform': platform,
+                    'source': f'organized_folder_{platform_folder}',
+                    'creator_name': creator_name
+                }
+        
+        # Si no se puede determinar, usar valores por defecto
+        return {
+            'platform': 'tiktok',  # Mapear a plataforma válida existente
+            'source': 'manual_file',
+            'creator_name': 'Desconocido'
+        }
+    
+    def _search_file_in_databases(self, file_path: Path) -> Optional[Dict]:
+        """
+        Buscar información del archivo en las bases de datos externas
+        """
+        file_path_str = str(file_path)
+        
+        # Buscar en YouTube DB
+        if self.external_youtube_db and self.external_youtube_db.exists():
+            conn = self._get_connection(self.external_youtube_db)
+            if conn:
+                try:
+                    query = """
+                    SELECT 
+                        di.id as download_id,
+                        mid.title as video_title,
+                        mim.value as creator_name
+                    FROM download_item di
+                    LEFT JOIN media_item_description mid ON di.id = mid.download_item_id
+                    LEFT JOIN media_item_metadata mim ON di.id = mim.download_item_id AND mim.type = 0
+                    WHERE di.filename = ?
+                    """
+                    
+                    cursor = conn.execute(query, (file_path_str,))
+                    row = cursor.fetchone()
+                    
+                    if row:
+                        return {
+                            'creator_name': row['creator_name'],
+                            'title': row['video_title'] or file_path.stem,  # 🔧 ARREGLADO: Agregar fallback como las otras funciones
+                            'external_id': row['download_id']
+                        }
+                finally:
+                    conn.close()
+        
+        # Buscar en TikTok DB
+        if self.tiktok_db_path and self.tiktok_db_path.exists():
+            conn = self._get_connection(self.tiktok_db_path)
+            if conn:
+                try:
+                    # Construir ruta relativa para comparar
+                    tiktok_base = self.tiktok_db_path.parent
+                    try:
+                        relative_path = file_path.relative_to(tiktok_base)
+                        relative_path_str = str(relative_path).replace('\\', '/')
+                        
+                        # Probar con y sin "/" inicial
+                        query = """
+                        SELECT 
+                            id,
+                            authorName as creator_name,
+                            description as video_title
+                        FROM MediaItems
+                        WHERE relativePath = ? OR relativePath = ?
+                        """
+                        
+                        cursor = conn.execute(query, (relative_path_str, f"/{relative_path_str}"))
+                        row = cursor.fetchone()
+                        
+                        if row:
+                            return {
+                                'creator_name': row['creator_name'],
+                                'title': row['video_title'] or file_path.stem,  # 🔧 ARREGLADO: Mapear description como title
+                                'external_id': row['id']
+                            }
+                    except ValueError:
+                        # El archivo no está dentro de la ruta base de TikTok
+                        pass
+                finally:
+                    conn.close()
+        
+        # Buscar en Instagram DB
+        if self.instagram_db_path and self.instagram_db_path.exists():
+            conn = self._get_connection(self.instagram_db_path)
+            if conn:
+                try:
+                    # Construir ruta relativa para comparar
+                    instagram_base = self.instagram_db_path.parent
+                    try:
+                        relative_path = file_path.relative_to(instagram_base)
+                        relative_path_str = str(relative_path).replace('\\', '/')
+                        
+                        query = """
+                        SELECT 
+                            id,
+                            title,
+                            ownerName as creator_name
+                        FROM photos
+                        WHERE file = ?
+                        """
+                        
+                        cursor = conn.execute(query, (relative_path_str,))
+                        row = cursor.fetchone()
+                        
+                        if row:
+                            return {
+                                'creator_name': row['creator_name'],
+                                'title': row['title'] or file_path.stem,  # 🔧 ARREGLADO: Consistente con función global
+                                'external_id': row['id']
+                            }
+                    except ValueError:
+                        # El archivo no está dentro de la ruta base de Instagram
+                        pass
+                finally:
+                    conn.close()
+        
+        return None
 
 # Instancia global
 external_sources = ExternalSourcesManager()

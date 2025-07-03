@@ -82,16 +82,16 @@ class VideoAnalyzer:
         Returns:
             List[Dict]: Lista de diccionarios con información completa del video
         """
-        logger.info("Buscando videos nuevos...")
+        logger.info(f"🔍 Buscando videos nuevos (source: {source_filter}, platform: {platform_filter or 'todas'})...")
         
         # Obtener videos ya procesados de la BD
         existing_videos = set()
         try:
             videos_in_db = db.get_videos()
             existing_videos = {video['file_path'] for video in videos_in_db}
-            logger.info(f"Videos en BD: {len(existing_videos)}")
+            logger.info(f"📊 Videos ya en BD: {len(existing_videos)}")
         except Exception as e:
-            logger.error(f"Error consultando BD: {e}")
+            logger.error(f"❌ Error consultando BD: {e}")
         
         new_videos = []
         
@@ -99,9 +99,16 @@ class VideoAnalyzer:
         use_external_sources = source_filter in ['db', 'all']
         use_organized_folders = source_filter in ['organized', 'all']
         
+        # 🆕 MEJORADO: Logging detallado de fuentes seleccionadas
+        logger.info(f"📂 Fuentes seleccionadas por --source '{source_filter}':")
+        if use_external_sources:
+            logger.info(f"  ✅ Bases de datos externas (4K Apps)")
+        if use_organized_folders:
+            logger.info(f"  ✅ Carpetas organizadas (D:\\4K All)")
+        
         if use_external_sources:
             # Usar fuentes externas (bases de datos y carpetas organizadas)
-            logger.info("Usando fuentes externas para búsqueda de videos...")
+            logger.info("📁 Consultando fuentes externas para videos nuevos...")
             
             # Mapear nombres de plataforma modernos a códigos legacy internos
             platform_map = {
@@ -162,7 +169,13 @@ class VideoAnalyzer:
                     if video_data.get('content_type', 'video') == 'video':
                         new_videos.append(video_data)  # Retornar datos completos
         
-        logger.info(f"Videos nuevos para procesar: {len(new_videos)}")
+        # 🆕 MEJORADO: Logging detallado del resultado
+        logger.info(f"✅ Videos nuevos encontrados: {len(new_videos)}")
+        if platform_filter:
+            logger.info(f"   🎯 Filtrados por platform: {platform_filter}")
+        if source_filter != 'all':
+            logger.info(f"   📂 Filtrados por source: {source_filter}")
+        
         return new_videos    
     def process_video(self, video_data: Dict) -> Dict:
         """Procesar un video individual completamente
@@ -389,18 +402,19 @@ class VideoAnalyzer:
         
         return results
     
-    def get_pending_videos(self, platform_filter=None, limit=None) -> List[Dict]:
+    def get_pending_videos(self, platform_filter=None, source_filter='all', limit=None) -> List[Dict]:
         """
         Obtener videos pendientes de la base de datos para procesamiento
         
         Args:
             platform_filter: 'youtube', 'tiktok', 'instagram', 'other', 'all-platforms' o None para todas las plataformas
+            source_filter: 'db', 'organized', 'all' - determina las fuentes a considerar
             limit: número máximo de videos a retornar
             
         Returns:
             List[Dict]: Lista de diccionarios con información completa del video
         """
-        logger.info("Buscando videos pendientes en la base de datos...")
+        logger.info(f"Buscando videos pendientes en la base de datos (source: {source_filter})...")
         
         # Obtener plataformas disponibles
         available_platforms = external_sources.get_available_platforms()
@@ -435,7 +449,35 @@ class VideoAnalyzer:
         # Obtener videos pendientes de la BD
         pending_videos_db = db.get_videos(filters, limit=limit)
         
-        logger.info(f"Videos pendientes encontrados: {len(pending_videos_db)}")
+        logger.info(f"Videos pendientes encontrados (antes de filtrar por source): {len(pending_videos_db)}")
+        
+        # 🆕 FILTRAR POR SOURCE: Solo videos que correspondan al source seleccionado
+        if source_filter != 'all':
+            filtered_videos_db = []
+            
+            for video in pending_videos_db:
+                video_path = Path(video['file_path'])
+                should_include = False
+                
+                if source_filter == 'db':
+                    # Solo videos que provienen de bases de datos externas
+                    # Verificar si el video está en alguna ruta de BD externa
+                    if (config.EXTERNAL_YOUTUBE_DB and 'youtube' in video['platform'].lower()) or \
+                       (config.EXTERNAL_TIKTOK_DB and 'tiktok' in video['platform'].lower()) or \
+                       (config.EXTERNAL_INSTAGRAM_DB and 'instagram' in video['platform'].lower()):
+                        should_include = True
+                        
+                elif source_filter == 'organized':
+                    # Solo videos que provienen de carpetas organizadas
+                    # Verificar si el video está en la ruta base de carpetas organizadas
+                    if config.ORGANIZED_BASE_PATH and str(video_path).startswith(str(config.ORGANIZED_BASE_PATH)):
+                        should_include = True
+                
+                if should_include:
+                    filtered_videos_db.append(video)
+            
+            logger.info(f"Videos pendientes filtrados por source '{source_filter}': {len(filtered_videos_db)}")
+            pending_videos_db = filtered_videos_db
         
         # Convertir a formato compatible con process_video
         pending_videos = []
@@ -455,7 +497,8 @@ class VideoAnalyzer:
                 'platform': video['platform'],
                 'title': title,  # ✅ Título derivado de file_name
                 'content_type': 'video',
-                'existing_video_id': video['id']  # Marcador para identificar que ya existe
+                'existing_video_id': video['id'],  # Marcador para identificar que ya existe
+                'source_type': 'pending'  # 🆕 Marcador para debug
             }
             
             # Verificar que el archivo aún existe
@@ -464,7 +507,7 @@ class VideoAnalyzer:
             else:
                 logger.warning(f"Archivo no encontrado: {video['file_path']}")
         
-        logger.info(f"Videos pendientes válidos: {len(pending_videos)}")
+        logger.info(f"Videos pendientes válidos finales: {len(pending_videos)}")
         return pending_videos
 
     def run(self, limit=None, platform=None, source='all'):
@@ -505,50 +548,142 @@ class VideoAnalyzer:
             logger.info(f"FUENTE ESPECÍFICA: {source_names.get(source, source)}")
         
         try:
-            # 0. Importar desde 4K Downloader si está disponible (solo si no hay filtro de plataforma)
-            if not platform and downloader_integration.is_available:
-                logger.info("Importando desde 4K Video Downloader...")
-                import_result = downloader_integration.import_creators_and_videos()
-                if import_result['success']:
-                    logger.info(f"✓ Importados {import_result['imported_videos']} videos, {import_result['creators_found']} creadores")
+            # 0. 🆕 MEJORADO: Importar desde 4K Downloader respetando límites y filtros
+            imported_count = 0
+            if downloader_integration.is_available:
+                # Solo importar si source permite BD externas
+                if source in ['db', 'all']:
+                    # Determinar límite para importación
+                    import_limit = None
+                    if limit:
+                        # Si hay límite global, usar para importación también
+                        import_limit = limit
+                        logger.info(f"🔄 Importando desde 4K Video Downloader con límite: {import_limit}")
+                    else:
+                        logger.info(f"🔄 Importando desde 4K Video Downloader sin límite")
+                    
+                    # Importar con límite respetado
+                    import_result = downloader_integration.import_creators_and_videos(limit=import_limit)
+                    if import_result['success']:
+                        imported_count = import_result.get('imported_videos', 0)
+                        logger.info(f"✅ Importados {imported_count} videos, {import_result['creators_found']} creadores")
+                    else:
+                        logger.warning(f"⚠️ Importación falló: {import_result.get('error', 'Error desconocido')}")
                 else:
-                    logger.warning(f"Importación falló: {import_result.get('error', 'Error desconocido')}")
+                    logger.info(f"⏭️ Saltando importación 4K Downloader (source='{source}' no incluye BD externas)")
+            else:
+                logger.info(f"ℹ️ 4K Video Downloader no disponible")
             
-            # 1. Buscar videos pendientes primero
+            # 1. 🆕 MEJORADO: Buscar videos pendientes con límite ajustado
             videos_to_process = []
             
-            # 1a. Obtener videos pendientes de la BD
-            pending_videos = self.get_pending_videos(platform_filter=platform, limit=limit)
+            # 1a. 🆕 COORDINACIÓN INTELIGENTE: Ajustar límite considerando importación previa
+            remaining_limit_for_pending = limit
+            if limit and imported_count > 0:
+                # Si se importaron videos y hay límite, reducir el límite para videos pendientes
+                remaining_limit_for_pending = max(0, limit - imported_count)
+                if remaining_limit_for_pending <= 0:
+                    logger.info(f"✅ Límite alcanzado con importación ({imported_count} videos importados)")
+                    logger.info(f"📊 Source '{source}' completamente cubierto con videos recién importados")
+                    logger.info(f"⏭️ No se buscarán videos pendientes adicionales (límite ya alcanzado)")
+                    # 🔧 CORREGIDO: Si límite alcanzado, no buscar pendientes
+                    pending_videos = []
+                else:
+                    logger.info(f"📊 Límite ajustado para pendientes: {limit} - {imported_count} = {remaining_limit_for_pending}")
+                    # 1b. Obtener videos pendientes que correspondan al source seleccionado
+                    pending_videos = self.get_pending_videos(
+                        platform_filter=platform, 
+                        source_filter=source, 
+                        limit=remaining_limit_for_pending
+                    )
+            else:
+                # 1b. Obtener videos pendientes que correspondan al source seleccionado
+                pending_videos = self.get_pending_videos(
+                    platform_filter=platform, 
+                    source_filter=source, 
+                    limit=remaining_limit_for_pending
+                )
+            
             videos_to_process.extend(pending_videos)
             
-            # 1b. Si no hay suficientes videos pendientes, buscar videos nuevos
-            remaining_limit = None
+            # 1c. 🆕 COORDINACIÓN FINAL: Calcular límite restante total
+            final_remaining_limit = None
             if limit:
-                remaining_limit = limit - len(videos_to_process)
-                if remaining_limit <= 0:
-                    logger.info(f"Límite alcanzado con videos pendientes: {len(videos_to_process)}")
+                total_videos_so_far = imported_count + len(videos_to_process)
+                final_remaining_limit = limit - total_videos_so_far
+                
+                if final_remaining_limit <= 0:
+                    logger.info(f"✅ Límite alcanzado completamente:")
+                    logger.info(f"  📥 Videos importados: {imported_count}")
+                    logger.info(f"  📋 Videos pendientes: {len(videos_to_process)}")
+                    logger.info(f"  📊 Total: {total_videos_so_far}/{limit}")
+                    logger.info(f"⏭️ No se buscarán videos nuevos adicionales (límite ya alcanzado)")
                 else:
-                    logger.info(f"Videos pendientes: {len(videos_to_process)}, buscando {remaining_limit} videos nuevos...")
+                    logger.info(f"📋 Videos hasta ahora: {total_videos_so_far}")
+                    logger.info(f"🔍 Buscando hasta {final_remaining_limit} videos nuevos para completar límite...")
             else:
-                logger.info(f"Videos pendientes: {len(videos_to_process)}, buscando videos nuevos adicionales...")
+                logger.info(f"📋 Videos encontrados hasta ahora: {imported_count + len(videos_to_process)}")
+                logger.info(f"🔍 Buscando videos nuevos adicionales (sin límite)...")
             
             # Solo buscar videos nuevos si no hemos alcanzado el límite
-            if not limit or remaining_limit > 0:
-                # Usar fuentes según source filter
+            if not limit or final_remaining_limit > 0:
+                # 🆕 MEJORADO: Usar fuentes según source filter con coordinación inteligente
+                logger.info(f"🔍 Buscando videos nuevos (source: {source}, platform: {platform or 'todas'})...")
                 new_videos = self.find_new_videos(platform_filter=platform, source_filter=source)
                 
-                # Aplicar límite restante a videos nuevos
-                if remaining_limit and len(new_videos) > remaining_limit:
-                    logger.info(f"Limitando videos nuevos: {len(new_videos)} encontrados -> {remaining_limit} seleccionados")
-                    new_videos = new_videos[:remaining_limit]
+                # 🆕 MEJORADO: Aplicar límite restante FINAL a videos nuevos con logging detallado
+                if final_remaining_limit and len(new_videos) > final_remaining_limit:
+                    logger.info(f"📊 Videos nuevos encontrados: {len(new_videos)}")
+                    logger.info(f"⚡ Aplicando límite restante FINAL: {len(new_videos)} -> {final_remaining_limit} seleccionados")
+                    new_videos = new_videos[:final_remaining_limit]
+                elif new_videos:
+                    logger.info(f"📊 Videos nuevos encontrados: {len(new_videos)} (todos serán procesados)")
+                else:
+                    logger.info(f"📊 No se encontraron videos nuevos para procesar")
+                
+                # 🆕 MEJORADO: Marcar videos nuevos para debug
+                for video in new_videos:
+                    video['source_type'] = 'new'
                 
                 videos_to_process.extend(new_videos)
+            else:
+                logger.info(f"⏭️ Saltando búsqueda de videos nuevos (límite ya alcanzado)")
             
             if not videos_to_process:
-                logger.info("No hay videos para procesar (ni pendientes ni nuevos)")
-                return
+                if imported_count > 0:
+                    if limit and imported_count >= limit:
+                        logger.info(f"✅ Procesamiento completado: límite alcanzado con importación")
+                        logger.info(f"   📥 {imported_count} videos importados y agregados a la BD")
+                        logger.info(f"   ⚡ Límite de {limit} respetado perfectamente")
+                        return
+                    else:
+                        logger.info(f"✅ Procesamiento completado con {imported_count} videos importados solamente")
+                        return
+                else:
+                    logger.info("❌ No hay videos para procesar (ni importados, ni pendientes, ni nuevos)")
+                    logger.info(f"💡 Sugerencia: Verificar source '{source}' y platform '{platform or 'todas'}'")
+                    return
             
-            logger.info(f"Total de videos a procesar: {len(videos_to_process)}")
+            # 🆕 MEJORADO: Estadísticas finales COMPLETAS antes del procesamiento
+            imported_for_stats = imported_count if imported_count > 0 else 0
+            pending_count = sum(1 for v in videos_to_process if v.get('source_type') == 'pending')
+            new_count = sum(1 for v in videos_to_process if v.get('source_type') == 'new')
+            
+            logger.info(f"📋 RESUMEN COMPLETO DE PROCESAMIENTO:")
+            logger.info(f"  📥 Videos importados (nuevos en BD): {imported_for_stats}")
+            logger.info(f"  📁 Videos ya poblados (pendientes): {pending_count}")
+            logger.info(f"  🆕 Videos nuevos (se poblarán): {new_count}")
+            logger.info(f"  📊 Total a procesar: {len(videos_to_process)}")
+            if imported_for_stats > 0:
+                logger.info(f"  🎯 Total de videos nuevos en BD: {imported_for_stats + new_count}")
+            logger.info(f"  🎯 Source: {source} | Platform: {platform or 'todas'}")
+            if limit:
+                total_final = imported_for_stats + len(videos_to_process)
+                if total_final <= limit:
+                    logger.info(f"  ✅ Límite respetado: {total_final}/{limit}")
+                else:
+                    logger.error(f"  ❌ Error: Límite excedido: {total_final}/{limit}")
+            logger.info("=" * 60)
             
             # 2. Procesar videos en lotes
             batch_results = self.process_videos_batch(videos_to_process)

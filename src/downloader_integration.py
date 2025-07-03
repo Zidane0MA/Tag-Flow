@@ -47,8 +47,12 @@ class DownloaderIntegration:
             logger.error(f"Error conectando a 4K Downloader DB: {e}")
             return None
     
-    def import_creators_and_videos(self) -> Dict:
-        """Importar creadores y videos desde 4K Downloader"""
+    def import_creators_and_videos(self, limit: Optional[int] = None) -> Dict:
+        """Importar creadores y videos desde 4K Downloader
+        
+        Args:
+            limit: Número máximo de videos a importar (None = sin límite)
+        """
         if not self.is_available:
             return {
                 'success': False,
@@ -71,8 +75,8 @@ class DownloaderIntegration:
                     result['error'] = 'No se pudo conectar a la base de datos'
                     return result
                 
-                # Obtener información de descargas
-                downloads_data = self._get_downloads_data(conn)
+                # Obtener información de descargas con límite respetado
+                downloads_data = self._get_downloads_data(conn, limit)
                 
                 # Procesar cada descarga
                 for download in downloads_data:
@@ -99,8 +103,13 @@ class DownloaderIntegration:
         
         return result
     
-    def _get_downloads_data(self, conn: sqlite3.Connection) -> List[sqlite3.Row]:
-        """Obtener datos de descargas desde 4K Downloader+ (YouTube)"""
+    def _get_downloads_data(self, conn: sqlite3.Connection, limit: Optional[int] = None) -> List[sqlite3.Row]:
+        """Obtener datos de descargas desde 4K Downloader+ (YouTube)
+        
+        Args:
+            conn: Conexión a la base de datos
+            limit: Número máximo de registros a obtener (None = sin límite)
+        """
         try:
             query = """
                 SELECT 
@@ -114,6 +123,14 @@ class DownloaderIntegration:
                     AND di.filename != ''
                 ORDER BY di.id DESC
             """
+            
+            # Agregar límite si se especifica
+            if limit is not None:
+                query += f" LIMIT {limit}"
+                logger.info(f"🔢 Consultando 4K Downloader con límite: {limit}")
+            else:
+                logger.info(f"🔢 Consultando 4K Downloader sin límite")
+            
             cursor = conn.execute(query)
             return cursor.fetchall()
         except sqlite3.Error as e:

@@ -213,6 +213,33 @@ python maintenance.py populate-db [opciones]
   - `all-platforms`: Todas las plataformas (principales + adicionales)
 - `--limit N`: Número máximo de videos a importar
 - `--force`: Forzar reimportación de videos existentes
+- `--file "RUTA"`: **🆕 Importar un video específico por ruta**
+
+**🆕 NUEVA FUNCIONALIDAD: Importar Video Específico**
+```bash
+# Importar un video específico desde cualquier ubicación
+python maintenance.py populate-db --file "D:\Videos\mi_video.mp4"
+
+# Importar y forzar actualización si ya existe
+python maintenance.py populate-db --file "C:\Users\Usuario\Downloads\video.mp4" --force
+
+# Ejemplos con rutas de apps 4K (obtendrá metadatos completos automáticamente)
+python maintenance.py populate-db --file "D:\4K Tokkit\Username\video.mp4"
+python maintenance.py populate-db --file "C:\Users\Usuario\Downloads\4K Video Downloader+\Canal\video.mp4"
+python maintenance.py populate-db --file "D:\4K All\Youtube\Creador\video.mp4"
+```
+
+**Detección Automática Inteligente:**
+- **Apps 4K**: Si el video pertenece a una app 4K, extrae automáticamente metadatos completos (título/descripción, creador, etc.)
+- **Carpetas Organizadas**: Detecta plataforma y creador desde la estructura de carpetas
+- **Archivos Independientes**: Detecta información básica y permite edición manual posterior
+
+**🔧 Campo Principal - `description`:**
+- Campo único que actúa como "título" del video en Tag-Flow
+- TikTok: Mapea desde `description` de la BD de 4K Tokkit
+- Instagram: Mapea desde `title` de la BD de 4K Stogram
+- YouTube: Mapea desde `video_title` de la BD de 4K Video Downloader+
+- Archivos manuales: Usa el nombre del archivo sin extensión
 
 **Ejemplos Optimizados y Escalables:**
 ```bash
@@ -239,6 +266,10 @@ python maintenance.py populate-db --source organized --limit 100
 
 # Poblado masivo para testing de rendimiento
 python maintenance.py populate-db --limit 1000
+
+# 🆕 NUEVOS EJEMPLOS - Archivos Específicos
+python maintenance.py populate-db --file "D:\MisVideos\baile_hutao.mp4"
+python maintenance.py populate-db --file "E:\Descargas\tiktok_trend.mp4" --force
 ```
 
 #### `clear-db` - Limpieza Selectiva de Base de Datos

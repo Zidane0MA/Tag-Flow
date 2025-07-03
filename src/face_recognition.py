@@ -239,11 +239,44 @@ class FaceRecognizer:
         return results
     
     def _recognize_with_google_vision(self, image_data: bytes) -> Dict:
-        """Reconocimiento con Google Vision API para TikTokers famosos"""
+        """Reconocimiento con Google Vision API para TikTokers famosos - CON FILTROS ANTI-FALSOS POSITIVOS"""
         results = {
             'detected_characters': [],
             'confidence_scores': []
         }
+        
+        # 🚫 LISTA DE FILTROS PARA FALSOS POSITIVOS
+        # Nombres que claramente no son relevantes para videos de baile/cosplay asiático
+        false_positive_filters = {
+            # Nombres que suenan como músicos/artistas occidentales no relevantes
+            'sanju', 'rathod', 'shaky', 'g-spxrk', 'dj', 'mc', 'rapper',
+            
+            # Nombres genéricos que no son personas específicas
+            'person', 'people', 'dancer', 'girl', 'woman', 'man', 'cosplayer',
+            'tiktoker', 'influencer', 'creator', 'user', 'account',
+            
+            # Términos técnicos de Google Vision que no son nombres
+            'entertainment', 'performance', 'music', 'dance', 'video', 'content',
+            'fashion', 'style', 'beauty', 'makeup', 'hair', 'outfit',
+            
+            # Términos relacionados con apps/plataformas
+            'tiktok', 'instagram', 'youtube', 'shorts', 'reels', 'story',
+            'live', 'stream', 'broadcast', 'upload', 'post', 'share',
+            
+            # Palabras que indican ubicaciones o marcas, no personas
+            'studio', 'stage', 'room', 'home', 'house', 'background',
+            'brand', 'company', 'product', 'service', 'app', 'website'
+        }
+        
+        # 🎯 PATRONES SOSPECHOSOS QUE INDICAN FALSOS POSITIVOS
+        suspicious_patterns = [
+            r'^[A-Z]-[A-Z]+$',  # Patrones como "G-SPXRK" (letra-guion-letras)
+            r'^\w+\d+$',        # Nombres con números al final como "User123"
+            r'^DJ\s+\w+',       # Nombres que empiezan con "DJ"
+            r'^MC\s+\w+',       # Nombres que empiezan con "MC"
+            r'^\w{1,2}$',       # Nombres muy cortos (1-2 caracteres)
+            r'^\w+[._]\w+$',    # Nombres con puntos o guiones bajos (usernames)
+        ]
         
         try:
             # Crear objeto imagen para Google Vision
@@ -261,23 +294,107 @@ class FaceRecognizer:
                     web_response = self.vision_client.web_detection(image=image)
                     web_entities = web_response.web_detection.web_entities
                     
+                    valid_detections = 0
+                    filtered_detections = 0
+                    
                     for entity in web_entities:
                         if entity.score > 0.5:  # Umbral de confianza
-                            results['detected_characters'].append(entity.description)
-                            results['confidence_scores'].append(entity.score)
+                            entity_name = entity.description.strip()
+                            entity_name_lower = entity_name.lower()
                             
+                            # 🚫 APLICAR FILTROS DE FALSOS POSITIVOS
+                            
+                            # Filtro 1: Lista de palabras prohibidas
+                            is_filtered = False
+                            for filter_word in false_positive_filters:
+                                if filter_word in entity_name_lower:
+                                    logger.debug(f"Filtrado por palabra prohibida '{filter_word}': {entity_name}")
+                                    is_filtered = True
+                                    break
+                            
+                            # Filtro 2: Patrones sospechosos
+                            if not is_filtered:
+                                import re
+                                for pattern in suspicious_patterns:
+                                    if re.match(pattern, entity_name):
+                                        logger.debug(f"Filtrado por patrón sospechoso '{pattern}': {entity_name}")
+                                        is_filtered = True
+                                        break
+                            
+                            # Filtro 3: Verificar relevancia contextual
+                            if not is_filtered:
+                                # Solo aceptar nombres que parecen personas reales asiáticas o cosplayers conocidos
+                                if self._is_likely_relevant_person(entity_name):
+                                    results['detected_characters'].append(entity_name)
+                                    results['confidence_scores'].append(entity.score)
+                                    valid_detections += 1
+                                    logger.info(f"✅ Detección válida: {entity_name} (confianza: {entity.score:.2f})")
+                                else:
+                                    logger.debug(f"Filtrado por irrelevancia contextual: {entity_name}")
+                                    is_filtered = True
+                            
+                            if is_filtered:
+                                filtered_detections += 1
+                    
+                    logger.info(f"Google Vision: {valid_detections} detecciones válidas, {filtered_detections} filtradas")
+                    
                 except Exception as e:
                     logger.debug(f"Web detection no disponible: {e}")
                 
-                # Si no hay entidades web, al menos sabemos que hay caras
-                if not results['detected_characters'] and faces:
-                    results['detected_characters'].append("Persona detectada")
-                    results['confidence_scores'].append(0.8)
+                # Si no hay entidades web válidas después del filtrado, NO agregar detección genérica
+                # Esto evita agregar "Persona detectada" cuando las detecciones fueron filtradas por irrelevantes
+                if not results['detected_characters']:
+                    logger.info("No se encontraron detecciones válidas después del filtrado")
             
         except Exception as e:
             logger.error(f"Error en Google Vision: {e}")
         
         return results
+    
+    def _is_likely_relevant_person(self, name: str) -> bool:
+        """Verificar si un nombre detectado es probablemente una persona relevante"""
+        name_lower = name.lower().strip()
+        
+        # 🚫 RECHAZAR nombres claramente irrelevantes
+        irrelevant_indicators = [
+            # Términos genéricos
+            'unknown', 'unnamed', 'anonymous', 'user', 'account', 'profile',
+            'person', 'people', 'individual', 'someone', 'anybody', 'everybody',
+            
+            # Términos técnicos
+            'algorithm', 'system', 'software', 'application', 'platform', 'service',
+            'technology', 'digital', 'virtual', 'artificial', 'computer', 'machine',
+            
+            # Términos de contenido
+            'content', 'media', 'video', 'audio', 'image', 'photo', 'picture',
+            'clip', 'segment', 'scene', 'frame', 'shot', 'angle', 'view',
+            
+            # Términos de redes sociales
+            'follower', 'subscriber', 'viewer', 'audience', 'fan', 'community',
+            'channel', 'page', 'feed', 'timeline', 'story', 'post', 'update'
+        ]
+        
+        for indicator in irrelevant_indicators:
+            if indicator in name_lower:
+                return False
+        
+        # ✅ ACEPTAR nombres que parecen personas reales
+        relevant_indicators = [
+            # Solo nombres que parecen personas reales con al menos 3 caracteres
+            # y que no contienen caracteres especiales raros
+        ]
+        
+        # Verificaciones básicas para nombres de personas reales
+        # - Al menos 3 caracteres
+        # - No más de 50 caracteres (evitar descripciones largas)
+        # - Contiene solo letras, espacios, guiones, apostrofes básicos
+        import re
+        if (len(name) >= 3 and 
+            len(name) <= 50 and 
+            re.match(r"^[a-zA-Z\s\-'\.]+$", name)):
+            return True
+        
+        return False
     
     def _recognize_with_deepface(self, image_data: bytes) -> Dict:
         """Reconocimiento con DeepFace para personajes anime/gaming"""

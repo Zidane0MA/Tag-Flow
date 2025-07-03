@@ -262,16 +262,89 @@ class MaintenanceUtils:
         except Exception as e:
             logger.error(f"Error optimizando base de datos: {e}")
     
-    def populate_database(self, source='all', platform=None, limit=None, force=False):
+    def populate_database(self, source='all', platform=None, limit=None, force=False, file_path=None):
         """
-        Poblar la base de datos desde fuentes externas
+        Poblar la base de datos desde fuentes externas o un archivo específico
         
         Args:
             source: 'db', 'organized', 'all' - fuente de datos
             platform: 'youtube', 'tiktok', 'instagram' o None para todas
             limit: número máximo de videos a importar
             force: forzar reimportación de videos existentes
+            file_path: 🆕 ruta específica de un video para importar
         """
+        
+        # 🆕 NUEVA FUNCIONALIDAD: Importar archivo específico
+        if file_path:
+            logger.info(f"Importando archivo específico: {file_path}")
+            
+            # Extraer información del video específico
+            video_data = external_sources.extract_single_video_info(file_path)
+            
+            if not video_data:
+                logger.error("No se pudo extraer información del archivo")
+                return
+            
+            # Verificar si ya existe en la BD
+            existing = db.get_video_by_path(video_data['file_path'])
+            if existing and not force:
+                logger.info(f"El video ya existe en la BD (ID: {existing['id']})")
+                logger.info(f"Usa --force para forzar actualización")
+                return
+            
+            # Preparar datos para la BD
+            db_data = {
+                'file_path': video_data['file_path'],
+                'file_name': video_data['file_name'],
+                'creator_name': video_data['creator_name'],
+                'platform': video_data['platform'],
+                'processing_status': 'pendiente'
+            }
+            
+            # Agregar información adicional si está disponible
+            if 'title' in video_data:
+                # Solo mapear a description, que es el campo principal para títulos
+                db_data['description'] = video_data['title']
+            
+            # Obtener tamaño del archivo y duración si es video
+            file_path_obj = Path(video_data['file_path'])
+            if file_path_obj.exists():
+                db_data['file_size'] = file_path_obj.stat().st_size
+                
+                # Si es video, intentar obtener duración
+                if video_data.get('content_type', 'video') == 'video':
+                    try:
+                        from src.video_processor import video_processor
+                        metadata = video_processor.extract_metadata(file_path_obj)
+                        if 'duration_seconds' in metadata:
+                            db_data['duration_seconds'] = metadata['duration_seconds']
+                    except Exception as e:
+                        logger.warning(f"No se pudo obtener duración de {file_path_obj.name}: {e}")
+            
+            # Agregar o actualizar en la BD
+            try:
+                if existing and force:
+                    # Actualizar registro existente
+                    db.update_video(existing['id'], db_data)
+                    logger.info(f"✅ Video actualizado: {video_data['file_name']}")
+                    logger.info(f"   Plataforma: {video_data['platform']}")
+                    logger.info(f"   Creador: {video_data['creator_name']}")
+                    logger.info(f"   Fuente: {video_data['source']}")
+                else:
+                    # Agregar nuevo registro
+                    db.add_video(db_data)
+                    logger.info(f"✅ Video importado: {video_data['file_name']}")
+                    logger.info(f"   Plataforma: {video_data['platform']}")
+                    logger.info(f"   Creador: {video_data['creator_name']}")
+                    logger.info(f"   Fuente: {video_data['source']}")
+                
+                return
+                
+            except Exception as e:
+                logger.error(f"Error importando archivo específico: {e}")
+                return
+        
+        # FUNCIONALIDAD EXISTENTE: Importar desde fuentes múltiples
         logger.info(f"Poblando base de datos desde {source} (plataforma: {platform or 'todas'})")
         
         if limit:
@@ -316,7 +389,8 @@ class MaintenanceUtils:
                 
                 # Agregar información adicional si está disponible
                 if 'title' in video_data:
-                    db_data['title'] = video_data['title']
+                    # Solo mapear a description, que es el campo principal para títulos
+                    db_data['description'] = video_data['title']
                 
                 # Obtener tamaño del archivo y duración si es video
                 file_path = Path(video_data['file_path'])
@@ -1104,6 +1178,8 @@ def main():
                         help='Fuente de datos (db=bases datos externas, organized=carpetas organizadas, all=ambas)')
     parser.add_argument('--platform', 
                         help='Plataforma específica: youtube|tiktok|instagram (principales), other (adicionales), all-platforms (todas), o nombre específico como "iwara"')
+    parser.add_argument('--file', type=str, 
+                        help='Ruta específica de un video para importar (ej: "D:/videos/video.mp4")')
     
     # Argumentos específicos para gestión de personajes
     parser.add_argument('--character', type=str, help='Nombre del personaje')
@@ -1136,7 +1212,8 @@ def main():
             source=args.source, 
             platform=args.platform, 
             limit=args.limit, 
-            force=args.force
+            force=args.force,
+            file_path=args.file
         )
     elif args.action == 'clear-db':
         utils.clear_database(platform=args.platform, force=args.force)

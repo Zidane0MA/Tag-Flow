@@ -531,7 +531,7 @@ class CharacterIntelligence:
         return detected_characters
     
     def analyze_creator_name(self, creator_name: str) -> Optional[Dict]:
-        """Analizar nombre del creador para mapear a personaje"""
+        """Analizar nombre del creador para mapear a personaje - VERSION CONSERVADORA"""
         if not creator_name:
             return None
         
@@ -558,26 +558,31 @@ class CharacterIntelligence:
                         'creator': creator_name
                     }
         
-        # Buscar patrones en el nombre del creador
-        creator_lower = creator_name.lower()
+        # 🚫 DESHABILITAR MAPEO AUTOMATICO AGRESIVO
+        # Este código estaba causando falsos positivos como Tenshimaru-san → Aru
+        # Comentamos esta sección para evitar mapeos incorrectos automáticos
         
-        # Verificar si el nombre del creador contiene nombre de personaje
-        for game, game_data in self.character_db.items():
-            # ARREGLADO: Usar wrapper de compatibilidad
-            characters = self._get_characters_compatible(game_data)
-            for character in characters:
-                if character.lower() in creator_lower:
-                    # Auto-registrar este mapeo para el futuro
-                    self._auto_register_creator_mapping(creator_name, character, game)
-                    
-                    return {
-                        'name': character,
-                        'game': game,
-                        'confidence': 0.7,
-                        'source': 'creator_name_analysis',
-                        'creator': creator_name
-                    }
+        # Buscar patrones en el nombre del creador - SOLO SI ES MUY ESPECÍFICO
+        # creator_lower = creator_name.lower()
+        # 
+        # # Verificar si el nombre del creador contiene nombre de personaje
+        # for game, game_data in self.character_db.items():
+        #     characters = self._get_characters_compatible(game_data)
+        #     for character in characters:
+        #         if character.lower() in creator_lower:
+        #             # Auto-registrar este mapeo para el futuro
+        #             self._auto_register_creator_mapping(creator_name, character, game)
+        #             
+        #             return {
+        #                 'name': character,
+        #                 'game': game,
+        #                 'confidence': 0.7,
+        #                 'source': 'creator_name_analysis',
+        #                 'creator': creator_name
+        #             }
         
+        # NO HACER MAPEO AUTOMÁTICO - Solo retornar mapeos explícitos
+        logger.debug(f"No se encontró mapeo explícito para creador: {creator_name}")
         return None
     
     def _normalize_character_name(self, name: str) -> str:
@@ -770,10 +775,12 @@ class CharacterIntelligence:
             logger.error(f"Error guardando character_database.json: {e}")
     
     def _save_creator_mapping(self):
-        """Guardar mapeo de creadores"""
+        """Guardar mapeo de creadores en la base de datos unificada"""
         try:
-            with open(self.creator_mapping_path, 'w', encoding='utf-8') as f:
-                json.dump(self.creator_mapping, f, ensure_ascii=False, indent=2)
+            # Los mapeos ahora se guardan integrados en character_database.json
+            # No necesitamos archivo separado
+            self._save_character_database()
+            logger.info("Mapeos de creadores guardados en character_database.json")
         except Exception as e:
             logger.error(f"Error guardando creator_mapping.json: {e}")
     

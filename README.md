@@ -144,6 +144,9 @@ python maintenance.py populate-db --source all --limit 20
 # Poblar solo desde una plataforma específica
 python maintenance.py populate-db --platform youtube --limit 10
 
+# 🆕 NUEVA FUNCIONALIDAD: Importar video específico por ruta
+python maintenance.py populate-db --file "D:\Videos\mi_video.mp4"
+
 # Generar thumbnails para videos importados
 python maintenance.py populate-thumbnails --platform youtube
 ```
