@@ -10,6 +10,7 @@ import json
 import time
 from pathlib import Path
 from datetime import datetime
+from typing import Dict, List, Optional, Tuple  # 🚀 Añadido Tuple para optimizaciones
 import sqlite3
 import logging
 
@@ -265,7 +266,7 @@ class MaintenanceUtils:
     
     def populate_database(self, source='all', platform=None, limit=None, force=False, file_path=None):
         """
-        Poblar la base de datos desde fuentes externas o un archivo específico
+        🚀 OPTIMIZADO: Poblar la base de datos desde fuentes externas o un archivo específico
         
         Args:
             source: 'db', 'organized', 'all' - fuente de datos
@@ -274,161 +275,333 @@ class MaintenanceUtils:
             force: forzar reimportación de videos existentes
             file_path: 🆕 ruta específica de un video para importar
         """
+        start_time = time.time()
         
         # 🆕 NUEVA FUNCIONALIDAD: Importar archivo específico
         if file_path:
-            logger.info(f"Importando archivo específico: {file_path}")
-            
-            # Extraer información del video específico
-            video_data = external_sources.extract_single_video_info(file_path)
-            
-            if not video_data:
-                logger.error("No se pudo extraer información del archivo")
-                return
-            
-            # Verificar si ya existe en la BD
-            existing = db.get_video_by_path(video_data['file_path'])
-            if existing and not force:
-                logger.info(f"El video ya existe en la BD (ID: {existing['id']})")
-                logger.info(f"Usa --force para forzar actualización")
-                return
-            
-            # Preparar datos para la BD
-            db_data = {
-                'file_path': video_data['file_path'],
-                'file_name': video_data['file_name'],
-                'creator_name': video_data['creator_name'],
-                'platform': video_data['platform'],
-                'processing_status': 'pendiente'
-            }
-            
-            # Agregar información adicional si está disponible
-            if 'title' in video_data:
-                # Solo mapear a description, que es el campo principal para títulos
-                db_data['description'] = video_data['title']
-            
-            # Obtener tamaño del archivo y duración si es video
-            file_path_obj = Path(video_data['file_path'])
-            if file_path_obj.exists():
-                db_data['file_size'] = file_path_obj.stat().st_size
-                
-                # Si es video, intentar obtener duración
-                if video_data.get('content_type', 'video') == 'video':
-                    try:
-                        from src.video_processor import video_processor
-                        metadata = video_processor.extract_metadata(file_path_obj)
-                        if 'duration_seconds' in metadata:
-                            db_data['duration_seconds'] = metadata['duration_seconds']
-                    except Exception as e:
-                        logger.warning(f"No se pudo obtener duración de {file_path_obj.name}: {e}")
-            
-            # Agregar o actualizar en la BD
-            try:
-                if existing and force:
-                    # Actualizar registro existente
-                    db.update_video(existing['id'], db_data)
-                    logger.info(f"✅ Video actualizado: {video_data['file_name']}")
-                    logger.info(f"   Plataforma: {video_data['platform']}")
-                    logger.info(f"   Creador: {video_data['creator_name']}")
-                    logger.info(f"   Fuente: {video_data['source']}")
-                else:
-                    # Agregar nuevo registro
-                    db.add_video(db_data)
-                    logger.info(f"✅ Video importado: {video_data['file_name']}")
-                    logger.info(f"   Plataforma: {video_data['platform']}")
-                    logger.info(f"   Creador: {video_data['creator_name']}")
-                    logger.info(f"   Fuente: {video_data['source']}")
-                
-                return
-                
-            except Exception as e:
-                logger.error(f"Error importando archivo específico: {e}")
-                return
+            return self._populate_single_file(file_path, force)
         
-        # FUNCIONALIDAD EXISTENTE: Importar desde fuentes múltiples
-        logger.info(f"Poblando base de datos desde {source} (plataforma: {platform or 'todas'})")
+        # 🚀 FUNCIONALIDAD OPTIMIZADA: Importar desde fuentes múltiples
+        logger.info(f"🚀 Poblando base de datos OPTIMIZADO desde {source} (plataforma: {platform or 'todas'})")
         
         if limit:
             logger.info(f"Límite establecido: {limit} videos")
         
-        # Obtener videos de fuentes externas
+        # 🚀 PASO 1: Obtener videos de fuentes externas (sin cambios)
+        logger.info("📥 Obteniendo videos de fuentes externas...")
         external_videos = external_sources.get_all_videos_from_source(source, platform, limit)
         
         if not external_videos:
             logger.info("No se encontraron videos para importar")
             return
         
-        logger.info(f"Videos encontrados para importar: {len(external_videos)}")
+        logger.info(f"Videos encontrados para procesar: {len(external_videos)}")
         
-        # Verificar duplicados si no se fuerza
+        # 🚀 PASO 2: Verificación optimizada de duplicados
         if not force:
-            existing_paths = {video['file_path'] for video in db.get_videos()}
-            new_videos = [v for v in external_videos if v['file_path'] not in existing_paths]
-            skipped = len(external_videos) - len(new_videos)
-            if skipped > 0:
-                logger.info(f"Videos ya existentes omitidos: {skipped}")
-            external_videos = new_videos
+            logger.info("🔍 Verificando duplicados (optimizado)...")
+            external_videos = self._filter_duplicates_optimized(external_videos)
         
         if not external_videos:
-            logger.info("Todos los videos ya están en la base de datos")
+            logger.info("✅ Todos los videos ya están en la base de datos")
             return
         
-        # Importar videos
+        logger.info(f"Videos únicos para importar: {len(external_videos)}")
+        
+        # 🚀 PASO 3: Extracción de metadatos en paralelo
+        logger.info("⚡ Extrayendo metadatos en paralelo...")
+        processed_videos = self._extract_metadata_parallel(external_videos, force)
+        
+        # 🚀 PASO 4: Inserción por lotes optimizada
+        logger.info("💾 Insertando videos por lotes...")
+        imported, errors = self._insert_videos_batch(processed_videos, force)
+        
+        # 📊 Métricas finales
+        end_time = time.time()
+        duration = end_time - start_time
+        
+        logger.info(f"✅ Importación OPTIMIZADA completada en {duration:.2f}s")
+        logger.info(f"   📊 Resultados: {imported} exitosos, {errors} errores")
+        logger.info(f"   ⚡ Throughput: {imported/duration:.1f} videos/segundo")
+        
+        # 🚀 PASO 5: Optimizar BD después de inserción masiva
+        if imported > 50:  # Solo optimizar si se insertaron muchos videos
+            logger.info("🔧 Optimizando base de datos...")
+            try:
+                self.optimize_database()
+                logger.info("✅ Base de datos optimizada")
+            except Exception as e:
+                logger.warning(f"Advertencia optimizando BD: {e}")
+    
+    def _populate_single_file(self, file_path: str, force: bool = False) -> None:
+        """🆕 Importar un archivo específico (funcionalidad existente mantenida)"""
+        logger.info(f"Importando archivo específico: {file_path}")
+        
+        # Extraer información del video específico
+        video_data = external_sources.extract_single_video_info(file_path)
+        
+        if not video_data:
+            logger.error("No se pudo extraer información del archivo")
+            return
+        
+        # Verificar si ya existe en la BD
+        existing = db.get_video_by_path(video_data['file_path'])
+        if existing and not force:
+            logger.info(f"El video ya existe en la BD (ID: {existing['id']})")
+            logger.info(f"Usa --force para forzar actualización")
+            return
+        
+        # Preparar datos para la BD
+        db_data = self._prepare_db_data(video_data)
+        
+        # Obtener metadatos del archivo
+        db_data.update(self._extract_file_metadata(video_data))
+        
+        # Agregar o actualizar en la BD
+        try:
+            if existing and force:
+                # Actualizar registro existente
+                db.update_video(existing['id'], db_data)
+                logger.info(f"✅ Video actualizado: {video_data['file_name']}")
+            else:
+                # Agregar nuevo registro
+                db.add_video(db_data)
+                logger.info(f"✅ Video importado: {video_data['file_name']}")
+            
+            logger.info(f"   Plataforma: {video_data['platform']}")
+            logger.info(f"   Creador: {video_data['creator_name']}")
+            logger.info(f"   Fuente: {video_data['source']}")
+            
+        except Exception as e:
+            logger.error(f"Error importando archivo específico: {e}")
+    
+    def _filter_duplicates_optimized(self, external_videos: List[Dict]) -> List[Dict]:
+        """🚀 OPTIMIZADO: Filtrar duplicados usando consulta SQL directa"""
+        if not external_videos:
+            return []
+        
+        # Extraer rutas de archivos para verificar
+        file_paths = [video['file_path'] for video in external_videos]
+        
+        # 🚀 Consulta SQL optimizada con WHERE IN
+        placeholders = ','.join(['?' for _ in file_paths])
+        query = f"SELECT file_path FROM videos WHERE file_path IN ({placeholders})"
+        
+        with db.get_connection() as conn:
+            cursor = conn.execute(query, file_paths)
+            existing_paths = {row[0] for row in cursor.fetchall()}
+        
+        # Filtrar videos nuevos usando set lookup O(1)
+        new_videos = [v for v in external_videos if v['file_path'] not in existing_paths]
+        skipped = len(external_videos) - len(new_videos)
+        
+        if skipped > 0:
+            logger.info(f"⏭️  Videos ya existentes omitidos: {skipped}")
+        
+        return new_videos
+    
+    def _extract_metadata_parallel(self, external_videos: List[Dict], force: bool = False) -> List[Dict]:
+        """🚀 OPTIMIZADO: Extraer metadatos en paralelo con cache"""
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        
+        # Cache temporal para evitar recálculos
+        metadata_cache = {}
+        
+        def extract_single_metadata(video_data: Dict) -> Dict:
+            """Extraer metadatos de un video individual"""
+            try:
+                file_path = video_data['file_path']
+                
+                # Verificar cache primero
+                if file_path in metadata_cache:
+                    cached_metadata = metadata_cache[file_path]
+                    video_data.update(cached_metadata)
+                    return video_data
+                
+                # Preparar datos base
+                processed_data = self._prepare_db_data(video_data)
+                
+                # Extraer metadatos del archivo
+                file_metadata = self._extract_file_metadata(video_data)
+                processed_data.update(file_metadata)
+                
+                # Guardar en cache
+                metadata_cache[file_path] = file_metadata
+                
+                return processed_data
+                
+            except Exception as e:
+                logger.error(f"Error extrayendo metadatos de {video_data.get('file_name', 'unknown')}: {e}")
+                # Retornar datos básicos si falla la extracción de metadatos
+                return self._prepare_db_data(video_data)
+        
+        # 🚀 Procesamiento en paralelo
+        processed_videos = []
+        max_workers = min(4, len(external_videos))  # Máximo 4 threads para evitar sobrecarga
+        
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # Enviar todas las tareas
+            future_to_video = {
+                executor.submit(extract_single_metadata, video): video 
+                for video in external_videos
+            }
+            
+            # Recopilar resultados conforme se completan
+            for i, future in enumerate(as_completed(future_to_video), 1):
+                try:
+                    processed_video = future.result()
+                    processed_videos.append(processed_video)
+                    
+                    # Mostrar progreso cada 10 videos
+                    if i % 10 == 0 or i == len(external_videos):
+                        logger.info(f"⚡ Metadatos extraídos: {i}/{len(external_videos)} ({i/len(external_videos)*100:.1f}%)")
+                        
+                except Exception as e:
+                    video = future_to_video[future]
+                    logger.error(f"Error procesando {video.get('file_name', 'unknown')}: {e}")
+        
+        logger.info(f"✅ Metadatos extraídos para {len(processed_videos)} videos")
+        return processed_videos
+    
+    def _insert_videos_batch(self, processed_videos: List[Dict], force: bool = False) -> Tuple[int, int]:
+        """🚀 OPTIMIZADO: Inserción por lotes con transacciones"""
+        if not processed_videos:
+            return 0, 0
+        
+        batch_size = 50  # Insertar en lotes de 50
         imported = 0
         errors = 0
         
-        for video_data in external_videos:
-            try:
-                # Preparar datos para la BD
-                db_data = {
-                    'file_path': video_data['file_path'],
-                    'file_name': video_data['file_name'],
-                    'creator_name': video_data['creator_name'],
-                    'platform': video_data['platform'],
-                    'processing_status': 'pendiente'
-                }
-                
-                # Agregar información adicional si está disponible
-                if 'title' in video_data:
-                    # Solo mapear a description, que es el campo principal para títulos
-                    db_data['description'] = video_data['title']
-                
-                # Obtener tamaño del archivo y duración si es video
-                file_path = Path(video_data['file_path'])
-                if file_path.exists():
-                    db_data['file_size'] = file_path.stat().st_size
-                    
-                    # Si es video, intentar obtener duración
-                    if video_data.get('content_type', 'video') == 'video':
-                        try:
-                            from src.video_processor import video_processor
-                            metadata = video_processor.extract_metadata(file_path)
-                            if 'duration_seconds' in metadata:
-                                db_data['duration_seconds'] = metadata['duration_seconds']
-                        except Exception as e:
-                            logger.warning(f"No se pudo obtener duración de {file_path.name}: {e}")
-                
-                # Agregar a la BD
-                if force:
-                    # Si forzamos, verificar si existe y actualizar o insertar
-                    existing = db.get_video_by_path(video_data['file_path'])
-                    if existing:
-                        db.update_video(existing['id'], db_data)
-                        logger.debug(f"Actualizado: {video_data['file_name']}")
-                    else:
-                        db.add_video(db_data)
-                        logger.debug(f"Agregado: {video_data['file_name']}")
-                else:
-                    db.add_video(db_data)
-                    logger.debug(f"Importado: {video_data['file_name']}")
-                
-                imported += 1
-                
-            except Exception as e:
-                logger.error(f"Error importando {video_data['file_name']}: {e}")
-                errors += 1
+        # Separar videos para insertar vs actualizar si force=True
+        videos_to_insert = []
+        videos_to_update = []
         
-        logger.info(f"✅ Importación completada: {imported} exitosos, {errors} errores")
+        if force:
+            # Si force=True, necesitamos verificar cuáles existen para actualizar
+            file_paths = [v['file_path'] for v in processed_videos]
+            placeholders = ','.join(['?' for _ in file_paths])
+            query = f"SELECT id, file_path FROM videos WHERE file_path IN ({placeholders})"
+            
+            with db.get_connection() as conn:
+                cursor = conn.execute(query, file_paths)
+                existing_videos = {row[1]: row[0] for row in cursor.fetchall()}  # path -> id
+            
+            for video in processed_videos:
+                if video['file_path'] in existing_videos:
+                    video['existing_id'] = existing_videos[video['file_path']]
+                    videos_to_update.append(video)
+                else:
+                    videos_to_insert.append(video)
+        else:
+            videos_to_insert = processed_videos
+        
+        # 🚀 Inserción por lotes para videos nuevos
+        if videos_to_insert:
+            logger.info(f"💾 Insertando {len(videos_to_insert)} videos nuevos en lotes...")
+            
+            for i in range(0, len(videos_to_insert), batch_size):
+                batch = videos_to_insert[i:i + batch_size]
+                
+                try:
+                    with db.get_connection() as conn:
+                        # Preparar datos para executemany
+                        insert_data = []
+                        for video in batch:
+                            insert_row = (
+                                video['file_path'],
+                                video['file_name'], 
+                                video['creator_name'],
+                                video.get('platform', 'tiktok'),
+                                video.get('file_size'),
+                                video.get('duration_seconds'),
+                                video.get('detected_music'),
+                                video.get('detected_music_artist'),
+                                video.get('detected_music_confidence'),
+                                json.dumps(video.get('detected_characters', [])),
+                                video.get('music_source'),
+                                video.get('processing_status', 'pendiente'),
+                                video.get('description')
+                            )
+                            insert_data.append(insert_row)
+                        
+                        # 🚀 Inserción por lotes usando executemany
+                        conn.executemany('''
+                            INSERT INTO videos (
+                                file_path, file_name, creator_name, platform, file_size, duration_seconds,
+                                detected_music, detected_music_artist, detected_music_confidence,
+                                detected_characters, music_source, processing_status, description
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        ''', insert_data)
+                        
+                        imported += len(batch)
+                        logger.info(f"✅ Lote insertado: {len(batch)} videos (total: {imported})")
+                        
+                except Exception as e:
+                    logger.error(f"Error insertando lote {i//batch_size + 1}: {e}")
+                    errors += len(batch)
+        
+        # 🚀 Actualización por lotes para videos existentes (si force=True)
+        if videos_to_update:
+            logger.info(f"🔄 Actualizando {len(videos_to_update)} videos existentes...")
+            
+            for video in videos_to_update:
+                try:
+                    # Remover 'existing_id' antes de actualizar
+                    existing_id = video.pop('existing_id')
+                    db.update_video(existing_id, video)
+                    imported += 1
+                    
+                    if imported % 20 == 0:  # Progreso cada 20 actualizaciones
+                        logger.info(f"🔄 Actualizados: {imported - len(videos_to_insert)}")
+                        
+                except Exception as e:
+                    logger.error(f"Error actualizando video {video.get('file_name', 'unknown')}: {e}")
+                    errors += 1
+        
+        return imported, errors
+    
+    def _prepare_db_data(self, video_data: Dict) -> Dict:
+        """🔧 Preparar datos básicos para la BD"""
+        db_data = {
+            'file_path': video_data['file_path'],
+            'file_name': video_data['file_name'],
+            'creator_name': video_data['creator_name'],
+            'platform': video_data['platform'],
+            'processing_status': 'pendiente'
+        }
+        
+        # Agregar información adicional si está disponible
+        if 'title' in video_data:
+            db_data['description'] = video_data['title']
+        
+        return db_data
+    
+    def _extract_file_metadata(self, video_data: Dict) -> Dict:
+        """🔧 Extraer metadatos del archivo (tamaño, duración)"""
+        metadata = {}
+        
+        file_path = Path(video_data['file_path'])
+        if not file_path.exists():
+            return metadata
+        
+        try:
+            # Tamaño del archivo
+            metadata['file_size'] = file_path.stat().st_size
+            
+            # Duración si es video
+            if video_data.get('content_type', 'video') == 'video':
+                try:
+                    from src.video_processor import video_processor
+                    file_metadata = video_processor.extract_metadata(file_path)
+                    if 'duration_seconds' in file_metadata:
+                        metadata['duration_seconds'] = file_metadata['duration_seconds']
+                except Exception as e:
+                    logger.debug(f"No se pudo obtener duración de {file_path.name}: {e}")
+            
+        except Exception as e:
+            logger.warning(f"Error extrayendo metadatos de {file_path.name}: {e}")
+        
+        return metadata
         
     def clear_database(self, platform=None, force=False):
         """

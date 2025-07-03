@@ -45,7 +45,6 @@ class DatabaseManager:
                     
                     -- Información del contenido
                     description TEXT,  -- Título/descripción del video
-                    title TEXT,        -- Título alternativo
                     
                     -- Creador (desde 4K Downloader + manual)
                     creator_name TEXT NOT NULL,
