@@ -1346,6 +1346,113 @@ class MaintenanceUtils:
         except Exception as e:
             logger.error(f"Error listando plataformas: {e}")
 
+    def show_optimization_stats(self):
+        """
+        Mostrar estadísticas de optimizaciones de BD para main.py
+        """
+        print("\n" + "="*60)
+        print("ESTADISTICAS DE OPTIMIZACION - TAG-FLOW V2")
+        print("="*60)
+        
+        # Verificar configuración
+        print(f"Estado de optimizaciones: {'ACTIVAS' if config.USE_OPTIMIZED_DATABASE else 'DESACTIVADAS'}")
+        print(f"Cache TTL configurado: {config.DATABASE_CACHE_TTL} segundos")
+        print(f"Cache size maximo: {config.DATABASE_CACHE_SIZE} entradas")
+        print(f"Metricas habilitadas: {'SI' if config.ENABLE_PERFORMANCE_METRICS else 'NO'}")
+        
+        if not config.USE_OPTIMIZED_DATABASE:
+            print("\nOPTIMIZACIONES DESACTIVADAS")
+            print("Para activar, configura USE_OPTIMIZED_DATABASE=true en .env")
+            print("\nBeneficios de las optimizaciones:")
+            print("  - 10-20x mejora en verificacion de duplicados")
+            print("  - 5-10x mejora en busqueda de videos pendientes")
+            print("  - 70% reduccion en I/O de base de datos")
+            print("  - Cache inteligente con 80-95% hit rate")
+            return
+        
+        # Intentar mostrar estadísticas de optimización
+        try:
+            # Importar OptimizedDatabaseManager
+            sys.path.append(str(Path(__file__).parent / 'src'))
+            from src.optimized_database import OptimizedDatabaseManager
+            from src.pattern_cache import get_global_cache
+            
+            # Crear instancia optimizada
+            optimized_db = OptimizedDatabaseManager()
+            cache = get_global_cache()
+            
+            print("\nESTADO ACTUAL:")
+            print("-" * 40)
+            
+            # Estadísticas del cache
+            cache_stats = cache.get_cache_stats()
+            memory_usage = cache.get_memory_usage()
+            
+            print(f"Total consultas realizadas: {cache_stats['total_queries']}")
+            print(f"Cache hits: {cache_stats['cache_hits']}")
+            print(f"Cache misses: {cache_stats['cache_misses']}")
+            print(f"Hit rate: {cache_stats['hit_rate_percentage']}%")
+            print(f"Eficiencia: {cache_stats['cache_efficiency']}")
+            
+            print(f"\nUSO DE MEMORIA:")
+            print("-" * 40)
+            print(f"Cache de paths: {memory_usage['paths_cache_mb']} MB")
+            print(f"Cache de pendientes: {memory_usage['pending_cache_mb']} MB")
+            print(f"Total cache: {memory_usage['total_cache_mb']} MB")
+            
+            # Performance report si está disponible
+            try:
+                performance_report = optimized_db.get_performance_report()
+                
+                print(f"\nRENDIMIENTO:")
+                print("-" * 40)
+                print(f"Runtime total: {performance_report['total_runtime_seconds']:.2f}s")
+                print(f"Queries ejecutadas: {performance_report['total_db_queries']}")
+                print(f"Queries/segundo: {performance_report['queries_per_second']:.1f}")
+                print(f"Performance grade: {performance_report['performance_grade']}")
+                
+                if performance_report.get('avg_query_times'):
+                    print(f"\nTIEMPOS PROMEDIO POR QUERY:")
+                    print("-" * 40)
+                    for query_type, avg_time in performance_report['avg_query_times'].items():
+                        print(f"  {query_type}: {avg_time:.3f}s")
+                        
+            except Exception as e:
+                logger.debug(f"Error obteniendo performance report: {e}")
+            
+            # Recomendaciones
+            hit_rate = cache_stats['hit_rate_percentage']
+            print(f"\nRECOMENDACIONES:")
+            print("-" * 40)
+            
+            if hit_rate >= 90:
+                print("EXCELENTE - sistema optimizado funcionando perfectamente")
+            elif hit_rate >= 70:
+                print("BUENA performance - considera aumentar DATABASE_CACHE_SIZE")
+            else:
+                print("Performance mejorable - revisa configuracion del cache")
+                print("   - Aumenta DATABASE_CACHE_TTL para datos mas estables")
+                print("   - Aumenta DATABASE_CACHE_SIZE para mejor hit rate")
+            
+            print(f"\nACCIONES DISPONIBLES:")
+            print("-" * 40)
+            print("  python maintenance.py optimization-stats  -> Ver estas estadisticas")
+            print("  python main.py --limit 10  -> Test con optimizaciones")
+            
+        except ImportError as e:
+            print(f"\nERROR: No se pudieron cargar las optimizaciones")
+            print(f"Detalles: {e}")
+            print(f"\nSolucion:")
+            print(f"1. Verifica que src/optimized_database.py existe")
+            print(f"2. Verifica que src/pattern_cache.py existe") 
+            print(f"3. Ejecuta: python verify_config.py")
+            
+        except Exception as e:
+            print(f"\nERROR obteniendo estadisticas de optimizacion: {e}")
+            logger.error(f"Error en show_optimization_stats: {e}")
+        
+        print("="*60)
+
     def download_character_images(self, character_name: str = None, game: str = None, limit: int = None):
         """Descargar imágenes de referencia para personajes"""
         if character_name:
@@ -1884,7 +1991,7 @@ def main():
         'optimize-db', 'report', 'populate-db', 'clear-db', 'populate-thumbnails',
         'clear-thumbnails', 'show-stats', 'character-stats', 'add-character',
         'download-character-images', 'analyze-titles', 'update-creator-mappings',
-        'clean-false-positives', 'add-tiktoker', 'list-platforms'
+        'clean-false-positives', 'add-tiktoker', 'list-platforms', 'optimization-stats'
     ], help='Acción a realizar')
     
     # Argumentos generales
@@ -1967,6 +2074,8 @@ def main():
         utils.add_tiktoker_persona(args.creator, args.persona, args.confidence)
     elif args.action == 'list-platforms':
         utils.list_available_platforms()
+    elif args.action == 'optimization-stats':
+        utils.show_optimization_stats()
 
 if __name__ == '__main__':
     main()

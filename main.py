@@ -819,8 +819,35 @@ Notas:
     print()
     
     try:
-        analyzer = VideoAnalyzer()
+        # ✅ OPTIMIZACIONES: Usar VideoAnalyzer optimizado si está configurado
+        if config.USE_OPTIMIZED_DATABASE:
+            try:
+                # Intentar importar y usar OptimizedVideoAnalyzer
+                sys.path.append(str(Path(__file__).parent / 'src'))
+                from optimized_video_analyzer import OptimizedVideoAnalyzer
+                analyzer = OptimizedVideoAnalyzer()
+                logger.info("🚀 Usando VideoAnalyzer OPTIMIZADO")
+            except Exception as e:
+                logger.warning(f"⚠️ Error cargando optimizaciones, fallback a estándar: {e}")
+                analyzer = VideoAnalyzer()
+                logger.info("📊 Usando VideoAnalyzer ESTÁNDAR (fallback)")
+        else:
+            analyzer = VideoAnalyzer()
+            logger.info("📊 Usando VideoAnalyzer ESTÁNDAR (configuración)")
+        
         analyzer.run(limit=args.limit, platform=args.platform, source=args.source)
+        
+        # ✅ MÉTRICAS: Log de performance si están disponibles
+        if config.USE_OPTIMIZED_DATABASE and hasattr(analyzer, 'get_performance_report'):
+            try:
+                performance_report = analyzer.get_performance_report()
+                if performance_report.get('optimization_status') == 'ACTIVE':
+                    logger.info("📊 MÉTRICAS DE OPTIMIZACIÓN:")
+                    logger.info(f"  💾 Cache hit rate: {performance_report['cache_stats']['hit_rate_percentage']}%")
+                    logger.info(f"  ⚡ Queries/segundo: {performance_report['queries_per_second']:.1f}")
+                    logger.info(f"  🏆 Performance grade: {performance_report['performance_grade']}")
+            except Exception as e:
+                logger.debug(f"Error mostrando métricas: {e}")
         
         print()
         print("=" * 60)

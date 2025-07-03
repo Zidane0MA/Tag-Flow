@@ -70,6 +70,12 @@ class Config:
     ACRCLOUD_ACCESS_KEY = os.getenv('ACRCLOUD_ACCESS_KEY')
     ACRCLOUD_ACCESS_SECRET = os.getenv('ACRCLOUD_ACCESS_SECRET')
     
+    # 🆕 CONFIGURACIÓN DE OPTIMIZACIONES DE BD PARA MAIN.PY
+    USE_OPTIMIZED_DATABASE = os.getenv('USE_OPTIMIZED_DATABASE', 'true').lower() == 'true'
+    DATABASE_CACHE_TTL = int(os.getenv('DATABASE_CACHE_TTL', '300'))  # 5 minutos
+    DATABASE_CACHE_SIZE = int(os.getenv('DATABASE_CACHE_SIZE', '1000'))
+    ENABLE_PERFORMANCE_METRICS = os.getenv('ENABLE_PERFORMANCE_METRICS', 'true').lower() == 'true'
+    
     @classmethod
     def ensure_directories(cls):
         """Crear directorios necesarios si no existen"""

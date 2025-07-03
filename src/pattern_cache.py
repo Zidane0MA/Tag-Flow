@@ -1,218 +1,162 @@
 """
-Tag-Flow V2 - Pattern Cache
-Cache inteligente LRU para resultados de detección con métricas avanzadas
+Tag-Flow V2 - Cache LRU Inteligente para Optimizaciones de BD
+Sistema de cache para mejorar rendimiento de consultas frecuentes en main.py
 """
 
-import hashlib
 import time
-from typing import Any, Callable, Dict, Optional, List, Tuple
-from collections import OrderedDict
+from typing import Set, List, Dict, Optional, Any
+from functools import lru_cache
+import logging
 
-class PatternCache:
-    """Cache LRU optimizado para resultados de detección"""
+logger = logging.getLogger(__name__)
+
+class DatabaseCache:
+    """Cache LRU para consultas frecuentes de main.py con gestión automática"""
     
-    def __init__(self, max_size: int = 1000):
-        self.cache = OrderedDict()
+    def __init__(self, max_size=1000, ttl_seconds=300):
         self.max_size = max_size
+        self.ttl_seconds = ttl_seconds
         
-        # Estadísticas de rendimiento
-        self.hit_count = 0
-        self.miss_count = 0
-        self.total_computation_time = 0.0
-        self.total_cache_time = 0.0
+        # Cache de paths existentes
+        self.path_cache = None
+        self.path_cache_time = 0
         
-        # Métricas de eficiencia
-        self.cache_sizes_history = []
-        self.hit_rates_history = []
-    
-    def get_or_compute(self, key: str, compute_func: Callable, *args, **kwargs) -> Any:
-        """Obtener del cache o computar y cachear"""
-        cache_key = self._generate_cache_key(key, args, kwargs)
+        # Cache de videos pendientes por filtro
+        self.pending_cache = {}
+        
+        # Cache de estadísticas
+        self.stats_cache = None
+        self.stats_cache_time = 0
+        
+        # Métricas de rendimiento
+        self.cache_hits = 0
+        self.cache_misses = 0
+        self.total_queries = 0
+        
+        logger.debug("DatabaseCache inicializado con configuración enterprise")
+        
+    def get_existing_paths(self, db_manager) -> Set[str]:
+        """✅ Cache de paths existentes con TTL automático"""
+        current_time = time.time()
+        
+        # Verificar si cache es válido
+        if (self.path_cache is None or 
+            current_time - self.path_cache_time > self.ttl_seconds):
+            
+            # Cache miss - actualizar
+            self.path_cache = db_manager.get_existing_paths_only()
+            self.path_cache_time = current_time
+            self.cache_misses += 1
+            
+            logger.debug(f"🔄 Cache MISS - paths actualizados: {len(self.path_cache)} paths")
+        else:
+            # Cache hit
+            self.cache_hits += 1
+            logger.debug(f"💾 Cache HIT - paths: {len(self.path_cache)} paths")
+        
+        self.total_queries += 1
+        return self.path_cache
+        
+    def get_pending_videos_cached(self, cache_key: str, db_manager, platform_filter: str, source_filter: str, limit: int) -> List[Dict]:
+        """✅ Cache de videos pendientes con gestión inteligente"""
+        current_time = time.time()
         
         # Verificar cache
-        start_time = time.time()
-        if cache_key in self.cache:
-            # Cache hit - mover al final (más reciente)
-            result = self.cache.pop(cache_key)
-            self.cache[cache_key] = result
-            
-            self.hit_count += 1
-            self.total_cache_time += time.time() - start_time
-            
-            return result
+        if cache_key in self.pending_cache:
+            cached_data, cache_time = self.pending_cache[cache_key]
+            if current_time - cache_time < self.ttl_seconds:
+                self.cache_hits += 1
+                self.total_queries += 1
+                logger.debug(f"💾 Cache HIT para pendientes: {cache_key}")
+                return cached_data
         
-        # Cache miss - computar resultado
-        self.miss_count += 1
+        # Cache miss - actualizar
+        pending_videos = db_manager.get_pending_videos_filtered(platform_filter, source_filter, limit)
+        self.pending_cache[cache_key] = (pending_videos, current_time)
         
-        compute_start = time.time()
-        result = compute_func(*args, **kwargs)
-        computation_time = time.time() - compute_start
+        # Limpiar cache si es muy grande
+        if len(self.pending_cache) > self.max_size:
+            oldest_key = min(self.pending_cache.keys(), 
+                           key=lambda k: self.pending_cache[k][1])
+            del self.pending_cache[oldest_key]
+            logger.debug(f"🗑️ Cache pendientes limpiado (tamaño máximo alcanzado)")
         
-        self.total_computation_time += computation_time
+        self.cache_misses += 1
+        self.total_queries += 1
+        logger.debug(f"🔄 Cache MISS para pendientes: {cache_key}, {len(pending_videos)} videos")
+        return pending_videos
         
-        # Almacenar en cache
-        self._store_in_cache(cache_key, result)
+    def invalidate_paths(self):
+        """✅ Invalidar cache de paths cuando se modifica BD"""
+        self.path_cache = None
+        self.path_cache_time = 0
+        logger.debug("🗑️ Cache de paths invalidado")
         
-        return result
-    
-    def _generate_cache_key(self, key: str, args: Tuple, kwargs: Dict) -> str:
-        """Generar clave única para cache"""
-        # Combinar key, args y kwargs en un hash único
-        combined = f"{key}_{str(args)}_{str(sorted(kwargs.items()))}"
-        return hashlib.md5(combined.encode()).hexdigest()
-    
-    def _store_in_cache(self, cache_key: str, result: Any):
-        """Almacenar resultado en cache con gestión LRU"""
-        # Si cache está lleno, remover el más antiguo (LRU)
-        if len(self.cache) >= self.max_size:
-            # Remover 10% de entradas más antiguas para evitar thrashing
-            remove_count = max(1, self.max_size // 10)
-            for _ in range(remove_count):
-                if self.cache:
-                    self.cache.popitem(last=False)  # Remover el más antiguo
+    def invalidate_pending(self):
+        """✅ Invalidar cache de pendientes cuando cambia estado"""
+        self.pending_cache.clear()
+        logger.debug("🗑️ Cache de pendientes invalidado")
         
-        self.cache[cache_key] = result
-    
-    def invalidate(self, pattern: str = None):
-        """Invalidar cache completo o por patrón"""
-        if pattern is None:
-            self.cache.clear()
-        else:
-            # Remover entradas que coincidan con el patrón
-            keys_to_remove = [key for key in self.cache.keys() if pattern in key]
-            for key in keys_to_remove:
-                del self.cache[key]
-    
-    def get_stats(self) -> Dict:
-        """Obtener estadísticas completas del cache"""
-        total_requests = self.hit_count + self.miss_count
-        hit_rate = (self.hit_count / total_requests * 100) if total_requests > 0 else 0
+    def invalidate_all(self):
+        """✅ Invalidar todo el cache"""
+        self.invalidate_paths()
+        self.invalidate_pending()
+        self.stats_cache = None
+        self.stats_cache_time = 0
+        logger.debug("🗑️ Cache completo invalidado")
         
-        # Calcular tiempo promedio ahorrado por cache hit
-        avg_computation_time = (
-            self.total_computation_time / self.miss_count 
-            if self.miss_count > 0 else 0
-        )
-        avg_cache_time = (
-            self.total_cache_time / self.hit_count 
-            if self.hit_count > 0 else 0
-        )
-        
-        time_saved = self.hit_count * (avg_computation_time - avg_cache_time)
+    def get_cache_stats(self) -> Dict:
+        """✅ Estadísticas de rendimiento del cache"""
+        hit_rate = (self.cache_hits / max(1, self.total_queries)) * 100
         
         return {
-            "size": len(self.cache),
-            "max_size": self.max_size,
-            "utilization": len(self.cache) / self.max_size * 100,
-            "hit_count": self.hit_count,
-            "miss_count": self.miss_count,
-            "total_requests": total_requests,
-            "hit_rate": round(hit_rate, 2),
-            "avg_computation_time_ms": round(avg_computation_time * 1000, 2),
-            "avg_cache_time_ms": round(avg_cache_time * 1000, 2),
-            "total_time_saved_ms": round(time_saved * 1000, 2),
-            "efficiency_score": self._calculate_efficiency_score()
+            'total_queries': self.total_queries,
+            'cache_hits': self.cache_hits,
+            'cache_misses': self.cache_misses,
+            'hit_rate_percentage': round(hit_rate, 1),
+            'paths_cached': self.path_cache is not None,
+            'pending_cache_size': len(self.pending_cache),
+            'paths_cache_age_seconds': time.time() - self.path_cache_time if self.path_cache else 0,
+            'cache_efficiency': 'EXCELLENT' if hit_rate > 90 else 'GOOD' if hit_rate > 70 else 'NEEDS_IMPROVEMENT'
         }
-    
-    def _calculate_efficiency_score(self) -> float:
-        """Calcular score de eficiencia del cache (0-100)"""
-        if self.hit_count + self.miss_count == 0:
-            return 0.0
-        
-        hit_rate = self.hit_count / (self.hit_count + self.miss_count)
-        utilization = len(self.cache) / self.max_size
-        
-        # Score basado en hit rate (70%) y utilización óptima (30%)
-        # Utilización óptima está entre 70-90%
-        optimal_utilization = 1.0 if 0.7 <= utilization <= 0.9 else (
-            0.8 if utilization < 0.7 else max(0.2, 1.0 - (utilization - 0.9) * 2)
-        )
-        
-        return round((hit_rate * 0.7 + optimal_utilization * 0.3) * 100, 1)
-    
-    def optimize_size(self, target_hit_rate: float = 0.85):
-        """Optimizar tamaño del cache para alcanzar hit rate objetivo"""
-        current_hit_rate = self.hit_count / (self.hit_count + self.miss_count) if (self.hit_count + self.miss_count) > 0 else 0
-        
-        if current_hit_rate < target_hit_rate:
-            # Aumentar tamaño del cache
-            new_size = min(self.max_size * 1.5, 2000)  # Máximo 2000 entradas
-            self.max_size = int(new_size)
-        elif current_hit_rate > target_hit_rate + 0.1 and len(self.cache) < self.max_size * 0.5:
-            # Reducir tamaño si está muy subutilizado
-            new_size = max(self.max_size * 0.8, 100)  # Mínimo 100 entradas
-            self.max_size = int(new_size)
-            
-            # Recortar cache si es necesario
-            while len(self.cache) > self.max_size:
-                self.cache.popitem(last=False)
     
     def get_memory_usage(self) -> Dict:
-        """Estimar uso de memoria del cache"""
+        """✅ Estimación de uso de memoria del cache"""
         import sys
         
-        total_size = 0
-        for key, value in self.cache.items():
-            total_size += sys.getsizeof(key) + sys.getsizeof(value)
+        paths_memory = sys.getsizeof(self.path_cache) if self.path_cache else 0
+        pending_memory = sum(sys.getsizeof(data[0]) for data in self.pending_cache.values())
         
         return {
-            "total_bytes": total_size,
-            "total_kb": round(total_size / 1024, 2),
-            "total_mb": round(total_size / (1024 * 1024), 2),
-            "avg_entry_bytes": round(total_size / len(self.cache), 2) if self.cache else 0,
-            "entries": len(self.cache)
+            'paths_cache_mb': round(paths_memory / (1024*1024), 2),
+            'pending_cache_mb': round(pending_memory / (1024*1024), 2),
+            'total_cache_mb': round((paths_memory + pending_memory) / (1024*1024), 2)
         }
     
-    def export_analytics(self) -> Dict:
-        """Exportar analytics completos para análisis"""
-        stats = self.get_stats()
-        memory = self.get_memory_usage()
+    def clear_detection_cache(self):
+        """✅ Limpiar cache para forzar actualización"""
+        self.invalidate_all()
         
-        return {
-            "timestamp": time.time(),
-            "performance": stats,
-            "memory": memory,
-            "configuration": {
-                "max_size": self.max_size,
-                "current_size": len(self.cache)
-            },
-            "recommendations": self._generate_recommendations()
-        }
-    
-    def _generate_recommendations(self) -> List[str]:
-        """Generar recomendaciones para optimización"""
-        recommendations = []
-        stats = self.get_stats()
+        # Reset métricas
+        self.cache_hits = 0
+        self.cache_misses = 0
+        self.total_queries = 0
         
-        if stats["hit_rate"] < 50:
-            recommendations.append("Hit rate bajo - considera aumentar tamaño del cache")
-        
-        if stats["utilization"] > 95:
-            recommendations.append("Cache casi lleno - considera aumentar max_size")
-        
-        if stats["utilization"] < 30 and len(self.cache) > 100:
-            recommendations.append("Cache subutilizado - considera reducir max_size")
-        
-        if stats["efficiency_score"] < 60:
-            recommendations.append("Eficiencia baja - revisa patrones de acceso")
-        
-        if not recommendations:
-            recommendations.append("Cache funcionando óptimamente")
-        
-        return recommendations
+        logger.info("🔄 Cache de detección limpiado completamente")
 
-# Cache global para uso en el sistema
-_global_pattern_cache = None
 
-def get_global_cache(max_size: int = 1000) -> PatternCache:
+# Instancia global del cache para usar en toda la aplicación
+_global_cache = None
+
+def get_global_cache() -> DatabaseCache:
     """Obtener instancia global del cache"""
-    global _global_pattern_cache
-    if _global_pattern_cache is None:
-        _global_pattern_cache = PatternCache(max_size)
-    return _global_pattern_cache
+    global _global_cache
+    if _global_cache is None:
+        _global_cache = DatabaseCache()
+    return _global_cache
 
 def clear_global_cache():
     """Limpiar cache global"""
-    global _global_pattern_cache
-    if _global_pattern_cache:
-        _global_pattern_cache.invalidate()
+    global _global_cache
+    if _global_cache:
+        _global_cache.clear_detection_cache()

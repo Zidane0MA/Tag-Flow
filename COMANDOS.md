@@ -153,6 +153,58 @@ TikToker Personas configurados:
 Sistema listo para procesamiento optimizado de videos!
 ```
 
+#### `optimization-stats` - 🆕 Estadísticas de Optimizaciones de Base de Datos
+```bash
+python maintenance.py optimization-stats
+```
+**Funcionalidad:**
+- **Muestra el estado** de las optimizaciones de main.py (activas/inactivas)
+- **Estadísticas del cache LRU** (hit rate, memoria utilizada, eficiencia)
+- **Métricas de rendimiento** en tiempo real (queries/segundo, tiempos promedio)
+- **Recomendaciones automáticas** para mejorar el performance
+- **Configuración actual** del sistema optimizado
+
+**Output de Ejemplo:**
+```
+ESTADISTICAS DE OPTIMIZACION - TAG-FLOW V2
+============================================================
+Estado de optimizaciones: ACTIVAS
+Cache TTL configurado: 300 segundos
+Cache size maximo: 1000 entradas
+Metricas habilitadas: SI
+
+ESTADO ACTUAL:
+----------------------------------------
+Total consultas realizadas: 45
+Cache hits: 42
+Cache misses: 3
+Hit rate: 93.3%
+Eficiencia: EXCELLENT
+
+USO DE MEMORIA:
+----------------------------------------
+Cache de paths: 0.2 MB
+Cache de pendientes: 0.1 MB
+Total cache: 0.3 MB
+
+RENDIMIENTO:
+----------------------------------------
+Runtime total: 12.34s
+Queries ejecutadas: 8
+Queries/segundo: 0.6
+Performance grade: A (VERY_GOOD)
+
+RECOMENDACIONES:
+----------------------------------------
+EXCELENTE - sistema optimizado funcionando perfectamente
+
+ACCIONES DISPONIBLES:
+----------------------------------------
+  python maintenance.py optimization-stats  -> Ver estas estadisticas
+  python main.py --limit 10  -> Test con optimizaciones
+============================================================
+```
+
 #### `list-platforms` - 🆕 Listar Plataformas Disponibles (ESCALABLE)
 ```bash
 python maintenance.py list-platforms
@@ -689,13 +741,16 @@ python maintenance.py verify
 # 3. Optimizar bases de datos y cache
 python maintenance.py optimize-db
 
-# 4. Análisis masivo de títulos pendientes
+# 4. Verificar métricas de optimizaciones
+python maintenance.py optimization-stats
+
+# 5. Análisis masivo de títulos pendientes
 python maintenance.py analyze-titles --limit 10000  # 10,000 títulos en ~80 segundos
 
-# 5. Limpiar thumbnails huérfanos
+# 6. Limpiar thumbnails huérfanos
 python maintenance.py clean-thumbnails --force
 
-# 6. Generar reporte enterprise completo
+# 7. Generar reporte enterprise completo
 python maintenance.py report
 ```
 
@@ -814,6 +869,9 @@ python maintenance.py show-stats
 
 # Estadísticas específicas del sistema optimizado
 python maintenance.py character-stats
+
+# Estadísticas de optimizaciones de base de datos
+python maintenance.py optimization-stats
 
 # Generar reporte enterprise completo
 python maintenance.py report
@@ -972,6 +1030,7 @@ python quickstart.py                           # Configuración automática ente
 python maintenance.py list-platforms           # 🆕 Ver todas las plataformas disponibles
 python maintenance.py show-stats               # Ver estadísticas de fuentes
 python maintenance.py character-stats          # Ver sistema optimizado
+python maintenance.py optimization-stats       # Ver métricas de optimizaciones
 ```
 
 ### **Uso Diario Enterprise Escalable**
@@ -990,6 +1049,7 @@ python main.py --platform all-platforms --limit 50  # 🆕 50 videos de todas la
 python maintenance.py populate-db --platform all-platforms --limit 200  # 🆕 Poblar todas
 python maintenance.py analyze-titles --limit 5000   # 5000 títulos en ~40 segundos
 python maintenance.py character-stats               # Verificar métricas enterprise
+python maintenance.py optimization-stats            # Verificar optimizaciones BD
 ```
 
 ### **🆕 Gestión de Plataformas Enterprise**
