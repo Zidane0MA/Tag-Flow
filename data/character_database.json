@@ -4613,7 +4613,8 @@
         "priority": 1,
         "variants": {
           "exact": [
-            "Cipher"
+            "Cipher",
+            "Cifera"
           ],
           "native": [
             "サフェル",

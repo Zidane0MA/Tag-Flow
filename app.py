@@ -371,6 +371,9 @@ def api_update_video(video_id):
         updates = {}
         for field, value in data.items():
             if field in allowed_fields:
+                # Ignorar difficulty_level si es vacío o None
+                if field == 'difficulty_level' and (value is None or value == ''):
+                    continue
                 # Procesar listas/arrays especialmente
                 if field == 'final_characters' and isinstance(value, list):
                     import json

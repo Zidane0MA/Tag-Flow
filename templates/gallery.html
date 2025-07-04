@@ -278,9 +278,9 @@
                         <small>
                             {% set characters = video.final_characters or video.detected_characters %}
                             {% if characters %}
-                                {{ characters[:2] | join(', ') }}
-                                {% if characters | length > 2 %}
-                                    <span class="text-muted">+{{ characters | length - 2 }} más</span>
+                                {{ characters[:4] | join(', ') }}
+                                {% if characters | length > 4 %}
+                                    <span class="text-muted">+{{ characters | length - 4 }} más</span>
                                 {% endif %}
                             {% else %}
                                 <span class="text-muted">Sin personajes</span>
@@ -747,6 +747,6 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('static', filename='js/gallery.js') }}"></script>
+<script src="{{ url_for('static', filename='js/gallery.js') }}?v={{ (range(1)|random) }}"></script>
 <script src="{{ url_for('static', filename='js/shorts.js') }}"></script>
 {% endblock %}

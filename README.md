@@ -217,14 +217,19 @@ Tag-Flow-V2/
 ├── 🧠 CÓDIGO FUENTE OPTIMIZADO
 │   └── src/
 │       ├── database.py             # Gestión SQLite optimizada
-│       ├── external_sources.py     # Integración fuentes múltiples
-│       ├── character_intelligence.py # 🆕 Sistema híbrido optimizado
-│       ├── optimized_detector.py   # 🆕 Detector avanzado enterprise
-│       ├── pattern_cache.py        # 🆕 Cache LRU inteligente
-│       ├── video_processor.py      # Procesamiento de videos
-│       ├── music_recognition.py    # APIs musicales híbridas
-│       ├── face_recognition.py     # Reconocimiento facial mejorado
-│       └── thumbnail_generator.py  # Generación automática
+│       ├── __init__.py                # Inicialización del paquete src
+│       ├── database.py                # Gestión SQLite optimizada
+│       ├── external_sources.py        # Integración fuentes múltiples
+│       ├── character_intelligence.py  # 🆕 Sistema híbrido optimizado
+│       ├── optimized_detector.py      # 🆕 Detector avanzado enterprise
+│       ├── pattern_cache.py           # 🆕 Cache LRU inteligente
+│       ├── video_processor.py         # Procesamiento de videos
+│       ├── music_recognition.py       # APIs musicales híbridas
+│       ├── face_recognition.py        # Reconocimiento facial mejorado
+│       ├── thumbnail_generator.py     # Generación automática
+│       ├── optimized_database.py      # Consultas de BD ultra-rápidas
+│       ├── optimized_video_analyzer.py # Analizador de videos optimizado
+│       └── downloader_integration.py  # Integración con 4K Video Downloader
 │
 ├── 🌐 INTERFAZ WEB MEJORADA
 │   ├── templates/                  # HTML templates responsivos

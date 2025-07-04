@@ -196,47 +196,247 @@ class MaintenanceUtils:
         return issues
     
     def regenerate_thumbnails(self, force=False):
-        """Regenerar todos los thumbnails"""
-        logger.info("Regenerando thumbnails...")
+        """
+        🚀 OPTIMIZADO: Regeneración selectiva de thumbnails con procesamiento paralelo
         
-        from src.thumbnail_generator import thumbnail_generator
+        Args:
+            force: regenerar thumbnails existentes también
+        """
+        start_time = time.time()
+        logger.info("🚀 Regenerando thumbnails OPTIMIZADO...")
         
-        videos = db.get_videos()
-        videos_without_thumbs = [v for v in videos if not v.get('thumbnail_path') or not Path(v['thumbnail_path']).exists()]
+        # 🔍 PASO 1: Obtener videos que necesitan regeneración (consulta optimizada)
+        logger.info("📊 Identificando videos que necesitan regeneración...")
+        videos_to_regenerate = self._get_videos_for_regeneration_optimized(force)
         
-        if not videos_without_thumbs:
-            logger.info("✅ Todos los videos tienen thumbnails")
+        if not videos_to_regenerate:
+            logger.info("✅ Todos los videos tienen thumbnails válidos")
             return
         
-        logger.info(f"Regenerando thumbnails para {len(videos_without_thumbs)} videos...")
+        logger.info(f"Videos para regenerar: {len(videos_to_regenerate)}")
+        
+        # 🎯 PASO 2: Priorizar videos con personajes detectados
+        prioritized_videos = self._prioritize_videos_with_characters(videos_to_regenerate)
+        logger.info(f"📈 Videos priorizados: {len(prioritized_videos['priority'])} con personajes, {len(prioritized_videos['normal'])} normales")
+        
+        # Combinar videos priorizados
+        ordered_videos = prioritized_videos['priority'] + prioritized_videos['normal']
+        
+        # 🧹 PASO 3: Limpiar thumbnails corruptos/inválidos
+        logger.info("🧹 Limpiando thumbnails corruptos...")
+        cleaned_count = self._clean_corrupt_thumbnails(ordered_videos)
+        if cleaned_count > 0:
+            logger.info(f"✅ Thumbnails corruptos eliminados: {cleaned_count}")
+        
+        # ⚡ PASO 4: Regeneración en paralelo con ThreadPoolExecutor
+        logger.info("⚡ Regenerando thumbnails en paralelo...")
+        success, failed = self._regenerate_thumbnails_parallel(ordered_videos, force)
+        
+        # 📊 PASO 5: Métricas finales
+        end_time = time.time()
+        duration = end_time - start_time
+        
+        logger.info(f"✅ Thumbnails regenerados OPTIMIZADO en {duration:.2f}s")
+        logger.info(f"   📊 Resultados: {success} exitosos, {failed} fallidos")
+        if cleaned_count > 0:
+            logger.info(f"   🧹 Limpiezas: {cleaned_count} thumbnails corruptos eliminados")
+        if success > 0:
+            logger.info(f"   ⚡ Throughput: {success/duration:.1f} thumbnails/segundo")
+        
+        # 🔧 PASO 6: Optimización automática de BD si fue procesamiento masivo
+        if success > 20:
+            logger.info("🔧 Optimizando base de datos...")
+            try:
+                self.optimize_database()
+                logger.info("✅ Base de datos optimizada")
+            except Exception as e:
+                logger.warning(f"Advertencia optimizando BD: {e}")
+    
+    def _get_videos_for_regeneration_optimized(self, force=False):
+        """🚀 OPTIMIZADO: Obtener videos que necesitan regeneración con consulta SQL eficiente"""
+        # Construir consulta SQL optimizada
+        if force:
+            # Si force=True, regenerar todos los videos
+            query = """
+            SELECT id, file_path, file_name, thumbnail_path, detected_characters, platform
+            FROM videos 
+            WHERE file_path IS NOT NULL
+            ORDER BY 
+                CASE 
+                    WHEN detected_characters IS NOT NULL AND detected_characters != '[]' 
+                    THEN 0 ELSE 1 
+                END,
+                id
+            """
+            params = []
+        else:
+            # Solo videos sin thumbnails o con thumbnails inválidos
+            query = """
+            SELECT id, file_path, file_name, thumbnail_path, detected_characters, platform
+            FROM videos 
+            WHERE file_path IS NOT NULL 
+            AND (thumbnail_path IS NULL OR thumbnail_path = '')
+            ORDER BY 
+                CASE 
+                    WHEN detected_characters IS NOT NULL AND detected_characters != '[]' 
+                    THEN 0 ELSE 1 
+                END,
+                id
+            """
+            params = []
+        
+        # Ejecutar consulta
+        with db.get_connection() as conn:
+            cursor = conn.execute(query, params)
+            videos = [dict(row) for row in cursor.fetchall()]
+        
+        # Filtrar videos por existencia de archivo y validez de thumbnail
+        valid_videos = []
+        video_extensions = {'.mp4', '.avi', '.mov', '.mkv', '.wmv', '.flv', '.webm', '.m4v'}
+        
+        for video in videos:
+            file_path = Path(video['file_path'])
+            
+            # Verificar que el archivo de video existe
+            if not file_path.exists():
+                logger.debug(f"Archivo de video no existe: {file_path}")
+                continue
+            
+            # Verificar que es un video (no imagen)
+            if file_path.suffix.lower() not in video_extensions:
+                continue
+            
+            # Verificar si necesita regeneración de thumbnail
+            needs_regeneration = force
+            
+            if not needs_regeneration:
+                thumbnail_path = video.get('thumbnail_path')
+                if not thumbnail_path:
+                    needs_regeneration = True
+                else:
+                    thumb_path = Path(thumbnail_path)
+                    if not thumb_path.exists():
+                        needs_regeneration = True
+                    elif self._is_thumbnail_corrupt(thumb_path):
+                        needs_regeneration = True
+            
+            if needs_regeneration:
+                valid_videos.append(video)
+        
+        return valid_videos
+    
+    def _is_thumbnail_corrupt(self, thumbnail_path):
+        """Verificar si un thumbnail está corrupto"""
+        try:
+            thumb_path = Path(thumbnail_path)
+            
+            # Verificar que el archivo existe
+            if not thumb_path.exists():
+                return True
+            
+            # Verificar tamaño mínimo (thumbnails muy pequeños probablemente corruptos)
+            if thumb_path.stat().st_size < 1024:  # Menos de 1KB
+                return True
+            
+            # Intentar abrir la imagen para verificar validez
+            from PIL import Image
+            try:
+                with Image.open(thumb_path) as img:
+                    # Verificar que tiene dimensiones válidas
+                    if img.width < 50 or img.height < 50:
+                        return True
+                    # Verificar que no está completamente negro
+                    if hasattr(img, 'getextrema'):
+                        extrema = img.getextrema()
+                        if isinstance(extrema, tuple) and len(extrema) == 2 and extrema[0] == extrema[1] == 0:
+                            return True
+                return False
+            except Exception:
+                return True
+                
+        except Exception:
+            return True
+    
+    def _clean_corrupt_thumbnails(self, videos):
+        """🧹 Limpiar thumbnails corruptos identificados"""
+        cleaned_count = 0
+        
+        for video in videos:
+            thumbnail_path = video.get('thumbnail_path')
+            if not thumbnail_path:
+                continue
+            
+            thumb_path = Path(thumbnail_path)
+            if thumb_path.exists() and self._is_thumbnail_corrupt(thumb_path):
+                try:
+                    thumb_path.unlink()
+                    cleaned_count += 1
+                    logger.debug(f"Thumbnail corrupto eliminado: {thumb_path}")
+                except Exception as e:
+                    logger.warning(f"Error eliminando thumbnail corrupto {thumb_path}: {e}")
+        
+        return cleaned_count
+    
+    def _regenerate_thumbnails_parallel(self, videos, force=False):
+        """⚡ Regenerar thumbnails en paralelo con ThreadPoolExecutor"""
+        from concurrent.futures import ThreadPoolExecutor, as_completed
         
         success = 0
         failed = 0
+        max_workers = min(4, len(videos))  # Máximo 4 workers para evitar sobrecarga
         
-        for video in videos_without_thumbs:
+        def regenerate_single_thumbnail(video_data):
+            """Regenerar thumbnail para un video individual"""
             try:
-                video_path = Path(video['file_path'])
-                if not video_path.exists():
-                    logger.warning(f"Video no existe: {video_path}")
-                    failed += 1
-                    continue
+                video_path = Path(video_data['file_path'])
                 
-                thumbnail_path = thumbnail_generator.generate_thumbnail(video_path, force_regenerate=force)
+                # Verificar que el archivo existe
+                if not video_path.exists():
+                    return {'success': False, 'error': f"Video no existe: {video_path}"}
+                
+                # Generar thumbnail (siempre con force=True para regeneración)
+                thumbnail_path = thumbnail_generator.generate_thumbnail(video_path, force_regenerate=True)
                 
                 if thumbnail_path:
-                    # Actualizar BD
-                    db.update_video(video['id'], {'thumbnail_path': str(thumbnail_path)})
-                    success += 1
-                    logger.info(f"✓ {video_path.name}")
+                    # Actualizar BD con la ruta del thumbnail
+                    db.update_video(video_data['id'], {'thumbnail_path': str(thumbnail_path)})
+                    return {'success': True, 'path': str(thumbnail_path), 'video_name': video_path.name}
                 else:
-                    failed += 1
-                    logger.warning(f"✗ {video_path.name}")
+                    return {'success': False, 'error': f"Falló regeneración para {video_path.name}"}
                     
             except Exception as e:
-                failed += 1
-                logger.error(f"Error con {video.get('file_name', 'unknown')}: {e}")
+                return {'success': False, 'error': f"Error con {video_data.get('file_name', 'unknown')}: {e}"}
         
-        logger.info(f"✅ Thumbnails regenerados: {success} exitosos, {failed} fallidos")
+        # Procesamiento en paralelo
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # Enviar todas las tareas
+            future_to_video = {
+                executor.submit(regenerate_single_thumbnail, video): video 
+                for video in videos
+            }
+            
+            # Recopilar resultados conforme se completan
+            for i, future in enumerate(as_completed(future_to_video), 1):
+                try:
+                    result = future.result()
+                    
+                    if result['success']:
+                        success += 1
+                        logger.info(f"✓ {result['video_name']}")
+                    else:
+                        failed += 1
+                        logger.warning(f"✗ {result['error']}")
+                    
+                    # Mostrar progreso cada 10 thumbnails
+                    if i % 10 == 0 or i == len(videos):
+                        logger.info(f"⚡ Progreso: {i}/{len(videos)} ({i/len(videos)*100:.1f}%) - {success} exitosos, {failed} fallidos")
+                        
+                except Exception as e:
+                    failed += 1
+                    video = future_to_video[future]
+                    logger.error(f"Error procesando {video.get('file_name', 'unknown')}: {e}")
+        
+        return success, failed
     
     def optimize_database(self):
         """Optimizar base de datos SQLite"""
@@ -660,72 +860,191 @@ class MaintenanceUtils:
     
     def populate_thumbnails(self, platform=None, limit=None, force=False):
         """
-        Generar thumbnails para videos en la base de datos
+        🚀 OPTIMIZADO: Generación ultra-rápida de thumbnails con procesamiento paralelo
         
         Args:
             platform: plataforma específica o None para todas
             limit: número máximo de thumbnails a generar
             force: regenerar thumbnails existentes
         """
-        logger.info("Generando thumbnails para videos en la base de datos...")
+        start_time = time.time()
+        logger.info("🚀 Generando thumbnails OPTIMIZADO...")
         
-        # Obtener videos de la BD
-        filters = {'platform': platform} if platform else {}
-        videos = db.get_videos(filters, limit=limit)
-        
-        if not videos:
-            logger.info("No hay videos en la base de datos")
-            return
-        
-        # Filtrar videos que necesitan thumbnails
-        videos_needing_thumbs = []
-        for video in videos:
-            file_path = Path(video['file_path'])
-            
-            # Verificar que el archivo existe
-            if not file_path.exists():
-                logger.warning(f"Archivo no existe: {file_path}")
-                continue
-            
-            # Verificar que es un video (no imagen)
-            video_extensions = {'.mp4', '.avi', '.mov', '.mkv', '.wmv', '.flv', '.webm', '.m4v'}
-            if file_path.suffix.lower() not in video_extensions:
-                continue
-            
-            # Verificar si necesita thumbnail
-            needs_thumb = force or not video.get('thumbnail_path') or not Path(video['thumbnail_path']).exists()
-            
-            if needs_thumb:
-                videos_needing_thumbs.append(video)
+        # 🔍 PASO 1: Obtener videos que necesitan thumbnails (consulta optimizada)
+        logger.info("📊 Obteniendo videos que necesitan thumbnails...")
+        videos_needing_thumbs = self._get_videos_needing_thumbnails_optimized(platform, limit, force)
         
         if not videos_needing_thumbs:
             logger.info("✅ Todos los videos ya tienen thumbnails")
             return
         
-        logger.info(f"Generando thumbnails para {len(videos_needing_thumbs)} videos...")
+        logger.info(f"Videos que necesitan thumbnails: {len(videos_needing_thumbs)}")
+        
+        # 🎯 PASO 2: Priorizar videos con personajes detectados
+        prioritized_videos = self._prioritize_videos_with_characters(videos_needing_thumbs)
+        logger.info(f"📈 Videos priorizados: {len(prioritized_videos['priority'])} con personajes, {len(prioritized_videos['normal'])} normales")
+        
+        # Combinar videos priorizados
+        ordered_videos = prioritized_videos['priority'] + prioritized_videos['normal']
+        
+        # ⚡ PASO 3: Generación en paralelo con ThreadPoolExecutor
+        logger.info("⚡ Generando thumbnails en paralelo...")
+        success, failed = self._generate_thumbnails_parallel(ordered_videos, force)
+        
+        # 📊 PASO 4: Métricas finales
+        end_time = time.time()
+        duration = end_time - start_time
+        
+        logger.info(f"✅ Thumbnails generados OPTIMIZADO en {duration:.2f}s")
+        logger.info(f"   📊 Resultados: {success} exitosos, {failed} fallidos")
+        if success > 0:
+            logger.info(f"   ⚡ Throughput: {success/duration:.1f} thumbnails/segundo")
+        
+        # 🔧 PASO 5: Optimización automática de BD si fue procesamiento masivo
+        if success > 20:
+            logger.info("🔧 Optimizando base de datos...")
+            try:
+                self.optimize_database()
+                logger.info("✅ Base de datos optimizada")
+            except Exception as e:
+                logger.warning(f"Advertencia optimizando BD: {e}")
+    
+    def _get_videos_needing_thumbnails_optimized(self, platform=None, limit=None, force=False):
+        """🚀 OPTIMIZADO: Obtener videos que necesitan thumbnails con consulta SQL eficiente"""
+        # Construir consulta SQL optimizada
+        query = """
+        SELECT id, file_path, file_name, thumbnail_path, detected_characters, platform
+        FROM videos 
+        WHERE 1=1
+        """
+        params = []
+        
+        # Filtrar por plataforma si se especifica
+        if platform:
+            query += " AND platform = ?"
+            params.append(platform)
+        
+        # Filtrar por videos que necesitan thumbnails
+        if not force:
+            query += " AND (thumbnail_path IS NULL OR thumbnail_path = '')"
+        
+        # Aplicar límite
+        if limit:
+            query += " LIMIT ?"
+            params.append(limit)
+        
+        # Ejecutar consulta
+        with db.get_connection() as conn:
+            cursor = conn.execute(query, params)
+            videos = [dict(row) for row in cursor.fetchall()]
+        
+        # Filtrar videos por existencia de archivo y extensión
+        valid_videos = []
+        video_extensions = {'.mp4', '.avi', '.mov', '.mkv', '.wmv', '.flv', '.webm', '.m4v'}
+        
+        for video in videos:
+            file_path = Path(video['file_path'])
+            
+            # Verificar que el archivo existe
+            if not file_path.exists():
+                logger.debug(f"Archivo no existe: {file_path}")
+                continue
+            
+            # Verificar que es un video (no imagen)
+            if file_path.suffix.lower() not in video_extensions:
+                continue
+            
+            # Verificar si necesita thumbnail (para force=True)
+            if force or not video.get('thumbnail_path') or not Path(str(video['thumbnail_path'])).exists():
+                valid_videos.append(video)
+        
+        return valid_videos
+    
+    def _prioritize_videos_with_characters(self, videos):
+        """🎯 Priorizar videos con personajes detectados para thumbnails"""
+        priority_videos = []
+        normal_videos = []
+        
+        for video in videos:
+            detected_characters = video.get('detected_characters')
+            
+            # Verificar si tiene personajes detectados
+            has_characters = False
+            if detected_characters:
+                try:
+                    import json
+                    characters = json.loads(detected_characters) if isinstance(detected_characters, str) else detected_characters
+                    has_characters = len(characters) > 0
+                except:
+                    has_characters = False
+            
+            if has_characters:
+                priority_videos.append(video)
+            else:
+                normal_videos.append(video)
+        
+        return {'priority': priority_videos, 'normal': normal_videos}
+    
+    def _generate_thumbnails_parallel(self, videos, force=False):
+        """⚡ Generar thumbnails en paralelo con ThreadPoolExecutor"""
+        from concurrent.futures import ThreadPoolExecutor, as_completed
         
         success = 0
         failed = 0
+        max_workers = min(4, len(videos))  # Máximo 4 workers para evitar sobrecarga
         
-        for video in videos_needing_thumbs:
+        def generate_single_thumbnail(video_data):
+            """Generar thumbnail para un video individual"""
             try:
-                video_path = Path(video['file_path'])
+                video_path = Path(video_data['file_path'])
+                
+                # Verificar que el archivo existe
+                if not video_path.exists():
+                    return {'success': False, 'error': f"Archivo no existe: {video_path}"}
+                
+                # Generar thumbnail
                 thumbnail_path = thumbnail_generator.generate_thumbnail(video_path, force_regenerate=force)
                 
                 if thumbnail_path:
                     # Actualizar BD con la ruta del thumbnail
-                    db.update_video(video['id'], {'thumbnail_path': str(thumbnail_path)})
-                    success += 1
-                    logger.info(f"✓ {video_path.name}")
+                    db.update_video(video_data['id'], {'thumbnail_path': str(thumbnail_path)})
+                    return {'success': True, 'path': str(thumbnail_path), 'video_name': video_path.name}
                 else:
-                    failed += 1
-                    logger.warning(f"✗ {video_path.name}")
+                    return {'success': False, 'error': f"Falló generación para {video_path.name}"}
                     
             except Exception as e:
-                failed += 1
-                logger.error(f"Error generando thumbnail para {video.get('file_name', 'unknown')}: {e}")
+                return {'success': False, 'error': f"Error con {video_data.get('file_name', 'unknown')}: {e}"}
         
-        logger.info(f"✅ Thumbnails generados: {success} exitosos, {failed} fallidos")
+        # Procesamiento en paralelo
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # Enviar todas las tareas
+            future_to_video = {
+                executor.submit(generate_single_thumbnail, video): video 
+                for video in videos
+            }
+            
+            # Recopilar resultados conforme se completan
+            for i, future in enumerate(as_completed(future_to_video), 1):
+                try:
+                    result = future.result()
+                    
+                    if result['success']:
+                        success += 1
+                        logger.info(f"✓ {result['video_name']}")
+                    else:
+                        failed += 1
+                        logger.warning(f"✗ {result['error']}")
+                    
+                    # Mostrar progreso cada 10 thumbnails
+                    if i % 10 == 0 or i == len(videos):
+                        logger.info(f"⚡ Progreso: {i}/{len(videos)} ({i/len(videos)*100:.1f}%) - {success} exitosos, {failed} fallidos")
+                        
+                except Exception as e:
+                    failed += 1
+                    video = future_to_video[future]
+                    logger.error(f"Error procesando {video.get('file_name', 'unknown')}: {e}")
+        
+        return success, failed
         
     def clear_thumbnails(self, platform=None, force=False):
         """

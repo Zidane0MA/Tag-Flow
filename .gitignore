@@ -294,6 +294,7 @@ data/deepface_models/
 # Archivos de configuración específicos del usuario
 config_local.py
 settings_local.py
+CLAUDE.md
 
 # FFmpeg y binarios
 ffmpeg.exe

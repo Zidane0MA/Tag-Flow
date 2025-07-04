@@ -388,19 +388,19 @@ function updateVideoCardInDOM(updatedVideo) {
             }
         });
         
-        // Actualizar información de música
+        // Actualizar información de música (con truncado)
         const musicInfo = videoCard.querySelector('.fa-music')?.parentElement;
+        const truncate = (str, n) => str && str.length > n ? str.slice(0, n) + '...' : str;
         if (musicInfo) {
             const music = updatedVideo.final_music || updatedVideo.detected_music;
             const artist = updatedVideo.final_music_artist || updatedVideo.detected_music_artist;
             const isAutoDetected = !updatedVideo.final_music && updatedVideo.detected_music;
-            
             if (music) {
                 musicInfo.innerHTML = `
                     <i class="fas fa-music text-primary me-1"></i>
                     <small>
-                        <strong>${music}</strong>
-                        ${artist ? ` - ${artist}` : ''}
+                        <strong>${truncate(music, 60)}</strong>
+                        ${artist ? ` - ${truncate(artist, 40)}` : ''}
                         ${isAutoDetected ? ' <span class="text-muted">(auto)</span>' : ''}
                     </small>
                 `;
