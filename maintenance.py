@@ -394,28 +394,36 @@ class MaintenanceUtils:
         max_workers = min(4, len(videos))
         
         def regenerate_single_thumbnail(video_data):
-            """Regenerar thumbnail para un video individual"""
+            """Regenerar thumbnail para un video individual (sin actualizar BD)"""
             try:
                 video_path = Path(video_data['file_path'])
                 
                 # Verificar que el archivo existe
                 if not video_path.exists():
-                    return {'success': False, 'error': f"Video no existe: {video_path}"}
+                    return {'success': False, 'error': f"Video no existe: {video_path}", 'video_id': video_data['id']}
                 
                 # Generar thumbnail (siempre con force=True para regeneración)
                 thumbnail_path = thumbnail_generator.generate_thumbnail(video_path, force_regenerate=True)
                 
                 if thumbnail_path:
-                    # Actualizar BD con la ruta del thumbnail
-                    db.update_video(video_data['id'], {'thumbnail_path': str(thumbnail_path)})
-                    return {'success': True, 'path': str(thumbnail_path), 'video_name': video_path.name}
+                    # NO actualizar BD aquí - acumular para batch update
+                    return {
+                        'success': True, 
+                        'path': str(thumbnail_path), 
+                        'video_name': video_path.name,
+                        'video_id': video_data['id'],
+                        'thumbnail_path': str(thumbnail_path)
+                    }
                 else:
-                    return {'success': False, 'error': f"Falló regeneración para {video_path.name}"}
+                    return {'success': False, 'error': f"Falló regeneración para {video_path.name}", 'video_id': video_data['id']}
                     
             except Exception as e:
-                return {'success': False, 'error': f"Error con {video_data.get('file_name', 'unknown')}: {e}"}
+                return {'success': False, 'error': f"Error con {video_data.get('file_name', 'unknown')}: {e}", 'video_id': video_data['id']}
         
-        # Procesamiento en paralelo
+        # Procesamiento en paralelo con batch updates
+        batch_updates = []  # Acumular updates para BD
+        batch_size = 25  # Actualizar BD cada 25 thumbnails
+        
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             # Enviar todas las tareas
             future_to_video = {
@@ -431,9 +439,26 @@ class MaintenanceUtils:
                     if result['success']:
                         success += 1
                         logger.info(f"✓ {result['video_name']}")
+                        
+                        # Acumular update para batch
+                        batch_updates.append({
+                            'video_id': result['video_id'],
+                            'updates': {'thumbnail_path': result['thumbnail_path']}
+                        })
+                        
                     else:
                         failed += 1
                         logger.warning(f"✗ {result['error']}")
+                    
+                    # Batch update cada 25 thumbnails o al final
+                    if len(batch_updates) >= batch_size or i == len(videos):
+                        if batch_updates:
+                            try:
+                                batch_success, batch_failed = db.batch_update_videos(batch_updates)
+                                logger.debug(f"🔄 Batch update: {batch_success} exitosos, {batch_failed} fallidos")
+                                batch_updates = []  # Limpiar batch
+                            except Exception as e:
+                                logger.warning(f"Error en batch update: {e}")
                     
                     # Mostrar progreso cada 10 thumbnails
                     if i % 10 == 0 or i == len(videos):
@@ -443,6 +468,14 @@ class MaintenanceUtils:
                     failed += 1
                     video = future_to_video[future]
                     logger.error(f"Error procesando {video.get('file_name', 'unknown')}: {e}")
+        
+        # Procesar cualquier update restante
+        if batch_updates:
+            try:
+                batch_success, batch_failed = db.batch_update_videos(batch_updates)
+                logger.info(f"🔄 Batch update final: {batch_success} exitosos, {batch_failed} fallidos")
+            except Exception as e:
+                logger.warning(f"Error en batch update final: {e}")
         
         return success, failed
     
@@ -1010,28 +1043,36 @@ class MaintenanceUtils:
         max_workers = min(4, len(videos))
         
         def generate_single_thumbnail(video_data):
-            """Generar thumbnail para un video individual"""
+            """Generar thumbnail para un video individual (sin actualizar BD)"""
             try:
                 video_path = Path(video_data['file_path'])
                 
                 # Verificar que el archivo existe
                 if not video_path.exists():
-                    return {'success': False, 'error': f"Archivo no existe: {video_path}"}
+                    return {'success': False, 'error': f"Archivo no existe: {video_path}", 'video_id': video_data['id']}
                 
                 # Generar thumbnail
                 thumbnail_path = thumbnail_generator.generate_thumbnail(video_path, force_regenerate=force)
                 
                 if thumbnail_path:
-                    # Actualizar BD con la ruta del thumbnail
-                    db.update_video(video_data['id'], {'thumbnail_path': str(thumbnail_path)})
-                    return {'success': True, 'path': str(thumbnail_path), 'video_name': video_path.name}
+                    # NO actualizar BD aquí - acumular para batch update
+                    return {
+                        'success': True, 
+                        'path': str(thumbnail_path), 
+                        'video_name': video_path.name,
+                        'video_id': video_data['id'],
+                        'thumbnail_path': str(thumbnail_path)
+                    }
                 else:
-                    return {'success': False, 'error': f"Falló generación para {video_path.name}"}
+                    return {'success': False, 'error': f"Falló generación para {video_path.name}", 'video_id': video_data['id']}
                     
             except Exception as e:
-                return {'success': False, 'error': f"Error con {video_data.get('file_name', 'unknown')}: {e}"}
+                return {'success': False, 'error': f"Error con {video_data.get('file_name', 'unknown')}: {e}", 'video_id': video_data['id']}
         
-        # Procesamiento en paralelo
+        # Procesamiento en paralelo con batch updates
+        batch_updates = []  # Acumular updates para BD
+        batch_size = 25  # Actualizar BD cada 25 thumbnails
+        
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             # Enviar todas las tareas
             future_to_video = {
@@ -1047,9 +1088,26 @@ class MaintenanceUtils:
                     if result['success']:
                         success += 1
                         logger.info(f"✓ {result['video_name']}")
+                        
+                        # Acumular update para batch
+                        batch_updates.append({
+                            'video_id': result['video_id'],
+                            'updates': {'thumbnail_path': result['thumbnail_path']}
+                        })
+                        
                     else:
                         failed += 1
                         logger.warning(f"✗ {result['error']}")
+                    
+                    # Batch update cada 25 thumbnails o al final
+                    if len(batch_updates) >= batch_size or i == len(videos):
+                        if batch_updates:
+                            try:
+                                batch_success, batch_failed = db.batch_update_videos(batch_updates)
+                                logger.debug(f"🔄 Batch update: {batch_success} exitosos, {batch_failed} fallidos")
+                                batch_updates = []  # Limpiar batch
+                            except Exception as e:
+                                logger.warning(f"Error en batch update: {e}")
                     
                     # Mostrar progreso cada 10 thumbnails
                     if i % 10 == 0 or i == len(videos):
@@ -1059,6 +1117,14 @@ class MaintenanceUtils:
                     failed += 1
                     video = future_to_video[future]
                     logger.error(f"Error procesando {video.get('file_name', 'unknown')}: {e}")
+        
+        # Procesar cualquier update restante
+        if batch_updates:
+            try:
+                batch_success, batch_failed = db.batch_update_videos(batch_updates)
+                logger.info(f"🔄 Batch update final: {batch_success} exitosos, {batch_failed} fallidos")
+            except Exception as e:
+                logger.warning(f"Error en batch update final: {e}")
         
         return success, failed
         

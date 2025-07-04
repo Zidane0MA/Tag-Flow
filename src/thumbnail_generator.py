@@ -7,6 +7,8 @@ import cv2
 import numpy as np
 import time
 import os
+import subprocess
+import tempfile
 from PIL import Image, ImageDraw, ImageFont
 from pathlib import Path
 import logging
@@ -35,6 +37,8 @@ class ThumbnailGenerator:
         self.enable_image_enhancement = False  # Deshabilitado por defecto para mayor velocidad
         self.fast_mode = True  # Modo rápido activado
         self.enable_validation = os.getenv('ENABLE_THUMBNAIL_VALIDATION', 'true').lower() == 'true'
+        self.use_ffmpeg_direct = True  # Usar FFmpeg directo cuando sea posible
+        self._last_used_ffmpeg = False  # Flag para tracking
         
     def enable_ultra_fast_mode(self):
         """🚀 Activar modo ultra-rápido para máximo rendimiento"""
@@ -47,6 +51,37 @@ class ThumbnailGenerator:
         if self.thumbnail_size[0] > 160:
             self.thumbnail_size = (160, 120)  # Más pequeño = más rápido
         logger.info(f"⚡ Modo ultra-rápido activado - Máximo rendimiento ({self.thumbnail_size[0]}x{self.thumbnail_size[1]}, calidad {self.quality})")
+        
+    def _generate_thumbnail_ffmpeg_direct(self, video_path: Path, thumbnail_path: Path, timestamp: float = 3.0) -> bool:
+        """🚀 ULTRA OPTIMIZADO: Generar thumbnail directamente con FFmpeg (bypassing PIL)"""
+        try:
+            # Usar timestamp fijo para máximo rendimiento
+            fixed_timestamp = min(timestamp, 3.0)
+            
+            # Comando FFmpeg optimizado para generar thumbnail directo
+            cmd = [
+                'ffmpeg',
+                '-y',  # Sobrescribir archivo de salida
+                '-ss', str(fixed_timestamp),  # Buscar a timestamp
+                '-i', str(video_path),  # Archivo de entrada
+                '-vframes', '1',  # Solo 1 frame
+                '-vf', f'scale={self.thumbnail_size[0]}:{self.thumbnail_size[1]}',  # Redimensionar directo
+                '-q:v', str(10 - int(self.quality/10)),  # Convertir calidad PIL a FFmpeg
+                '-loglevel', 'quiet',  # Sin logs de FFmpeg
+                str(thumbnail_path)
+            ]
+            
+            # Ejecutar FFmpeg con timeout
+            result = subprocess.run(cmd, capture_output=True, timeout=5)
+            
+            if result.returncode == 0 and thumbnail_path.exists():
+                return True
+                
+            return False
+                
+        except Exception as e:
+            logger.debug(f"Error con FFmpeg directo: {e}")
+            return False
         
     def enable_quality_mode(self):
         """🎨 Activar modo de calidad para mejor imagen"""
@@ -88,14 +123,33 @@ class ThumbnailGenerator:
                     except Exception as e:
                         logger.warning(f"Error eliminando thumbnail corrupto: {e}")
             
+            # ULTRA OPTIMIZACIÓN: Usar FFmpeg directo en modo ultra-rápido
+            if self.fast_mode and self.use_ffmpeg_direct and not self.add_watermark:
+                if self._generate_thumbnail_ffmpeg_direct(video_path, thumbnail_path, timestamp):
+                    logger.debug(f"Thumbnail generado con FFmpeg directo: {thumbnail_path}")
+                    return thumbnail_path
+                # Si FFmpeg falla, continuar con método tradicional
+                logger.debug(f"FFmpeg directo falló, usando método tradicional")
+            
+            # Método tradicional como fallback
             # Extraer frame del video con optimizaciones
-            frame = self._extract_frame_ultra_fast(video_path, timestamp) if self.fast_mode else self._extract_frame_optimized(video_path, timestamp)
+            if self.fast_mode:
+                frame = self._extract_frame_ffmpeg(video_path, timestamp)
+                if frame is None:
+                    frame = self._extract_frame_ultra_fast(video_path, timestamp)
+            else:
+                frame = self._extract_frame_optimized(video_path, timestamp)
             if frame is None:
                 logger.error(f"No se pudo extraer frame de {video_path}")
                 return None
             
             # Procesar imagen con optimizaciones
-            processed_image = self._process_frame_optimized(frame)
+            if self.fast_mode and hasattr(self, '_last_used_ffmpeg') and self._last_used_ffmpeg:
+                # Si usamos FFmpeg, la imagen ya está redimensionada
+                processed_image = Image.fromarray(frame)
+                self._last_used_ffmpeg = False  # Reset flag
+            else:
+                processed_image = self._process_frame_optimized(frame)
             
             # Añadir watermark si está habilitado
             if self.add_watermark:
@@ -143,6 +197,62 @@ class ThumbnailGenerator:
             
         except Exception:
             return False
+    
+    def _extract_frame_ffmpeg(self, video_path: Path, timestamp: float) -> Optional[np.ndarray]:
+        """🚀 ULTRA OPTIMIZADO: Extraer frame usando FFmpeg (mucho más rápido que OpenCV)"""
+        try:
+            # Usar timestamp fijo para máximo rendimiento
+            fixed_timestamp = min(timestamp, 3.0)
+            
+            # Crear archivo temporal para el frame
+            with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as temp_file:
+                temp_path = temp_file.name
+            
+            try:
+                # Comando FFmpeg optimizado para velocidad máxima
+                cmd = [
+                    'ffmpeg',
+                    '-y',  # Sobrescribir archivo de salida
+                    '-ss', str(fixed_timestamp),  # Buscar a timestamp
+                    '-i', str(video_path),  # Archivo de entrada
+                    '-vframes', '1',  # Solo 1 frame
+                    '-vf', f'scale={self.thumbnail_size[0]}:{self.thumbnail_size[1]}',  # Redimensionar directo
+                    '-q:v', '5',  # Calidad baja para velocidad
+                    '-loglevel', 'quiet',  # Sin logs de FFmpeg
+                    temp_path
+                ]
+                
+                # Ejecutar FFmpeg con timeout
+                result = subprocess.run(cmd, capture_output=True, timeout=5)
+                
+                if result.returncode == 0 and os.path.exists(temp_path):
+                    # Cargar imagen directamente
+                    image = Image.open(temp_path)
+                    # Convertir a array numpy
+                    frame_array = np.array(image)
+                    
+                    # Si es grayscale, convertir a RGB
+                    if len(frame_array.shape) == 2:
+                        frame_array = np.stack([frame_array] * 3, axis=-1)
+                    
+                    # Marcar que usamos FFmpeg para evitar redimensionamiento posterior
+                    self._last_used_ffmpeg = True
+                    
+                    return frame_array
+                
+                return None
+                
+            finally:
+                # Limpiar archivo temporal
+                try:
+                    if os.path.exists(temp_path):
+                        os.unlink(temp_path)
+                except:
+                    pass
+                    
+        except Exception as e:
+            logger.debug(f"Error con FFmpeg: {e}")
+            return None
     
     def _extract_frame_ultra_fast(self, video_path: Path, timestamp: float) -> Optional[np.ndarray]:
         """🚀 ULTRA OPTIMIZADO: Extraer frame con mínimo procesamiento"""

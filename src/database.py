@@ -299,6 +299,85 @@ class DatabaseManager:
                 logger.info(f"Video {video_id} actualizado exitosamente")
             return success
     
+    def batch_update_videos(self, video_updates: List[Dict]) -> Tuple[int, int]:
+        """
+        🚀 OPTIMIZADO: Actualizar múltiples videos en una sola transacción
+        
+        Args:
+            video_updates: Lista de diccionarios con formato:
+                          [{'video_id': int, 'updates': dict}, ...]
+        
+        Returns:
+            Tuple (exitosos, fallidos)
+        """
+        if not video_updates:
+            return 0, 0
+        
+        successful = 0
+        failed = 0
+        
+        allowed_fields = [
+            'final_music', 'final_music_artist', 'final_characters', 'difficulty_level',
+            'edit_status', 'edited_video_path', 'notes', 'processing_status', 'error_message',
+            'thumbnail_path', 'description',
+            'detected_music', 'detected_music_artist', 'detected_music_confidence', 'music_source', 'detected_characters'
+        ]
+        
+        # Usar una sola transacción para todas las actualizaciones
+        with self.get_connection() as conn:
+            try:
+                for video_update in video_updates:
+                    video_id = video_update.get('video_id')
+                    updates = video_update.get('updates', {})
+                    
+                    if not video_id or not updates:
+                        failed += 1
+                        continue
+                    
+                    # Construir query de actualización dinámica
+                    set_clauses = []
+                    params = []
+                    
+                    for field, value in updates.items():
+                        if field in allowed_fields:
+                            set_clauses.append(f"{field} = ?")
+                            # Convertir listas a JSON para campos de personajes
+                            if field in ['final_characters', 'detected_characters'] and isinstance(value, list):
+                                value = json.dumps(value)
+                            params.append(value)
+                    
+                    if not set_clauses:
+                        failed += 1
+                        continue
+                    
+                    # Agregar timestamp de actualización
+                    set_clauses.append("last_updated = CURRENT_TIMESTAMP")
+                    params.append(video_id)
+                    
+                    query = f"UPDATE videos SET {', '.join(set_clauses)} WHERE id = ?"
+                    
+                    try:
+                        cursor = conn.execute(query, params)
+                        if cursor.rowcount > 0:
+                            successful += 1
+                        else:
+                            failed += 1
+                    except Exception as e:
+                        logger.debug(f"Error actualizando video {video_id}: {e}")
+                        failed += 1
+                
+                # Commit de toda la transacción al final
+                conn.commit()
+                logger.info(f"Batch update completado: {successful} exitosos, {failed} fallidos")
+                
+            except Exception as e:
+                # Si hay error general, rollback
+                conn.rollback()
+                logger.error(f"Error en batch update, rollback realizado: {e}")
+                return 0, len(video_updates)
+        
+        return successful, failed
+    
     def update_video_characters(self, video_id: int, characters_json: str = None) -> bool:
         """Actualizar solo los personajes detectados de un video"""
         return self.update_video(video_id, {'detected_characters': characters_json})
