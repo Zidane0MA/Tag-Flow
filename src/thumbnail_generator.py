@@ -40,6 +40,12 @@ class ThumbnailGenerator:
         self.use_ffmpeg_direct = True  # Usar FFmpeg directo cuando sea posible
         self._last_used_ffmpeg = False  # Flag para tracking
         
+        # Cache para intercambiar CPU por RAM
+        self.frame_cache = {}  # Cache de frames extraídos
+        self.max_cache_size = int(os.getenv('THUMBNAIL_CACHE_SIZE', '50'))  # Máximo frames en cache
+        self.use_ram_optimization = True  # Activar optimizaciones de RAM
+        self.preload_cache = {}  # Cache para pre-cargar datos de video en RAM
+        
     def enable_ultra_fast_mode(self):
         """🚀 Activar modo ultra-rápido para máximo rendimiento"""
         self.fast_mode = True
@@ -82,6 +88,41 @@ class ThumbnailGenerator:
         except Exception as e:
             logger.debug(f"Error con FFmpeg directo: {e}")
             return False
+    
+    def _extract_frame_with_cache(self, video_path: Path, timestamp: float, cache_key: str) -> Optional[np.ndarray]:
+        """🧠 OPTIMIZACIÓN RAM: Extraer frame con cache inteligente"""
+        # Extraer frame usando método rápido
+        if self.fast_mode:
+            frame = self._extract_frame_ffmpeg(video_path, timestamp)
+            if frame is None:
+                frame = self._extract_frame_ultra_fast(video_path, timestamp)
+        else:
+            frame = self._extract_frame_optimized(video_path, timestamp)
+        
+        # Añadir al cache si se extrajo exitosamente
+        if frame is not None and self.use_ram_optimization:
+            self._add_to_cache(cache_key, frame)
+        
+        return frame
+    
+    def _add_to_cache(self, cache_key: str, frame: np.ndarray):
+        """Añadir frame al cache con gestión de memoria"""
+        # Si el cache está lleno, eliminar el más antiguo (FIFO)
+        if len(self.frame_cache) >= self.max_cache_size:
+            # Eliminar la primera entrada (más antigua)
+            oldest_key = next(iter(self.frame_cache))
+            del self.frame_cache[oldest_key]
+            logger.debug(f"Cache lleno, eliminando frame antiguo: {oldest_key}")
+        
+        # Añadir nuevo frame al cache
+        self.frame_cache[cache_key] = frame.copy()  # Copia para evitar modificaciones
+        logger.debug(f"Frame añadido al cache: {cache_key} (total: {len(self.frame_cache)})")
+    
+    def clear_frame_cache(self):
+        """Limpiar cache de frames para liberar RAM"""
+        cache_size = len(self.frame_cache)
+        self.frame_cache.clear()
+        logger.info(f"Cache de frames limpiado: {cache_size} frames eliminados")
         
     def enable_quality_mode(self):
         """🎨 Activar modo de calidad para mejor imagen"""
@@ -131,14 +172,15 @@ class ThumbnailGenerator:
                 # Si FFmpeg falla, continuar con método tradicional
                 logger.debug(f"FFmpeg directo falló, usando método tradicional")
             
-            # Método tradicional como fallback
-            # Extraer frame del video con optimizaciones
-            if self.fast_mode:
-                frame = self._extract_frame_ffmpeg(video_path, timestamp)
-                if frame is None:
-                    frame = self._extract_frame_ultra_fast(video_path, timestamp)
+            # 🧠 OPTIMIZACIÓN RAM: Verificar cache de frames primero
+            cache_key = f"{video_path}_{timestamp}"
+            if self.use_ram_optimization and cache_key in self.frame_cache:
+                logger.debug(f"Frame encontrado en cache: {video_path}")
+                frame = self.frame_cache[cache_key]
             else:
-                frame = self._extract_frame_optimized(video_path, timestamp)
+                # Extraer frame y añadir al cache
+                frame = self._extract_frame_with_cache(video_path, timestamp, cache_key)
+            
             if frame is None:
                 logger.error(f"No se pudo extraer frame de {video_path}")
                 return None
@@ -271,10 +313,17 @@ class ThumbnailGenerator:
             # La mayoría de videos tienen contenido interesante en los primeros 3-5 segundos
             fixed_timestamp = min(timestamp, 3.0)  # Máximo 3 segundos
             
-            # Obtener FPS rápido (sin verificaciones)
-            fps = cap.get(cv2.CAP_PROP_FPS)
-            if fps <= 0 or fps > 120:  # Valores irreales
-                fps = 30  # Asumir 30fps
+            # 🧠 OPTIMIZACIÓN RAM: Usar metadatos pre-cargados si están disponibles
+            video_path_str = str(video_path)
+            if self.use_ram_optimization and video_path_str in self.preload_cache:
+                metadata = self.preload_cache[video_path_str]
+                fps = metadata['fps']
+                logger.debug(f"Usando metadatos pre-cargados para {video_path.name}")
+            else:
+                # Obtener FPS rápido (sin verificaciones)
+                fps = cap.get(cv2.CAP_PROP_FPS)
+                if fps <= 0 or fps > 120:  # Valores irreales
+                    fps = 30  # Asumir 30fps
             
             # Calcular frame objetivo (simplificado)
             target_frame = int(fixed_timestamp * fps)
@@ -598,6 +647,11 @@ class ThumbnailGenerator:
         if not video_data_list:
             return results
         
+        # 🧠 OPTIMIZACIÓN RAM: Pre-cargar metadatos si está habilitado
+        if self.use_ram_optimization:
+            video_paths = [v['file_path'] for v in video_data_list]
+            self.preload_video_metadata(video_paths)
+        
         # Filtrar videos que realmente necesitan thumbnails (validación en lotes)
         videos_to_process = self._batch_validate_videos(video_data_list, force_regenerate, results)
         
@@ -712,6 +766,45 @@ class ThumbnailGenerator:
             timestamp=timestamp, 
             force_regenerate=False
         )
+    
+    def preload_video_metadata(self, video_paths: list) -> dict:
+        """🧠 OPTIMIZACIÓN RAM: Pre-cargar metadatos de videos en RAM"""
+        preload_results = {'loaded': 0, 'failed': 0}
+        
+        for video_path in video_paths[:20]:  # Limitar a 20 videos para no saturar RAM
+            try:
+                path_obj = Path(video_path)
+                if not path_obj.exists():
+                    continue
+                
+                # Pre-cargar información básica del video
+                cap = cv2.VideoCapture(str(path_obj))
+                if cap.isOpened():
+                    fps = cap.get(cv2.CAP_PROP_FPS) or 30
+                    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+                    duration = total_frames / fps if fps > 0 else 0
+                    
+                    # Guardar metadatos en cache
+                    self.preload_cache[str(path_obj)] = {
+                        'fps': fps,
+                        'total_frames': total_frames,
+                        'duration': duration,
+                        'loaded_at': time.time()
+                    }
+                    
+                    preload_results['loaded'] += 1
+                    cap.release()
+                else:
+                    preload_results['failed'] += 1
+                    
+            except Exception as e:
+                logger.debug(f"Error pre-cargando {video_path}: {e}")
+                preload_results['failed'] += 1
+        
+        if preload_results['loaded'] > 0:
+            logger.info(f"🧠 Pre-cargados {preload_results['loaded']} metadatos en RAM")
+        
+        return preload_results
     
     def _batch_validate_videos(self, video_data_list: list, force_regenerate: bool, results: dict) -> list:
         """🚀 OPTIMIZADO: Validar videos en lotes para mejor rendimiento"""

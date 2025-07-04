@@ -914,6 +914,7 @@ class MaintenanceUtils:
         # Activar modo ultra-rápido
         thumbnail_generator.enable_ultra_fast_mode()
         logger.info(f"🎯 Configuración aplicada: Tamaño {thumbnail_generator.thumbnail_size}, Calidad {thumbnail_generator.quality}%, Validación: {thumbnail_generator.enable_validation}")
+        logger.info(f"🧠 Optimización RAM: Cache {thumbnail_generator.max_cache_size} frames, Pre-carga habilitada: {thumbnail_generator.use_ram_optimization}")
         
         # 🔍 PASO 1: Obtener videos que necesitan thumbnails (consulta optimizada)
         logger.info("📊 Obteniendo videos que necesitan thumbnails...")
