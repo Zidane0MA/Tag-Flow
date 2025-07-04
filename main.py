@@ -824,7 +824,7 @@ Notas:
             try:
                 # Intentar importar y usar OptimizedVideoAnalyzer
                 sys.path.append(str(Path(__file__).parent / 'src'))
-                from optimized_video_analyzer import OptimizedVideoAnalyzer
+                from src.optimized_video_analyzer import OptimizedVideoAnalyzer
                 analyzer = OptimizedVideoAnalyzer()
                 logger.info("🚀 Usando VideoAnalyzer OPTIMIZADO")
             except Exception as e:
