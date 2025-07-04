@@ -46,6 +46,9 @@ class ThumbnailGenerator:
         self.use_ram_optimization = True  # Activar optimizaciones de RAM
         self.preload_cache = {}  # Cache para pre-cargar datos de video en RAM
         
+        # 🎯 OPTIMIZACIÓN: Tamaño dinámico según modo
+        self.adaptive_sizing = os.getenv('ADAPTIVE_THUMBNAIL_SIZE', 'true').lower() == 'true'
+        
         # 🎯 CONFIGURACIÓN AUTOMÁTICA: Aplicar modo desde configuración
         thumbnail_mode = config.THUMBNAIL_MODE.lower().strip().replace('"', '').split('#')[0].strip()
         if thumbnail_mode == 'auto':
@@ -64,6 +67,16 @@ class ThumbnailGenerator:
         self._enable_gpu_acceleration = True
         self._gpu_decoder = self._detect_gpu_support()
         self._gpu_mode = 'ultra_fast'  # Modo GPU específico
+        
+        # 🚀 OPTIMIZACIÓN: Reducir tamaño 5% para ultra velocidad
+        if self.adaptive_sizing:
+            original_size = self.thumbnail_size
+            self.thumbnail_size = (
+                int(original_size[0] * 0.95),  # 5% menor
+                int(original_size[1] * 0.95)
+            )
+            logger.info(f"⚡ Tamaño adaptativo: {original_size} → {self.thumbnail_size}")
+        
         logger.info(f"⚡ Modo ultra-rápido GPU activado - Máximo rendimiento ({self.thumbnail_size[0]}x{self.thumbnail_size[1]}, calidad {self.quality}, GPU: {self._gpu_decoder or 'CPU fallback'})")
         
     def enable_balanced_mode(self):
@@ -143,8 +156,13 @@ class ThumbnailGenerator:
             # 🎨 FILTROS OPTIMIZADOS POR MODO GPU
             vf_filters = []
             
-            # Transferencia GPU a CPU solo si es necesario
-            if hasattr(self, '_gpu_decoder') and self._gpu_decoder == 'cuda' and gpu_mode != 'ultra_fast':
+            # 🚀 OPTIMIZACIÓN: Mantener más trabajo en GPU para reducir carga CPU
+            gpu_transfer_needed = False
+            if gpu_mode in ['quality', 'max_quality'] and self.enable_image_enhancement:
+                # Solo transferir si necesitamos filtros complejos que requieren CPU
+                gpu_transfer_needed = True
+            
+            if hasattr(self, '_gpu_decoder') and self._gpu_decoder == 'cuda' and gpu_transfer_needed:
                 vf_filters.append('hwdownload,format=nv12,format=yuv420p')
             
             # 1. Redimensionar (optimizado por modo)
