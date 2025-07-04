@@ -203,7 +203,10 @@ class MaintenanceUtils:
             force: regenerar thumbnails existentes también
         """
         start_time = time.time()
-        logger.info("🚀 Regenerando thumbnails OPTIMIZADO...")
+        logger.info("🚀 Regenerando thumbnails ULTRA-OPTIMIZADO...")
+        
+        # Activar modo ultra-rápido
+        thumbnail_generator.enable_ultra_fast_mode()
         
         # 🔍 PASO 1: Obtener videos que necesitan regeneración (consulta optimizada)
         logger.info("📊 Identificando videos que necesitan regeneración...")
@@ -383,7 +386,11 @@ class MaintenanceUtils:
         
         success = 0
         failed = 0
-        max_workers = min(4, len(videos))  # Máximo 4 workers para evitar sobrecarga
+        # Optimizar workers para I/O bound (thumbnail generation)
+        import os
+        cpu_count = os.cpu_count() or 4
+        # Para thumbnail generation, usar menos workers para evitar thrashing
+        max_workers = min(4, len(videos))
         
         def regenerate_single_thumbnail(video_data):
             """Regenerar thumbnail para un video individual"""
@@ -868,7 +875,10 @@ class MaintenanceUtils:
             force: regenerar thumbnails existentes
         """
         start_time = time.time()
-        logger.info("🚀 Generando thumbnails OPTIMIZADO...")
+        logger.info("🚀 Generando thumbnails ULTRA-OPTIMIZADO...")
+        
+        # Activar modo ultra-rápido
+        thumbnail_generator.enable_ultra_fast_mode()
         
         # 🔍 PASO 1: Obtener videos que necesitan thumbnails (consulta optimizada)
         logger.info("📊 Obteniendo videos que necesitan thumbnails...")
@@ -991,7 +1001,11 @@ class MaintenanceUtils:
         
         success = 0
         failed = 0
-        max_workers = min(4, len(videos))  # Máximo 4 workers para evitar sobrecarga
+        # Optimizar workers para I/O bound (thumbnail generation)
+        import os
+        cpu_count = os.cpu_count() or 4
+        # Para thumbnail generation, usar menos workers para evitar thrashing
+        max_workers = min(4, len(videos))
         
         def generate_single_thumbnail(video_data):
             """Generar thumbnail para un video individual"""

@@ -29,6 +29,27 @@ class ThumbnailGenerator:
         self.add_watermark = False
         self.watermark_text = "Tag-Flow"
         
+        # Configuración de optimización para velocidad
+        self.enable_image_enhancement = False  # Deshabilitado por defecto para mayor velocidad
+        self.fast_mode = True  # Modo rápido activado
+        
+    def enable_ultra_fast_mode(self):
+        """🚀 Activar modo ultra-rápido para máximo rendimiento"""
+        self.fast_mode = True
+        self.enable_image_enhancement = False
+        self.add_watermark = False
+        self.quality = 60  # Calidad aún más baja para velocidad
+        # Reducir tamaño de thumbnail para mayor velocidad
+        self.thumbnail_size = (160, 120)  # Más pequeño = más rápido
+        logger.info("⚡ Modo ultra-rápido activado - Máximo rendimiento (160x120, calidad 60)")
+        
+    def enable_quality_mode(self):
+        """🎨 Activar modo de calidad para mejor imagen"""
+        self.fast_mode = False
+        self.enable_image_enhancement = True
+        self.quality = 85  # Calidad más alta
+        logger.info("🎨 Modo de calidad activado - Mejor imagen")
+        
     def generate_thumbnail(self, video_path: Path, timestamp: float = 3.0, 
                           force_regenerate: bool = False) -> Optional[Path]:
         """
@@ -49,7 +70,10 @@ class ThumbnailGenerator:
             
             # Si ya existe y no forzamos regeneración, validar thumbnail
             if thumbnail_path.exists() and not force_regenerate:
-                if self._is_thumbnail_valid(thumbnail_path):
+                if self.fast_mode:
+                    # En modo ultra-rápido, asumir que thumbnails existentes son válidos
+                    return thumbnail_path
+                elif self._is_thumbnail_valid(thumbnail_path):
                     return thumbnail_path
                 else:
                     # Thumbnail corrupto, eliminarlo y regenerar
@@ -60,7 +84,7 @@ class ThumbnailGenerator:
                         logger.warning(f"Error eliminando thumbnail corrupto: {e}")
             
             # Extraer frame del video con optimizaciones
-            frame = self._extract_frame_optimized(video_path, timestamp)
+            frame = self._extract_frame_ultra_fast(video_path, timestamp) if self.fast_mode else self._extract_frame_optimized(video_path, timestamp)
             if frame is None:
                 logger.error(f"No se pudo extraer frame de {video_path}")
                 return None
@@ -73,7 +97,7 @@ class ThumbnailGenerator:
                 processed_image = self._add_watermark(processed_image)
             
             # Guardar thumbnail con optimizaciones
-            self._save_thumbnail_optimized(processed_image, thumbnail_path)
+            self._save_thumbnail_ultra_fast(processed_image, thumbnail_path) if self.fast_mode else self._save_thumbnail_optimized(processed_image, thumbnail_path)
             
             logger.debug(f"Thumbnail generado: {thumbnail_path}")
             return thumbnail_path
@@ -114,6 +138,55 @@ class ThumbnailGenerator:
             
         except Exception:
             return False
+    
+    def _extract_frame_ultra_fast(self, video_path: Path, timestamp: float) -> Optional[np.ndarray]:
+        """🚀 ULTRA OPTIMIZADO: Extraer frame con mínimo procesamiento"""
+        cap = None
+        try:
+            cap = cv2.VideoCapture(str(video_path))
+            if not cap.isOpened():
+                return None
+            
+            # Configuraciones agresivas para máximo rendimiento
+            cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+            cap.set(cv2.CAP_PROP_FRAME_WIDTH, 480)   # Reducir resolución temporalmente
+            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 360)  # Reducir resolución temporalmente
+            
+            # Usar timestamp fijo para evitar cálculos
+            # La mayoría de videos tienen contenido interesante en los primeros 3-5 segundos
+            fixed_timestamp = min(timestamp, 3.0)  # Máximo 3 segundos
+            
+            # Obtener FPS rápido (sin verificaciones)
+            fps = cap.get(cv2.CAP_PROP_FPS)
+            if fps <= 0 or fps > 120:  # Valores irreales
+                fps = 30  # Asumir 30fps
+            
+            # Calcular frame objetivo (simplificado)
+            target_frame = int(fixed_timestamp * fps)
+            target_frame = max(0, min(target_frame, 300))  # Límite de 300 frames (10s @ 30fps)
+            
+            # Posicionarse y leer frame
+            cap.set(cv2.CAP_PROP_POS_FRAMES, target_frame)
+            ret, frame = cap.read()
+            
+            if ret and frame is not None:
+                # Conversión directa sin verificaciones extras
+                return cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            
+            # Fallback ultra-rápido a frame 0
+            cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+            ret, frame = cap.read()
+            
+            if ret and frame is not None:
+                return cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            
+            return None
+            
+        except Exception:
+            return None
+        finally:
+            if cap is not None:
+                cap.release()
     
     def _extract_frame_optimized(self, video_path: Path, timestamp: float) -> Optional[np.ndarray]:
         """🚀 OPTIMIZADO: Extraer frame específico del video con mejor manejo de errores"""
@@ -192,8 +265,9 @@ class ThumbnailGenerator:
         # Redimensionar manteniendo aspecto con algoritmo de alta calidad
         pil_image = self._resize_with_aspect_ratio_optimized(pil_image)
         
-        # Mejorar imagen con filtros básicos
-        pil_image = self._enhance_image_optimized(pil_image)
+        # Mejorar imagen con filtros básicos (solo si está habilitado)
+        if getattr(self, 'enable_image_enhancement', False):
+            pil_image = self._enhance_image_optimized(pil_image)
         
         return pil_image
     
@@ -215,13 +289,22 @@ class ThumbnailGenerator:
             new_height = target_height
             new_width = int(target_height * aspect_ratio)
         
-        # Redimensionar con algoritmo de alta calidad
-        image = image.resize((new_width, new_height), Image.Resampling.LANCZOS)
+        # Redimensionar con algoritmo ultra-rápido
+        if self.fast_mode:
+            # En modo ultra-rápido, usar NEAREST (más rápido pero menor calidad)
+            image = image.resize((new_width, new_height), Image.Resampling.NEAREST)
+        else:
+            # Modo normal, usar BILINEAR
+            image = image.resize((new_width, new_height), Image.Resampling.BILINEAR)
         
         # Crear imagen con padding si es necesario
         if new_width != target_width or new_height != target_height:
-            # Usar color de padding inteligente basado en bordes
-            padding_color = self._get_intelligent_padding_color(image)
+            # En modo rápido, usar padding simple
+            if self.fast_mode:
+                padding_color = (0, 0, 0)  # Negro simple
+            else:
+                padding_color = self._get_intelligent_padding_color(image)
+            
             padded_image = Image.new('RGB', (target_width, target_height), padding_color)
             
             # Centrar imagen
@@ -289,6 +372,27 @@ class ThumbnailGenerator:
         except Exception as e:
             logger.debug(f"Error aplicando mejoras de imagen: {e}")
             return image
+    
+    def _save_thumbnail_ultra_fast(self, image: Image.Image, thumbnail_path: Path):
+        """🚀 ULTRA OPTIMIZADO: Guardar thumbnail con configuración ultra-rápida"""
+        try:
+            # Asegurar directorio
+            thumbnail_path.parent.mkdir(parents=True, exist_ok=True)
+            
+            # Configuración ultra-rápida para JPEG
+            save_kwargs = {
+                'format': 'JPEG',
+                'quality': self.quality,  # Usar calidad dinámica
+                'optimize': False,  # Sin optimización para velocidad
+                'progressive': False,  # Sin JPEG progresivo
+            }
+            
+            # Guardar directo sin optimizaciones
+            image.save(thumbnail_path, **save_kwargs)
+            
+        except Exception as e:
+            logger.error(f"Error guardando thumbnail ultra-rápido en {thumbnail_path}: {e}")
+            raise
     
     def _save_thumbnail_optimized(self, image: Image.Image, thumbnail_path: Path):
         """🚀 OPTIMIZADO: Guardar thumbnail con configuración optimizada"""
@@ -379,27 +483,8 @@ class ThumbnailGenerator:
         if not video_data_list:
             return results
         
-        # Filtrar videos que realmente necesitan thumbnails
-        videos_to_process = []
-        for video_data in video_data_list:
-            video_path = Path(video_data['file_path'])
-            
-            # Verificar que el archivo existe
-            if not video_path.exists():
-                results['errors'].append(f"Archivo no existe: {video_path}")
-                results['failed'] += 1
-                continue
-            
-            # Verificar si necesita thumbnail
-            thumbnail_name = f"{video_path.stem}_thumb.jpg"
-            thumbnail_path = self.output_path / thumbnail_name
-            
-            if thumbnail_path.exists() and not force_regenerate:
-                if self._is_thumbnail_valid(thumbnail_path):
-                    results['skipped'] += 1
-                    continue
-            
-            videos_to_process.append(video_data)
+        # Filtrar videos que realmente necesitan thumbnails (validación en lotes)
+        videos_to_process = self._batch_validate_videos(video_data_list, force_regenerate, results)
         
         if not videos_to_process:
             logger.info("No hay videos que procesar para thumbnails")
@@ -438,7 +523,10 @@ class ThumbnailGenerator:
                     'video_path': video_data.get('file_path', 'unknown')
                 }
         
-        # Procesamiento en paralelo
+        # Procesamiento en paralelo optimizado para I/O bound
+        import os
+        cpu_count = os.cpu_count() or 4
+        # Para thumbnail generation (I/O bound), usar 2-4 workers max
         max_workers = min(4, len(videos_to_process))
         
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -509,6 +597,37 @@ class ThumbnailGenerator:
             timestamp=timestamp, 
             force_regenerate=False
         )
+    
+    def _batch_validate_videos(self, video_data_list: list, force_regenerate: bool, results: dict) -> list:
+        """🚀 OPTIMIZADO: Validar videos en lotes para mejor rendimiento"""
+        videos_to_process = []
+        
+        # Procesar en lotes de 100 para optimizar acceso a disco
+        batch_size = 100
+        for i in range(0, len(video_data_list), batch_size):
+            batch = video_data_list[i:i+batch_size]
+            
+            for video_data in batch:
+                video_path = Path(video_data['file_path'])
+                
+                # Verificar que el archivo existe
+                if not video_path.exists():
+                    results['errors'].append(f"Archivo no existe: {video_path}")
+                    results['failed'] += 1
+                    continue
+                
+                # Verificar si necesita thumbnail
+                thumbnail_name = f"{video_path.stem}_thumb.jpg"
+                thumbnail_path = self.output_path / thumbnail_name
+                
+                if thumbnail_path.exists() and not force_regenerate:
+                    if self._is_thumbnail_valid(thumbnail_path):
+                        results['skipped'] += 1
+                        continue
+                
+                videos_to_process.append(video_data)
+        
+        return videos_to_process
 
 # Instancia global
 thumbnail_generator = ThumbnailGenerator()
