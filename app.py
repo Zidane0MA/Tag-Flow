@@ -83,6 +83,7 @@ def index():
             else:
                 video['final_characters'] = []
             
+            
             # URL del thumbnail
             if video.get('thumbnail_path'):
                 video['thumbnail_url'] = f"/thumbnail/{Path(video['thumbnail_path']).name}"
@@ -666,6 +667,194 @@ def api_bulk_restore_videos():
     except Exception as e:
         logger.error(f"Error en restauración masiva: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/videos/bulk-update', methods=['POST'])
+def api_bulk_update_videos():
+    """API para actualizar múltiples videos (actualización masiva simple)"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'error': 'No data provided'}), 400
+        
+        video_ids = data.get('video_ids', [])
+        updates = data.get('updates', {})
+        
+        if not video_ids:
+            return jsonify({'success': False, 'error': 'No video IDs provided'}), 400
+        
+        if not updates:
+            return jsonify({'success': False, 'error': 'No updates provided'}), 400
+        
+        # Preparar updates para batch
+        video_updates = []
+        for video_id in video_ids:
+            video_updates.append({
+                'video_id': video_id,
+                'updates': updates
+            })
+        
+        successful, failed = db.batch_update_videos(video_updates)
+        
+        return jsonify({
+            'success': True,
+            'message': f'{successful} videos actualizados, {failed} fallidos',
+            'successful': successful,
+            'failed': failed,
+            'total': len(video_ids)
+        })
+        
+    except Exception as e:
+        logger.error(f"Error en actualización masiva: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/videos/bulk-edit', methods=['POST'])
+def api_bulk_edit_videos():
+    """API para edición masiva avanzada de videos"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'error': 'No data provided'}), 400
+        
+        video_ids = data.get('video_ids', [])
+        updates = data.get('updates', {})
+        options = data.get('options', {})
+        
+        if not video_ids:
+            return jsonify({'success': False, 'error': 'No video IDs provided'}), 400
+        
+        # Validar campos permitidos
+        allowed_fields = {
+            'final_music', 'final_music_artist', 'final_characters', 
+            'difficulty_level', 'edit_status', 'notes'
+        }
+        
+        # Preparar updates con opciones de limpieza
+        processed_updates = {}
+        for field, value in updates.items():
+            if field in allowed_fields and value is not None and value != '':
+                if field == 'final_characters' and isinstance(value, list):
+                    processed_updates[field] = value
+                else:
+                    processed_updates[field] = value
+        
+        # Aplicar opciones de limpieza
+        if options.get('clear_music'):
+            processed_updates['final_music'] = None
+        if options.get('clear_artist'):
+            processed_updates['final_music_artist'] = None
+        if options.get('clear_characters'):
+            processed_updates['final_characters'] = []
+        if options.get('clear_notes'):
+            processed_updates['notes'] = None
+        
+        if not processed_updates and not any(options.values()):
+            return jsonify({'success': False, 'error': 'No changes to apply'}), 400
+        
+        # Preparar updates para batch
+        video_updates = []
+        for video_id in video_ids:
+            video_updates.append({
+                'video_id': video_id,
+                'updates': processed_updates
+            })
+        
+        successful, failed = db.batch_update_videos(video_updates)
+        
+        # Manejar opciones avanzadas (placeholder para futuras funcionalidades)
+        additional_actions = []
+        if options.get('reprocess'):
+            additional_actions.append('reprocesar (pendiente de implementar)')
+        if options.get('regenerate_thumbnails'):
+            additional_actions.append('regenerar thumbnails (pendiente de implementar)')
+        
+        message = f'{successful} videos editados, {failed} fallidos'
+        if additional_actions:
+            message += f'. Acciones adicionales: {", ".join(additional_actions)}'
+        
+        return jsonify({
+            'success': True,
+            'message': message,
+            'successful': successful,
+            'failed': failed,
+            'total': len(video_ids),
+            'additional_actions': additional_actions
+        })
+        
+    except Exception as e:
+        logger.error(f"Error en edición masiva: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/videos/bulk-delete', methods=['POST'])
+def api_bulk_delete_videos_alias():
+    """Alias para compatibilidad con nomenclatura consistente"""
+    return api_bulk_delete_videos()
+
+# ===== API ENDPOINTS PARA REANÁLISIS DE VIDEOS =====
+
+@app.route('/api/video/<int:video_id>/reanalyze', methods=['POST'])
+def api_reanalyze_video(video_id):
+    """API para reanalizar un video específico"""
+    try:
+        data = request.get_json() or {}
+        force = data.get('force', False)  # Forzar reanálisis aunque ya esté procesado
+        
+        # Verificar que el video existe
+        video = db.get_video(video_id)
+        if not video:
+            return jsonify({'success': False, 'error': 'Video no encontrado'}), 404
+        
+        # Verificar que el archivo existe
+        video_path = Path(video['file_path'])
+        if not video_path.exists():
+            return jsonify({'success': False, 'error': 'Archivo de video no encontrado'}), 404
+        
+        # Marcar como procesando
+        db.update_video(video_id, {
+            'processing_status': 'procesando',
+            'error_message': None
+        })
+        
+        # Ejecutar reanálisis en background usando subprocess
+        try:
+            cmd = [
+                'python', 'main.py', 
+                '--reanalyze-video', str(video_id),
+                '--limit', '1'
+            ]
+            
+            if force:
+                cmd.append('--force')
+            
+            # Ejecutar comando de forma asíncrona
+            process = subprocess.Popen(
+                cmd,
+                cwd=str(Path(__file__).parent),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True
+            )
+            
+            logger.info(f"Iniciado reanálisis del video {video_id} con PID {process.pid}")
+            
+            return jsonify({
+                'success': True,
+                'message': f'Reanálisis iniciado para video {video_id}',
+                'video_id': video_id,
+                'process_id': process.pid
+            })
+            
+        except Exception as e:
+            # Revertir estado en caso de error
+            db.update_video(video_id, {
+                'processing_status': 'error',
+                'error_message': f'Error iniciando reanálisis: {str(e)}'
+            })
+            raise e
+            
+    except Exception as e:
+        logger.error(f"Error reanalizing video {video_id}: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 
 @app.route('/trash')
 def trash():

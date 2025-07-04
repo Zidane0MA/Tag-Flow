@@ -981,7 +981,7 @@ function updateOverlayInfo(video) {
         `;
     }
     
-    // Tags/personajes
+    // Personajes detectados
     const tagsContainer = document.getElementById('current-video-tags');
     if (tagsContainer) {
         if (video.characters && video.characters.length > 0) {

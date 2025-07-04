@@ -224,6 +224,23 @@ function debounce(func, wait) {
 }
 
 /**
+ * Throttle para funciones que se ejecutan frecuentemente
+ * @param {Function} func - Función a ejecutar
+ * @param {number} wait - Tiempo mínimo entre ejecuciones en ms
+ * @returns {Function} Función con throttle aplicado
+ */
+function throttle(func, wait) {
+    let lastTime = 0;
+    return function executedFunction(...args) {
+        const now = Date.now();
+        if (now - lastTime >= wait) {
+            lastTime = now;
+            func(...args);
+        }
+    };
+}
+
+/**
  * Formatear duración en segundos a formato legible
  * @param {number} seconds - Duración en segundos
  * @returns {string} Duración formateada
@@ -287,6 +304,7 @@ window.TagFlow.utils = {
     showNotification,
     apiRequest,
     debounce,
+    throttle,
     formatDuration,
     formatFileSize,
     isValidString,

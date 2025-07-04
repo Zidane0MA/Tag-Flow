@@ -165,24 +165,60 @@
 
 /* Responsive mejorado */
 @media (max-width: 768px) {
-    /* Filtros en móvil */
+    /* Filtros en móvil - mejorado */
     .card-header h5 {
-        font-size: 1.1rem;
+        font-size: 1rem;
     }
     
     .form-label {
-        font-size: 0.9rem;
+        font-size: 0.85rem;
         margin-bottom: 0.25rem;
+        font-weight: 600;
     }
     
     .form-control, .form-select {
-        font-size: 0.9rem;
-        padding: 0.5rem;
+        font-size: 0.85rem;
+        padding: 0.6rem 0.75rem;
+        border-radius: 6px;
     }
     
-    /* Cards de video en tablet */
+    /* Mejorar filtros en móvil */
+    .row.g-3 {
+        --bs-gutter-x: 0.75rem;
+        --bs-gutter-y: 0.75rem;
+    }
+    
+    .col-md-3, .col-md-2, .col-md-1 {
+        margin-bottom: 0.75rem;
+    }
+    
+    /* Búsqueda más grande en móvil */
+    #search-input {
+        font-size: 16px; /* Prevenir zoom en iOS */
+        padding: 0.75rem;
+    }
+    
+    /* Botones de filtro más accesibles */
+    .input-group .btn {
+        padding: 0.75rem 1rem;
+        min-width: 50px;
+    }
+    
+    /* Cards de video en tablet - mejorado */
     .thumbnail-image {
-        height: 180px;
+        height: 160px;
+    }
+    
+    /* Mejorar legibilidad en móvil */
+    .card-title {
+        font-size: 1.1rem;
+        font-weight: 600;
+        line-height: 1.3;
+    }
+    
+    .card-text {
+        font-size: 0.9rem;
+        line-height: 1.4;
     }
     
     .overlay-buttons .btn {
@@ -213,28 +249,59 @@
         font-size: 0.85rem;
     }
     
-    /* Paginación en móvil */
+    /* Paginación en móvil - mejorado */
     .pagination .page-link {
-        padding: 0.5rem 0.75rem;
+        padding: 0.6rem 0.8rem;
         font-size: 0.9rem;
+        min-width: 44px;
+        min-height: 44px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .pagination .page-item {
+        margin: 0 0.1rem;
+    }
+    
+    /* Ocultar números de página en móvil pequeño */
+    .pagination .page-link:not(:first-child):not(:last-child) {
+        display: none;
+    }
+    
+    .pagination .page-item.active .page-link {
+        display: flex;
     }
 }
 
 @media (max-width: 576px) {
-    /* Móviles pequeños */
+    /* Móviles pequeños - mejorado */
     .col-xl-3, .col-lg-4, .col-md-6 {
         margin-bottom: 1rem;
         padding-left: 0.25rem;
         padding-right: 0.25rem;
     }
     
-    /* Filtros compactos en móvil */
+    /* Filtros compactos en móvil - stack vertical */
     .row.g-3 {
         --bs-gutter-x: 0.5rem;
+        --bs-gutter-y: 0.5rem;
     }
     
     .col-md-3, .col-md-2, .col-md-1 {
         margin-bottom: 0.5rem;
+    }
+    
+    /* Hacer filtros de una columna en móvil */
+    .col-md-3, .col-md-2, .col-md-1 {
+        flex: 0 0 auto;
+        width: 100%;
+    }
+    
+    /* Excepción para botón limpiar - mantener en línea */
+    .col-md-1:last-child {
+        width: auto;
+        flex: 0 0 auto;
     }
     
     /* Cards compactas */
@@ -304,19 +371,51 @@
         margin-right: 0.15rem;
     }
     
-    /* Paginación compacta */
+    /* Paginación compacta - mejorado */
     .pagination {
         margin-bottom: 0;
+        justify-content: center;
     }
     
     .pagination .page-link {
-        padding: 0.25rem 0.5rem;
+        padding: 0.4rem 0.6rem;
         font-size: 0.8rem;
+        min-width: 40px;
+        min-height: 40px;
     }
     
-    /* Ocultar algunos elementos en móviles muy pequeños */
+    /* Mostrar solo navegación esencial en móvil */
+    .pagination .page-item:not(.active):not(:first-child):not(:last-child):not(:nth-child(2)):not(:nth-last-child(2)) {
+        display: none;
+    }
+    
+    /* Ocultar algunos elementos en móviles muy pequeños - mejorado */
     .badge.bg-info:last-child {
         display: none; /* Ocultar badge de plataforma */
+    }
+    
+    /* Simplificar overlay en móviles */
+    .card-overlay {
+        background: rgba(0, 0, 0, 0.8);
+    }
+    
+    /* Mejorar visibilidad de texto en móvil */
+    .card-text {
+        color: #333;
+        font-weight: 500;
+    }
+    
+    .text-muted {
+        color: #666 !important;
+        font-weight: 400;
+    }
+    
+    /* Mejorar contraste de badges */
+    .badge {
+        font-size: 0.65rem;
+        padding: 0.2rem 0.4rem;
+        font-weight: 600;
+        border: 1px solid rgba(255,255,255,0.2);
     }
     
     /* Estadísticas más compactas */

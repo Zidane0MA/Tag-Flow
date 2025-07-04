@@ -10,6 +10,7 @@ config/tag-flow-0268193d12b4.json
 # Base de datos y datos generados
 !data/
 *.db
+.claude/
 *.sqlite
 *.sqlite3
 datos_videos.json

@@ -99,13 +99,16 @@
                         </a>
                     </div>
                 </form>
+                
+                
+                </form>
             </div>
         </div>
     </div>
 </div>
 
 <!-- Filtros activos -->
-{% if request.args.get('search') or request.args.get('creator') or request.args.get('platform') or request.args.get('status') or request.args.get('processing_status') or request.args.get('difficulty') %}
+{% if request.args.get('search') or request.args.get('creator') or request.args.get('platform') or request.args.get('status') or request.args.get('processing_status') or request.args.get('difficulty') or request.args.get('tags') %}
 <div class="row mb-3">
     <div class="col-12">
         <div class="alert alert-info d-flex justify-content-between align-items-center">
@@ -138,6 +141,65 @@
     </div>
 </div>
 {% endif %}
+
+<!-- Panel de Edición Masiva -->
+<div class="row mb-3" id="bulk-edit-panel" style="display: none;">
+    <div class="col-12">
+        <div class="card border-primary">
+            <div class="card-header bg-primary text-white">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="mb-0">
+                            <i class="fas fa-check-square me-2"></i>Edición Masiva
+                        </h6>
+                        <small id="selection-count">0 videos seleccionados</small>
+                    </div>
+                    <div class="btn-group btn-group-sm">
+                        <button class="btn btn-outline-light" onclick="clearBulkSelection()">
+                            <i class="fas fa-times me-1"></i>Limpiar
+                        </button>
+                        <button class="btn btn-light text-primary" onclick="openBulkEditModal()">
+                            <i class="fas fa-edit me-1"></i>Editar Seleccionados
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body py-2">
+                <div class="row">
+                    <div class="col-auto">
+                        <label class="form-check-label">
+                            <input type="checkbox" class="form-check-input me-1" id="select-all-videos" onchange="toggleSelectAll()">
+                            Seleccionar todo
+                        </label>
+                    </div>
+                    <div class="col">
+                        <div class="btn-group btn-group-sm me-2" role="group">
+                            <button class="btn btn-outline-secondary" onclick="bulkSetStatus('nulo')">
+                                <i class="fas fa-circle me-1"></i>Sin Edición
+                            </button>
+                            <button class="btn btn-outline-warning" onclick="bulkSetStatus('en_proceso')">
+                                <i class="fas fa-play me-1"></i>En Proceso
+                            </button>
+                            <button class="btn btn-outline-success" onclick="bulkSetStatus('hecho')">
+                                <i class="fas fa-check me-1"></i>Completado
+                            </button>
+                        </div>
+                        <div class="btn-group btn-group-sm me-2" role="group">
+                            <button class="btn btn-outline-info" onclick="bulkReanalyzeVideos()">
+                                <i class="fas fa-sync me-1"></i>Reanalizar Seleccionados
+                            </button>
+                        </div>
+                        <div class="btn-group btn-group-sm" role="group">
+                            <button class="btn btn-outline-danger" onclick="bulkDeleteVideos()">
+                                <i class="fas fa-trash me-1"></i>Eliminar Seleccionados
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 
 <!-- Estadísticas -->
 {% if stats %}
@@ -177,7 +239,7 @@
 </div>
 {% endif %}
 <!-- Galería de videos -->
-<div class="row" id="videos-container">
+<div class="row" id="videos-container" data-total-videos="{{ total_videos }}" data-per-page="{{ per_page }}" data-current-page="{{ page }}">
     {% if videos %}
         {% for video in videos %}
         <div class="col-xl-3 col-lg-4 col-md-6 col-sm-12 mb-4 video-card-wrapper" 
@@ -189,6 +251,12 @@
              data-video-id="{{ video.id }}">
             
             <div class="card video-card h-100">
+                <!-- Checkbox de selección -->
+                <div class="position-absolute" style="top: 0.5rem; left: 0.5rem; z-index: 10;">
+                    <input type="checkbox" class="form-check-input video-select" 
+                           value="{{ video.id }}" onchange="updateBulkSelection()">
+                </div>
+                
                 <!-- Thumbnail -->
                 <div class="card-img-top-container position-relative">
                     {% if video.thumbnail_path %}
@@ -217,6 +285,11 @@
                                     title="Editar" 
                                     onclick="editVideo('{{ video.id }}')">
                                 <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="btn btn-warning btn-sm" 
+                                    title="Reanalizar música y personajes" 
+                                    onclick="reanalyzeVideo('{{ video.id }}')">
+                                <i class="fas fa-sync"></i>
                             </button>
                             <button class="btn btn-info btn-sm" 
                                     title="Abrir carpeta" 
@@ -401,7 +474,7 @@
 
 <!-- Paginación mejorada -->
 {% if total_videos > per_page %}
-<nav aria-label="Paginación de videos" class="mt-4">
+<nav aria-label="Paginación de videos" class="mt-4" id="pagination-controls">
     <div class="row align-items-center">
         <div class="col-md-6">
             <p class="text-muted mb-0">
@@ -478,6 +551,22 @@
     </div>
 </nav>
 {% endif %}
+
+<!-- Indicador de carga para scroll infinito -->
+<div id="infinite-loading" class="text-center py-4" style="display: none;">
+    <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Cargando más videos...</span>
+    </div>
+    <p class="mt-2 text-muted">Cargando más videos...</p>
+</div>
+
+<!-- Mensaje de fin para scroll infinito -->
+<div id="infinite-end" class="text-center py-4" style="display: none;">
+    <p class="text-muted mb-0">
+        <i class="fas fa-check-circle text-success me-2"></i>
+        Has visto todos los videos disponibles
+    </p>
+</div>
 
 <!-- Modal de reproducción tipo TikTok/Shorts -->
 <div class="modal fade" id="videoShortsModal" tabindex="-1" aria-labelledby="videoShortsModalLabel" aria-hidden="true" data-bs-backdrop="static">
@@ -727,6 +816,161 @@
         </div>
     </div>
 </div>
+
+<!-- Modal de edición masiva -->
+<div class="modal fade" id="bulkEditModal" tabindex="-1" aria-labelledby="bulkEditModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="bulkEditModalLabel">
+                    <i class="fas fa-edit me-2"></i>Edición Masiva
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <strong id="bulk-video-count">0</strong> videos seleccionados para edición masiva.
+                    Los campos vacíos no se modificarán.
+                </div>
+                
+                <form id="bulk-edit-form">
+                    <div class="row">
+                        <!-- Estado de edición -->
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="bulk-edit-status" class="form-label">Estado de Edición</label>
+                                <select class="form-select" id="bulk-edit-status" name="edit_status">
+                                    <option value="">No modificar</option>
+                                    <option value="nulo">Sin Edición</option>
+                                    <option value="en_proceso">En proceso</option>
+                                    <option value="hecho">Completado</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <!-- Nivel de dificultad -->
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="bulk-difficulty-level" class="form-label">Nivel de Dificultad</label>
+                                <select class="form-select" id="bulk-difficulty-level" name="difficulty_level">
+                                    <option value="">No modificar</option>
+                                    <option value="bajo">Bajo</option>
+                                    <option value="medio">Medio</option>
+                                    <option value="alto">Alto</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <!-- Música -->
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="bulk-final-music" class="form-label">Música</label>
+                                <input type="text" class="form-control" id="bulk-final-music" name="final_music" 
+                                       placeholder="Dejar vacío para no modificar">
+                                <div class="form-check mt-2">
+                                    <input class="form-check-input" type="checkbox" id="bulk-clear-music">
+                                    <label class="form-check-label" for="bulk-clear-music">
+                                        Limpiar música existente
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Artista -->
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="bulk-final-music-artist" class="form-label">Artista</label>
+                                <input type="text" class="form-control" id="bulk-final-music-artist" name="final_music_artist" 
+                                       placeholder="Dejar vacío para no modificar">
+                                <div class="form-check mt-2">
+                                    <input class="form-check-input" type="checkbox" id="bulk-clear-artist">
+                                    <label class="form-check-label" for="bulk-clear-artist">
+                                        Limpiar artista existente
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Personajes -->
+                    <div class="mb-3">
+                        <label for="bulk-final-characters" class="form-label">Personajes</label>
+                        <textarea class="form-control" id="bulk-final-characters" name="final_characters" rows="2"
+                                  placeholder="Lista de personajes separados por comas (dejar vacío para no modificar)"></textarea>
+                        <div class="form-text">Separa múltiples personajes con comas</div>
+                        <div class="form-check mt-2">
+                            <input class="form-check-input" type="checkbox" id="bulk-clear-characters">
+                            <label class="form-check-label" for="bulk-clear-characters">
+                                Limpiar personajes existentes
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <!-- Notas -->
+                    <div class="mb-3">
+                        <label for="bulk-notes" class="form-label">Notas</label>
+                        <textarea class="form-control" id="bulk-notes" name="notes" rows="3"
+                                  placeholder="Notas adicionales (dejar vacío para no modificar)"></textarea>
+                        <div class="form-check mt-2">
+                            <input class="form-check-input" type="checkbox" id="bulk-clear-notes">
+                            <label class="form-check-label" for="bulk-clear-notes">
+                                Limpiar notas existentes
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <!-- Opciones avanzadas -->
+                    <div class="accordion" id="bulkAdvancedOptions">
+                        <div class="accordion-item">
+                            <h2 class="accordion-header" id="headingBulkAdvanced">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" 
+                                        data-bs-target="#collapseBulkAdvanced" aria-expanded="false" aria-controls="collapseBulkAdvanced">
+                                    <i class="fas fa-cogs me-2"></i>Opciones Avanzadas
+                                </button>
+                            </h2>
+                            <div id="collapseBulkAdvanced" class="accordion-collapse collapse" aria-labelledby="headingBulkAdvanced" 
+                                 data-bs-parent="#bulkAdvancedOptions">
+                                <div class="accordion-body">
+                                    <div class="alert alert-warning">
+                                        <i class="fas fa-exclamation-triangle me-2"></i>
+                                        <strong>Cuidado:</strong> Estas acciones afectarán todos los videos seleccionados.
+                                    </div>
+                                    
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" id="bulk-reprocess">
+                                        <label class="form-check-label" for="bulk-reprocess">
+                                            <strong>Reprocesar automáticamente</strong> - Ejecutar detección de música y personajes
+                                        </label>
+                                    </div>
+                                    
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" id="bulk-regenerate-thumbnails">
+                                        <label class="form-check-label" for="bulk-regenerate-thumbnails">
+                                            <strong>Regenerar thumbnails</strong> - Crear nuevas miniaturas
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-warning" onclick="previewBulkChanges()">
+                    <i class="fas fa-eye me-1"></i>Vista Previa
+                </button>
+                <button type="button" class="btn btn-primary" onclick="applyBulkChanges()">
+                    <i class="fas fa-save me-1"></i>Aplicar Cambios
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 
 <!-- Loading overlay -->
 <div id="loading-overlay" class="loading-overlay" style="display: none;">

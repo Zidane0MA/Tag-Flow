@@ -24,6 +24,7 @@ python main.py [opciones]
   - `iwara`, `NOMBRE`: Plataforma específica por nombre (auto-detectada)
   - `other`: Solo plataformas adicionales (no principales)
   - `all-platforms`: Todas las plataformas (principales + adicionales)
+  - `--reanalyze-video`: Reanalizar video específico por ID
 
 **Rendimiento Enterprise:**
 - **0.01ms promedio** por detección (2000x más rápido)
@@ -57,6 +58,9 @@ python main.py --platform other --source organized         # Solo adicionales de
 
 # Procesamiento masivo enterprise
 python main.py --limit 5000                       # 5000 videos en <40 segundos
+
+python main.py --reanalyze-video 123             # Reanalizar video específico por ID
+python main.py --reanalyze-video 123 --force     # Forzar reanálisis sobrescribiendo datos
 ```
 
 **Plataformas Disponibles (ESCALABLES):**

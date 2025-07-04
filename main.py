@@ -709,6 +709,88 @@ class VideoAnalyzer:
             logger.error(f"Error en ejecución principal: {e}")
             raise
 
+def reanalyze_single_video(video_id, force=False):
+    """Reanalizar un video específico por su ID"""
+    try:
+        print(f"Tag-Flow V2 - Reanálisis de Video ID: {video_id}")
+        print("=" * 60)
+        
+        # Verificar que el video existe
+        video = db.get_video(video_id)
+        if not video:
+            print(f"Error: Video con ID {video_id} no encontrado en la base de datos")
+            return False
+        
+        print(f"Video encontrado: {video['file_name']}")
+        print(f"Creador: {video['creator_name']}")
+        print(f"Plataforma: {video['platform']}")
+        print(f"Estado actual: {video['processing_status']}")
+        
+        # Verificar que el archivo existe
+        video_path = Path(video['file_path'])
+        if not video_path.exists():
+            print(f"Error: Archivo no encontrado en: {video_path}")
+            db.update_video(video_id, {
+                'processing_status': 'error',
+                'error_message': 'Archivo no encontrado'
+            })
+            return False
+        
+        # Verificar si ya está procesado y no es forzado
+        if video['processing_status'] == 'completado' and not force:
+            print("Video ya está procesado. Use --force para forzar reanálisis.")
+            return False
+        
+        # Marcar como procesando
+        db.update_video(video_id, {
+            'processing_status': 'procesando',
+            'error_message': None
+        })
+        
+        print("Iniciando reanálisis...")
+        
+        # Crear VideoAnalyzer
+        analyzer = VideoAnalyzer()
+        
+        # Preparar datos del video en formato compatible
+        video_data = {
+            'file_path': video['file_path'],
+            'file_name': video['file_name'],
+            'creator_name': video['creator_name'],
+            'platform': video['platform'],
+            'title': video.get('description', ''),
+            'content_type': 'video',
+            'existing_video_id': video_id,  # Marcador para identificar reanálisis
+            'source_type': 'reanalysis'
+        }
+        
+        # Procesar el video
+        result = analyzer.process_video(video_data)
+        
+        if result.get('success'):
+            print(f"✅ Reanálisis completado exitosamente")
+            print(f"   Música detectada: {result.get('detected_music', 'N/A')}")
+            print(f"   Personajes detectados: {len(result.get('detected_characters', []))}")
+            return True
+        else:
+            print(f"❌ Error en reanálisis: {result.get('error', 'Error desconocido')}")
+            return False
+            
+    except Exception as e:
+        print(f"❌ Error fatal en reanálisis: {e}")
+        logger.error(f"Error reanalizing video {video_id}: {e}")
+        
+        # Marcar como error en la BD
+        try:
+            db.update_video(video_id, {
+                'processing_status': 'error',
+                'error_message': str(e)
+            })
+        except:
+            pass
+            
+        return False
+
 def main():
     """Función principal"""
     parser = argparse.ArgumentParser(
@@ -723,6 +805,8 @@ Ejemplos de uso:
   python main.py --source organized --limit 20     # Procesar 20 videos solo de carpetas organizadas
   python main.py --platform other --limit 10       # Procesar 10 videos de plataformas adicionales
   python main.py --platform all-platforms          # Procesar videos de todas las plataformas
+  python main.py --reanalyze-video 123             # Reanalizar video específico por ID
+  python main.py --reanalyze-video 123 --force     # Forzar reanálisis sobrescribiendo datos
 
 Opciones de source:
   db        = Solo bases de datos externas (4K Apps)
@@ -771,12 +855,29 @@ Notas:
         help=f'Plataforma específica. Principales: youtube, tiktok, instagram. Adicionales: {", ".join(available_platforms["additional"].keys()) if available_platforms["additional"] else "ninguna"}. Especiales: other (solo adicionales), all-platforms (todas)'
     )
     
+    # Opción para reanálisis de video específico
+    parser.add_argument(
+        '--reanalyze-video',
+        type=int,
+        help='ID del video específico a reanalizar (fuerza re-procesamiento de música y personajes)'
+    )
+    
+    parser.add_argument(
+        '--force',
+        action='store_true',
+        help='Forzar reanálisis sobrescribiendo datos existentes'
+    )
+    
     args = parser.parse_args()
     
     # Validaciones
     if args.limit is not None and args.limit <= 0:
         print("Error: El límite debe ser un número positivo")
         sys.exit(1)
+    
+    # Modo especial: reanálisis de video específico
+    if args.reanalyze_video:
+        return reanalyze_single_video(args.reanalyze_video, args.force)
     
     # Mostrar información de configuración
     print("Tag-Flow V2 - Procesador con Flags Profesionales")
