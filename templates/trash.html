@@ -1,0 +1,558 @@
+{% extends "base.html" %}
+
+{% block title %}Papelera{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/gallery.css') }}">
+<style>
+/* Estilos específicos para papelera */
+.trash-card {
+    opacity: 0.8;
+    border: 2px solid #dc3545;
+    background: #fef2f2;
+}
+
+.trash-card .card-img-top {
+    filter: grayscale(0.5);
+}
+
+.trash-badge {
+    background: #dc3545 !important;
+    color: white;
+    font-weight: bold;
+}
+
+.deleted-info {
+    background: #ffe6e6;
+    border-left: 4px solid #dc3545;
+    padding: 0.5rem;
+    margin: 0.5rem 0;
+    border-radius: 4px;
+}
+
+.danger-zone {
+    background: #fff5f5;
+    border: 1px solid #fed7d7;
+    border-radius: 8px;
+    padding: 1rem;
+    margin: 1rem 0;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header de papelera -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h4 class="mb-0">
+                        <i class="fas fa-trash me-2"></i>Papelera de Videos
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <p class="mb-2">
+                                <i class="fas fa-info-circle text-info me-2"></i>
+                                Los videos eliminados se mantienen aquí hasta ser eliminados permanentemente.
+                            </p>
+                            <p class="mb-0">
+                                <strong>Total en papelera:</strong> {{ total_deleted }} videos
+                            </p>
+                        </div>
+                        <div class="col-md-4 text-end">
+                            <a href="{{ url_for('index') }}" class="btn btn-outline-primary me-2">
+                                <i class="fas fa-arrow-left me-1"></i>Volver a Galería
+                            </a>
+                            <button class="btn btn-outline-success" onclick="bulkRestore()" id="bulk-restore-btn" disabled>
+                                <i class="fas fa-undo me-1"></i>Restaurar Seleccionados
+                            </button>
+                            <button class="btn btn-outline-danger ms-2" onclick="bulkPermanentDelete()" id="bulk-delete-btn" disabled>
+                                <i class="fas fa-times me-1"></i>Eliminar Permanentemente
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtros de selección -->
+    {% if videos %}
+    <div class="row mb-3">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <label class="form-check-label me-3">
+                                <input type="checkbox" class="form-check-input me-1" id="select-all" onchange="toggleSelectAll()">
+                                Seleccionar todo
+                            </label>
+                            <span class="text-muted" id="selection-count">0 videos seleccionados</span>
+                        </div>
+                        <div>
+                            <button class="btn btn-sm btn-outline-info" onclick="clearSelection()">
+                                <i class="fas fa-times me-1"></i>Limpiar selección
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Galería de videos eliminados -->
+    <div class="row" id="trash-container">
+        {% if videos %}
+            {% for video in videos %}
+            <div class="col-xl-3 col-lg-4 col-md-6 col-sm-12 mb-4 video-card-wrapper" data-video-id="{{ video.id }}">
+                <div class="card trash-card h-100">
+                    <!-- Checkbox de selección -->
+                    <div class="position-absolute" style="top: 0.5rem; left: 0.5rem; z-index: 10;">
+                        <input type="checkbox" class="form-check-input video-select" 
+                               value="{{ video.id }}" onchange="updateSelection()">
+                    </div>
+
+                    <!-- Thumbnail -->
+                    <div class="card-img-top-container position-relative">
+                        <img src="{{ video.thumbnail_url }}" 
+                             class="card-img-top thumbnail-image" 
+                             alt="Thumbnail de {{ video.file_name }}"
+                             loading="lazy"
+                             onerror="this.src='/static/img/no-thumbnail.svg'">
+                        
+                        <!-- Badge de eliminado -->
+                        <div class="position-absolute top-0 end-0 m-2">
+                            <span class="badge trash-badge">
+                                <i class="fas fa-trash me-1"></i>ELIMINADO
+                            </span>
+                        </div>
+                        
+                        <!-- Overlay con botones de restauración -->
+                        <div class="card-overlay">
+                            <div class="overlay-buttons">
+                                <button class="btn btn-success btn-sm" 
+                                        title="Restaurar video" 
+                                        onclick="restoreVideo('{{ video.id }}')">
+                                    <i class="fas fa-undo"></i>
+                                </button>
+                                <button class="btn btn-warning btn-sm" 
+                                        title="Ver detalles" 
+                                        onclick="viewDeletedVideoDetails('{{ video.id }}')">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                                <button class="btn btn-danger btn-sm" 
+                                        title="Eliminar permanentemente" 
+                                        onclick="permanentDeleteVideo('{{ video.id }}')">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Información del video -->
+                    <div class="card-body">
+                        <h6 class="card-title">{{ video.creator_name }}</h6>
+                        <p class="card-text small text-muted mb-2" title="{{ video.file_name }}">
+                            {{ video.file_name[:50] }}{% if video.file_name|length > 50 %}...{% endif %}
+                        </p>
+                        
+                        <!-- Información de eliminación -->
+                        <div class="deleted-info">
+                            <small>
+                                <strong>Eliminado:</strong> {{ video.deleted_at[:16] if video.deleted_at else 'Fecha desconocida' }}<br>
+                                {% if video.deleted_by %}
+                                <strong>Por:</strong> {{ video.deleted_by }}<br>
+                                {% endif %}
+                                {% if video.deletion_reason %}
+                                <strong>Razón:</strong> {{ video.deletion_reason }}
+                                {% endif %}
+                            </small>
+                        </div>
+                        
+                        <!-- Música y personajes (grisados) -->
+                        <div class="mb-2 opacity-75">
+                            <i class="fas fa-music text-secondary me-1"></i>
+                            <small class="text-muted">
+                                {% if video.final_music or video.detected_music %}
+                                    {{ video.final_music or video.detected_music }}
+                                    {% if video.final_music_artist or video.detected_music_artist %}
+                                        - {{ video.final_music_artist or video.detected_music_artist }}
+                                    {% endif %}
+                                {% else %}
+                                    Sin música
+                                {% endif %}
+                            </small>
+                        </div>
+                        
+                        <div class="mb-2 opacity-75">
+                            <i class="fas fa-user-friends text-secondary me-1"></i>
+                            <small class="text-muted">
+                                {% set characters = video.final_characters or video.detected_characters %}
+                                {% if characters %}
+                                    {{ characters[:2] | join(', ') }}
+                                    {% if characters | length > 2 %}
+                                        +{{ characters | length - 2 }} más
+                                    {% endif %}
+                                {% else %}
+                                    Sin personajes
+                                {% endif %}
+                            </small>
+                        </div>
+                    </div>
+                    
+                    <!-- Footer con acciones -->
+                    <div class="card-footer bg-light">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <small class="text-muted">
+                                ID: {{ video.id }} | {{ video.platform.title() }}
+                            </small>
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn btn-outline-success" 
+                                        onclick="restoreVideo('{{ video.id }}')"
+                                        title="Restaurar">
+                                    <i class="fas fa-undo"></i>
+                                </button>
+                                <button class="btn btn-outline-danger" 
+                                        onclick="permanentDeleteVideo('{{ video.id }}')"
+                                        title="Eliminar permanentemente">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <!-- Estado vacío -->
+            <div class="col-12 text-center py-5">
+                <i class="fas fa-trash fa-4x text-muted mb-3"></i>
+                <h4 class="text-muted">La papelera está vacía</h4>
+                <p class="text-muted">No hay videos eliminados.</p>
+                <a href="{{ url_for('index') }}" class="btn btn-primary">
+                    <i class="fas fa-arrow-left me-1"></i>Volver a la Galería
+                </a>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- Paginación -->
+    {% if total_deleted > 20 %}
+    <nav aria-label="Paginación de papelera" class="mt-4">
+        <div class="row align-items-center">
+            <div class="col-md-6">
+                <p class="text-muted mb-0">
+                    Mostrando {{ ((page - 1) * per_page) + 1 }} - {{ [total_deleted, page * per_page] | min }} 
+                    de {{ total_deleted }} videos eliminados
+                </p>
+            </div>
+            <div class="col-md-6">
+                <ul class="pagination justify-content-end mb-0">
+                    <li class="page-item {% if page <= 1 %}disabled{% endif %}">
+                        {% if page > 1 %}
+                        <a class="page-link" href="?page={{ page - 1 }}">Anterior</a>
+                        {% else %}
+                        <span class="page-link">Anterior</span>
+                        {% endif %}
+                    </li>
+                    
+                    {% for p in range(1, total_pages + 1) %}
+                        {% if p == page or (p <= 3) or (p >= total_pages - 2) or (page - 2 <= p <= page + 2) %}
+                        <li class="page-item {% if p == page %}active{% endif %}">
+                            <a class="page-link" href="?page={{ p }}">{{ p }}</a>
+                        </li>
+                        {% elif p == 4 and page > 6 %}
+                        <li class="page-item disabled"><span class="page-link">...</span></li>
+                        {% elif p == total_pages - 3 and page < total_pages - 5 %}
+                        <li class="page-item disabled"><span class="page-link">...</span></li>
+                        {% endif %}
+                    {% endfor %}
+                    
+                    <li class="page-item {% if page >= total_pages %}disabled{% endif %}">
+                        {% if page < total_pages %}
+                        <a class="page-link" href="?page={{ page + 1 }}">Siguiente</a>
+                        {% else %}
+                        <span class="page-link">Siguiente</span>
+                        {% endif %}
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+    {% endif %}
+</div>
+
+<!-- Modal de confirmación para eliminación permanente -->
+<div class="modal fade" id="permanentDeleteModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title">
+                    <i class="fas fa-exclamation-triangle me-2"></i>Eliminar Permanentemente
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="danger-zone">
+                    <h6 class="text-danger">⚠️ ADVERTENCIA</h6>
+                    <p class="mb-2">Esta acción eliminará permanentemente el video y <strong>NO SE PUEDE DESHACER</strong>.</p>
+                    <p class="mb-0">¿Estás seguro de que quieres continuar?</p>
+                </div>
+                <div class="form-check mt-3">
+                    <input class="form-check-input" type="checkbox" id="confirmPermanentDelete">
+                    <label class="form-check-label" for="confirmPermanentDelete">
+                        Entiendo que esta acción no se puede deshacer
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-danger" id="confirmPermanentBtn" disabled 
+                        onclick="confirmPermanentDelete()">
+                    <i class="fas fa-times me-1"></i>Eliminar Permanentemente
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Loading overlay -->
+<div id="loading-overlay" class="loading-overlay" style="display: none;">
+    <div class="spinner-border text-danger" role="status">
+        <span class="visually-hidden">Procesando...</span>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Variables globales para la papelera
+let selectedVideos = new Set();
+let currentVideoForDeletion = null;
+let permanentDeleteModal = null;
+
+// Inicializar cuando el DOM esté listo
+document.addEventListener('DOMContentLoaded', function() {
+    permanentDeleteModal = new bootstrap.Modal(document.getElementById('permanentDeleteModal'));
+    
+    // Event listener para el checkbox de confirmación
+    const confirmCheckbox = document.getElementById('confirmPermanentDelete');
+    const confirmBtn = document.getElementById('confirmPermanentBtn');
+    
+    if (confirmCheckbox && confirmBtn) {
+        confirmCheckbox.addEventListener('change', function() {
+            confirmBtn.disabled = !this.checked;
+        });
+    }
+});
+
+// Alternar selección de todos los videos
+function toggleSelectAll() {
+    const selectAllCheckbox = document.getElementById('select-all');
+    const videoCheckboxes = document.querySelectorAll('.video-select');
+    
+    videoCheckboxes.forEach(checkbox => {
+        checkbox.checked = selectAllCheckbox.checked;
+    });
+    
+    updateSelection();
+}
+
+// Actualizar selección y botones
+function updateSelection() {
+    const videoCheckboxes = document.querySelectorAll('.video-select:checked');
+    const selectAllCheckbox = document.getElementById('select-all');
+    const bulkRestoreBtn = document.getElementById('bulk-restore-btn');
+    const bulkDeleteBtn = document.getElementById('bulk-delete-btn');
+    const selectionCount = document.getElementById('selection-count');
+    
+    // Actualizar conjunto de videos seleccionados
+    selectedVideos.clear();
+    videoCheckboxes.forEach(checkbox => {
+        selectedVideos.add(parseInt(checkbox.value));
+    });
+    
+    // Actualizar contador
+    const count = selectedVideos.size;
+    selectionCount.textContent = `${count} video${count !== 1 ? 's' : ''} seleccionado${count !== 1 ? 's' : ''}`;
+    
+    // Habilitar/deshabilitar botones
+    bulkRestoreBtn.disabled = count === 0;
+    bulkDeleteBtn.disabled = count === 0;
+    
+    // Actualizar checkbox de "seleccionar todo"
+    const allCheckboxes = document.querySelectorAll('.video-select');
+    selectAllCheckbox.checked = allCheckboxes.length > 0 && videoCheckboxes.length === allCheckboxes.length;
+    selectAllCheckbox.indeterminate = videoCheckboxes.length > 0 && videoCheckboxes.length < allCheckboxes.length;
+}
+
+// Limpiar selección
+function clearSelection() {
+    document.querySelectorAll('.video-select').forEach(checkbox => {
+        checkbox.checked = false;
+    });
+    document.getElementById('select-all').checked = false;
+    updateSelection();
+}
+
+// Restaurar video individual
+async function restoreVideo(videoId) {
+    try {
+        TagFlow.utils.showLoading();
+        
+        const response = await TagFlow.utils.apiRequest(`/api/video/${videoId}/restore`, {
+            method: 'POST'
+        });
+        
+        if (response.success) {
+            TagFlow.utils.showNotification('Video restaurado exitosamente', 'success');
+            // Remover de la vista
+            const videoCard = document.querySelector(`[data-video-id="${videoId}"]`);
+            if (videoCard) {
+                videoCard.remove();
+            }
+            // Recargar página si no quedan videos
+            setTimeout(() => {
+                const remainingCards = document.querySelectorAll('.video-card-wrapper');
+                if (remainingCards.length === 0) {
+                    window.location.reload();
+                }
+            }, 1000);
+        } else {
+            TagFlow.utils.showNotification(`Error: ${response.error}`, 'error');
+        }
+    } catch (error) {
+        TagFlow.utils.showNotification('Error restaurando video', 'error');
+    } finally {
+        TagFlow.utils.hideLoading();
+    }
+}
+
+// Eliminar permanentemente video individual
+function permanentDeleteVideo(videoId) {
+    currentVideoForDeletion = videoId;
+    
+    // Resetear modal
+    document.getElementById('confirmPermanentDelete').checked = false;
+    document.getElementById('confirmPermanentBtn').disabled = true;
+    
+    permanentDeleteModal.show();
+}
+
+// Confirmar eliminación permanente
+async function confirmPermanentDelete() {
+    if (!currentVideoForDeletion) return;
+    
+    try {
+        TagFlow.utils.showLoading();
+        
+        const response = await TagFlow.utils.apiRequest(`/api/video/${currentVideoForDeletion}/permanent-delete`, {
+            method: 'POST',
+            body: JSON.stringify({ confirm: true })
+        });
+        
+        if (response.success) {
+            TagFlow.utils.showNotification('Video eliminado permanentemente', 'warning');
+            // Remover de la vista
+            const videoCard = document.querySelector(`[data-video-id="${currentVideoForDeletion}"]`);
+            if (videoCard) {
+                videoCard.remove();
+            }
+            // Cerrar modal
+            permanentDeleteModal.hide();
+            // Recargar página si no quedan videos
+            setTimeout(() => {
+                const remainingCards = document.querySelectorAll('.video-card-wrapper');
+                if (remainingCards.length === 0) {
+                    window.location.reload();
+                }
+            }, 1000);
+        } else {
+            TagFlow.utils.showNotification(`Error: ${response.error}`, 'error');
+        }
+    } catch (error) {
+        TagFlow.utils.showNotification('Error eliminando permanentemente', 'error');
+    } finally {
+        TagFlow.utils.hideLoading();
+        currentVideoForDeletion = null;
+    }
+}
+
+// Restaurar videos seleccionados
+async function bulkRestore() {
+    if (selectedVideos.size === 0) {
+        TagFlow.utils.showNotification('No hay videos seleccionados', 'warning');
+        return;
+    }
+    
+    const confirmed = confirm(`¿Restaurar ${selectedVideos.size} video(s) seleccionado(s)?`);
+    if (!confirmed) return;
+    
+    try {
+        TagFlow.utils.showLoading();
+        
+        const response = await TagFlow.utils.apiRequest('/api/videos/restore-bulk', {
+            method: 'POST',
+            body: JSON.stringify({
+                video_ids: Array.from(selectedVideos)
+            })
+        });
+        
+        if (response.success) {
+            TagFlow.utils.showNotification(response.message, 'success');
+            // Remover videos restaurados de la vista
+            selectedVideos.forEach(videoId => {
+                const videoCard = document.querySelector(`[data-video-id="${videoId}"]`);
+                if (videoCard) {
+                    videoCard.remove();
+                }
+            });
+            clearSelection();
+            // Recargar página si no quedan videos
+            setTimeout(() => {
+                const remainingCards = document.querySelectorAll('.video-card-wrapper');
+                if (remainingCards.length === 0) {
+                    window.location.reload();
+                }
+            }, 1000);
+        } else {
+            TagFlow.utils.showNotification(`Error: ${response.error}`, 'error');
+        }
+    } catch (error) {
+        TagFlow.utils.showNotification('Error en restauración masiva', 'error');
+    } finally {
+        TagFlow.utils.hideLoading();
+    }
+}
+
+// Eliminar permanentemente videos seleccionados
+function bulkPermanentDelete() {
+    if (selectedVideos.size === 0) {
+        TagFlow.utils.showNotification('No hay videos seleccionados', 'warning');
+        return;
+    }
+    
+    const confirmed = confirm(`⚠️ PELIGRO: ¿Eliminar PERMANENTEMENTE ${selectedVideos.size} video(s)?\n\nEsta acción NO SE PUEDE DESHACER.`);
+    if (!confirmed) return;
+    
+    const doubleConfirmed = confirm(`CONFIRMACIÓN FINAL:\n\n${selectedVideos.size} video(s) serán eliminados para siempre.\n\n¿Continuar?`);
+    if (!doubleConfirmed) return;
+    
+    // Implementar eliminación masiva permanente
+    TagFlow.utils.showNotification('Función en desarrollo', 'info');
+}
+
+// Ver detalles de video eliminado
+function viewDeletedVideoDetails(videoId) {
+    // Por ahora, solo mostrar información básica
+    TagFlow.utils.showNotification(`Ver detalles del video ID: ${videoId}`, 'info');
+}
+
+console.log('🗑️ Papelera JavaScript cargado');
+</script>
+{% endblock %}

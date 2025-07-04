@@ -351,6 +351,46 @@ python maintenance.py clear-db --platform youtube --force
 
 ### 🖼️ **Gestión de Thumbnails Optimizada**
 
+#### `configure-thumbnails` - Configuracion momentanea de modos
+
+**Sintaxis:**
+```bash
+python maintenance.py configure-thumbnails [opciones]
+```
+
+**Opciones:**
+- `--mode {ultra_fast|balanced|quality|gpu}`: Modo específico
+
+**Variables** Agrega/modifica en tu archivo `.env`:
+```
+THUMBNAIL_MODE="balanced"     # o ultra_fast, quality, gpu, auto
+THUMBNAIL_QUALITY=75          # Calidad mejorada (era 60)
+```
+
+**Ejemplos Optimizados:**
+```bash
+# Configurar modo balanceado (recomendado)
+python maintenance.py configure-thumbnails --mode balanced
+
+# O configuración automática según tu hardware
+python maintenance.py configure-thumbnails --mode auto
+```
+
+#### `test-thumbnail-quality` - Configuracion momentanea de modos
+
+**Sintaxis:**
+```bash
+python maintenance.py test-thumbnail-quality [opciones]
+```
+
+**Opciones:**
+- `--file {"ruta/al/video.mp4"}`: Video específico
+
+**Ejemplos Optimizados:**
+```bash
+python maintenance.py test-thumbnail-quality --file "ruta/al/video.mp4"
+```
+
 #### `populate-thumbnails` - Generación Ultra-Rápida de Thumbnails
 
 **Sintaxis:**

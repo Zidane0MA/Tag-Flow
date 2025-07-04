@@ -71,7 +71,12 @@ class DatabaseManager:
                     -- Metadatos
                     processing_status TEXT DEFAULT 'pendiente' CHECK(processing_status IN ('pendiente', 'procesando', 'completado', 'error')),
                     error_message TEXT,
-                    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    
+                    -- Sistema de eliminación (soft delete)
+                    deleted_at TIMESTAMP NULL,
+                    deleted_by TEXT,
+                    deletion_reason TEXT
                 )
             ''')
             
@@ -93,6 +98,7 @@ class DatabaseManager:
             conn.execute('CREATE INDEX IF NOT EXISTS idx_videos_status ON videos(edit_status)')
             conn.execute('CREATE INDEX IF NOT EXISTS idx_videos_platform ON videos(platform)')
             conn.execute('CREATE INDEX IF NOT EXISTS idx_videos_file_path ON videos(file_path)')
+            conn.execute('CREATE INDEX IF NOT EXISTS idx_videos_deleted ON videos(deleted_at)')
             
             conn.commit()
             logger.info("Base de datos inicializada correctamente")
@@ -125,23 +131,32 @@ class DatabaseManager:
             logger.info(f"Video agregado con ID {video_id}: {video_data['file_name']}")
             return video_id
     
-    def get_video(self, video_id: int) -> Optional[Dict]:
+    def get_video(self, video_id: int, include_deleted: bool = False) -> Optional[Dict]:
         """Obtener un video por ID"""
         with self.get_connection() as conn:
-            cursor = conn.execute('SELECT * FROM videos WHERE id = ?', (video_id,))
+            if include_deleted:
+                cursor = conn.execute('SELECT * FROM videos WHERE id = ?', (video_id,))
+            else:
+                cursor = conn.execute('SELECT * FROM videos WHERE id = ? AND deleted_at IS NULL', (video_id,))
             row = cursor.fetchone()
             return dict(row) if row else None
     
-    def get_video_by_path(self, file_path: str) -> Optional[Dict]:
+    def get_video_by_path(self, file_path: str, include_deleted: bool = False) -> Optional[Dict]:
         """Obtener un video por su file_path (ruta absoluta)"""
         with self.get_connection() as conn:
-            cursor = conn.execute('SELECT * FROM videos WHERE file_path = ?', (file_path,))
+            if include_deleted:
+                cursor = conn.execute('SELECT * FROM videos WHERE file_path = ?', (file_path,))
+            else:
+                cursor = conn.execute('SELECT * FROM videos WHERE file_path = ? AND deleted_at IS NULL', (file_path,))
             row = cursor.fetchone()
             return dict(row) if row else None
 
-    def get_videos(self, filters: Dict = None, limit: int = None, offset: int = 0) -> List[Dict]:
+    def get_videos(self, filters: Dict = None, limit: int = None, offset: int = 0, include_deleted: bool = False) -> List[Dict]:
         """Obtener lista de videos con filtros opcionales"""
-        query = "SELECT * FROM videos WHERE 1=1"
+        if include_deleted:
+            query = "SELECT * FROM videos WHERE 1=1"
+        else:
+            query = "SELECT * FROM videos WHERE deleted_at IS NULL"
         params = []
         
         # Aplicar filtros
@@ -205,9 +220,12 @@ class DatabaseManager:
             rows = cursor.fetchall()
             return [dict(row) for row in rows]
     
-    def count_videos(self, filters: Dict = None) -> int:
+    def count_videos(self, filters: Dict = None, include_deleted: bool = False) -> int:
         """Contar videos que coinciden con los filtros"""
-        query = "SELECT COUNT(*) FROM videos WHERE 1=1"
+        if include_deleted:
+            query = "SELECT COUNT(*) FROM videos WHERE 1=1"
+        else:
+            query = "SELECT COUNT(*) FROM videos WHERE deleted_at IS NULL"
         params = []
         
         # Aplicar los mismos filtros que get_videos
@@ -414,33 +432,210 @@ class DatabaseManager:
         with self.get_connection() as conn:
             stats = {}
             
-            # Total de videos
-            cursor = conn.execute('SELECT COUNT(*) FROM videos')
+            # Total de videos (excluyendo eliminados)
+            cursor = conn.execute('SELECT COUNT(*) FROM videos WHERE deleted_at IS NULL')
             stats['total_videos'] = cursor.fetchone()[0]
             
-            # Videos por estado
-            cursor = conn.execute('SELECT edit_status, COUNT(*) FROM videos GROUP BY edit_status')
+            # Videos por estado (excluyendo eliminados)
+            cursor = conn.execute('SELECT edit_status, COUNT(*) FROM videos WHERE deleted_at IS NULL GROUP BY edit_status')
             stats['by_status'] = dict(cursor.fetchall())
             
-            # Videos por plataforma
-            cursor = conn.execute('SELECT platform, COUNT(*) FROM videos GROUP BY platform')
+            # Videos por plataforma (excluyendo eliminados)
+            cursor = conn.execute('SELECT platform, COUNT(*) FROM videos WHERE deleted_at IS NULL GROUP BY platform')
             stats['by_platform'] = dict(cursor.fetchall())
             
-            # Videos con música detectada
+            # Videos con música detectada (excluyendo eliminados)
             cursor = conn.execute('''
                 SELECT COUNT(*) FROM videos 
-                WHERE detected_music IS NOT NULL OR final_music IS NOT NULL
+                WHERE deleted_at IS NULL AND (detected_music IS NOT NULL OR final_music IS NOT NULL)
             ''')
             stats['with_music'] = cursor.fetchone()[0]
             
-            # Videos con personajes detectados
+            # Videos con personajes detectados (excluyendo eliminados)
             cursor = conn.execute('''
                 SELECT COUNT(*) FROM videos 
-                WHERE detected_characters IS NOT NULL AND detected_characters != '[]'
+                WHERE deleted_at IS NULL AND detected_characters IS NOT NULL AND detected_characters != '[]'
             ''')
             stats['with_characters'] = cursor.fetchone()[0]
             
             return stats
+    
+    def soft_delete_video(self, video_id: int, deleted_by: str = "user", deletion_reason: str = "") -> bool:
+        """
+        Marcar un video como eliminado (soft delete)
+        
+        Args:
+            video_id: ID del video a eliminar
+            deleted_by: Usuario que realiza la eliminación
+            deletion_reason: Razón de la eliminación
+            
+        Returns:
+            bool: True si se eliminó exitosamente
+        """
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.execute('''
+                    UPDATE videos 
+                    SET deleted_at = CURRENT_TIMESTAMP,
+                        deleted_by = ?,
+                        deletion_reason = ?,
+                        last_updated = CURRENT_TIMESTAMP
+                    WHERE id = ? AND deleted_at IS NULL
+                ''', (deleted_by, deletion_reason, video_id))
+                
+                if cursor.rowcount > 0:
+                    logger.info(f"Video {video_id} marcado como eliminado por {deleted_by}")
+                    return True
+                else:
+                    logger.warning(f"Video {video_id} no encontrado o ya estaba eliminado")
+                    return False
+                    
+        except Exception as e:
+            logger.error(f"Error eliminando video {video_id}: {e}")
+            return False
+    
+    def restore_video(self, video_id: int) -> bool:
+        """
+        Restaurar un video eliminado
+        
+        Args:
+            video_id: ID del video a restaurar
+            
+        Returns:
+            bool: True si se restauró exitosamente
+        """
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.execute('''
+                    UPDATE videos 
+                    SET deleted_at = NULL,
+                        deleted_by = NULL,
+                        deletion_reason = NULL,
+                        last_updated = CURRENT_TIMESTAMP
+                    WHERE id = ? AND deleted_at IS NOT NULL
+                ''', (video_id,))
+                
+                if cursor.rowcount > 0:
+                    logger.info(f"Video {video_id} restaurado exitosamente")
+                    return True
+                else:
+                    logger.warning(f"Video {video_id} no encontrado o no estaba eliminado")
+                    return False
+                    
+        except Exception as e:
+            logger.error(f"Error restaurando video {video_id}: {e}")
+            return False
+    
+    def permanent_delete_video(self, video_id: int) -> bool:
+        """
+        Eliminar permanentemente un video de la base de datos
+        ⚠️ PELIGROSO: Esta acción no se puede deshacer
+        
+        Args:
+            video_id: ID del video a eliminar permanentemente
+            
+        Returns:
+            bool: True si se eliminó exitosamente
+        """
+        try:
+            with self.get_connection() as conn:
+                # Eliminar referencias en downloader_mapping primero
+                conn.execute('DELETE FROM downloader_mapping WHERE video_id = ?', (video_id,))
+                
+                # Eliminar el video
+                cursor = conn.execute('DELETE FROM videos WHERE id = ?', (video_id,))
+                
+                if cursor.rowcount > 0:
+                    logger.warning(f"Video {video_id} ELIMINADO PERMANENTEMENTE")
+                    return True
+                else:
+                    logger.warning(f"Video {video_id} no encontrado para eliminación permanente")
+                    return False
+                    
+        except Exception as e:
+            logger.error(f"Error eliminando permanentemente video {video_id}: {e}")
+            return False
+    
+    def get_deleted_videos(self, limit: int = None, offset: int = 0) -> List[Dict]:
+        """
+        Obtener videos eliminados (papelera)
+        
+        Args:
+            limit: Límite de resultados
+            offset: Offset para paginación
+            
+        Returns:
+            Lista de videos eliminados
+        """
+        query = "SELECT * FROM videos WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC"
+        params = []
+        
+        if limit:
+            query += " LIMIT ? OFFSET ?"
+            params.extend([limit, offset])
+        
+        with self.get_connection() as conn:
+            cursor = conn.execute(query, params)
+            rows = cursor.fetchall()
+            return [dict(row) for row in rows]
+    
+    def count_deleted_videos(self) -> int:
+        """Contar videos en papelera"""
+        with self.get_connection() as conn:
+            cursor = conn.execute('SELECT COUNT(*) FROM videos WHERE deleted_at IS NOT NULL')
+            return cursor.fetchone()[0]
+    
+    def bulk_delete_videos(self, video_ids: List[int], deleted_by: str = "user", deletion_reason: str = "") -> Tuple[int, int]:
+        """
+        Eliminar múltiples videos (soft delete)
+        
+        Args:
+            video_ids: Lista de IDs de videos a eliminar
+            deleted_by: Usuario que realiza la eliminación
+            deletion_reason: Razón de la eliminación
+            
+        Returns:
+            Tuple (exitosos, fallidos)
+        """
+        if not video_ids:
+            return 0, 0
+            
+        successful = 0
+        failed = 0
+        
+        for video_id in video_ids:
+            if self.soft_delete_video(video_id, deleted_by, deletion_reason):
+                successful += 1
+            else:
+                failed += 1
+        
+        logger.info(f"Eliminación masiva: {successful} exitosos, {failed} fallidos")
+        return successful, failed
+    
+    def bulk_restore_videos(self, video_ids: List[int]) -> Tuple[int, int]:
+        """
+        Restaurar múltiples videos
+        
+        Args:
+            video_ids: Lista de IDs de videos a restaurar
+            
+        Returns:
+            Tuple (exitosos, fallidos)
+        """
+        if not video_ids:
+            return 0, 0
+            
+        successful = 0
+        failed = 0
+        
+        for video_id in video_ids:
+            if self.restore_video(video_id):
+                successful += 1
+            else:
+                failed += 1
+        
+        logger.info(f"Restauración masiva: {successful} exitosos, {failed} fallidos")
+        return successful, failed
 
 # Instancia global del gestor de base de datos
 db = DatabaseManager()

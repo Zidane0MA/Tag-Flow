@@ -583,6 +583,69 @@ async function reloadGallery() {
     }
 }
 
+/**
+ * Eliminar video (soft delete)
+ */
+async function deleteVideo(videoId) {
+    try {
+        // Convertir videoId a número si es string
+        const numericVideoId = parseInt(videoId);
+        if (isNaN(numericVideoId)) {
+            TagFlow.utils.showNotification('ID de video inválido', 'error');
+            return;
+        }
+        
+        // Confirmar eliminación
+        const confirmed = confirm('¿Estás seguro de que quieres eliminar este video?\n\nSe moverá a la papelera y podrás restaurarlo más tarde.');
+        if (!confirmed) return;
+        
+        // Obtener razón opcional
+        const reason = prompt('Razón de eliminación (opcional):') || 'Eliminado desde galería';
+        
+        const response = await TagFlow.utils.apiRequest(
+            `${TagFlow.apiBase}/video/${numericVideoId}/delete`,
+            {
+                method: 'POST',
+                body: JSON.stringify({ 
+                    reason: reason,
+                    deleted_by: 'web_user'
+                })
+            }
+        );
+        
+        if (response.success) {
+            TagFlow.utils.showNotification('Video eliminado y movido a papelera', 'success');
+            
+            // Remover video de la vista con animación
+            const videoCard = document.querySelector(`[data-video-id="${numericVideoId}"]`);
+            if (videoCard) {
+                videoCard.style.transition = 'all 0.3s ease';
+                videoCard.style.opacity = '0';
+                videoCard.style.transform = 'scale(0.8)';
+                
+                setTimeout(() => {
+                    videoCard.remove();
+                    
+                    // Verificar si quedan videos en la página
+                    const remainingCards = document.querySelectorAll('.video-card-wrapper');
+                    if (remainingCards.length === 0) {
+                        // Si no quedan videos, mostrar mensaje o recargar
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 500);
+                    }
+                }, 300);
+            }
+        } else {
+            TagFlow.utils.showNotification(`Error: ${response.error}`, 'error');
+        }
+        
+    } catch (error) {
+        console.error('Error eliminando video:', error);
+        TagFlow.utils.showNotification('Error eliminando video', 'error');
+    }
+}
+
 // Event listeners para el modal de edición
 document.addEventListener('DOMContentLoaded', function() {
     // Cerrar modal al hacer clic fuera

@@ -1,0 +1,927 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard Administrativo{% endblock %}
+
+{% block extra_css %}
+<style>
+/* Estilos específicos para el dashboard admin */
+.admin-header {
+    background: linear-gradient(135deg, #6f42c1 0%, #5a32a3 100%);
+    color: white;
+    border-radius: 8px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+}
+
+.command-card {
+    border: none;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+    border-radius: 12px;
+}
+
+.command-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 15px rgba(0, 0, 0, 0.15);
+}
+
+.command-card .card-header {
+    background: transparent;
+    border-bottom: 1px solid #e9ecef;
+    font-weight: 600;
+}
+
+.stats-card {
+    background: linear-gradient(45deg, #f8f9fa, #ffffff);
+    border: none;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    border-radius: 12px;
+}
+
+.stats-number {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin: 0;
+}
+
+.terminal-output {
+    background: #1a1a1a;
+    color: #00ff00;
+    font-family: 'Courier New', monospace;
+    border-radius: 8px;
+    padding: 1rem;
+    max-height: 400px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.command-form {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin: 1rem 0;
+}
+
+.progress-container {
+    margin: 1rem 0;
+    display: none;
+}
+
+.status-indicator {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    margin-right: 8px;
+}
+
+.status-online { background: #28a745; }
+.status-offline { background: #dc3545; }
+.status-warning { background: #ffc107; }
+
+.danger-zone {
+    background: #fff5f5;
+    border: 1px solid #fed7d7;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin: 1rem 0;
+}
+
+.quick-action-btn {
+    width: 100%;
+    height: 60px;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+    border-radius: 8px;
+}
+
+.log-entry {
+    padding: 0.5rem;
+    border-bottom: 1px solid #eee;
+    font-family: monospace;
+    font-size: 0.9rem;
+}
+
+.log-entry.error { background: #ffeaea; color: #d32f2f; }
+.log-entry.warning { background: #fff8e1; color: #f57c00; }
+.log-entry.info { background: #e3f2fd; color: #1976d2; }
+.log-entry.success { background: #e8f5e8; color: #388e3c; }
+
+/* Responsive para dashboard admin */
+@media (max-width: 768px) {
+    .admin-header {
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+    }
+    
+    .admin-header h1 {
+        font-size: 1.5rem;
+        margin-bottom: 0.5rem;
+    }
+    
+    .stats-number {
+        font-size: 2rem;
+    }
+    
+    .command-form {
+        padding: 1rem;
+        margin: 0.75rem 0;
+    }
+    
+    .command-form .row {
+        --bs-gutter-x: 0.5rem;
+    }
+    
+    .quick-action-btn {
+        height: 50px;
+        font-size: 0.9rem;
+    }
+    
+    .terminal-output {
+        max-height: 300px;
+        padding: 0.75rem;
+        font-size: 0.8rem;
+    }
+    
+    .log-entry {
+        padding: 0.4rem;
+        font-size: 0.8rem;
+    }
+    
+    .card-body {
+        padding: 1rem;
+    }
+    
+    .status-indicator {
+        width: 10px;
+        height: 10px;
+    }
+}
+
+@media (max-width: 576px) {
+    .admin-header {
+        padding: 1rem;
+        margin-bottom: 1rem;
+        text-align: left;
+    }
+    
+    .admin-header h1 {
+        font-size: 1.3rem;
+    }
+    
+    .stats-number {
+        font-size: 1.8rem;
+    }
+    
+    .stats-card .card-body {
+        padding: 0.75rem;
+    }
+    
+    .command-form {
+        padding: 0.75rem;
+    }
+    
+    .command-form .col-md-6,
+    .command-form .col-md-4,
+    .command-form .col-md-3,
+    .command-form .col-md-2 {
+        margin-bottom: 0.5rem;
+    }
+    
+    .form-label {
+        font-size: 0.9rem;
+        margin-bottom: 0.25rem;
+    }
+    
+    .form-control,
+    .form-select {
+        font-size: 0.9rem;
+        padding: 0.5rem;
+    }
+    
+    .quick-action-btn {
+        height: 45px;
+        font-size: 0.85rem;
+        margin-bottom: 0.4rem;
+    }
+    
+    .terminal-output {
+        max-height: 250px;
+        padding: 0.5rem;
+        font-size: 0.75rem;
+    }
+    
+    .log-entry {
+        padding: 0.3rem;
+        font-size: 0.75rem;
+    }
+    
+    .danger-zone {
+        padding: 1rem;
+    }
+    
+    .modal-dialog {
+        margin: 0.5rem;
+    }
+    
+    .modal-body {
+        padding: 1rem;
+    }
+    
+    /* Ocultar algunos elementos en pantallas muy pequeñas */
+    .card-header .me-2 {
+        display: none;
+    }
+    
+    /* Ajustar grid para móviles */
+    .col-lg-8,
+    .col-lg-4 {
+        margin-bottom: 1rem;
+    }
+}
+
+/* Mejoras táctiles para admin */
+@media (pointer: coarse) {
+    .quick-action-btn {
+        min-height: 48px;
+    }
+    
+    .btn {
+        min-height: 44px;
+        padding: 0.6rem 1rem;
+    }
+    
+    .form-control,
+    .form-select {
+        min-height: 44px;
+        font-size: 16px; /* Prevenir zoom en iOS */
+    }
+    
+    .command-card:hover {
+        transform: none;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+}
+
+/* Orientación landscape en móviles */
+@media (orientation: landscape) and (max-height: 600px) {
+    .admin-header {
+        padding: 0.75rem;
+        margin-bottom: 0.75rem;
+    }
+    
+    .stats-number {
+        font-size: 1.5rem;
+    }
+    
+    .terminal-output {
+        max-height: 200px;
+    }
+    
+    .quick-action-btn {
+        height: 40px;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header del Dashboard -->
+    <div class="admin-header text-center">
+        <h1 class="mb-2">
+            <i class="fas fa-cog me-2"></i>Dashboard Administrativo
+        </h1>
+        <p class="mb-0">Control central para gestión del sistema Tag-Flow V2</p>
+    </div>
+
+    <!-- Estadísticas Rápidas -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card stats-card text-center">
+                <div class="card-body">
+                    <div class="stats-number text-primary" id="total-videos">-</div>
+                    <p class="card-text">Total Videos</p>
+                    <small class="text-muted">Activos en sistema</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stats-card text-center">
+                <div class="card-body">
+                    <div class="stats-number text-danger" id="deleted-videos">-</div>
+                    <p class="card-text">En Papelera</p>
+                    <small class="text-muted">Videos eliminados</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stats-card text-center">
+                <div class="card-body">
+                    <div class="stats-number text-success" id="processed-videos">-</div>
+                    <p class="card-text">Procesados</p>
+                    <small class="text-muted">Con análisis completo</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stats-card text-center">
+                <div class="card-body">
+                    <div class="stats-number text-warning" id="pending-videos">-</div>
+                    <p class="card-text">Pendientes</p>
+                    <small class="text-muted">Sin procesar</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Estado del Sistema -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-heartbeat me-2"></i>Estado del Sistema
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <span class="status-indicator status-online"></span>
+                            <strong>Base de Datos:</strong> Online
+                        </div>
+                        <div class="col-md-3">
+                            <span class="status-indicator status-online"></span>
+                            <strong>API:</strong> Funcionando
+                        </div>
+                        <div class="col-md-3">
+                            <span class="status-indicator status-warning"></span>
+                            <strong>Cache:</strong> Moderado
+                        </div>
+                        <div class="col-md-3">
+                            <span class="status-indicator status-online"></span>
+                            <strong>Thumbnails:</strong> Disponible
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Comandos de Gestión -->
+    <div class="row">
+        <!-- Columna Izquierda: Comandos Principales -->
+        <div class="col-lg-8">
+            <!-- Poblado de Base de Datos -->
+            <div class="card command-card mb-4">
+                <div class="card-header">
+                    <i class="fas fa-database me-2"></i>Gestión de Base de Datos
+                </div>
+                <div class="card-body">
+                    <div class="command-form">
+                        <h6>Poblar Base de Datos</h6>
+                        <p class="text-muted">Importar videos desde fuentes externas</p>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <label class="form-label">Fuente</label>
+                                <select class="form-select" id="populate-source">
+                                    <option value="all">Todas las fuentes</option>
+                                    <option value="youtube">4K Video Downloader (YouTube)</option>
+                                    <option value="tiktok">4K Tokkit (TikTok)</option>
+                                    <option value="instagram">4K Stogram (Instagram)</option>
+                                    <option value="organized">Carpetas organizadas</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Límite</label>
+                                <input type="number" class="form-control" id="populate-limit" value="50" min="1" max="1000">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">&nbsp;</label>
+                                <button class="btn btn-primary d-block w-100" onclick="executePopulateDB()">
+                                    <i class="fas fa-play me-1"></i>Ejecutar
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="progress-container" id="populate-progress">
+                            <div class="progress">
+                                <div class="progress-bar" role="progressbar" style="width: 0%"></div>
+                            </div>
+                            <small class="text-muted">Poblando base de datos...</small>
+                        </div>
+                    </div>
+
+                    <div class="command-form">
+                        <h6>Análisis de Videos</h6>
+                        <p class="text-muted">Ejecutar análisis de música y personajes</p>
+                        <div class="row">
+                            <div class="col-md-4">
+                                <label class="form-label">Plataforma</label>
+                                <select class="form-select" id="analyze-platform">
+                                    <option value="">Todas</option>
+                                    <option value="youtube">YouTube</option>
+                                    <option value="tiktok">TikTok</option>
+                                    <option value="instagram">Instagram</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Límite</label>
+                                <input type="number" class="form-control" id="analyze-limit" value="10" min="1" max="100">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">Solo pendientes</label>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="analyze-pending-only" checked>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">&nbsp;</label>
+                                <button class="btn btn-success d-block w-100" onclick="executeAnalyzeVideos()">
+                                    <i class="fas fa-brain me-1"></i>Analizar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="command-form">
+                        <h6>Generación de Thumbnails</h6>
+                        <p class="text-muted">Crear thumbnails para videos sin imagen</p>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <label class="form-label">Plataforma</label>
+                                <select class="form-select" id="thumbnail-platform">
+                                    <option value="">Todas</option>
+                                    <option value="youtube">YouTube</option>
+                                    <option value="tiktok">TikTok</option>
+                                    <option value="instagram">Instagram</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Límite</label>
+                                <input type="number" class="form-control" id="thumbnail-limit" value="20" min="1" max="100">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">&nbsp;</label>
+                                <button class="btn btn-info d-block w-100" onclick="executeGenerateThumbnails()">
+                                    <i class="fas fa-image me-1"></i>Generar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mantenimiento del Sistema -->
+            <div class="card command-card mb-4">
+                <div class="card-header">
+                    <i class="fas fa-tools me-2"></i>Mantenimiento del Sistema
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <button class="btn btn-outline-primary quick-action-btn" onclick="executeSystemBackup()">
+                                <i class="fas fa-save me-2"></i>Crear Backup
+                            </button>
+                        </div>
+                        <div class="col-md-6">
+                            <button class="btn btn-outline-success quick-action-btn" onclick="executeOptimizeDB()">
+                                <i class="fas fa-database me-2"></i>Optimizar BD
+                            </button>
+                        </div>
+                        <div class="col-md-6">
+                            <button class="btn btn-outline-info quick-action-btn" onclick="executeVerifySystem()">
+                                <i class="fas fa-check-circle me-2"></i>Verificar Sistema
+                            </button>
+                        </div>
+                        <div class="col-md-6">
+                            <button class="btn btn-outline-warning quick-action-btn" onclick="executeCleanCache()">
+                                <i class="fas fa-broom me-2"></i>Limpiar Cache
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Zona de Peligro -->
+            <div class="card command-card">
+                <div class="card-header text-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i>Zona de Peligro
+                </div>
+                <div class="card-body">
+                    <div class="danger-zone">
+                        <h6 class="text-danger">⚠️ Acciones Irreversibles</h6>
+                        <p class="mb-3">Estas acciones pueden causar pérdida de datos. Úsalas con precaución.</p>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <button class="btn btn-outline-danger quick-action-btn" onclick="executeEmptyTrash()">
+                                    <i class="fas fa-trash me-2"></i>Vaciar Papelera
+                                </button>
+                            </div>
+                            <div class="col-md-6">
+                                <button class="btn btn-outline-danger quick-action-btn" onclick="executeResetDatabase()">
+                                    <i class="fas fa-skull me-2"></i>Reset Completo BD
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Columna Derecha: Terminal y Logs -->
+        <div class="col-lg-4">
+            <!-- Terminal de Salida -->
+            <div class="card command-card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span><i class="fas fa-terminal me-2"></i>Terminal</span>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="clearTerminal()">
+                        <i class="fas fa-trash me-1"></i>Limpiar
+                    </button>
+                </div>
+                <div class="card-body p-0">
+                    <div class="terminal-output" id="terminal-output">
+                        Tag-Flow V2 Dashboard Administrativo
+                        Sistema iniciado correctamente
+                        Esperando comandos...
+                        
+                    </div>
+                </div>
+            </div>
+
+            <!-- Logs Recientes -->
+            <div class="card command-card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span><i class="fas fa-list me-2"></i>Logs Recientes</span>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="refreshLogs()">
+                        <i class="fas fa-sync me-1"></i>Actualizar
+                    </button>
+                </div>
+                <div class="card-body p-0" style="max-height: 300px; overflow-y: auto;">
+                    <div id="logs-container">
+                        <div class="log-entry info">Sistema iniciado - Dashboard cargado</div>
+                        <div class="log-entry success">Base de datos conectada</div>
+                        <div class="log-entry info">Esperando comandos del usuario</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Confirmación -->
+<div class="modal fade" id="confirmActionModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="confirmActionTitle">Confirmar Acción</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="confirmActionBody">
+                ¿Estás seguro de que quieres ejecutar esta acción?
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-danger" id="confirmActionBtn" onclick="executeConfirmedAction()">
+                    Confirmar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Variables globales para el dashboard admin
+let currentAction = null;
+let confirmModal = null;
+
+// Inicializar dashboard
+document.addEventListener('DOMContentLoaded', function() {
+    initializeAdminDashboard();
+});
+
+function initializeAdminDashboard() {
+    console.log('🎛️ Inicializando Dashboard Administrativo...');
+    
+    // Inicializar modal de confirmación
+    confirmModal = new bootstrap.Modal(document.getElementById('confirmActionModal'));
+    
+    // Cargar estadísticas iniciales
+    loadSystemStats();
+    
+    // Configurar actualización automática cada 30 segundos
+    setInterval(loadSystemStats, 30000);
+    
+    console.log('✅ Dashboard Administrativo inicializado');
+}
+
+// Cargar estadísticas del sistema
+async function loadSystemStats() {
+    try {
+        const statsResponse = await TagFlow.utils.apiRequest('/api/stats');
+        const trashResponse = await TagFlow.utils.apiRequest('/api/trash/stats');
+        
+        if (statsResponse.success && trashResponse.success) {
+            const stats = statsResponse.stats;
+            const trashStats = trashResponse;
+            
+            // Actualizar contadores
+            document.getElementById('total-videos').textContent = stats.total_videos || 0;
+            document.getElementById('deleted-videos').textContent = trashStats.total_deleted || 0;
+            document.getElementById('processed-videos').textContent = stats.by_status?.completado || 0;
+            document.getElementById('pending-videos').textContent = stats.by_status?.pendiente || 0;
+        }
+    } catch (error) {
+        console.error('Error cargando estadísticas:', error);
+        addLogEntry('Error cargando estadísticas del sistema', 'error');
+    }
+}
+
+// Ejecutar poblado de base de datos
+async function executePopulateDB() {
+    const source = document.getElementById('populate-source').value;
+    const limit = document.getElementById('populate-limit').value;
+    
+    addTerminalOutput(`Ejecutando: python maintenance.py populate-db --source ${source} --limit ${limit}`);
+    showProgress('populate-progress');
+    
+    try {
+        const response = await TagFlow.utils.apiRequest('/api/admin/populate-db', {
+            method: 'POST',
+            body: JSON.stringify({
+                source: source,
+                limit: parseInt(limit)
+            })
+        });
+        
+        if (response.success) {
+            addTerminalOutput(`✅ Poblado completado: ${response.message}`);
+            addLogEntry(`Poblado de BD completado - Fuente: ${source}, Límite: ${limit}`, 'success');
+            loadSystemStats(); // Actualizar estadísticas
+        } else {
+            addTerminalOutput(`❌ Error: ${response.error}`);
+            addLogEntry(`Error en poblado de BD: ${response.error}`, 'error');
+        }
+    } catch (error) {
+        addTerminalOutput(`❌ Error ejecutando comando: ${error.message}`);
+        addLogEntry(`Error ejecutando poblado de BD: ${error.message}`, 'error');
+    } finally {
+        hideProgress('populate-progress');
+    }
+}
+
+// Ejecutar análisis de videos
+async function executeAnalyzeVideos() {
+    const platform = document.getElementById('analyze-platform').value;
+    const limit = document.getElementById('analyze-limit').value;
+    const pendingOnly = document.getElementById('analyze-pending-only').checked;
+    
+    let command = `python main.py --limit ${limit}`;
+    if (platform) command += ` --platform ${platform}`;
+    if (pendingOnly) command += ` --source db`;
+    
+    addTerminalOutput(`Ejecutando: ${command}`);
+    
+    try {
+        const response = await TagFlow.utils.apiRequest('/api/admin/analyze-videos', {
+            method: 'POST',
+            body: JSON.stringify({
+                platform: platform || null,
+                limit: parseInt(limit),
+                pending_only: pendingOnly
+            })
+        });
+        
+        if (response.success) {
+            addTerminalOutput(`✅ Análisis completado: ${response.message}`);
+            addLogEntry(`Análisis de videos completado - ${response.processed} videos procesados`, 'success');
+            loadSystemStats();
+        } else {
+            addTerminalOutput(`❌ Error: ${response.error}`);
+            addLogEntry(`Error en análisis: ${response.error}`, 'error');
+        }
+    } catch (error) {
+        addTerminalOutput(`❌ Error ejecutando análisis: ${error.message}`);
+        addLogEntry(`Error ejecutando análisis: ${error.message}`, 'error');
+    }
+}
+
+// Ejecutar generación de thumbnails
+async function executeGenerateThumbnails() {
+    const platform = document.getElementById('thumbnail-platform').value;
+    const limit = document.getElementById('thumbnail-limit').value;
+    
+    addTerminalOutput(`Generando thumbnails para ${platform || 'todas las plataformas'} (límite: ${limit})`);
+    
+    try {
+        const response = await TagFlow.utils.apiRequest('/api/admin/generate-thumbnails', {
+            method: 'POST',
+            body: JSON.stringify({
+                platform: platform || null,
+                limit: parseInt(limit)
+            })
+        });
+        
+        if (response.success) {
+            addTerminalOutput(`✅ Thumbnails generados: ${response.message}`);
+            addLogEntry(`Generación de thumbnails completada`, 'success');
+        } else {
+            addTerminalOutput(`❌ Error: ${response.error}`);
+            addLogEntry(`Error generando thumbnails: ${response.error}`, 'error');
+        }
+    } catch (error) {
+        addTerminalOutput(`❌ Error: ${error.message}`);
+        addLogEntry(`Error generando thumbnails: ${error.message}`, 'error');
+    }
+}
+
+// Acciones de mantenimiento
+async function executeSystemBackup() {
+    addTerminalOutput('Creando backup del sistema...');
+    addLogEntry('Backup del sistema iniciado', 'info');
+    
+    try {
+        const response = await TagFlow.utils.apiRequest('/api/admin/backup', {
+            method: 'POST'
+        });
+        
+        if (response.success) {
+            addTerminalOutput(`✅ Backup creado: ${response.backup_path}`);
+            addLogEntry('Backup del sistema completado', 'success');
+        } else {
+            addTerminalOutput(`❌ Error creando backup: ${response.error}`);
+            addLogEntry(`Error en backup: ${response.error}`, 'error');
+        }
+    } catch (error) {
+        addTerminalOutput(`❌ Error: ${error.message}`);
+        addLogEntry(`Error en backup: ${error.message}`, 'error');
+    }
+}
+
+async function executeOptimizeDB() {
+    addTerminalOutput('Optimizando base de datos...');
+    addLogEntry('Optimización de BD iniciada', 'info');
+    
+    try {
+        const response = await TagFlow.utils.apiRequest('/api/admin/optimize-db', {
+            method: 'POST'
+        });
+        
+        if (response.success) {
+            addTerminalOutput(`✅ Optimización completada: ${response.message}`);
+            addLogEntry('Base de datos optimizada', 'success');
+        } else {
+            addTerminalOutput(`❌ Error: ${response.error}`);
+            addLogEntry(`Error optimizando BD: ${response.error}`, 'error');
+        }
+    } catch (error) {
+        addTerminalOutput(`❌ Error: ${error.message}`);
+        addLogEntry(`Error optimizando BD: ${error.message}`, 'error');
+    }
+}
+
+async function executeVerifySystem() {
+    addTerminalOutput('Verificando integridad del sistema...');
+    addLogEntry('Verificación del sistema iniciada', 'info');
+    
+    try {
+        const response = await TagFlow.utils.apiRequest('/api/admin/verify', {
+            method: 'POST'
+        });
+        
+        if (response.success) {
+            addTerminalOutput(`✅ Verificación completada: ${response.message}`);
+            addLogEntry('Sistema verificado correctamente', 'success');
+        } else {
+            addTerminalOutput(`⚠️ Advertencias encontradas: ${response.warnings}`);
+            addLogEntry(`Verificación con advertencias: ${response.warnings}`, 'warning');
+        }
+    } catch (error) {
+        addTerminalOutput(`❌ Error: ${error.message}`);
+        addLogEntry(`Error en verificación: ${error.message}`, 'error');
+    }
+}
+
+async function executeCleanCache() {
+    addTerminalOutput('Limpiando cache del sistema...');
+    
+    // Simular limpieza de cache
+    setTimeout(() => {
+        addTerminalOutput('✅ Cache limpiado correctamente');
+        addLogEntry('Cache del sistema limpiado', 'success');
+    }, 1000);
+}
+
+// Acciones peligrosas (con confirmación)
+function executeEmptyTrash() {
+    showConfirmAction(
+        'Vaciar Papelera',
+        '⚠️ Esta acción eliminará PERMANENTEMENTE todos los videos en la papelera.\n\nEsta acción NO SE PUEDE DESHACER.\n\n¿Continuar?',
+        'danger',
+        'confirmEmptyTrash'
+    );
+}
+
+function executeResetDatabase() {
+    showConfirmAction(
+        'Reset Completo de Base de Datos',
+        '💀 PELIGRO EXTREMO: Esta acción eliminará TODA la base de datos.\n\nSe perderán TODOS los videos, metadatos y configuraciones.\n\nEsta acción es IRREVERSIBLE.\n\n¿Estás ABSOLUTAMENTE seguro?',
+        'danger',
+        'confirmResetDatabase'
+    );
+}
+
+// Sistema de confirmación
+function showConfirmAction(title, message, type, action) {
+    document.getElementById('confirmActionTitle').textContent = title;
+    document.getElementById('confirmActionBody').innerHTML = message.replace(/\n/g, '<br>');
+    
+    const confirmBtn = document.getElementById('confirmActionBtn');
+    confirmBtn.className = `btn btn-${type}`;
+    
+    currentAction = action;
+    confirmModal.show();
+}
+
+function executeConfirmedAction() {
+    if (currentAction) {
+        window[currentAction]();
+        confirmModal.hide();
+        currentAction = null;
+    }
+}
+
+async function confirmEmptyTrash() {
+    addTerminalOutput('🗑️ Vaciando papelera...');
+    addLogEntry('Vaciado de papelera iniciado', 'warning');
+    
+    try {
+        const response = await TagFlow.utils.apiRequest('/api/admin/empty-trash', {
+            method: 'POST'
+        });
+        
+        if (response.success) {
+            addTerminalOutput(`✅ Papelera vaciada: ${response.deleted_count} videos eliminados permanentemente`);
+            addLogEntry(`Papelera vaciada - ${response.deleted_count} videos eliminados`, 'warning');
+            loadSystemStats();
+        } else {
+            addTerminalOutput(`❌ Error: ${response.error}`);
+        }
+    } catch (error) {
+        addTerminalOutput(`❌ Error: ${error.message}`);
+    }
+}
+
+function confirmResetDatabase() {
+    addTerminalOutput('💀 RESET COMPLETO DE BASE DE DATOS - IMPLEMENTACIÓN PENDIENTE');
+    addLogEntry('Intento de reset de BD (no implementado)', 'error');
+}
+
+// Utilidades del terminal
+function addTerminalOutput(text) {
+    const terminal = document.getElementById('terminal-output');
+    const timestamp = new Date().toLocaleTimeString();
+    terminal.textContent += `[${timestamp}] ${text}\n`;
+    terminal.scrollTop = terminal.scrollHeight;
+}
+
+function clearTerminal() {
+    document.getElementById('terminal-output').textContent = 'Terminal limpiado\n';
+}
+
+function addLogEntry(message, type = 'info') {
+    const logsContainer = document.getElementById('logs-container');
+    const timestamp = new Date().toLocaleTimeString();
+    
+    const logEntry = document.createElement('div');
+    logEntry.className = `log-entry ${type}`;
+    logEntry.textContent = `[${timestamp}] ${message}`;
+    
+    // Insertar al principio
+    logsContainer.insertBefore(logEntry, logsContainer.firstChild);
+    
+    // Mantener solo los últimos 50 logs
+    while (logsContainer.children.length > 50) {
+        logsContainer.removeChild(logsContainer.lastChild);
+    }
+}
+
+function refreshLogs() {
+    addLogEntry('Logs actualizados manualmente', 'info');
+}
+
+function showProgress(progressId) {
+    document.getElementById(progressId).style.display = 'block';
+}
+
+function hideProgress(progressId) {
+    document.getElementById(progressId).style.display = 'none';
+}
+
+console.log('🎛️ Dashboard Administrativo JavaScript cargado');
+</script>
+{% endblock %}

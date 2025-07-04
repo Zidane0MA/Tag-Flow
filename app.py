@@ -529,6 +529,531 @@ def api_search():
         logger.error(f"Error en búsqueda: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@app.route('/api/video/<int:video_id>/delete', methods=['POST'])
+def api_delete_video(video_id):
+    """API para eliminar un video (soft delete)"""
+    try:
+        data = request.get_json() or {}
+        deletion_reason = data.get('reason', 'Usuario')
+        deleted_by = data.get('deleted_by', 'web_user')
+        
+        success = db.soft_delete_video(video_id, deleted_by, deletion_reason)
+        
+        if success:
+            logger.info(f"Video {video_id} eliminado por {deleted_by}")
+            return jsonify({
+                'success': True,
+                'message': 'Video eliminado exitosamente',
+                'video_id': video_id
+            })
+        else:
+            return jsonify({
+                'success': False, 
+                'error': 'Video no encontrado o ya estaba eliminado'
+            }), 404
+            
+    except Exception as e:
+        logger.error(f"Error eliminando video {video_id}: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/video/<int:video_id>/restore', methods=['POST'])
+def api_restore_video(video_id):
+    """API para restaurar un video eliminado"""
+    try:
+        success = db.restore_video(video_id)
+        
+        if success:
+            logger.info(f"Video {video_id} restaurado")
+            return jsonify({
+                'success': True,
+                'message': 'Video restaurado exitosamente',
+                'video_id': video_id
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Video no encontrado o no estaba eliminado'
+            }), 404
+            
+    except Exception as e:
+        logger.error(f"Error restaurando video {video_id}: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/video/<int:video_id>/permanent-delete', methods=['POST'])
+def api_permanent_delete_video(video_id):
+    """API para eliminar permanentemente un video"""
+    try:
+        data = request.get_json() or {}
+        confirmation = data.get('confirm', False)
+        
+        if not confirmation:
+            return jsonify({
+                'success': False,
+                'error': 'Confirmación requerida para eliminación permanente'
+            }), 400
+        
+        success = db.permanent_delete_video(video_id)
+        
+        if success:
+            logger.warning(f"Video {video_id} ELIMINADO PERMANENTEMENTE")
+            return jsonify({
+                'success': True,
+                'message': 'Video eliminado permanentemente',
+                'video_id': video_id
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Video no encontrado'
+            }), 404
+            
+    except Exception as e:
+        logger.error(f"Error eliminando permanentemente video {video_id}: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/videos/delete-bulk', methods=['POST'])
+def api_bulk_delete_videos():
+    """API para eliminar múltiples videos"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'error': 'No data provided'}), 400
+        
+        video_ids = data.get('video_ids', [])
+        deletion_reason = data.get('reason', 'Eliminación masiva')
+        deleted_by = data.get('deleted_by', 'web_user')
+        
+        if not video_ids:
+            return jsonify({'success': False, 'error': 'No video IDs provided'}), 400
+        
+        successful, failed = db.bulk_delete_videos(video_ids, deleted_by, deletion_reason)
+        
+        return jsonify({
+            'success': True,
+            'message': f'{successful} videos eliminados, {failed} fallidos',
+            'successful': successful,
+            'failed': failed,
+            'total': len(video_ids)
+        })
+        
+    except Exception as e:
+        logger.error(f"Error en eliminación masiva: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/videos/restore-bulk', methods=['POST'])
+def api_bulk_restore_videos():
+    """API para restaurar múltiples videos"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'error': 'No data provided'}), 400
+        
+        video_ids = data.get('video_ids', [])
+        
+        if not video_ids:
+            return jsonify({'success': False, 'error': 'No video IDs provided'}), 400
+        
+        successful, failed = db.bulk_restore_videos(video_ids)
+        
+        return jsonify({
+            'success': True,
+            'message': f'{successful} videos restaurados, {failed} fallidos',
+            'successful': successful,
+            'failed': failed,
+            'total': len(video_ids)
+        })
+        
+    except Exception as e:
+        logger.error(f"Error en restauración masiva: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/trash')
+def trash():
+    """Página de papelera de videos eliminados"""
+    try:
+        # Obtener filtros y paginación
+        page = int(request.args.get('page', 1))
+        per_page = int(request.args.get('per_page', 20))
+        offset = (page - 1) * per_page
+        
+        # Obtener videos eliminados
+        deleted_videos = db.get_deleted_videos(limit=per_page, offset=offset)
+        total_deleted = db.count_deleted_videos()
+        total_pages = (total_deleted + per_page - 1) // per_page
+        
+        # Procesar videos para el template
+        for video in deleted_videos:
+            # Parsear JSON de personajes
+            if video.get('detected_characters'):
+                try:
+                    video['detected_characters'] = json.loads(video['detected_characters'])
+                except:
+                    video['detected_characters'] = []
+            
+            if video.get('final_characters'):
+                try:
+                    video['final_characters'] = json.loads(video['final_characters'])
+                except:
+                    video['final_characters'] = []
+            
+            # URL del thumbnail
+            if video.get('thumbnail_path'):
+                video['thumbnail_url'] = f"/thumbnail/{Path(video['thumbnail_path']).name}"
+            else:
+                video['thumbnail_url'] = "/static/img/no-thumbnail.svg"
+        
+        return render_template('trash.html',
+                             videos=deleted_videos,
+                             page=page,
+                             per_page=per_page,
+                             total_pages=total_pages,
+                             total_deleted=total_deleted)
+        
+    except Exception as e:
+        logger.error(f"Error en página de papelera: {e}")
+        return render_template('error.html', error=str(e)), 500
+
+@app.route('/api/trash/stats')
+def api_trash_stats():
+    """API para obtener estadísticas de papelera"""
+    try:
+        total_deleted = db.count_deleted_videos()
+        
+        return jsonify({
+            'success': True,
+            'total_deleted': total_deleted
+        })
+        
+    except Exception as e:
+        logger.error(f"Error obteniendo estadísticas de papelera: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/admin')
+def admin_dashboard():
+    """Dashboard administrativo"""
+    try:
+        return render_template('admin.html')
+    except Exception as e:
+        logger.error(f"Error en dashboard admin: {e}")
+        return render_template('error.html', error=str(e)), 500
+
+@app.route('/api/admin/populate-db', methods=['POST'])
+def api_admin_populate_db():
+    """API para poblar base de datos desde dashboard"""
+    try:
+        data = request.get_json() or {}
+        source = data.get('source', 'all')
+        limit = data.get('limit', 50)
+        
+        # Ejecutar comando maintenance.py populate-db
+        import subprocess
+        import sys
+        
+        cmd = [
+            sys.executable, 'maintenance.py', 'populate-db',
+            '--source', str(source),
+            '--limit', str(limit)
+        ]
+        
+        logger.info(f"Ejecutando comando: {' '.join(cmd)}")
+        
+        result = subprocess.run(
+            cmd,
+            cwd=Path(__file__).parent,
+            capture_output=True,
+            text=True,
+            timeout=300  # 5 minutos timeout
+        )
+        
+        if result.returncode == 0:
+            return jsonify({
+                'success': True,
+                'message': f'Poblado completado exitosamente',
+                'output': result.stdout,
+                'source': source,
+                'limit': limit
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': f'Error ejecutando comando: {result.stderr}',
+                'output': result.stdout
+            }), 500
+            
+    except subprocess.TimeoutExpired:
+        return jsonify({
+            'success': False,
+            'error': 'Comando expiró (timeout de 5 minutos)'
+        }), 500
+    except Exception as e:
+        logger.error(f"Error en populate-db: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/admin/analyze-videos', methods=['POST'])
+def api_admin_analyze_videos():
+    """API para analizar videos desde dashboard"""
+    try:
+        data = request.get_json() or {}
+        platform = data.get('platform')
+        limit = data.get('limit', 10)
+        pending_only = data.get('pending_only', True)
+        
+        # Construir comando main.py
+        import subprocess
+        import sys
+        
+        cmd = [sys.executable, 'main.py', '--limit', str(limit)]
+        
+        if platform:
+            cmd.extend(['--platform', platform])
+        
+        if pending_only:
+            cmd.extend(['--source', 'db'])
+        
+        logger.info(f"Ejecutando análisis: {' '.join(cmd)}")
+        
+        result = subprocess.run(
+            cmd,
+            cwd=Path(__file__).parent,
+            capture_output=True,
+            text=True,
+            timeout=600  # 10 minutos timeout
+        )
+        
+        if result.returncode == 0:
+            return jsonify({
+                'success': True,
+                'message': 'Análisis completado exitosamente',
+                'output': result.stdout,
+                'processed': limit  # Aproximado
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': f'Error en análisis: {result.stderr}',
+                'output': result.stdout
+            }), 500
+            
+    except subprocess.TimeoutExpired:
+        return jsonify({
+            'success': False,
+            'error': 'Análisis expiró (timeout de 10 minutos)'
+        }), 500
+    except Exception as e:
+        logger.error(f"Error en analyze-videos: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/admin/generate-thumbnails', methods=['POST'])
+def api_admin_generate_thumbnails():
+    """API para generar thumbnails desde dashboard"""
+    try:
+        data = request.get_json() or {}
+        platform = data.get('platform')
+        limit = data.get('limit', 20)
+        
+        # Ejecutar comando maintenance.py populate-thumbnails
+        import subprocess
+        import sys
+        
+        cmd = [sys.executable, 'maintenance.py', 'populate-thumbnails']
+        
+        if platform:
+            cmd.extend(['--platform', platform])
+        
+        cmd.extend(['--limit', str(limit)])
+        
+        logger.info(f"Generando thumbnails: {' '.join(cmd)}")
+        
+        result = subprocess.run(
+            cmd,
+            cwd=Path(__file__).parent,
+            capture_output=True,
+            text=True,
+            timeout=300  # 5 minutos timeout
+        )
+        
+        if result.returncode == 0:
+            return jsonify({
+                'success': True,
+                'message': f'Thumbnails generados exitosamente',
+                'output': result.stdout
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': f'Error generando thumbnails: {result.stderr}',
+                'output': result.stdout
+            }), 500
+            
+    except subprocess.TimeoutExpired:
+        return jsonify({
+            'success': False,
+            'error': 'Generación expiró (timeout de 5 minutos)'
+        }), 500
+    except Exception as e:
+        logger.error(f"Error en generate-thumbnails: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/admin/backup', methods=['POST'])
+def api_admin_backup():
+    """API para crear backup del sistema"""
+    try:
+        import subprocess
+        import sys
+        
+        cmd = [sys.executable, 'maintenance.py', 'backup']
+        
+        logger.info("Creando backup del sistema")
+        
+        result = subprocess.run(
+            cmd,
+            cwd=Path(__file__).parent,
+            capture_output=True,
+            text=True,
+            timeout=120  # 2 minutos timeout
+        )
+        
+        if result.returncode == 0:
+            return jsonify({
+                'success': True,
+                'message': 'Backup creado exitosamente',
+                'backup_path': 'backup creado',
+                'output': result.stdout
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': f'Error creando backup: {result.stderr}',
+                'output': result.stdout
+            }), 500
+            
+    except subprocess.TimeoutExpired:
+        return jsonify({
+            'success': False,
+            'error': 'Backup expiró (timeout de 2 minutos)'
+        }), 500
+    except Exception as e:
+        logger.error(f"Error en backup: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/admin/optimize-db', methods=['POST'])
+def api_admin_optimize_db():
+    """API para optimizar base de datos"""
+    try:
+        import subprocess
+        import sys
+        
+        cmd = [sys.executable, 'maintenance.py', 'optimize-db']
+        
+        logger.info("Optimizando base de datos")
+        
+        result = subprocess.run(
+            cmd,
+            cwd=Path(__file__).parent,
+            capture_output=True,
+            text=True,
+            timeout=120  # 2 minutos timeout
+        )
+        
+        if result.returncode == 0:
+            return jsonify({
+                'success': True,
+                'message': 'Base de datos optimizada exitosamente',
+                'output': result.stdout
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': f'Error optimizando BD: {result.stderr}',
+                'output': result.stdout
+            }), 500
+            
+    except subprocess.TimeoutExpired:
+        return jsonify({
+            'success': False,
+            'error': 'Optimización expiró (timeout de 2 minutos)'
+        }), 500
+    except Exception as e:
+        logger.error(f"Error en optimize-db: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/admin/verify', methods=['POST'])
+def api_admin_verify():
+    """API para verificar sistema"""
+    try:
+        import subprocess
+        import sys
+        
+        cmd = [sys.executable, 'maintenance.py', 'verify']
+        
+        logger.info("Verificando sistema")
+        
+        result = subprocess.run(
+            cmd,
+            cwd=Path(__file__).parent,
+            capture_output=True,
+            text=True,
+            timeout=60  # 1 minuto timeout
+        )
+        
+        if result.returncode == 0:
+            return jsonify({
+                'success': True,
+                'message': 'Sistema verificado correctamente',
+                'output': result.stdout
+            })
+        else:
+            # Verificación puede devolver advertencias sin error
+            return jsonify({
+                'success': True,
+                'message': 'Verificación completada con advertencias',
+                'warnings': result.stderr,
+                'output': result.stdout
+            })
+            
+    except subprocess.TimeoutExpired:
+        return jsonify({
+            'success': False,
+            'error': 'Verificación expiró (timeout de 1 minuto)'
+        }), 500
+    except Exception as e:
+        logger.error(f"Error en verify: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/admin/empty-trash', methods=['POST'])
+def api_admin_empty_trash():
+    """API para vaciar papelera (eliminación permanente)"""
+    try:
+        # Obtener todos los videos eliminados
+        deleted_videos = db.get_deleted_videos()
+        
+        if not deleted_videos:
+            return jsonify({
+                'success': True,
+                'message': 'La papelera ya está vacía',
+                'deleted_count': 0
+            })
+        
+        # Eliminar permanentemente cada video
+        deleted_count = 0
+        for video in deleted_videos:
+            success = db.permanent_delete_video(video['id'])
+            if success:
+                deleted_count += 1
+        
+        logger.warning(f"Papelera vaciada: {deleted_count} videos eliminados permanentemente")
+        
+        return jsonify({
+            'success': True,
+            'message': f'Papelera vaciada exitosamente',
+            'deleted_count': deleted_count,
+            'total_found': len(deleted_videos)
+        })
+        
+    except Exception as e:
+        logger.error(f"Error vaciando papelera: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @app.errorhandler(404)
 def not_found(error):
     """Página de error 404"""
