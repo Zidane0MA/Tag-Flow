@@ -44,6 +44,7 @@ class Config:
     
     # Procesamiento
     THUMBNAIL_SIZE = tuple(map(int, os.getenv('THUMBNAIL_SIZE', '320x180').split('x')))
+    THUMBNAIL_MODE = os.getenv('THUMBNAIL_MODE', 'balanced')  # ultra_fast, balanced, quality, gpu, auto
     MAX_CONCURRENT_PROCESSING = int(os.getenv('MAX_CONCURRENT_PROCESSING', 3))
     USE_GPU_DEEPFACE = os.getenv('USE_GPU_DEEPFACE', 'true').lower() == 'true'
     DEEPFACE_MODEL = os.getenv('DEEPFACE_MODEL', 'ArcFace')

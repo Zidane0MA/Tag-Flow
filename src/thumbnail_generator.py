@@ -46,46 +46,160 @@ class ThumbnailGenerator:
         self.use_ram_optimization = True  # Activar optimizaciones de RAM
         self.preload_cache = {}  # Cache para pre-cargar datos de video en RAM
         
+        # 🎯 CONFIGURACIÓN AUTOMÁTICA: Aplicar modo desde configuración
+        thumbnail_mode = config.THUMBNAIL_MODE.lower().strip().replace('"', '').split('#')[0].strip()
+        if thumbnail_mode == 'auto':
+            self.auto_configure_best_mode()
+        else:
+            self.configure_thumbnail_mode(thumbnail_mode)
+        
     def enable_ultra_fast_mode(self):
-        """🚀 Activar modo ultra-rápido para máximo rendimiento"""
+        """🚀 Activar modo ultra-rápido GPU para máximo rendimiento"""
         self.fast_mode = True
         self.enable_image_enhancement = False
         self.add_watermark = False
         # Usar calidad mínima para velocidad
         self.quality = min(self.quality, 60)
-        # Solo reducir tamaño si no está ya optimizado en .env
-        if self.thumbnail_size[0] > 160:
-            self.thumbnail_size = (160, 120)  # Más pequeño = más rápido
-        logger.info(f"⚡ Modo ultra-rápido activado - Máximo rendimiento ({self.thumbnail_size[0]}x{self.thumbnail_size[1]}, calidad {self.quality})")
+        # 🎮 GPU: Configuración ultra-rápida
+        self._enable_gpu_acceleration = True
+        self._gpu_decoder = self._detect_gpu_support()
+        self._gpu_mode = 'ultra_fast'  # Modo GPU específico
+        logger.info(f"⚡ Modo ultra-rápido GPU activado - Máximo rendimiento ({self.thumbnail_size[0]}x{self.thumbnail_size[1]}, calidad {self.quality}, GPU: {self._gpu_decoder or 'CPU fallback'})")
+        
+    def enable_balanced_mode(self):
+        """⚖️ Activar modo balanceado GPU para buena calidad con buen rendimiento"""
+        self.fast_mode = True
+        self.enable_image_enhancement = True  # Activar mejoras básicas
+        self.add_watermark = False
+        # Mantener calidad del .env (no sobrescribir)
+        # 🎮 GPU: Configuración balanceada
+        self._enable_gpu_acceleration = True
+        self._gpu_decoder = self._detect_gpu_support()
+        self._gpu_mode = 'balanced'  # Modo GPU específico
+        self.use_ffmpeg_direct = False  # Forzar post-procesamiento para mejoras
+        logger.info(f"⚖️ Modo balanceado GPU activado - Buena calidad + buen rendimiento (calidad {self.quality}, GPU: {self._gpu_decoder or 'CPU fallback'})")
+        
+    def enable_gpu_mode(self):
+        """🎮 Activar modo GPU para máxima calidad con aceleración hardware"""
+        self.fast_mode = False
+        self.enable_image_enhancement = True
+        # Incrementar calidad solo si es menor a 80
+        if self.quality < 80:
+            self.quality = min(90, self.quality + 15)  # Aumentar más para modo GPU
+        # 🎮 GPU: Configuración máxima calidad
+        self._enable_gpu_acceleration = True
+        self._gpu_decoder = self._detect_gpu_support()
+        self._gpu_mode = 'quality'  # Modo GPU de máxima calidad
+        logger.info(f"🎮 Modo GPU activado - Máxima calidad con aceleración hardware (calidad {self.quality}, GPU: {self._gpu_decoder or 'CPU fallback'})")
+        
+    def _detect_gpu_support(self) -> Optional[str]:
+        """🎮 Detectar soporte GPU disponible para FFmpeg"""
+        try:
+            # Probar NVIDIA GPU (NVENC/NVDEC)
+            result = subprocess.run(['ffmpeg', '-hwaccels'], capture_output=True, text=True, timeout=5)
+            if result.returncode == 0:
+                output = result.stdout.lower()
+                if 'cuda' in output:
+                    logger.info("🎮 GPU NVIDIA CUDA detectada")
+                    return 'cuda'
+                elif 'dxva2' in output:
+                    logger.info("🎮 GPU Intel/AMD DirectX Video Acceleration detectada")
+                    return 'dxva2'
+                elif 'qsv' in output:
+                    logger.info("🎮 GPU Intel Quick Sync Video detectada")
+                    return 'qsv'
+            return None
+        except Exception as e:
+            logger.debug(f"Error detectando GPU: {e}")
+            return None
         
     def _generate_thumbnail_ffmpeg_direct(self, video_path: Path, thumbnail_path: Path, timestamp: float = 3.0) -> bool:
-        """🚀 ULTRA OPTIMIZADO: Generar thumbnail directamente con FFmpeg (bypassing PIL), SIN distorsionar aspecto"""
+        """🚀 MEJORADO: Generar thumbnail con FFmpeg GPU optimizado por modo"""
         try:
             # Usar timestamp fijo para máximo rendimiento
             fixed_timestamp = min(timestamp, 3.0)
-            # Extraer solo el frame, sin forzar ambos lados del scale
-            # Usar -1 en uno de los lados para mantener aspecto
-            # Elegimos limitar el ancho (más común para thumbnails 16:9)
             target_width, target_height = self.thumbnail_size
-            # Usar solo el ancho, dejar que FFmpeg mantenga el aspecto
-            vf_filter = f'scale={target_width}:-1'
-            cmd = [
-                'ffmpeg',
-                '-y',
-                '-ss', str(fixed_timestamp),
-                '-i', str(video_path),
+            
+            # 🎮 CONFIGURACIÓN GPU ESPECÍFICA POR MODO
+            cmd = ['ffmpeg', '-y']
+            gpu_mode = getattr(self, '_gpu_mode', 'balanced')
+            
+            # Configurar GPU según modo
+            if hasattr(self, '_enable_gpu_acceleration') and self._enable_gpu_acceleration and hasattr(self, '_gpu_decoder'):
+                if self._gpu_decoder == 'cuda':
+                    if gpu_mode == 'ultra_fast':
+                        # Modo ultra rápido: decodificación GPU básica
+                        cmd.extend(['-hwaccel', 'cuda'])
+                    else:
+                        # Otros modos: decodificación GPU completa
+                        cmd.extend(['-hwaccel', 'cuda', '-hwaccel_output_format', 'cuda'])
+                elif self._gpu_decoder == 'qsv':
+                    cmd.extend(['-hwaccel', 'qsv'])
+                elif self._gpu_decoder == 'dxva2':
+                    cmd.extend(['-hwaccel', 'dxva2'])
+            
+            cmd.extend(['-ss', str(fixed_timestamp), '-i', str(video_path)])
+            
+            # 🎨 FILTROS OPTIMIZADOS POR MODO GPU
+            vf_filters = []
+            
+            # Transferencia GPU a CPU solo si es necesario
+            if hasattr(self, '_gpu_decoder') and self._gpu_decoder == 'cuda' and gpu_mode != 'ultra_fast':
+                vf_filters.append('hwdownload,format=nv12,format=yuv420p')
+            
+            # 1. Redimensionar (optimizado por modo)
+            if gpu_mode == 'ultra_fast':
+                # Ultra rápido: algoritmo más básico
+                vf_filters.append(f'scale={target_width}:{target_height}:force_original_aspect_ratio=decrease:flags=fast_bilinear')
+            else:
+                # Otros modos: algoritmo de mejor calidad
+                vf_filters.append(f'scale={target_width}:{target_height}:force_original_aspect_ratio=decrease:flags=lanczos')
+            
+            # 2. Padding
+            vf_filters.append(f'pad={target_width}:{target_height}:(ow-iw)/2:(oh-ih)/2:black')
+            
+            # 3. Mejoras de imagen según modo
+            if gpu_mode == 'ultra_fast':
+                # Sin mejoras para máxima velocidad
+                pass
+            elif gpu_mode == 'balanced':
+                # Mejoras básicas
+                if self.quality >= 70:
+                    vf_filters.append('eq=contrast=1.05:saturation=1.02')
+            elif gpu_mode in ['quality', 'max_quality']:
+                # Mejoras completas
+                if self.quality >= 70:
+                    vf_filters.append('eq=contrast=1.1:saturation=1.05:brightness=0.02')
+                    vf_filters.append('unsharp=5:5:1.0:5:5:0.0')
+            
+            # Unir filtros
+            vf_filter = ','.join(vf_filters)
+            
+            # 🎯 CONFIGURACIÓN DE CALIDAD POR MODO
+            if gpu_mode == 'ultra_fast':
+                q_value = 8  # Calidad básica para velocidad
+            elif gpu_mode == 'balanced':
+                q_value = max(3, min(7, 9 - int(self.quality/15)))
+            else:  # quality/max_quality
+                q_value = max(2, min(5, 7 - int(self.quality/20)))
+            
+            # 🚀 TIMEOUT OPTIMIZADO POR MODO
+            timeout = 8 if gpu_mode == 'ultra_fast' else 15
+            
+            cmd.extend([
                 '-vframes', '1',
                 '-vf', vf_filter,
-                '-q:v', str(10 - int(self.quality/10)),
+                '-q:v', str(q_value),
                 '-loglevel', 'quiet',
                 str(thumbnail_path)
-            ]
-            result = subprocess.run(cmd, capture_output=True, timeout=5)
+            ])
+            
+            result = subprocess.run(cmd, capture_output=True, timeout=timeout)
             if result.returncode == 0 and thumbnail_path.exists():
                 return True
             return False
         except Exception as e:
-            logger.debug(f"Error con FFmpeg directo: {e}")
+            logger.debug(f"Error con FFmpeg GPU (modo {getattr(self, '_gpu_mode', 'unknown')}): {e}")
             return False
     
     def _extract_frame_with_cache(self, video_path: Path, timestamp: float, cache_key: str) -> Optional[np.ndarray]:
@@ -124,11 +238,17 @@ class ThumbnailGenerator:
         logger.info(f"Cache de frames limpiado: {cache_size} frames eliminados")
         
     def enable_quality_mode(self):
-        """🎨 Activar modo de calidad para mejor imagen"""
+        """🎨 Activar modo de calidad GPU para mejor imagen"""
         self.fast_mode = False
         self.enable_image_enhancement = True
-        self.quality = 85  # Calidad más alta
-        logger.info("🎨 Modo de calidad activado - Mejor imagen")
+        # Solo aumentar calidad si es menor a la configurada
+        if self.quality < 85:
+            self.quality = 90  # Calidad máxima para modo quality
+        # 🎮 GPU: Configuración de máxima calidad
+        self._enable_gpu_acceleration = True
+        self._gpu_decoder = self._detect_gpu_support()
+        self._gpu_mode = 'max_quality'  # Modo GPU de máxima calidad
+        logger.info(f"🎨 Modo de calidad GPU activado - Mejor imagen (calidad {self.quality}, GPU: {self._gpu_decoder or 'CPU fallback'})")
         
     def generate_thumbnail(self, video_path: Path, timestamp: float = 3.0, 
                           force_regenerate: bool = False) -> Optional[Path]:
@@ -461,20 +581,22 @@ class ThumbnailGenerator:
             new_height = target_height
             new_width = int(target_height * aspect_ratio)
         
-        # Redimensionar con algoritmo ultra-rápido
+        # Redimensionar con algoritmo mejorado
         if self.fast_mode:
-            # En modo ultra-rápido, usar NEAREST (más rápido pero menor calidad)
-            image = image.resize((new_width, new_height), Image.Resampling.NEAREST)
-        else:
-            # Modo normal, usar BILINEAR
+            # 🎨 MEJORADO: En modo rápido, usar BILINEAR (mejor que NEAREST, aún rápido)
             image = image.resize((new_width, new_height), Image.Resampling.BILINEAR)
+        else:
+            # Modo normal, usar LANCZOS para máxima calidad
+            image = image.resize((new_width, new_height), Image.Resampling.LANCZOS)
         
         # Crear imagen con padding si es necesario
         if new_width != target_width or new_height != target_height:
-            # En modo rápido, usar padding simple
-            if self.fast_mode:
-                padding_color = (0, 0, 0)  # Negro simple
+            # 🎨 MEJORADO: Usar padding inteligente siempre para mejor resultado visual
+            if hasattr(self, '_enable_gpu_acceleration') and self._enable_gpu_acceleration:
+                # Modo GPU: usar padding más sofisticado
+                padding_color = self._get_intelligent_padding_color(image)
             else:
+                # Modo normal/rápido: padding inteligente básico 
                 padding_color = self._get_intelligent_padding_color(image)
             
             padded_image = Image.new('RGB', (target_width, target_height), padding_color)
@@ -844,6 +966,43 @@ class ThumbnailGenerator:
                 videos_to_process.append(video_data)
         
         return videos_to_process
+
+    def configure_thumbnail_mode(self, mode: str = 'balanced'):
+        """🎯 Configurar modo de thumbnail según necesidades"""
+        if mode == 'ultra_fast':
+            self.enable_ultra_fast_mode()
+        elif mode == 'balanced':
+            self.enable_balanced_mode()
+        elif mode == 'quality':
+            self.enable_quality_mode()
+        elif mode == 'gpu':
+            self.enable_gpu_mode()
+        else:
+            logger.warning(f"Modo desconocido: {mode}. Usando 'balanced'")
+            self.enable_balanced_mode()
+    
+    def auto_configure_best_mode(self):
+        """🧠 Configurar automáticamente el mejor modo según el hardware"""
+        # Detectar GPU primero
+        gpu_support = self._detect_gpu_support()
+        
+        if gpu_support:
+            logger.info("🎮 GPU detectada, configurando modo GPU para máxima calidad")
+            self.enable_gpu_mode()
+        else:
+            # Estimar capacidad del sistema basado en CPU cores
+            import os
+            cpu_count = os.cpu_count() or 4
+            
+            if cpu_count >= 8:
+                logger.info("💪 CPU potente detectada, configurando modo calidad")
+                self.enable_quality_mode()
+            elif cpu_count >= 4:
+                logger.info("⚖️ CPU moderada detectada, configurando modo balanceado")
+                self.enable_balanced_mode()
+            else:
+                logger.info("⚡ CPU limitada detectada, configurando modo ultra-rápido")
+                self.enable_ultra_fast_mode()
 
 # Instancia global
 thumbnail_generator = ThumbnailGenerator()

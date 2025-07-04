@@ -203,10 +203,9 @@ class MaintenanceUtils:
             force: regenerar thumbnails existentes también
         """
         start_time = time.time()
-        logger.info("🚀 Regenerando thumbnails ULTRA-OPTIMIZADO...")
+        logger.info("🚀 Regenerando thumbnails OPTIMIZADO...")
         
-        # Activar modo ultra-rápido
-        thumbnail_generator.enable_ultra_fast_mode()
+        # 🔧 CORREGIDO: Usar configuración del .env en lugar de forzar ultra_fast
         logger.info(f"🎯 Configuración aplicada: Tamaño {thumbnail_generator.thumbnail_size}, Calidad {thumbnail_generator.quality}%, Validación: {thumbnail_generator.enable_validation}")
         
         # 🔍 PASO 1: Obtener videos que necesitan regeneración (consulta optimizada)
@@ -909,10 +908,9 @@ class MaintenanceUtils:
             force: regenerar thumbnails existentes
         """
         start_time = time.time()
-        logger.info("🚀 Generando thumbnails ULTRA-OPTIMIZADO...")
+        logger.info("🚀 Generando thumbnails OPTIMIZADO...")
         
-        # Activar modo ultra-rápido
-        thumbnail_generator.enable_ultra_fast_mode()
+        # 🔧 CORREGIDO: Usar configuración del .env en lugar de forzar ultra_fast
         logger.info(f"🎯 Configuración aplicada: Tamaño {thumbnail_generator.thumbnail_size}, Calidad {thumbnail_generator.quality}%, Validación: {thumbnail_generator.enable_validation}")
         logger.info(f"🧠 Optimización RAM: Cache {thumbnail_generator.max_cache_size} frames, Pre-carga habilitada: {thumbnail_generator.use_ram_optimization}")
         
@@ -2384,6 +2382,137 @@ class MaintenanceUtils:
             'mmd_creators_filtered': mmd_creators_filtered,
             'total_analyzed': total_analyzed
         }
+    
+    def configure_thumbnail_mode(self, mode=None):
+        """🎯 Configurar modo de thumbnail para mejorar calidad/rendimiento"""
+        print("🎯 CONFIGURADOR DE MODO THUMBNAIL")
+        print("=" * 50)
+        
+        # Mostrar configuración actual
+        current_mode = getattr(config, 'THUMBNAIL_MODE', 'no configurado')
+        print(f"Modo actual: {current_mode}")
+        print(f"Tamaño actual: {config.THUMBNAIL_SIZE}")
+        print(f"Calidad desde .env: {thumbnail_generator.quality}")
+        print()
+        
+        # Mostrar opciones disponibles
+        modes = {
+            'ultra_fast': '⚡ Ultra Rápido - Velocidad máxima, calidad básica',
+            'balanced': '⚖️ Balanceado - Buena calidad + buen rendimiento (RECOMENDADO)',
+            'quality': '🎨 Calidad - Mejor imagen, más tiempo de procesamiento',
+            'gpu': '🎮 GPU - Máxima calidad con aceleración hardware',
+            'auto': '🧠 Automático - Detecta el mejor modo según tu hardware'
+        }
+        
+        if not mode:
+            print("Modos disponibles:")
+            for key, desc in modes.items():
+                print(f"  {key}: {desc}")
+            print()
+            
+            mode = input("Selecciona un modo [balanced]: ").strip().lower()
+            if not mode:
+                mode = 'balanced'
+        
+        if mode not in modes:
+            print(f"❌ Modo inválido: {mode}")
+            return
+        
+        print(f"\n🔧 Configurando modo: {mode}")
+        print("-" * 30)
+        
+        # Probar configuración
+        from src.thumbnail_generator import ThumbnailGenerator
+        test_generator = ThumbnailGenerator()
+        
+        if mode == 'auto':
+            test_generator.auto_configure_best_mode()
+        else:
+            test_generator.configure_thumbnail_mode(mode)
+        
+        # Mostrar resultados
+        print("✅ Configuración aplicada:")
+        print(f"   Modo rápido: {test_generator.fast_mode}")
+        print(f"   Mejoras de imagen: {test_generator.enable_image_enhancement}")
+        print(f"   Calidad JPEG: {test_generator.quality}")
+        print(f"   GPU habilitada: {hasattr(test_generator, '_enable_gpu_acceleration') and test_generator._enable_gpu_acceleration}")
+        
+        # Detectar GPU si está en modo GPU
+        if hasattr(test_generator, '_gpu_decoder'):
+            gpu_info = test_generator._gpu_decoder or 'No detectada'
+            print(f"   GPU detectada: {gpu_info}")
+        
+        print()
+        print("💡 Para hacer este cambio permanente:")
+        print(f'   Agrega en tu .env: THUMBNAIL_MODE="{mode}"')
+        print()
+        print("🔍 Para probar la calidad:")
+        print("   python test_thumbnail_quality.py")
+    
+    def test_thumbnail_quality(self, video_path=None):
+        """🧪 Probar calidad de thumbnails con diferentes modos"""
+        print("🧪 PRUEBA DE CALIDAD DE THUMBNAILS")
+        print("=" * 50)
+        
+        if video_path:
+            test_video = Path(video_path)
+        else:
+            # Buscar video de prueba
+            test_video = None
+            test_locations = [
+                Path("tests"),
+                Path("data"),
+                config.THUMBNAILS_PATH.parent
+            ]
+            
+            for location in test_locations:
+                if location.exists():
+                    for ext in ['.mp4', '.avi', '.mkv', '.mov']:
+                        videos = list(location.glob(f"*{ext}"))
+                        if videos:
+                            test_video = videos[0]
+                            break
+                if test_video:
+                    break
+        
+        if not test_video or not test_video.exists():
+            print("❌ No se encontró video de prueba.")
+            print("   Uso: python maintenance.py test-thumbnail-quality --file /ruta/al/video.mp4")
+            return
+        
+        print(f"🎬 Video de prueba: {test_video}")
+        
+        # Crear directorio de salida
+        output_dir = Path("thumbnail_test_results")
+        output_dir.mkdir(exist_ok=True)
+        
+        modes = ['ultra_fast', 'balanced', 'quality', 'gpu']
+        mode_names = {
+            'ultra_fast': '⚡ Ultra Rápido',
+            'balanced': '⚖️ Balanceado', 
+            'quality': '🎨 Calidad',
+            'gpu': '🎮 GPU'
+        }
+        
+        for mode in modes:
+            print(f"\n{mode_names.get(mode, mode)}")
+            from src.thumbnail_generator import ThumbnailGenerator
+            generator = ThumbnailGenerator()
+            generator.configure_thumbnail_mode(mode)
+            generator.output_path = output_dir / mode
+            generator.output_path.mkdir(exist_ok=True)
+            
+            start_time = time.time()
+            result = generator.generate_thumbnail(test_video, force_regenerate=True)
+            duration = time.time() - start_time
+            
+            if result:
+                size = result.stat().st_size
+                print(f"  ✅ {duration:.2f}s, {size/1024:.1f} KB")
+            else:
+                print(f"  ❌ Error")
+        
+        print(f"\n📁 Resultados guardados en: {output_dir.absolute()}")
 
 def main():
     """Función principal con CLI"""
@@ -2393,7 +2522,8 @@ def main():
         'optimize-db', 'report', 'populate-db', 'clear-db', 'populate-thumbnails',
         'clear-thumbnails', 'show-stats', 'character-stats', 'add-character',
         'download-character-images', 'analyze-titles', 'update-creator-mappings',
-        'clean-false-positives', 'add-tiktoker', 'list-platforms', 'optimization-stats'
+        'clean-false-positives', 'add-tiktoker', 'list-platforms', 'optimization-stats',
+        'configure-thumbnails', 'test-thumbnail-quality'
     ], help='Acción a realizar')
     
     # Argumentos generales
@@ -2417,6 +2547,10 @@ def main():
     parser.add_argument('--creator', type=str, help='Nombre del creador/TikToker')
     parser.add_argument('--persona', type=str, help='Nombre del personaje/persona (opcional)')
     parser.add_argument('--confidence', type=float, default=0.9, help='Nivel de confianza (0.0-1.0)')
+    
+    # Argumentos específicos para thumbnails
+    parser.add_argument('--mode', type=str, choices=['ultra_fast', 'balanced', 'quality', 'gpu', 'auto'],
+                        help='Modo de thumbnail para configurar')
     
     args = parser.parse_args()
     
@@ -2478,6 +2612,10 @@ def main():
         utils.list_available_platforms()
     elif args.action == 'optimization-stats':
         utils.show_optimization_stats()
+    elif args.action == 'configure-thumbnails':
+        utils.configure_thumbnail_mode(args.mode)
+    elif args.action == 'test-thumbnail-quality':
+        utils.test_thumbnail_quality(args.file)
 
 if __name__ == '__main__':
     main()
