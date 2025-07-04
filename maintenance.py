@@ -207,6 +207,7 @@ class MaintenanceUtils:
         
         # Activar modo ultra-rápido
         thumbnail_generator.enable_ultra_fast_mode()
+        logger.info(f"🎯 Configuración aplicada: Tamaño {thumbnail_generator.thumbnail_size}, Calidad {thumbnail_generator.quality}%, Validación: {thumbnail_generator.enable_validation}")
         
         # 🔍 PASO 1: Obtener videos que necesitan regeneración (consulta optimizada)
         logger.info("📊 Identificando videos que necesitan regeneración...")
@@ -879,6 +880,7 @@ class MaintenanceUtils:
         
         # Activar modo ultra-rápido
         thumbnail_generator.enable_ultra_fast_mode()
+        logger.info(f"🎯 Configuración aplicada: Tamaño {thumbnail_generator.thumbnail_size}, Calidad {thumbnail_generator.quality}%, Validación: {thumbnail_generator.enable_validation}")
         
         # 🔍 PASO 1: Obtener videos que necesitan thumbnails (consulta optimizada)
         logger.info("📊 Obteniendo videos que necesitan thumbnails...")

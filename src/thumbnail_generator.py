@@ -6,6 +6,7 @@ Creación optimizada de miniaturas para videos
 import cv2
 import numpy as np
 import time
+import os
 from PIL import Image, ImageDraw, ImageFont
 from pathlib import Path
 import logging
@@ -23,7 +24,8 @@ class ThumbnailGenerator:
         self.output_path.mkdir(parents=True, exist_ok=True)
         
         self.thumbnail_size = config.THUMBNAIL_SIZE
-        self.quality = 85  # Calidad JPEG
+        # Leer calidad desde configuración del entorno
+        self.quality = int(os.getenv('THUMBNAIL_QUALITY', '85'))
         
         # Configuración de watermark (opcional)
         self.add_watermark = False
@@ -32,16 +34,19 @@ class ThumbnailGenerator:
         # Configuración de optimización para velocidad
         self.enable_image_enhancement = False  # Deshabilitado por defecto para mayor velocidad
         self.fast_mode = True  # Modo rápido activado
+        self.enable_validation = os.getenv('ENABLE_THUMBNAIL_VALIDATION', 'true').lower() == 'true'
         
     def enable_ultra_fast_mode(self):
         """🚀 Activar modo ultra-rápido para máximo rendimiento"""
         self.fast_mode = True
         self.enable_image_enhancement = False
         self.add_watermark = False
-        self.quality = 60  # Calidad aún más baja para velocidad
-        # Reducir tamaño de thumbnail para mayor velocidad
-        self.thumbnail_size = (160, 120)  # Más pequeño = más rápido
-        logger.info("⚡ Modo ultra-rápido activado - Máximo rendimiento (160x120, calidad 60)")
+        # Usar calidad mínima para velocidad
+        self.quality = min(self.quality, 60)
+        # Solo reducir tamaño si no está ya optimizado en .env
+        if self.thumbnail_size[0] > 160:
+            self.thumbnail_size = (160, 120)  # Más pequeño = más rápido
+        logger.info(f"⚡ Modo ultra-rápido activado - Máximo rendimiento ({self.thumbnail_size[0]}x{self.thumbnail_size[1]}, calidad {self.quality})")
         
     def enable_quality_mode(self):
         """🎨 Activar modo de calidad para mejor imagen"""
@@ -70,8 +75,8 @@ class ThumbnailGenerator:
             
             # Si ya existe y no forzamos regeneración, validar thumbnail
             if thumbnail_path.exists() and not force_regenerate:
-                if self.fast_mode:
-                    # En modo ultra-rápido, asumir que thumbnails existentes son válidos
+                if self.fast_mode or not self.enable_validation:
+                    # En modo ultra-rápido o con validación deshabilitada, asumir que thumbnails existentes son válidos
                     return thumbnail_path
                 elif self._is_thumbnail_valid(thumbnail_path):
                     return thumbnail_path
