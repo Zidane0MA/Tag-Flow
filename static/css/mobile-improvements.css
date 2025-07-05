@@ -186,37 +186,81 @@ body, html {
    MEJORAS DE NAVEGACIÓN MÓVIL
    ============================================ */
 
-@media (max-width: 768px) {
-    /* Navbar colapsable mejorada */
+/* Mejoras para menú colapsado - aplicar a móvil y tablet */
+@media (max-width: 991.98px) {
     .navbar-collapse {
-        background: rgba(33, 37, 41, 0.95);
+        background: rgba(52, 58, 64, 0.95);
         backdrop-filter: blur(10px);
-        border-radius: 8px;
-        margin-top: 1rem;
-        padding: 1rem;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        border-radius: 12px;
+        margin-top: 0.75rem;
+        padding: 1.25rem;
+        padding-bottom: 1rem !important;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+        border: 1px solid rgba(255, 255, 255, 0.1);
     }
     
     .navbar-nav .nav-link {
-        padding: 0.75rem 1rem;
-        border-radius: 6px;
+        padding: 0.6rem 1rem;
+        border-radius: 8px;
         margin-bottom: 0.25rem;
-        transition: background-color 0.2s ease;
+        transition: all 0.2s ease;
+        font-weight: 500;
+    }
+    
+    .navbar-nav .nav-link:last-child {
+        margin-bottom: 0;
     }
     
     .navbar-nav .nav-link:hover {
-        background-color: rgba(255,255,255,0.1);
+        background-color: rgba(255, 255, 255, 0.1);
+        transform: translateX(4px);
     }
     
-    /* Estadísticas en navbar mejoradas */
+    .navbar-nav .nav-link i {
+        width: 20px;
+        text-align: center;
+    }
+    
+    /* Estadísticas con diseño mejorado */
+    .navbar-collapse .navbar-nav:not(.me-auto) {
+        margin-top: 1rem;
+        padding-top: 1rem;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
     .navbar-text {
-        background: rgba(255,255,255,0.1);
-        padding: 0.5rem 0.75rem;
-        border-radius: 20px;
+        background: rgba(111, 66, 193, 0.2);
+        padding: 0.5rem 0.875rem;
+        border-radius: 25px;
         margin: 0.25rem 0;
         display: inline-block;
-        font-size: 0.8rem;
+        font-size: 0.85rem;
         font-weight: 500;
+        border: 1px solid rgba(111, 66, 193, 0.3);
+    }
+    
+    /* Switch de modo con estilo mejorado */
+    #view-mode-switcher {
+        margin-top: 1rem !important;
+        padding-top: 1rem !important;
+        border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
+        display: flex;
+        justify-content: center;
+    }
+    
+    #view-mode-switcher .nav-item {
+        flex-direction: column;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    
+    #view-mode-switcher .navbar-text {
+        margin: 0;
+        background: transparent;
+        border: none;
+        padding: 0;
+        font-size: 0.8rem;
+        opacity: 0.8;
     }
 }
 
