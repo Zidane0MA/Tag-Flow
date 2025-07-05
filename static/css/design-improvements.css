@@ -111,11 +111,6 @@
     opacity: 0.9;
 }
 
-@media (min-width: 992px) {
-    #view-mode-switcher .navbar-text {
-        padding-left: 0.45rem !important;
-    }
-}
 
 /* ==========================================
    CARDS MODERNIZADAS
@@ -400,9 +395,6 @@
         background: none !important;
         border: none !important;
         box-shadow: none !important;
-    }
-    #view-mode-switcher .navbar-text {
-        padding-left: 0.25rem !important;
     }
     .navbar-text.ms-3 {
         margin-left: 0 !important;

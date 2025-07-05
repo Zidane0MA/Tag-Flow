@@ -150,8 +150,7 @@
 }
 
 .btn-group.btn-group-sm > .btn {
-    margin-left: 0.30rem !important;
-    margin-right: 0 !important;
+    margin: 0rem 0.30rem !important;
 }
 
 .btn-group.btn-group-sm > .btn:first-child {

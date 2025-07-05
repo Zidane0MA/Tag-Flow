@@ -254,14 +254,6 @@ body, html {
         gap: 0.5rem;
     }
     
-    #view-mode-switcher .navbar-text {
-        margin: 0;
-        background: transparent;
-        border: none;
-        padding: 0;
-        font-size: 0.8rem;
-        opacity: 0.8;
-    }
 }
 
 /* ============================================
