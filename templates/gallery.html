@@ -75,7 +75,7 @@
                             <option value="">Todos</option>
                             <option value="pendiente" {% if request.args.get('processing_status') == 'pendiente' %}selected{% endif %}>Pendiente</option>
                             <option value="procesando" {% if request.args.get('processing_status') == 'procesando' %}selected{% endif %}>Procesando</option>
-                            <option value="completado" {% if request.args.get('processing_status') == 'completado' %}selected{% endif %}>Completado</option>
+                            <option value="completado" {% if request.args.get('processing_status') == 'completado' %}selected{% endif %}>Completo</option>
                             <option value="error" {% if request.args.get('processing_status') == 'error' %}selected{% endif %}>Error</option>
                         </select>
                     </div>
@@ -89,13 +89,6 @@
                             <option value="medio" {% if request.args.get('difficulty') == 'medio' %}selected{% endif %}>Medio</option>
                             <option value="alto" {% if request.args.get('difficulty') == 'alto' %}selected{% endif %}>Alto</option>
                         </select>
-                    </div>
-                    
-                    <!-- Botón limpiar filtros -->
-                    <div class="col-auto align-self-end">
-                        <a href="{{ url_for('index') }}" class="btn btn-outline-danger" title="Limpiar filtros">
-                            <i class="fas fa-times"></i>
-                        </a>
                     </div>
                 </form>
             </div>
@@ -124,7 +117,7 @@
                     <span class="badge bg-warning ms-1">Estado: {{ {'nulo': 'Sin Edición', 'en_proceso': 'En proceso', 'hecho': 'Completado'}.get(request.args.get('status'), request.args.get('status')) }}</span>
                 {% endif %}
                 {% if request.args.get('processing_status') %}
-                    <span class="badge bg-success ms-1">Procesamiento: {{ request.args.get('processing_status').title() }}</span>
+                    <span class="badge bg-success ms-1">Procesamiento: {{ {'pendiente': 'Pendiente', 'procesando': 'Procesando', 'completado': 'Completo', 'error': 'Error'}.get(request.args.get('processing_status'), request.args.get('processing_status').title()) }}</span>
                 {% endif %}
                 {% if request.args.get('difficulty') %}
                     <span class="badge bg-danger ms-1">Dificultad: {{ request.args.get('difficulty').title() }}</span>
@@ -228,7 +221,7 @@
         <div class="card text-center">
             <div class="card-body">
                 <h5 class="card-title">{{ stats.by_status.get('hecho', 0) }}</h5>
-                <p class="card-text">Completados</p>
+                <p class="card-text">Completos</p>
             </div>
         </div>
     </div>
@@ -315,7 +308,7 @@
                         
                         {% if video.processing_status %}
                         <span class="badge bg-{{ 'success' if video.processing_status == 'completado' else 'danger' if video.processing_status == 'error' else 'info' if video.processing_status == 'procesando' else 'light text-dark' }}">
-                            {{ {'pendiente': 'Pendiente', 'procesando': 'Procesando', 'completado': 'Procesado', 'error': 'Error'}.get(video.processing_status, video.processing_status) }}
+                            {{ {'pendiente': 'Pendiente', 'procesando': 'Procesando', 'completado': 'Completo', 'error': 'Error'}.get(video.processing_status, video.processing_status) }}
                         </span>
                         {% endif %}
                         
