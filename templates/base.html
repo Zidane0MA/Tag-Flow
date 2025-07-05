@@ -119,9 +119,6 @@
     {% block extra_css %}{% endblock %}
 </head>
 <body>
-    <!-- Skip link para accesibilidad -->
-    <a href="#main-content" class="skip-link">Saltar al contenido principal</a>
-    
     <!-- Navbar -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
         <div class="container-fluid">
@@ -161,8 +158,8 @@
                             <i class="fas fa-video me-1"></i>{{ stats.total_videos }} videos
                         </span>
                     </li>
-                    <li class="nav-item">
-                        <span class="navbar-text ms-3">
+                    <li class="nav-item mt-2 mt-lg-0">
+                        <span class="navbar-text ms-lg-3">
                             <i class="fas fa-music me-1"></i>{{ stats.with_music }} con música
                         </span>
                     </li>
@@ -170,20 +167,18 @@
                 {% endif %}
                 
                 <!-- Switch de modo de visualización global - mejorado -->
-                <div class="navbar-nav ms-3" id="view-mode-switcher">
+                <div class="navbar-nav ms-lg-4 mt-2 mt-lg-0" id="view-mode-switcher">
                     <div class="nav-item d-flex align-items-center">
                         <span class="navbar-text me-2 small d-none d-lg-inline text-light" style="font-weight: 500; opacity: 0.9;">Vista:</span>
                         <div class="btn-group btn-group-sm" role="group" aria-label="Modo de visualización">
                             <input type="radio" class="btn-check" name="global-loading-mode" id="global-pagination-mode" autocomplete="off" checked>
                             <label class="btn btn-outline-light btn-sm" for="global-pagination-mode" onclick="setLoadingMode('pagination')" title="Modo Paginación - Navegar por páginas">
                                 <i class="fas fa-list"></i>
-                                <span class="d-none d-lg-inline ms-1">Páginas</span>
                             </label>
                             
                             <input type="radio" class="btn-check" name="global-loading-mode" id="global-infinite-mode" autocomplete="off">
                             <label class="btn btn-outline-light btn-sm" for="global-infinite-mode" onclick="setLoadingMode('infinite')" title="Modo Scroll Infinito - Carga automática">
                                 <i class="fas fa-arrow-down"></i>
-                                <span class="d-none d-lg-inline ms-1">Scroll</span>
                             </label>
                         </div>
                     </div>

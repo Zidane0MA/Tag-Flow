@@ -92,15 +92,11 @@
                     </div>
                     
                     <!-- Botón limpiar filtros -->
-                    <div class="col-md-1">
-                        <label class="form-label">&nbsp;</label>
-                        <a href="{{ url_for('index') }}" class="btn btn-outline-danger d-block" title="Limpiar filtros">
+                    <div class="col-auto align-self-end">
+                        <a href="{{ url_for('index') }}" class="btn btn-outline-danger" title="Limpiar filtros">
                             <i class="fas fa-times"></i>
                         </a>
                     </div>
-                </form>
-                
-                
                 </form>
             </div>
         </div>
@@ -111,7 +107,7 @@
 {% if request.args.get('search') or request.args.get('creator') or request.args.get('platform') or request.args.get('status') or request.args.get('processing_status') or request.args.get('difficulty') or request.args.get('tags') %}
 <div class="row mb-3">
     <div class="col-12">
-        <div class="alert alert-info d-flex justify-content-between align-items-center">
+        <div class="alert alert-info d-flex justify-content-between align-items-center flex-wrap">
             <div>
                 <i class="fas fa-filter me-2"></i>
                 <strong>Filtros activos:</strong>
@@ -486,7 +482,7 @@
             </p>
         </div>
         <div class="col-md-6">
-            <ul class="pagination justify-content-end mb-0">
+            <ul class="pagination justify-content-end mb-0 flex-wrap">
                 <!-- Primera página -->
                 {% if page > 2 %}
                 <li class="page-item">

@@ -111,6 +111,12 @@
     opacity: 0.9;
 }
 
+@media (min-width: 992px) {
+    #view-mode-switcher .navbar-text {
+        padding-left: 0.45rem !important;
+    }
+}
+
 /* ==========================================
    CARDS MODERNIZADAS
    ========================================== */
@@ -377,6 +383,31 @@
 /* ==========================================
    RESPONSIVE MEJORADO
    ========================================== */
+@media (max-width: 992px) {
+    #view-mode-switcher {
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+        width: auto;
+        max-width: 100vw;
+        min-width: 0;
+        margin: 0;
+        box-sizing: border-box;
+        display: inline-flex;
+        justify-content: flex-start;
+        align-items: center;
+        background: none !important;
+        border: none !important;
+        box-shadow: none !important;
+    }
+    #view-mode-switcher .navbar-text {
+        padding-left: 0.25rem !important;
+    }
+    .navbar-text.ms-3 {
+        margin-left: 0 !important;
+        padding-left: 0.25rem !important;
+    }
+}
+
 @media (max-width: 768px) {
     .card {
         margin-bottom: var(--space-lg);
@@ -398,41 +429,16 @@
 }
 
 /* ==========================================
-   ANIMACIONES SUAVES
-   ========================================== */
-@keyframes fadeInUp {
-    from {
-        opacity: 0;
-        transform: translateY(30px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-@keyframes slideInRight {
-    from {
-        opacity: 0;
-        transform: translateX(30px);
-    }
-    to {
-        opacity: 1;
-        transform: translateX(0);
-    }
-}
-
-.fade-in-up {
-    animation: fadeInUp 0.6s ease-out;
-}
-
-.slide-in-right {
-    animation: slideInRight 0.6s ease-out;
-}
-
-/* ==========================================
    MICRO-INTERACTIONS
    ========================================== */
+#view-mode-switcher {
+    padding-left: var(--space-md);
+    padding-right: var(--space-md);
+
+    animation: fadeInUp 0.6s ease-out;
+    animation-fill-mode: both;
+}
+
 .video-card-wrapper {
     animation: fadeInUp 0.6s ease-out;
     animation-fill-mode: both;
