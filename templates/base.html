@@ -109,18 +109,6 @@
             margin-left: 0 !important; /* Eliminar margin-left heredado */
         }
     }
-
-    
-    /* Animación sutil para el switch */
-    @keyframes switchGlow {
-        0% { box-shadow: 0 0 5px rgba(255,255,255,0.3); }
-        50% { box-shadow: 0 0 15px rgba(255,255,255,0.5); }
-        100% { box-shadow: 0 0 5px rgba(255,255,255,0.3); }
-    }
-    
-    #view-mode-switcher .btn-check:checked + .btn-outline-light {
-        animation: switchGlow 2s ease-in-out infinite;
-    }
     
     /* Mejor contraste para accesibilidad */
     @media (prefers-contrast: high) {
