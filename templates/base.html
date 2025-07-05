@@ -86,10 +86,29 @@
     }
     
     @media (max-width: 768px) {
-        /* El switch ahora es visible en móviles y se alinea a la derecha. */
+        /* Mejoras de diseño para el switch en móviles */
         #view-mode-switcher {
             margin-left: auto;
-            padding-left: 1rem;
+            padding: 0; /* Eliminar padding del contenedor */
+            background: none; /* Eliminar fondo del contenedor */
+            backdrop-filter: none; /* Eliminar filtro de desenfoque */
+            border-radius: 0; /* Eliminar borde redondeado */
+            box-shadow: none; /* Eliminar sombra del contenedor */
+        }
+
+        #view-mode-switcher .btn-outline-light {
+            border: none !important; /* Eliminar borde de los botones */
+            background-color: transparent !important; /* Asegurar fondo transparente */
+            color: rgba(255, 255, 255, 0.9) !important; /* Mantener color del icono */
+        }
+
+        #view-mode-switcher .btn-check:checked + .btn-outline-light {
+            background-color: rgba(255, 255, 255, 0.2) !important; /* Fondo sutil para el botón seleccionado */
+            box-shadow: none !important; /* Eliminar sombra del botón seleccionado */
+        }
+
+        #view-mode-switcher .btn-group .btn {
+            margin-left: 0 !important; /* Eliminar margin-left heredado */
         }
     }
     
