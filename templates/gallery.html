@@ -263,7 +263,8 @@
                         <img src="{{ url_for('serve_thumbnail', filename=thumbnail_filename | urlencode) }}" 
                              class="card-img-top thumbnail-image" 
                              alt="Thumbnail de {{ video.file_name }}"
-                             onerror="this.src='/static/img/no-thumbnail.svg'">
+                             onerror="this.src='/static/img/no-thumbnail.svg'"
+                             onclick="playVideoShorts('{{ video.id }}')">
                     {% else %}
                         <img src="/static/img/no-thumbnail.svg" 
                              class="card-img-top thumbnail-image" 

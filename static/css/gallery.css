@@ -45,7 +45,7 @@
     top: -1.5px;
     left: -1.5px;
     width: calc(100% + 3px);
-    height: calc(100% + 1.5px);
+    height: calc(100% + 6.3px);
     background: rgba(0, 0, 0, 0.7);
     display: flex;
     align-items: center;
@@ -84,12 +84,14 @@
     flex-direction: column;
     gap: 0.25rem;
     align-items: flex-end;
+    z-index: 1;
 }
 
 .card-badges .badge {
     font-size: 0.7rem;
-    padding: 0.25rem 0.5rem;
+    padding: 0.3rem 0.6rem; /* Adjusted padding for consistency */
     backdrop-filter: blur(10px);
+    border-radius: 50px; /* Ensure pill shape */
 }
 
 /* Información del video */
@@ -406,11 +408,6 @@
     /* Mostrar solo navegación esencial en móvil */
     .pagination .page-item:not(.active):not(:first-child):not(:last-child):not(:nth-child(2)):not(:nth-last-child(2)) {
         display: none;
-    }
-    
-    /* Ocultar algunos elementos en móviles muy pequeños - mejorado */
-    .badge.bg-info:last-child {
-        display: none; /* Ocultar badge de plataforma */
     }
     
     /* Simplificar overlay en móviles */

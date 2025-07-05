@@ -205,26 +205,29 @@
 /* Badges modernos */
 .badge {
     font-weight: 600;
-    padding: var(--space-xs) var(--space-sm);
-    border-radius: var(--radius-md);
+    padding: 0.35rem 0.8rem; /* Increased padding */
+    border-radius: 50px; /* Pill shape */
     backdrop-filter: var(--backdrop-blur);
     border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1); /* Subtle shadow */
+    transition: all 0.2s ease; /* Smooth transitions for any future changes */
 }
 
 .badge.bg-success {
-    background: linear-gradient(135deg, #48bb78, #38a169) !important;
+    background: linear-gradient(135deg, #4CAF50, #66BB6A) !important; /* Slightly adjusted gradient */
 }
 
 .badge.bg-warning {
-    background: linear-gradient(135deg, #ed8936, #dd6b20) !important;
+    background: linear-gradient(135deg, #FFC107, #FFD54F) !important; /* Adjusted gradient */
+    color: #333 !important; /* Ensure good contrast for warning */
 }
 
 .badge.bg-secondary {
-    background: linear-gradient(135deg, #718096, #4a5568) !important;
+    background: linear-gradient(135deg, #607D8B, #90A4AE) !important; /* Adjusted gradient */
 }
 
 .badge.bg-info {
-    background: linear-gradient(135deg, #4299e1, #3182ce) !important;
+    background: linear-gradient(135deg, #2196F3, #64B5F6) !important; /* Adjusted gradient */
 }
 
 /* ==========================================
