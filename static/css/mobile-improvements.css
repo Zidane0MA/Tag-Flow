@@ -72,15 +72,29 @@ body, html {
         transition: transform 0.2s ease, box-shadow 0.2s ease;
     }
     
-    /* Thumbnail optimizada para móvil */
+    /* Thumbnail optimizada para móvil con bleeding */
     .thumbnail-image {
+        top: -1.5px;
+        left: -1.5px;
+        width: calc(100% + 3px);
+        height: calc(100% + 1.5px);
+        border-radius: 13.5px 13.5px 0 0;
+    }
+    
+    /* Asegurar que el contenedor de la imagen también tenga el mismo border-radius */
+    .card-img-top-container {
         border-radius: 12px 12px 0 0;
     }
     
     /* Mejorar overlay en móvil */
     .card-overlay {
+        top: -1.5px;
+        left: -1.5px;
+        width: calc(100% + 3px);
+        height: calc(100% + 1.5px);
         background: linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.8) 100%);
         backdrop-filter: blur(5px);
+        border-radius: 13.5px 13.5px 0 0 !important;
     }
     
     .overlay-buttons {
@@ -91,7 +105,6 @@ body, html {
         display: flex;
         gap: 0.5rem;
         justify-content: center;
-        flex-wrap: wrap;
     }
     
     .overlay-buttons .btn {

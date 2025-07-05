@@ -238,7 +238,7 @@
 <div class="row" id="videos-container" data-total-videos="{{ total_videos }}" data-per-page="{{ per_page }}" data-current-page="{{ page }}">
     {% if videos %}
         {% for video in videos %}
-        <div class="col-xl-3 col-lg-4 col-md-6 col-sm-12 mb-4 video-card-wrapper" 
+        <div class="col-xl-3 col-lg-4 col-sm-6 mb-4 video-card-wrapper" 
              data-creator="{{ video.creator_name }}" 
              data-platform="{{ video.platform }}" 
              data-status="{{ video.edit_status }}" 
@@ -249,8 +249,11 @@
             <div class="card video-card h-100">
                 <!-- Checkbox de selección -->
                 <div class="position-absolute" style="top: 0.5rem; left: 0.5rem; z-index: 10;">
-                    <input type="checkbox" class="form-check-input video-select" 
-                           value="{{ video.id }}" onchange="updateBulkSelection()">
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input video-select" 
+                               value="{{ video.id }}" id="video-select-{{ video.id }}" onchange="updateBulkSelection()">
+                        <label class="form-check-label sr-only" for="video-select-{{ video.id }}">Seleccionar video {{ video.id }}</label>
+                    </div>
                 </div>
                 
                 <!-- Thumbnail -->
@@ -260,13 +263,11 @@
                         <img src="{{ url_for('serve_thumbnail', filename=thumbnail_filename | urlencode) }}" 
                              class="card-img-top thumbnail-image" 
                              alt="Thumbnail de {{ video.file_name }}"
-                             loading="lazy"
                              onerror="this.src='/static/img/no-thumbnail.svg'">
                     {% else %}
                         <img src="/static/img/no-thumbnail.svg" 
                              class="card-img-top thumbnail-image" 
-                             alt="Sin thumbnail"
-                             loading="lazy">
+                             alt="Sin thumbnail">
                     {% endif %}
                     
                     <!-- Overlay con botones -->

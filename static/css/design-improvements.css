@@ -158,14 +158,13 @@
     border-radius: var(--radius-lg);
     overflow: hidden;
     transition: var(--transition-slow);
-    border: 1px solid var(--gray-200);
-    background: white;
+    border: none;
+    background: transparent;
 }
 
 .video-card:hover {
     transform: translateY(-6px);
     box-shadow: var(--shadow-xl);
-    border-color: var(--primary-light);
 }
 
 .card-img-top-container {
