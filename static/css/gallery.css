@@ -32,7 +32,28 @@
     object-fit: cover;
     transition: transform 0.3s ease;
     border-radius: calc(var(--radius-lg) + 1.5px) calc(var(--radius-lg) + 1.5px) 0 0;
-    z-index: 1;
+    z-index: 3; /* Mayor que el overlay para recibir clics */
+}
+
+/* Zona clickeable para reproducir video */
+.thumbnail-click-zone {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    cursor: pointer;
+    z-index: 7; /* Por debajo del overlay */
+    background: transparent;
+    border-radius: calc(var(--radius-lg) + 1.5px) calc(var(--radius-lg) + 1.5px) 0 0;
+}
+
+.clickable-thumbnail {
+    cursor: pointer;
+}
+
+.clickable-thumbnail:hover {
+    opacity: 0.9;
 }
 
 .video-card:hover .thumbnail-image {
@@ -45,7 +66,7 @@
     top: -1.5px;
     left: -1.5px;
     width: calc(100% + 3px);
-    height: calc(100% + 6.3px);
+    height: calc(100% + 7.3px);
     background: rgba(0, 0, 0, 0.7);
     display: flex;
     align-items: center;
@@ -53,16 +74,19 @@
     opacity: 0;
     transition: opacity 0.3s ease;
     border-radius: calc(var(--radius-lg) + 1.5px) calc(var(--radius-lg) + 1.5px) 0 0;
-    z-index: 2;
+    z-index: 4; /* Por encima de la zona clickeable */
+    pointer-events: none; /* No interfiere con clics por defecto */
 }
 
 .video-card:hover .card-overlay {
     opacity: 1;
+    pointer-events: auto; /* Habilitar clics cuando es visible */
 }
 
 .overlay-buttons {
     display: flex;
     gap: 0.5rem;
+    pointer-events: auto; /* Asegurar que los botones sean clickeables */
 }
 
 .overlay-buttons .btn {
@@ -73,6 +97,9 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    position: relative;
+    z-index: 4; /* Por encima del overlay */
+    pointer-events: auto; /* Asegurar que sean clickeables */
 }
 
 /* Badges en las cards */
@@ -84,7 +111,8 @@
     flex-direction: column;
     gap: 0.25rem;
     align-items: flex-end;
-    z-index: 1;
+    z-index: 3; /* Por encima del thumbnail */
+    pointer-events: none; /* Los badges no deben bloquear clics */
 }
 
 .card-badges .badge {
@@ -470,6 +498,46 @@
     
     .btn-group .btn:hover {
         transform: none;
+    }
+    
+    .clickable-thumbnail:hover {
+        opacity: 1;
+    }
+    
+    /* Añadir un indicador visual sutil para thumbnail clickeable */
+    .clickable-thumbnail::after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        background: rgba(0, 0, 0, 0.6);
+        transform: translate(-50%, -50%);
+        opacity: 0;
+        transition: opacity 0.2s ease;
+        pointer-events: none;
+        z-index: 10;
+    }
+    
+    .clickable-thumbnail::before {
+        content: '▶';
+        position: absolute;
+        top: 50%;
+        left: 52%;
+        transform: translate(-50%, -50%);
+        color: white;
+        font-size: 20px;
+        opacity: 0;
+        transition: opacity 0.2s ease;
+        pointer-events: none;
+        z-index: 11;
+    }
+    
+    .clickable-thumbnail:active::after,
+    .clickable-thumbnail:active::before {
+        opacity: 1;
     }
 }
 

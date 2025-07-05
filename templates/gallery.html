@@ -263,13 +263,18 @@
                         <img src="{{ url_for('serve_thumbnail', filename=thumbnail_filename | urlencode) }}" 
                              class="card-img-top thumbnail-image" 
                              alt="Thumbnail de {{ video.file_name }}"
-                             onerror="this.src='/static/img/no-thumbnail.svg'"
-                             onclick="playVideoShorts('{{ video.id }}')">
+                             onerror="this.src='/static/img/no-thumbnail.svg'">
                     {% else %}
                         <img src="/static/img/no-thumbnail.svg" 
                              class="card-img-top thumbnail-image" 
                              alt="Sin thumbnail">
                     {% endif %}
+                    
+                    <!-- Zona clickeable para reproducir -->
+                    <div class="thumbnail-click-zone" 
+                         onclick="playVideoShorts('{{ video.id }}')"
+                         title="Clic para reproducir en modo Shorts">
+                    </div>
                     
                     <!-- Overlay con botones -->
                     <div class="card-overlay">
