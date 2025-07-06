@@ -709,11 +709,11 @@ body.modal-open {
     font-size: 1rem;
 }
 
-/* Responsive para contenedores de estadísticas */
+/* Responsive para contenedores de estadísticas - coincide con videos */
 #stats-container,
 #admin-stats-container {
-    --bs-gutter-x: 0.75rem;
-    --bs-gutter-y: 0.5rem;
+    --bs-gutter-x: 1.5rem; /* Coincide con videos: 12px cada lado = 24px total */
+    --bs-gutter-y: 1.5rem; /* Coincide con mb-4 de videos */
 }
 
 /* Fix margin-bottom issues on stats cards */
@@ -726,13 +726,13 @@ body.modal-open {
     margin-bottom: 0 !important;
 }
 
-/* Breakpoints específicos para estadísticas - ajustados */
+/* Breakpoints específicos para estadísticas - coincide con videos */
 @media (max-width: 991px) and (min-width: 768px) {
-    /* MD: 2x2 grid - transición más temprana de 4 a 2 */
+    /* MD: 2x2 grid - coincide con col-lg-4 de videos (3 por fila) */
     #stats-container,
     #admin-stats-container {
-        --bs-gutter-x: 0.4rem;
-        --bs-gutter-y: 0.25rem;
+        --bs-gutter-x: 1.5rem; /* Mantiene mismo espaciado que videos */
+        --bs-gutter-y: 1.5rem; /* Mantiene mismo espaciado que videos */
     }
     
     .stats-card-hover .card-title {
@@ -745,11 +745,11 @@ body.modal-open {
 }
 
 @media (max-width: 767px) and (min-width: 350px) {
-    /* SM: Mantener 2x2 grid hasta 350px */
+    /* SM: Mantener 2x2 grid hasta 350px - coincide con col-sm-6 de videos */
     #stats-container,
     #admin-stats-container {
-        --bs-gutter-x: 0.3rem;
-        --bs-gutter-y: 0.2rem;
+        --bs-gutter-x: 1.5rem; /* Mismo espaciado que videos (2 por fila) */
+        --bs-gutter-y: 1.5rem; /* Mismo espaciado vertical que videos */
     }
     
     /* Forzar que col-6 se mantenga en 50% */
@@ -773,11 +773,11 @@ body.modal-open {
 }
 
 @media (max-width: 350px) {
-    /* XS: Cambio a 1x4 stack SOLO bajo 350px */
+    /* XS: Cambio a 1x4 stack SOLO bajo 350px - espaciado reducido pero proporcional */
     #stats-container,
     #admin-stats-container {
-        --bs-gutter-x: 0.25rem;
-        --bs-gutter-y: 0.15rem;
+        --bs-gutter-x: 0.75rem; /* Reducido pero proporcional */
+        --bs-gutter-y: 0.75rem; /* Reducido pero mantiene proporción con videos */
     }
     
     /* Override col-6 para que sea 100% solo bajo 350px */
