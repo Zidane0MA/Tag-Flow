@@ -709,6 +709,97 @@ body.modal-open {
     font-size: 1rem;
 }
 
+/* Responsive para contenedores de estadísticas */
+#stats-container,
+#admin-stats-container {
+    --bs-gutter-x: 0.75rem;
+    --bs-gutter-y: 0.5rem;
+}
+
+/* Fix margin-bottom issues on stats cards */
+.stats-card-hover {
+    margin-bottom: 0 !important;
+}
+
+#stats-container [class*="col-"],
+#admin-stats-container [class*="col-"] {
+    margin-bottom: 0 !important;
+}
+
+/* Breakpoints específicos para estadísticas - ajustados */
+@media (max-width: 991px) and (min-width: 768px) {
+    /* MD: 2x2 grid - transición más temprana de 4 a 2 */
+    #stats-container,
+    #admin-stats-container {
+        --bs-gutter-x: 0.4rem;
+        --bs-gutter-y: 0.25rem;
+    }
+    
+    .stats-card-hover .card-title {
+        font-size: 2rem;
+    }
+    
+    .stats-card-hover .card-text {
+        font-size: 0.85rem;
+    }
+}
+
+@media (max-width: 767px) and (min-width: 350px) {
+    /* SM: Mantener 2x2 grid hasta 350px */
+    #stats-container,
+    #admin-stats-container {
+        --bs-gutter-x: 0.3rem;
+        --bs-gutter-y: 0.2rem;
+    }
+    
+    /* Forzar que col-6 se mantenga en 50% */
+    #stats-container .col-6,
+    #admin-stats-container .col-6 {
+        flex: 0 0 50% !important;
+        max-width: 50% !important;
+    }
+    
+    .stats-card-hover .card-title {
+        font-size: 1.8rem;
+    }
+    
+    .stats-card-hover .card-text {
+        font-size: 0.8rem;
+    }
+    
+    .stats-card-hover .card-body {
+        padding: 1rem 0.75rem;
+    }
+}
+
+@media (max-width: 349px) {
+    /* XS: Cambio a 1x4 stack SOLO bajo 350px */
+    #stats-container,
+    #admin-stats-container {
+        --bs-gutter-x: 0.25rem;
+        --bs-gutter-y: 0.15rem;
+    }
+    
+    /* Override col-6 para que sea 100% solo bajo 350px */
+    #stats-container .col-6,
+    #admin-stats-container .col-6 {
+        flex: 0 0 100% !important;
+        max-width: 100% !important;
+    }
+    
+    .stats-card-hover .card-title {
+        font-size: 1.5rem;
+    }
+    
+    .stats-card-hover .card-text {
+        font-size: 0.75rem;
+    }
+    
+    .stats-card-hover .card-body {
+        padding: 0.75rem 0.5rem;
+    }
+}
+
 /* Animaciones específicas */
 @keyframes pulse {
     0% { transform: scale(1); }
