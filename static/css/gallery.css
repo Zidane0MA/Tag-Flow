@@ -501,6 +501,15 @@
 body.modal-open {
     overflow: hidden !important;
     padding-right: 0 !important;
+    position: fixed;
+    width: 100%;
+    height: 100%;
+}
+
+/* Prevenir scroll chaining en los modales */
+#editVideoModal .modal-dialog,
+#bulkEditModal .modal-dialog {
+    overscroll-behavior: contain;
 }
 
 /* Asegurar que los modales tengan su propio scroll */
@@ -509,6 +518,7 @@ body.modal-open {
     max-height: 74vh;
     overflow-y: auto;
     overflow-x: hidden;
+    overscroll-behavior: contain;
 }
 
 /* Optimizar el scroll interno del modal */
@@ -540,6 +550,136 @@ body.modal-open {
     color: white;
     border: none;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+/* Responsive para formulario de filtros - optimizado */
+#filter-form {
+    --bs-gutter-x: 0.75rem;
+    --bs-gutter-y: 0.5rem;
+}
+
+#filter-form .form-label {
+    margin-bottom: 0.3rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+/* Breakpoints específicos para mejor apilado */
+@media (min-width: 1400px) {
+    /* XXL: Una sola fila en pantallas muy anchas */
+    #filter-form {
+        --bs-gutter-x: 1rem;
+        --bs-gutter-y: 0.5rem;
+    }
+    
+    #filter-form .form-label {
+        font-size: 0.9rem;
+        margin-bottom: 0.4rem;
+    }
+}
+
+@media (max-width: 1399px) and (min-width: 1200px) {
+    /* XL: Una sola fila optimizada */
+    #filter-form {
+        --bs-gutter-x: 0.75rem;
+        --bs-gutter-y: 0.5rem;
+    }
+}
+
+@media (max-width: 1199px) and (min-width: 992px) {
+    /* LG: Apilado 3-3 */
+    #filter-form {
+        --bs-gutter-x: 0.6rem;
+        --bs-gutter-y: 0.4rem;
+    }
+    
+    #filter-form .form-label {
+        font-size: 0.8rem;
+        margin-bottom: 0.2rem;
+    }
+}
+
+@media (max-width: 991px) and (min-width: 768px) {
+    /* MD: Apilado 2-2-2 */
+    #filter-form {
+        --bs-gutter-x: 0.5rem;
+        --bs-gutter-y: 0.3rem;
+    }
+    
+    #filter-form .form-label {
+        font-size: 0.8rem;
+        margin-bottom: 0.2rem;
+    }
+    
+    #filter-form .form-control,
+    #filter-form .form-select {
+        font-size: 0.85rem;
+        padding: 0.4rem 0.6rem;
+    }
+}
+
+@media (max-width: 767px) and (min-width: 576px) {
+    /* SM: Apilado flexible */
+    #filter-form {
+        --bs-gutter-x: 0.4rem;
+        --bs-gutter-y: 0.25rem;
+    }
+    
+    #filter-form .form-label {
+        font-size: 0.75rem;
+        margin-bottom: 0.15rem;
+    }
+    
+    #filter-form .form-control,
+    #filter-form .form-select {
+        font-size: 0.8rem;
+        padding: 0.35rem 0.5rem;
+    }
+    
+    /* Ensure consistent spacing on mobile */
+    #filter-form [class*="col-"] {
+        margin-bottom: 0 !important;
+    }
+}
+
+@media (max-width: 575px) {
+    /* XS: Stack completo con espaciado mínimo */
+    #filter-form {
+        --bs-gutter-x: 0.25rem;
+        --bs-gutter-y: 0.2rem;
+    }
+    
+    #filter-form .form-label {
+        font-size: 0.75rem;
+        margin-bottom: 0.1rem;
+    }
+    
+    #filter-form .form-control,
+    #filter-form .form-select {
+        font-size: 0.8rem;
+        padding: 0.3rem 0.5rem;
+    }
+    
+    /* Fix uneven margin-bottom on status fields */
+    #filter-form [class*="col-"] {
+        margin-bottom: 0 !important;
+    }
+    
+    #filter-form .form-group {
+        margin-bottom: 0 !important;
+    }
+    
+    /* Override any inherited margins on specific form elements */
+    #filter-form .form-control,
+    #filter-form .form-select,
+    #filter-form .input-group {
+        margin-bottom: 0 !important;
+    }
+    
+    /* Ensure uniform spacing controlled only by Bootstrap gutter */
+    #filter-form > .row > [class*="col-"] {
+        padding-bottom: var(--bs-gutter-y);
+    }
 }
 
 .card-header h4, .card-header h5, .card-header h6 {
