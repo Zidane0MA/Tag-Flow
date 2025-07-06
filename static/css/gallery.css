@@ -106,9 +106,9 @@
 }
 
 .video-card .card-body {
-    background: transparent; /* Transparente para evitar contorno ficticio */
+    background: rgba(45, 55, 72, 0.95);
     color: var(--color-text-light);
-    backdrop-filter: none; /* Remover blur para evitar efectos de renderizado */
+    backdrop-filter: var(--blur-md);
 }
 
 .video-card .card-title {
@@ -118,23 +118,45 @@
 }
 
 .video-card .card-text {
-    color: var(--color-text-secondary);
+    color: #cbd5e0;
     font-weight: 500;
 }
 
 .video-card .text-muted {
-    color: var(--color-text-muted);
+    color: #a0aec0;
     font-weight: 500;
 }
 
 /* Colores específicos para contenido de cards - optimizados para tema oscuro */
 .card-text {
-    color: #e2e8f0; /* Texto claro para fondo oscuro */
+    color: #e2e8f0 !important; /* Texto claro para fondo oscuro */
     font-size: 0.9rem;
 }
 
 .text-muted {
-    color: #a0aec0; /* Texto muted claro para fondo oscuro */
+    color: #a0aec0 !important; /* Texto muted claro para fondo oscuro */
+}
+
+/* Colores específicos para paginación y textos del tema oscuro */
+.pagination-info {
+    color: #e2e8f0 !important; /* Forzar visibilidad en tema oscuro */
+}
+
+/* Asegurar colores correctos en todos los elementos de texto */
+.video-card .card-body .card-text {
+    color: #cbd5e0 !important;
+}
+
+.video-card .card-body .text-muted {
+    color: #a0aec0 !important;
+}
+
+.video-card .card-body p {
+    color: #e2e8f0 !important;
+}
+
+.video-card .card-body small {
+    color: #a0aec0 !important;
 }
 
 .video-card .text-primary {
@@ -153,13 +175,13 @@
 }
 
 .video-card .card-footer {
-    background: transparent; /* Transparente para consistencia */
+    background: rgba(45, 55, 72, 0.95) !important;
     border-top: 1px solid rgba(255, 255, 255, 0.1);
-    backdrop-filter: none; /* Remover blur para evitar efectos de renderizado */
+    backdrop-filter: var(--blur-md);
 }
 
 .video-card .card-footer .text-muted {
-    color: var(--color-text-muted);
+    color: #a0aec0 !important;
     font-weight: 500;
 }
 
@@ -370,7 +392,7 @@
    BOTONES DE ESTADO - DISEÑO MODERNO CUADRADO
    ============================================ */
 .card-footer .btn-group .btn {
-    border-radius: var(--radius-md); /* Cuadrado con bordes redondeados modernos */
+    border-radius: 8px !important; /* Esquinas redondeadas consistentes */
     width: 36px;
     height: 36px;
     padding: 0;
@@ -380,8 +402,8 @@
     justify-content: center;
     font-size: 0.9rem;
     font-weight: 600;
-    transition: var(--transition-fast);
-    border: 2px solid transparent; /* Sin borde por defecto para diseño limpio */
+    transition: all 0.2s ease;
+    border: 2px solid transparent;
     position: relative;
     overflow: hidden;
 }
@@ -399,12 +421,12 @@
 }
 
 .card-footer .btn-group .btn.active {
-    transform: translateY(-2px);
+    transform: scale(1.1);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .card-footer .btn-group .btn:hover {
-    transform: translateY(-2px);
+    transform: scale(1.15);
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
     z-index: 2;
 }
@@ -920,7 +942,7 @@ body.modal-open {
 .pagination-info {
     font-size: 0.9rem;
     font-weight: 500;
-    color: #a0aec0; /* Color claro para tema oscuro */
+    color: #e2e8f0; /* Texto claro visible en tema oscuro */
     text-align: left; /* Desktop: alineado a la izquierda */
 }
 
@@ -1028,7 +1050,7 @@ body.modal-open {
         text-align: center;
         margin-bottom: 0.5rem;
         font-size: 0.85rem;
-        color: #a0aec0; /* Color claro para tema oscuro */
+        color: #e2e8f0 !important; /* Asegurar visibilidad en tablet */
     }
     
     .pagination-controls {

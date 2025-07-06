@@ -227,7 +227,7 @@ body, html {
     .card-text {
         font-size: 0.85rem;
         line-height: 1.4;
-        color: #555;
+        color: #cbd5e0;
         margin-bottom: 0.75rem;
     }
     
@@ -238,8 +238,8 @@ body, html {
     
     .card-footer {
         padding: 0.75rem 1rem;
-        background: rgba(248, 249, 250, 0.8);
-        border-top: 1px solid rgba(0,0,0,0.1);
+        background: rgba(45, 55, 72, 0.95);
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
     }
     
     .btn-group .btn {
