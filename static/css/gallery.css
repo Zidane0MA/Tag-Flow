@@ -94,7 +94,6 @@
     transition: var(--transition-normal);
     border: none;
     box-shadow: var(--shadow-md);
-    background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%);
     color: white;
     border-radius: var(--radius-lg);
     overflow: hidden;
@@ -139,7 +138,7 @@
 
 /* Colores específicos para paginación y textos del tema oscuro */
 .pagination-info {
-    color: #e2e8f0 !important; /* Forzar visibilidad en tema oscuro */
+    color: #6c757d !important; /* Forzar visibilidad en tema oscuro */
 }
 
 /* Asegurar colores correctos en todos los elementos de texto */
