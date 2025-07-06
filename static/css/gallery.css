@@ -765,8 +765,8 @@ body.modal-open {
     }
 }
 
-@media (max-width: 767px) and (min-width: 350px) {
-    /* SM: Mantener 2x2 grid hasta 350px - coincide con col-sm-6 de videos */
+@media (max-width: 767px) and (min-width: 576px) {
+    /* SM: Mantener 2x2 grid (576px-767px) - espaciado normal */
     #stats-container,
     #admin-stats-container {
         --bs-gutter-x: 1.5rem; /* Mismo espaciado que videos (2 por fila) */
@@ -797,6 +797,41 @@ body.modal-open {
     
     .stats-card-hover .card-body {
         padding: 1rem 0.75rem;
+    }
+}
+
+@media (max-width: 576px) and (min-width: 350px) {
+    /* XS: 2x2 grid en móvil (<576px) - espaciado más compacto */
+    #stats-container,
+    #admin-stats-container {
+        --bs-gutter-x: 0.75rem; /* Espaciado reducido para móvil */
+        --bs-gutter-y: 0.75rem; /* Espaciado vertical reducido para móvil */
+    }
+    
+    /* Filtros mantienen espaciado normal (menos reducción) */
+    #filters-container {
+        margin-bottom: 1.25rem; /* Ligeramente reducido */
+    }
+    
+    /* Forzar que col-6 se mantenga en 50% con spacing reducido */
+    #stats-container .col-6,
+    #admin-stats-container .col-6 {
+        flex: 0 0 50% !important;
+        max-width: 50% !important;
+        padding-left: calc(var(--bs-gutter-x) * 0.5) !important;
+        padding-right: calc(var(--bs-gutter-x) * 0.5) !important;
+    }
+    
+    .stats-card-hover .card-title {
+        font-size: 1.7rem;
+    }
+    
+    .stats-card-hover .card-text {
+        font-size: 0.75rem;
+    }
+    
+    .stats-card-hover .card-body {
+        padding: 0.85rem 0.65rem;
     }
 }
 
