@@ -45,7 +45,6 @@ body {
 
 .card:hover {
     box-shadow: var(--box-shadow-lg);
-    transform: translateY(-2px);
 }
 
 /* Botones personalizados */

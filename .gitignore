@@ -296,6 +296,7 @@ data/deepface_models/
 config_local.py
 settings_local.py
 CLAUDE.md
+GEMINI.md
 
 # FFmpeg y binarios
 ffmpeg.exe

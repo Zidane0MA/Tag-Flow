@@ -126,7 +126,6 @@
 
 .card:hover {
     box-shadow: var(--shadow-xl);
-    transform: translateY(-4px) scale(1.02);
 }
 
 .card-header {
@@ -363,6 +362,11 @@
     background: radial-gradient(circle, rgba(255, 255, 255, 0.1), transparent);
     border-radius: 50%;
     transform: translate(30px, -30px);
+}
+
+.stats-card-hover:hover {
+    box-shadow: var(--shadow-xl);
+    transform: translateY(-4px) scale(1.02);
 }
 
 /* ==========================================
