@@ -306,5 +306,6 @@ bin/
 
 # Archivos de prueba
 test_videos/
+test/*.png
 sample_videos/
 examples/videos/
