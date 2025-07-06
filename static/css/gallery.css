@@ -497,6 +497,43 @@
     filter: invert(1);
 }
 
+/* Prevenir doble scrollbar cuando se abren modales */
+body.modal-open {
+    overflow: hidden !important;
+    padding-right: 0 !important;
+}
+
+/* Asegurar que los modales tengan su propio scroll */
+#editVideoModal .modal-body,
+#bulkEditModal .modal-body {
+    max-height: 74vh;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+/* Optimizar el scroll interno del modal */
+#editVideoModal .modal-body::-webkit-scrollbar,
+#bulkEditModal .modal-body::-webkit-scrollbar {
+    width: 8px;
+}
+
+#editVideoModal .modal-body::-webkit-scrollbar-track,
+#bulkEditModal .modal-body::-webkit-scrollbar-track {
+    background: #2d3748;
+    border-radius: 4px;
+}
+
+#editVideoModal .modal-body::-webkit-scrollbar-thumb,
+#bulkEditModal .modal-body::-webkit-scrollbar-thumb {
+    background: #667eea;
+    border-radius: 4px;
+}
+
+#editVideoModal .modal-body::-webkit-scrollbar-thumb:hover,
+#bulkEditModal .modal-body::-webkit-scrollbar-thumb:hover {
+    background: #764ba2;
+}
+
 /* Filtros mejorados */
 .card-header {
     background: linear-gradient(135deg, #6f42c1 0%, #5a32a3 100%);
