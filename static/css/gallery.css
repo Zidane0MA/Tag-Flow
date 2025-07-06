@@ -1,15 +1,102 @@
 /* Tag-Flow V2 - Estilos de la Galería */
 
-/* Video cards */
+/* Mejoras de legibilidad para filtros */
+.form-label {
+    color: #ffffff !important;
+    font-weight: 600;
+    font-size: 0.9rem;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.form-control, .form-select {
+    background-color: rgba(255, 255, 255, 0.95) !important;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    color: #2d3748 !important;
+    font-weight: 500;
+}
+
+.form-control:focus, .form-select:focus {
+    background-color: #ffffff !important;
+    border-color: #667eea;
+    box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+    color: #2d3748 !important;
+}
+
+.btn-outline-secondary {
+    background-color: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.3);
+    color: #ffffff;
+    font-weight: 600;
+}
+
+.btn-outline-secondary:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+    border-color: rgba(255, 255, 255, 0.5);
+    color: #ffffff;
+}
+
+/* Video cards mejoradas */
 .video-card {
     transition: all 0.3s ease;
     border: none;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 12px;
+    overflow: hidden;
 }
 
 .video-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+    transform: translateY(-8px);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+}
+
+.video-card .card-body {
+    background: rgba(255, 255, 255, 0.98);
+    color: #2d3748;
+    backdrop-filter: blur(10px);
+}
+
+.video-card .card-title {
+    color: #2d3748 !important;
+    font-weight: 700;
+    font-size: 1.1rem;
+}
+
+.video-card .card-text {
+    color: #4a5568 !important;
+    font-weight: 500;
+}
+
+.video-card .text-muted {
+    color: #718096 !important;
+    font-weight: 500;
+}
+
+.video-card .text-primary {
+    color: #667eea !important;
+    font-weight: 600;
+}
+
+.video-card .text-success {
+    color: #48bb78 !important;
+    font-weight: 600;
+}
+
+.video-card .text-info {
+    color: #4299e1 !important;
+    font-weight: 600;
+}
+
+.video-card .card-footer {
+    background: rgba(255, 255, 255, 0.95);
+    border-top: 1px solid rgba(0, 0, 0, 0.1);
+    backdrop-filter: blur(10px);
+}
+
+.video-card .card-footer .text-muted {
+    color: #718096 !important;
+    font-weight: 500;
 }
 
 /* Thumbnail container */
@@ -115,10 +202,45 @@
 }
 
 .card-badges .badge {
-    font-size: 0.7rem;
-    padding: 0.3rem 0.6rem; /* Adjusted padding for consistency */
+    font-size: 0.75rem;
+    padding: 0.4rem 0.8rem;
     backdrop-filter: blur(10px);
-    border-radius: 50px; /* Ensure pill shape */
+    border-radius: 50px;
+    font-weight: 600;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* Badges mejorados con colores más vibrantes */
+.badge.bg-success {
+    background: linear-gradient(135deg, #48bb78, #38a169) !important;
+    color: white !important;
+}
+
+.badge.bg-warning {
+    background: linear-gradient(135deg, #ed8936, #dd6b20) !important;
+    color: white !important;
+}
+
+.badge.bg-secondary {
+    background: linear-gradient(135deg, #718096, #4a5568) !important;
+    color: white !important;
+}
+
+.badge.bg-info {
+    background: linear-gradient(135deg, #4299e1, #3182ce) !important;
+    color: white !important;
+}
+
+.badge.bg-danger {
+    background: linear-gradient(135deg, #f56565, #e53e3e) !important;
+    color: white !important;
+}
+
+.badge.bg-primary {
+    background: linear-gradient(135deg, #667eea, #764ba2) !important;
+    color: white !important;
 }
 
 /* Información del video */
@@ -136,29 +258,107 @@
     transition: all 0.3s ease;
 }
 
-/* Botones de estado rápido */
-.btn-group .btn {
-    border-radius: 50% !important;
-    width: 30px;
-    height: 30px;
+/* Mejoras para el panel de edición masiva */
+#bulk-edit-panel .card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: none;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+}
+
+#bulk-edit-panel .card-header {
+    background: rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(10px);
+}
+
+#bulk-edit-panel .card-body {
+    padding: 1.5rem;
+}
+
+#bulk-edit-panel .btn-group {
+    margin-bottom: 0.75rem;
+}
+
+#bulk-edit-panel .btn-group-sm .btn {
+    padding: 0.5rem 1rem;
+    font-size: 0.85rem;
+    font-weight: 500;
+    border-radius: 6px;
+    margin-right: 0.5rem;
+}
+
+#bulk-edit-panel .form-check-label {
+    color: white;
+    font-weight: 500;
+    margin-bottom: 0.75rem;
+}
+
+/* Organizar botones en filas responsive */
+#bulk-edit-panel .col {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+@media (max-width: 768px) {
+    #bulk-edit-panel .btn-group {
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+    }
+    
+    #bulk-edit-panel .btn-group .btn {
+        margin-right: 0;
+        margin-bottom: 0.5rem;
+        justify-content: flex-start;
+    }
+}
+
+/* Botones de estado rápido mejorados */
+.card-footer .btn-group .btn {
+    border-radius: 8px !important;
+    width: 36px;
+    height: 36px;
     padding: 0;
-    margin-right: 30px;
+    margin-right: 8px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 0.8rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    transition: all 0.2s ease;
+    border: 2px solid transparent;
 }
 
-.btn-group.btn-group-sm > .btn {
-    margin: 0rem 0.30rem !important;
+.card-footer .btn-group.btn-group-sm > .btn {
+    margin: 0rem 0.25rem !important;
 }
 
-.btn-group.btn-group-sm > .btn:first-child {
+.card-footer .btn-group.btn-group-sm > .btn:first-child {
     margin-left: 0 !important;
 }
 
-.btn-group .btn.active {
+.card-footer .btn-group .btn.active {
     transform: scale(1.1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.card-footer .btn-outline-secondary.active {
+    background: linear-gradient(135deg, #718096, #4a5568);
+    border-color: #4a5568;
+    color: white;
+}
+
+.card-footer .btn-outline-warning.active {
+    background: linear-gradient(135deg, #ed8936, #dd6b20);
+    border-color: #dd6b20;
+    color: white;
+}
+
+.card-footer .btn-outline-success.active {
+    background: linear-gradient(135deg, #48bb78, #38a169);
+    border-color: #38a169;
+    color: white;
 }
 
 /* Modal de video */
@@ -173,11 +373,39 @@
     background: #000;
 }
 
-/* Filtros */
+/* Filtros mejorados */
 .card-header {
     background: linear-gradient(135deg, #6f42c1 0%, #5a32a3 100%);
     color: white;
     border: none;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.card-header h4, .card-header h5, .card-header h6 {
+    color: white !important;
+    font-weight: 700;
+}
+
+/* Estadísticas mejoradas */
+.stats-card-hover {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    transition: all 0.3s ease;
+}
+
+.stats-card-hover .card-title {
+    color: white !important;
+    font-size: 2.5rem;
+    font-weight: 700;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.stats-card-hover .card-text {
+    color: rgba(255, 255, 255, 0.9) !important;
+    font-weight: 600;
+    font-size: 1rem;
 }
 
 /* Animaciones específicas */
