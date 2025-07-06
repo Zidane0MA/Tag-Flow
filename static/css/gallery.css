@@ -772,7 +772,7 @@ body.modal-open {
     }
 }
 
-@media (max-width: 349px) {
+@media (max-width: 350px) {
     /* XS: Cambio a 1x4 stack SOLO bajo 350px */
     #stats-container,
     #admin-stats-container {
