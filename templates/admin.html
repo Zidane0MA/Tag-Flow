@@ -3,6 +3,7 @@
 {% block title %}Dashboard Administrativo{% endblock %}
 
 {% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/gallery.css') }}">
 <style>
 /* Estilos específicos para el dashboard admin */
 .admin-header {
@@ -287,7 +288,6 @@
 {% endblock %}
 
 {% block content %}
-<div class="container-fluid">
     <!-- Header del Dashboard -->
     <div class="admin-header text-center">
         <h1 class="mb-2">
@@ -299,38 +299,34 @@
     <!-- Estadísticas Rápidas -->
     <div class="row mb-4">
         <div class="col-md-3">
-            <div class="card stats-card text-center">
+            <div class="card text-center stats-card-hover">
                 <div class="card-body">
-                    <div class="stats-number text-primary" id="total-videos">-</div>
+                    <h5 class="card-title text-primary" id="total-videos">-</h5>
                     <p class="card-text">Total Videos</p>
-                    <small class="text-muted">Activos en sistema</small>
                 </div>
             </div>
         </div>
         <div class="col-md-3">
-            <div class="card stats-card text-center">
+            <div class="card text-center stats-card-hover">
                 <div class="card-body">
-                    <div class="stats-number text-danger" id="deleted-videos">-</div>
+                    <h5 class="card-title text-danger" id="deleted-videos">-</h5>
                     <p class="card-text">En Papelera</p>
-                    <small class="text-muted">Videos eliminados</small>
                 </div>
             </div>
         </div>
         <div class="col-md-3">
-            <div class="card stats-card text-center">
+            <div class="card text-center stats-card-hover">
                 <div class="card-body">
-                    <div class="stats-number text-success" id="processed-videos">-</div>
+                    <h5 class="card-title text-success" id="processed-videos">-</h5>
                     <p class="card-text">Procesados</p>
-                    <small class="text-muted">Con análisis completo</small>
                 </div>
             </div>
         </div>
         <div class="col-md-3">
-            <div class="card stats-card text-center">
+            <div class="card text-center stats-card-hover">
                 <div class="card-body">
-                    <div class="stats-number text-warning" id="pending-videos">-</div>
+                    <h5 class="card-title text-warning" id="pending-videos">-</h5>
                     <p class="card-text">Pendientes</p>
-                    <small class="text-muted">Sin procesar</small>
                 </div>
             </div>
         </div>
@@ -370,9 +366,8 @@
     </div>
 
     <!-- Comandos de Gestión -->
-    <div class="row">
-        <!-- Columna Izquierda: Comandos Principales -->
-        <div class="col-lg-8">
+    <div class="row mb-4">
+        <div class="col-12">
             <!-- Poblado de Base de Datos -->
             <div class="card command-card mb-4">
                 <div class="card-header">
@@ -532,7 +527,11 @@
         </div>
 
         <!-- Columna Derecha: Terminal y Logs -->
-        <div class="col-lg-4">
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-12">
             <!-- Terminal de Salida -->
             <div class="card command-card mb-4">
                 <div class="card-header d-flex justify-content-between align-items-center">
@@ -590,7 +589,6 @@
             </div>
         </div>
     </div>
-</div>
 {% endblock %}
 
 {% block extra_js %}
