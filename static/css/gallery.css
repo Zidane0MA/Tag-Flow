@@ -297,24 +297,40 @@
     margin-bottom: 0.75rem;
 }
 
-/* Organizar botones en filas responsive */
+/* Organizar botones en filas responsive - layout mejorado */
 #bulk-edit-panel .col {
     display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+#bulk-edit-panel .btn-group {
+    margin-bottom: 0;
+    margin-right: 0.5rem;
+}
+
+#bulk-edit-panel .btn-group:last-child {
+    margin-right: 0;
 }
 
 @media (max-width: 768px) {
-    #bulk-edit-panel .btn-group {
-        display: flex;
+    #bulk-edit-panel .col {
         flex-direction: column;
+        align-items: stretch;
+    }
+    
+    #bulk-edit-panel .btn-group {
         width: 100%;
+        margin-bottom: 0.5rem;
+        margin-right: 0;
     }
     
     #bulk-edit-panel .btn-group .btn {
+        flex: 1;
         margin-right: 0;
-        margin-bottom: 0.5rem;
-        justify-content: flex-start;
+        justify-content: center;
     }
 }
 
@@ -379,6 +395,106 @@
     width: 100%;
     border-radius: 0.5rem;
     background: #000;
+}
+
+/* Modales de edición - tema oscuro */
+#editVideoModal .modal-content,
+#bulkEditModal .modal-content {
+    background: #2d3748;
+    color: #e2e8f0;
+    border: 1px solid #4a5568;
+}
+
+#editVideoModal .modal-header,
+#bulkEditModal .modal-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-bottom: 1px solid #4a5568;
+}
+
+#editVideoModal .modal-footer,
+#bulkEditModal .modal-footer {
+    background: #2d3748;
+    border-top: 1px solid #4a5568;
+}
+
+#editVideoModal .form-label,
+#bulkEditModal .form-label {
+    color: #e2e8f0;
+    font-weight: 600;
+}
+
+#editVideoModal .form-control,
+#editVideoModal .form-select,
+#bulkEditModal .form-control,
+#bulkEditModal .form-select {
+    background: #4a5568;
+    border: 1px solid #718096;
+    color: #e2e8f0;
+}
+
+#editVideoModal .form-control:focus,
+#editVideoModal .form-select:focus,
+#bulkEditModal .form-control:focus,
+#bulkEditModal .form-select:focus {
+    background: #4a5568;
+    border-color: #667eea;
+    color: #e2e8f0;
+    box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+}
+
+#editVideoModal .form-control[readonly],
+#editVideoModal .form-select[readonly] {
+    background: #2d3748;
+    border-color: #4a5568;
+    color: #a0aec0;
+}
+
+#editVideoModal .form-text,
+#bulkEditModal .form-text {
+    color: #a0aec0;
+}
+
+#editVideoModal .accordion-item,
+#bulkEditModal .accordion-item {
+    background: #4a5568;
+    border: 1px solid #718096;
+}
+
+#editVideoModal .accordion-button,
+#bulkEditModal .accordion-button {
+    background: #4a5568;
+    color: #e2e8f0;
+    border: none;
+}
+
+#editVideoModal .accordion-button:not(.collapsed),
+#bulkEditModal .accordion-button:not(.collapsed) {
+    background: #667eea;
+    color: white;
+}
+
+#editVideoModal .accordion-body,
+#bulkEditModal .accordion-body {
+    background: #2d3748;
+    color: #e2e8f0;
+}
+
+#editVideoModal .alert-info,
+#bulkEditModal .alert-info {
+    background: rgba(102, 126, 234, 0.2);
+    border: 1px solid rgba(102, 126, 234, 0.3);
+    color: #e2e8f0;
+}
+
+#editVideoModal .form-check-label,
+#bulkEditModal .form-check-label {
+    color: #e2e8f0;
+}
+
+#editVideoModal .btn-close,
+#bulkEditModal .btn-close {
+    filter: invert(1);
 }
 
 /* Filtros mejorados */

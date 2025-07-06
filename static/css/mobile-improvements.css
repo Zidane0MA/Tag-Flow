@@ -22,6 +22,22 @@ body, html {
    MEJORAS DE ACCESIBILIDAD MÓVIL
    ============================================ */
 
+/* Espaciado para switches de paginación en navbar */
+#view-mode-switcher {
+    margin-left: 1rem !important;
+}
+
+#view-mode-switcher .btn-group {
+    gap: 0.25rem;
+}
+
+@media (max-width: 991px) {
+    #view-mode-switcher {
+        margin-left: 0 !important;
+        margin-top: 0.75rem !important;
+    }
+}
+
 /* Mejoras para pantallas pequeñas */
 @media (max-width: 576px) {
     /* Filtros más accesibles en móvil */
