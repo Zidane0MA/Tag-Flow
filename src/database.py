@@ -48,7 +48,7 @@ class DatabaseManager:
                     
                     -- Creador (desde 4K Downloader + manual)
                     creator_name TEXT NOT NULL,
-                    platform TEXT DEFAULT 'tiktok' CHECK(platform IN ('tiktok', 'instagram', 'youtube', 'iwara', 'other')),
+                    platform TEXT DEFAULT 'tiktok',
                     
                     -- Reconocimiento Automático
                     detected_music TEXT,
