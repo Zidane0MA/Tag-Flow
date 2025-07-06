@@ -421,7 +421,7 @@
 
 .card-footer .btn-group .btn.active {
     transform: scale(1.1);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    box-shadow: none; /* Eliminar contorno del botón seleccionado */
 }
 
 .card-footer .btn-group .btn:hover {
@@ -444,10 +444,10 @@
 }
 
 .card-footer .btn-outline-secondary.active {
-    background: linear-gradient(135deg, var(--color-secondary), var(--color-secondary-dark));
-    border-color: var(--color-secondary-dark);
+    background: var(--color-secondary); /* Color plano sin gradiente */
+    border-color: var(--color-secondary);
     color: white;
-    box-shadow: 0 4px 12px rgba(113, 128, 150, 0.3);
+    box-shadow: none; /* Sin contorno */
 }
 
 /* Estilo moderno para botones - En proceso (Amarillo) */
@@ -464,10 +464,10 @@
 }
 
 .card-footer .btn-outline-warning.active {
-    background: linear-gradient(135deg, var(--color-warning), var(--color-warning-dark));
-    border-color: var(--color-warning-dark);
+    background: var(--color-warning); /* Color plano sin gradiente */
+    border-color: var(--color-warning);
     color: white;
-    box-shadow: 0 4px 12px rgba(237, 137, 54, 0.3);
+    box-shadow: none; /* Sin contorno */
 }
 
 /* Estilo moderno para botones - Completado (Verde) */
@@ -484,10 +484,10 @@
 }
 
 .card-footer .btn-outline-success.active {
-    background: linear-gradient(135deg, var(--color-success), var(--color-success-dark));
-    border-color: var(--color-success-dark);
+    background: var(--color-success); /* Color plano sin gradiente */
+    border-color: var(--color-success);
     color: white;
-    box-shadow: 0 4px 12px rgba(72, 187, 120, 0.3);
+    box-shadow: none; /* Sin contorno */
 }
 
 /* ============================================
