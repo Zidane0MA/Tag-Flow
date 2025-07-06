@@ -642,7 +642,7 @@ body.modal-open {
     }
 }
 
-@media (max-width: 575px) {
+@media (max-width: 576px) {
     /* XS: Stack completo con espaciado mínimo */
     #filter-form {
         --bs-gutter-x: 0.25rem;
@@ -716,6 +716,16 @@ body.modal-open {
     --bs-gutter-y: 1.5rem; /* Coincide con mb-4 de videos */
 }
 
+/* Responsive para contenedor de filtros - espaciado proporcional */
+#filters-container {
+    margin-bottom: 1.5rem; /* Base: equivale a mb-4 */
+}
+
+/* Override default card margin-bottom */
+#filters-container .card {
+    margin-bottom: 0 !important;
+}
+
 /* Fix margin-bottom issues on stats cards */
 .stats-card-hover {
     margin-bottom: 0 !important;
@@ -726,6 +736,12 @@ body.modal-open {
     margin-bottom: 0 !important;
 }
 
+/* Override default card margin-bottom for stats */
+#stats-container .card,
+#admin-stats-container .card {
+    margin-bottom: 0 !important;
+}
+
 /* Breakpoints específicos para estadísticas - coincide con videos */
 @media (max-width: 991px) and (min-width: 768px) {
     /* MD: 2x2 grid - coincide con col-lg-4 de videos (3 por fila) */
@@ -733,6 +749,11 @@ body.modal-open {
     #admin-stats-container {
         --bs-gutter-x: 1.5rem; /* Mantiene mismo espaciado que videos */
         --bs-gutter-y: 1.5rem; /* Mantiene mismo espaciado que videos */
+    }
+    
+    /* Filtros coinciden exactamente con estadísticas */
+    #filters-container {
+        margin-bottom: 1.5rem; /* Mismo espaciado que estadísticas */
     }
     
     .stats-card-hover .card-title {
@@ -750,6 +771,11 @@ body.modal-open {
     #admin-stats-container {
         --bs-gutter-x: 1.5rem; /* Mismo espaciado que videos (2 por fila) */
         --bs-gutter-y: 1.5rem; /* Mismo espaciado vertical que videos */
+    }
+    
+    /* Filtros coinciden exactamente con estadísticas */
+    #filters-container {
+        margin-bottom: 1.5rem; /* Mismo espaciado que estadísticas */
     }
     
     /* Forzar que col-6 se mantenga en 50% pero respete padding */
@@ -780,6 +806,11 @@ body.modal-open {
     #admin-stats-container {
         --bs-gutter-x: 0.75rem; /* Reducido pero proporcional */
         --bs-gutter-y: 0.75rem; /* Reducido pero mantiene proporción con videos */
+    }
+    
+    /* Filtros coinciden exactamente con estadísticas */
+    #filters-container {
+        margin-bottom: 0.75rem; /* Mismo espaciado que estadísticas */
     }
     
     /* Override col-6 para que sea 100% solo bajo 350px pero respete padding */
