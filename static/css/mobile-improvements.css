@@ -149,10 +149,10 @@ body, html {
     
     .card-badges .badge {
         font-size: 0.7rem;
-        padding: 0.3rem 0.6rem; /* Adjusted padding for consistency */
-        border-radius: 20px; /* Keep rounded shape for mobile */
+        padding: 0.4rem 0.8rem !important; /* Forzar mismo padding que desktop */
+        border-radius: 50px !important; /* Forzar mismo border-radius que desktop */
         font-weight: 600;
-        border: 1px solid rgba(255,255,255,0.3);
+        border: none;
         backdrop-filter: blur(10px);
     }
     
