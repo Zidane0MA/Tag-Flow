@@ -499,12 +499,11 @@
 
 /* Desktop y Tablet Grande (992px+) */
 @media (min-width: 992px) {
+    /* Forzar comportamiento correcto del header */
     #bulk-edit-panel .card-header .d-flex {
-        flex-direction: row !important;
-        align-items: center;
-        justify-content: space-between;
-        gap: 1rem;
-        text-align: left;
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
     }
     
     #bulk-edit-panel .card-body {
@@ -565,12 +564,11 @@
 
 /* Tablet Mediano (768px - 991px) */
 @media (min-width: 768px) and (max-width: 991px) {
+    /* Forzar comportamiento correcto del header */
     #bulk-edit-panel .card-header .d-flex {
-        flex-direction: row !important;
-        align-items: center;
-        justify-content: space-between;
-        gap: 0.75rem;
-        text-align: left;
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
     }
     
     #bulk-edit-panel .card-body {
@@ -579,7 +577,7 @@
     
     #bulk-edit-panel .card-body .row {
         display: grid !important;
-        grid-template-columns: repeat(2, 1fr);
+        grid-template-columns: repeat(2, 1fr) !important;
         gap: 0.6rem;
         margin: 0;
         width: 100%;
@@ -635,22 +633,29 @@
         padding: 0.75rem;
     }
     
+    /* Forzar comportamiento correcto del header */
     #bulk-edit-panel .card-header .d-flex {
-        flex-direction: column !important;
-        align-items: center;
-        gap: 0.5rem;
-        text-align: center;
-    }
-    
-    #bulk-edit-panel .card-header .btn-group-sm {
-        align-self: stretch;
-        width: 100%;
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
     }
     
     #bulk-edit-panel .card-header .btn-group-sm .btn {
-        flex: 1;
-        font-size: 0.7rem;
+        flex: none;
+        font-size: 0.7rem !important;
         padding: 0.375rem 0.5rem;
+        text-indent: 0 !important;
+        justify-content: flex-end !important;
+    }
+    
+    #bulk-edit-panel .card-header .btn-group-sm .btn i {
+        font-size: 0.7rem !important;
+        margin-right: 0.25rem !important;
+    }
+
+    /* Justifica a la derecha solo el grupo de botones del header de edición masiva */
+    #bulk-edit-panel .card-header .d-flex.btn-group.btn-group-sm {
+    justify-content: flex-end !important;
     }
     
     #bulk-edit-panel .card-body {
@@ -694,8 +699,8 @@
     
     #bulk-edit-panel .btn-group .btn {
         margin: 0;
-        padding: 0.5rem 0.375rem;
-        font-size: 0.7rem;
+        padding: 0;
+        font-size: 0;
         border-radius: 6px;
         font-weight: 600;
         transition: all 0.2s ease;
@@ -706,7 +711,25 @@
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
-        min-height: 44px; /* Touch-friendly */
+        min-height: 44px;
+        min-width: 44px;
+    }
+    
+    /* Solo mostrar iconos en móvil */
+    #bulk-edit-panel .btn-group .btn i {
+        font-size: 1.1rem;
+        margin: 0 !important;
+    }
+    
+    /* Ocultar texto en botones del body */
+    #bulk-edit-panel .card-body .btn-group .btn {
+        font-size: 0;
+        text-indent: -9999px;
+    }
+    
+    #bulk-edit-panel .card-body .btn-group .btn i {
+        text-indent: 0;
+        font-size: 1.1rem;
     }
 }
 
@@ -1801,5 +1824,19 @@ body.modal-open {
     
     .card-footer .btn-group .btn:hover {
         transform: none;
+    }
+    
+    /* Override touch optimizations for bulk edit panel in tablet/desktop */
+    #bulk-edit-panel .btn-group .btn {
+        min-width: auto !important;
+        min-height: auto !important;
+    }
+    
+    /* Only apply touch optimizations to bulk edit panel on mobile */
+    @media (pointer: coarse) and (max-width: 767px) {
+        #bulk-edit-panel .btn-group .btn {
+            min-width: 44px !important;
+            min-height: 44px !important;
+        }
     }
 }

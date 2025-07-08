@@ -154,7 +154,7 @@ body {
     }
     
     /* Botones en móvil - mejor accesibilidad */
-    .btn {
+    .btn:not(#bulk-edit-panel .btn-group .btn) {
         font-size: 0.9rem;
         padding: 0.6rem 1rem;
         font-weight: 500;
@@ -200,7 +200,7 @@ body {
         padding: 0.75rem;
     }
     
-    .btn {
+    .btn:not(#bulk-edit-panel .btn-group .btn) {
         font-size: 0.85rem;
         padding: 0.5rem 0.75rem;
         min-height: 44px; /* Mejor área de toque */
@@ -253,7 +253,7 @@ body {
 /* Mejoras touch para móviles - mejorado */
 @media (pointer: coarse) {
     /* Aumentar área de toque para elementos interactivos */
-    .btn {
+    .btn:not(#bulk-edit-panel .btn-group .btn) {
         min-height: 44px;
         min-width: 44px;
         padding: 0.75rem 1rem;

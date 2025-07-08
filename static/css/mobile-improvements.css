@@ -242,7 +242,7 @@ body, html {
         border-top: 1px solid rgba(255, 255, 255, 0.1);
     }
     
-    .btn-group .btn {
+    .btn-group .btn:not(#bulk-edit-panel .btn-group .btn) {
         border-radius: 50%;
         width: 32px;
         height: 32px;
