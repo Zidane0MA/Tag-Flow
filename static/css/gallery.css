@@ -497,8 +497,8 @@
    BULK EDIT PANEL - BREAKPOINTS CONSOLIDADOS
    ============================================ */
 
-/* Desktop y Tablet Grande (992px+) */
-@media (min-width: 992px) {
+/* Desktop y Tablet Grande (750px+) */
+@media (min-width: 750px) {
     /* Forzar comportamiento correcto del header */
     #bulk-edit-panel .card-header .d-flex {
         display: flex !important;
@@ -562,8 +562,8 @@
     }
 }
 
-/* Tablet Mediano (991px) */
-@media (max-width: 992px) {
+/* Tablet Mediano (750px) */
+@media (max-width: 750px) {
     /* Forzar comportamiento correcto del header */
     #bulk-edit-panel .card-header .d-flex {
         display: flex !important;
@@ -761,6 +761,13 @@
     
     .pagination-controls .page-item.active {
         display: block;
+    }
+
+    /* Eliminar contorno de botones de estado en el footer de la card en móvil */
+    .card-footer .btn-group .btn,
+    .card-footer .btn-group .btn.active {
+        border: none !important;
+        box-shadow: none !important;
     }
 }
 
