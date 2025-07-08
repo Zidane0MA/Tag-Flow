@@ -333,7 +333,7 @@
    PANEL DE EDICIÓN MASIVA
    ============================================ */
 #bulk-edit-panel .card {
-    background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%);
+    background-color: rgb(44 54 71) !important;
     border: none;
     box-shadow: var(--shadow-lg);
 }
@@ -342,10 +342,11 @@
     background: rgba(255, 255, 255, 0.1);
     border-bottom: 1px solid rgba(255, 255, 255, 0.2);
     backdrop-filter: var(--blur-md);
+    padding: 0.75rem 1.25rem; /* Reducido de 1.5rem (24px) a 0.75rem (12px) */
 }
 
 #bulk-edit-panel .card-body {
-    padding: 1.5rem;
+    padding: 1rem;
 }
 
 #bulk-edit-panel .btn-group {
@@ -358,10 +359,126 @@
 #bulk-edit-panel .btn-group-sm .btn {
     padding: 0.5rem 1rem;
     font-size: 0.85rem;
-    font-weight: 500;
-    border-radius: var(--radius-sm);
+    font-weight: 600;
+    border-radius: 8px; /* Igual que los botones de estado individuales */
     margin: 0.1rem 0.2rem;
     flex: 0 0 auto;
+    border: 2px solid transparent;
+    transition: all 0.2s ease;
+    box-shadow: none; /* Sin contorno por defecto */
+}
+
+/* Estados hover para botones del panel */
+#bulk-edit-panel .btn-group-sm .btn:hover {
+    transform: scale(1.05);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+/* Estados activos sin contorno */
+/* Estados específicos para cada tipo de botón */
+#bulk-edit-panel .btn-outline-secondary {
+    background: rgba(113, 128, 150, 0.15) !important;
+    border-color: rgba(113, 128, 150, 0.4) !important;
+    color: #718096 !important;
+}
+
+#bulk-edit-panel .btn-outline-secondary:hover {
+    background: rgba(113, 128, 150, 0.25) !important;
+    border-color: var(--color-secondary) !important;
+    color: var(--color-secondary) !important;
+    transform: scale(1.05);
+}
+
+#bulk-edit-panel .btn-outline-secondary.active,
+#bulk-edit-panel .btn-outline-secondary:active {
+    background: var(--color-secondary) !important;
+    border-color: var(--color-secondary) !important;
+    color: white !important;
+    box-shadow: none;
+}
+
+#bulk-edit-panel .btn-outline-warning {
+    background: rgba(237, 137, 54, 0.15) !important;
+    border-color: rgba(237, 137, 54, 0.4) !important;
+    color: #ed8936 !important;
+}
+
+#bulk-edit-panel .btn-outline-warning:hover {
+    background: rgba(237, 137, 54, 0.25) !important;
+    border-color: var(--color-warning) !important;
+    color: var(--color-warning) !important;
+    transform: scale(1.05);
+}
+
+#bulk-edit-panel .btn-outline-warning.active,
+#bulk-edit-panel .btn-outline-warning:active {
+    background: var(--color-warning) !important;
+    border-color: var(--color-warning) !important;
+    color: white !important;
+    box-shadow: none;
+}
+
+#bulk-edit-panel .btn-outline-success {
+    background: rgba(72, 187, 120, 0.15) !important;
+    border-color: rgba(72, 187, 120, 0.4) !important;
+    color: #48bb78 !important;
+}
+
+#bulk-edit-panel .btn-outline-success:hover {
+    background: rgba(72, 187, 120, 0.25) !important;
+    border-color: var(--color-success) !important;
+    color: var(--color-success) !important;
+    transform: scale(1.05);
+}
+
+#bulk-edit-panel .btn-outline-success.active,
+#bulk-edit-panel .btn-outline-success:active {
+    background: var(--color-success) !important;
+    border-color: var(--color-success) !important;
+    color: white !important;
+    box-shadow: none;
+}
+
+#bulk-edit-panel .btn-outline-info {
+    background: rgba(66, 153, 225, 0.15) !important;
+    border-color: rgba(66, 153, 225, 0.4) !important;
+    color: #4299e1 !important;
+}
+
+#bulk-edit-panel .btn-outline-info:hover {
+    background: rgba(66, 153, 225, 0.25) !important;
+    border-color: var(--color-info) !important;
+    color: var(--color-info) !important;
+    transform: scale(1.05);
+}
+
+#bulk-edit-panel .btn-outline-info.active,
+#bulk-edit-panel .btn-outline-info:active {
+    background: var(--color-info) !important;
+    border-color: var(--color-info) !important;
+    color: white !important;
+    box-shadow: none;
+}
+
+#bulk-edit-panel .btn-outline-danger {
+    background: rgba(245, 101, 101, 0.15) !important;
+    border-color: rgba(245, 101, 101, 0.4) !important;
+    color: #f56565 !important;
+}
+
+#bulk-edit-panel .btn-outline-danger:hover {
+    background: rgba(245, 101, 101, 0.25) !important;
+    border-color: var(--color-danger) !important;
+    color: var(--color-danger) !important;
+    transform: scale(1.05);
+}
+
+#bulk-edit-panel .btn-outline-danger.active,
+#bulk-edit-panel .btn-outline-danger:active {
+    background: var(--color-danger) !important;
+    border-color: var(--color-danger) !important;
+    color: white !important;
+    box-shadow: none;
 }
 
 #bulk-edit-panel .form-check-label {
@@ -374,9 +491,80 @@
     display: flex;
     flex-direction: row;
     flex-wrap: wrap;
-    gap: 0.5rem;
+    gap: 0.75rem;
     align-items: center;
 }
+
+/* SOLUCIONES ESPECÍFICAS PARA MOBILE < 768px */
+@media (max-width: 991px) {
+    #bulk-edit-panel .card-header h6 {
+        font-size: 0.9rem;
+        margin-bottom: 0.25rem;
+    }
+    
+    #bulk-edit-panel .card-header small {
+        font-size: 0.7rem;
+    }
+}
+
+@media (max-width: 991px) {
+    /* Segundo breakpoint: 2x2 grid (2 por fila) */
+    #bulk-edit-panel .card-body .row {
+        grid-template-columns: repeat(2, 1fr) !important; /* 2 por fila */
+        gap: 0.65rem;
+    }
+    
+    /* Checkbox sigue siendo primer elemento */
+    #bulk-edit-panel .col-auto {
+        grid-column: 1;
+    }
+    
+    #bulk-edit-panel .btn-group .btn {
+        font-size: 0.75rem;
+        padding: 0.55rem 0.4rem;
+    }
+}
+
+@media (max-width: 768px) {
+    /* Header: AHORA SÍ cambia a vertical */
+    #bulk-edit-panel .card-header {
+        padding: 0.5rem 0.75rem;
+    }
+    
+    #bulk-edit-panel .card-header .d-flex {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 0.5rem;
+    }
+    
+    #bulk-edit-panel .card-header .btn-group-sm {
+        align-self: stretch;
+        width: 100%;
+    }
+    
+    #bulk-edit-panel .card-header .btn-group-sm .btn {
+        flex: 1;
+        font-size: 0.7rem;
+        padding: 0.3rem 0.4rem;
+    }
+    
+    /* Body: Mantener 2x2 grid */
+    #bulk-edit-panel .card-body .row {
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 0.5rem;
+    }
+    
+    #bulk-edit-panel .btn-group .btn {
+        font-size: 0.7rem;
+        padding: 0.5rem 0.3rem;
+    }
+    
+    #bulk-edit-panel .col-auto .form-check-label {
+        font-size: 0.75rem;
+    }
+}
+
+
 
 #bulk-edit-panel .btn-group {
     margin-bottom: 0;
@@ -1006,21 +1194,80 @@ body.modal-open {
         padding: 0.4rem 0.6rem;
     }
     
-    #bulk-edit-panel .col {
-        flex-direction: column;
-        align-items: stretch;
+    /* SOLUCION UNIFORME: Grid de 6 elementos (1 checkbox + 5 botones) */
+    /* Primer breakpoint: 3x3 grid */
+    
+    /* Header: Mantener horizontal hasta 768px */
+    #bulk-edit-panel .card-header .d-flex {
+        flex-wrap: nowrap !important;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
     }
     
-    #bulk-edit-panel .btn-group {
+    #bulk-edit-panel .card-header .btn-group-sm {
+        flex-shrink: 0;
+        white-space: nowrap;
+    }
+    
+    /* Body: Grid uniforme para todos los elementos */
+    #bulk-edit-panel .card-body {
+        padding: 1rem;
+    }
+    
+    #bulk-edit-panel .card-body .row {
+        display: grid !important;
+        grid-template-columns: repeat(3, 1fr); /* 3 por fila en primer breakpoint */
+        gap: 0.75rem;
+        margin: 0;
         width: 100%;
-        margin-bottom: 0.5rem;
-        margin-right: 0;
     }
     
-    #bulk-edit-panel .btn-group .btn {
-        flex: 1;
-        margin-right: 0;
+    /* Checkbox como primer elemento del grid */
+    #bulk-edit-panel .col-auto {
+        grid-column: 1; /* Primera posición */
+        display: flex;
+        align-items: center;
         justify-content: center;
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 8px;
+        padding: 0.6rem;
+        margin: 0;
+    }
+    
+    #bulk-edit-panel .col-auto .form-check-label {
+        margin: 0;
+        font-size: 0.85rem;
+        color: white;
+        font-weight: 500;
+    }
+    
+    /* Contenedor de botones ocupa las 5 posiciones restantes */
+    #bulk-edit-panel .card-body .col {
+        display: contents; /* Los hijos van directamente al grid padre */
+    }
+    
+    /* Grupos de botones se expanden en el grid */
+    #bulk-edit-panel .btn-group {
+        display: contents !important;
+    }
+    
+    /* Botones individuales como elementos del grid */
+    #bulk-edit-panel .btn-group .btn {
+        margin: 0;
+        padding: 0.6rem 0.5rem;
+        font-size: 0.8rem;
+        border-radius: 8px;
+        font-weight: 600;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
     
     #stats-container,
@@ -1062,6 +1309,49 @@ body.modal-open {
     }
 }
 
+/* ============================================
+   BULK EDIT PANEL - COLORES GLOBALES
+   ============================================ */
+#bulk-edit-panel .btn-outline-secondary {
+    background: rgba(113, 128, 150, 0.15) !important;
+    border-color: rgba(113, 128, 150, 0.3) !important;
+    color: #718096 !important;
+}
+
+#bulk-edit-panel .btn-outline-warning {
+    background: rgba(237, 137, 54, 0.15) !important;
+    border-color: rgba(237, 137, 54, 0.3) !important;
+    color: #ed8936 !important;
+}
+
+#bulk-edit-panel .btn-outline-success {
+    background: rgba(72, 187, 120, 0.15) !important;
+    border-color: rgba(72, 187, 120, 0.3) !important;
+    color: #48bb78 !important;
+}
+
+#bulk-edit-panel .btn-outline-info {
+    background: rgba(66, 153, 225, 0.15) !important;
+    border-color: rgba(66, 153, 225, 0.3) !important;
+    color: #4299e1 !important;
+}
+
+#bulk-edit-panel .btn-outline-danger {
+    background: rgba(245, 101, 101, 0.15) !important;
+    border-color: rgba(245, 101, 101, 0.3) !important;
+    color: #f56565 !important;
+}
+
+/* ============================================
+   BULK EDIT PANEL - BREAKPOINT ESPECÍFICO 991px 
+   ============================================ */
+@media (max-width: 991px) and (min-width: 768px) {
+    /* Segundo breakpoint: cambiar de 3x3 a 2x2 grid */
+    #bulk-edit-panel .card-body .row {
+        grid-template-columns: repeat(2, 1fr) !important; /* 2 por fila en lugar de 3 */
+    }
+}
+
 /* Tablet */
 @media (max-width: 767px) and (min-width: 576px) {
     #filter-form {
@@ -1082,6 +1372,69 @@ body.modal-open {
     
     #filter-form [class*="col-"] {
         margin-bottom: 0;
+    }
+    
+    /* BULK EDIT PANEL - Segundo breakpoint: 2x2 grid, header vertical */
+    #bulk-edit-panel .card-header .d-flex {
+        flex-direction: column !important;
+        align-items: center;
+        gap: 0.75rem;
+        text-align: center;
+    }
+    
+    #bulk-edit-panel .card-body .row {
+        display: grid !important;
+        grid-template-columns: repeat(2, 1fr) !important; /* 2 por fila en segundo breakpoint */
+        gap: 0.75rem;
+        margin: 0;
+        width: 100%;
+    }
+    
+    /* Checkbox como primer elemento del grid */
+    #bulk-edit-panel .col-auto {
+        grid-column: 1; /* Primera posición */
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 8px;
+        padding: 0.6rem;
+        margin: 0;
+    }
+    
+    #bulk-edit-panel .col-auto .form-check-label {
+        margin: 0;
+        font-size: 0.85rem;
+        color: white;
+        font-weight: 500;
+    }
+    
+    /* Contenedor de botones ocupa las 5 posiciones restantes */
+    #bulk-edit-panel .card-body .col {
+        display: contents; /* Los hijos van directamente al grid padre */
+    }
+    
+    /* Grupos de botones se expanden en el grid */
+    #bulk-edit-panel .btn-group {
+        display: contents !important;
+    }
+    
+    /* Botones individuales como elementos del grid */
+    #bulk-edit-panel .btn-group .btn {
+        margin: 0;
+        padding: 0.6rem 0.5rem;
+        font-size: 0.8rem;
+        border-radius: 8px;
+        font-weight: 600;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
     
     #stats-container,
@@ -1172,6 +1525,70 @@ body.modal-open {
     
     #filter-form > .row > [class*="col-"] {
         padding-bottom: var(--bs-gutter-y);
+    }
+    
+    /* BULK EDIT PANEL - Mobile: Mantener 2x2 grid, header vertical */
+    #bulk-edit-panel .card-header .d-flex {
+        flex-direction: column !important;
+        align-items: center;
+        gap: 0.75rem;
+        text-align: center;
+    }
+    
+    #bulk-edit-panel .card-body .row {
+        display: grid !important;
+        grid-template-columns: repeat(2, 1fr) !important; /* Mantener 2 por fila en mobile */
+        gap: 0.6rem;
+        margin: 0;
+        width: 100%;
+    }
+    
+    /* Checkbox como primer elemento del grid */
+    #bulk-edit-panel .col-auto {
+        grid-column: 1; /* Primera posición */
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 8px;
+        padding: 0.5rem;
+        margin: 0;
+    }
+    
+    #bulk-edit-panel .col-auto .form-check-label {
+        margin: 0;
+        font-size: 0.8rem;
+        color: white;
+        font-weight: 500;
+    }
+    
+    /* Contenedor de botones ocupa las 5 posiciones restantes */
+    #bulk-edit-panel .card-body .col {
+        display: contents; /* Los hijos van directamente al grid padre */
+    }
+    
+    /* Grupos de botones se expanden en el grid */
+    #bulk-edit-panel .btn-group {
+        display: contents !important;
+    }
+    
+    /* Botones individuales como elementos del grid */
+    #bulk-edit-panel .btn-group .btn {
+        margin: 0;
+        padding: 0.5rem 0.4rem;
+        font-size: 0.75rem;
+        border-radius: 6px;
+        font-weight: 600;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        min-height: 44px; /* Área táctil adecuada */
     }
     
     #stats-container,
