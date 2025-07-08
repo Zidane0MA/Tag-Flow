@@ -209,7 +209,7 @@ function setupShortsEventListeners() {
                 overlayInfo.classList.add('auto-hide');
             }, 2000);
         }
-    });
+    }, { passive: true });
     
     modalElement.addEventListener('touchend', function(e) {
         const endY = e.changedTouches[0].clientY;

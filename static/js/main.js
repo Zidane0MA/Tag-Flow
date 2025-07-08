@@ -134,24 +134,34 @@ function showNotification(message, type = 'info') {
     
     const toastElement = document.getElementById('notification-toast');
     const messageElement = document.getElementById('toast-message');
-    const iconElement = toastElement.querySelector('.toast-header i');
+    const iconElement = document.getElementById('toast-icon')?.querySelector('i');
     
     // Configurar mensaje
     messageElement.textContent = message;
     
     // Configurar icono y color según el tipo
     const typeConfig = {
-        success: { icon: 'fas fa-check-circle text-success', class: 'toast-success' },
-        error: { icon: 'fas fa-exclamation-circle text-danger', class: 'toast-error' },
-        warning: { icon: 'fas fa-exclamation-triangle text-warning', class: 'toast-warning' },
-        info: { icon: 'fas fa-info-circle text-primary', class: 'toast-info' }
+        success: { icon: 'fas fa-check-circle', iconClass: 'success', toastClass: 'toast-success' },
+        error: { icon: 'fas fa-exclamation-circle', iconClass: 'error', toastClass: 'toast-error' },
+        warning: { icon: 'fas fa-exclamation-triangle', iconClass: 'warning', toastClass: 'toast-warning' },
+        info: { icon: 'fas fa-info-circle', iconClass: 'info', toastClass: 'toast-info' }
     };
     
     const config = typeConfig[type] || typeConfig.info;
-    iconElement.className = config.icon;
+    
+    // Configurar icono con clases apropiadas para modo oscuro
+    if (iconElement) {
+        iconElement.className = config.icon;
+    }
+    
+    // Configurar el contenedor del icono con la clase de color apropiada
+    const iconContainer = document.getElementById('toast-icon');
+    if (iconContainer) {
+        iconContainer.className = `toast-icon ${config.iconClass}`;
+    }
     
     // Limpiar clases anteriores y agregar nueva
-    toastElement.className = `toast ${config.class}`;
+    toastElement.className = `toast modern-toast ${config.toastClass}`;
     
     // Mostrar toast
     TagFlow.notifications.toast.show();

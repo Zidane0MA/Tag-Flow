@@ -314,32 +314,7 @@
     border-radius: var(--radius-md) 0 0 var(--radius-md);
 }
 
-/* ==========================================
-   PAGINACIÓN MODERNA
-   ========================================== */
-.pagination {
-    gap: var(--space-xs);
-}
-
-.page-link {
-    border: none;
-    border-radius: var(--radius-md);
-    font-weight: 600;
-    transition: var(--transition-base);
-    margin: 0 2px;
-}
-
-.page-link:hover {
-    background: var(--primary-gradient);
-    color: white;
-    transform: translateY(-1px);
-}
-
-.page-item.active .page-link {
-    background: var(--primary-gradient);
-    border: none;
-    box-shadow: var(--shadow-md);
-}
+/* Pagination styles consolidated in gallery.css */
 
 /* ==========================================
    ESTADÍSTICAS MEJORADAS

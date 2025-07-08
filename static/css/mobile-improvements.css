@@ -299,54 +299,7 @@ body, html {
     }
 }
 
-/* ============================================
-   PAGINACIÓN MÓVIL
-   ============================================ */
-@media (max-width: 576px) {
-    .pagination {
-        gap: 0.25rem;
-        justify-content: center;
-        flex-wrap: wrap;
-    }
-    
-    .pagination .page-item {
-        margin: 0;
-    }
-    
-    .pagination .page-link {
-        border-radius: 8px;
-        border: 2px solid #dee2e6;
-        font-weight: 500;
-        min-width: 44px;
-        min-height: 44px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-    
-    .pagination .page-item.active .page-link {
-        background-color: #6f42c1;
-        border-color: #6f42c1;
-        transform: scale(1.1);
-        box-shadow: 0 2px 8px rgba(111, 66, 193, 0.3);
-    }
-    
-    /* Mostrar solo elementos esenciales */
-    .pagination .page-item:not(.active):not(:first-child):not(:last-child):not(:nth-child(2)):not(:nth-last-child(2)) {
-        display: none;
-    }
-    
-    /* Información centrada */
-    .pagination + .row p {
-        text-align: center;
-        font-weight: 500;
-        background: rgba(111, 66, 193, 0.1);
-        padding: 0.5rem 1rem;
-        border-radius: 20px;
-        margin: 1rem auto;
-        display: inline-block;
-    }
-}
+/* Pagination styles consolidated in gallery.css */
 
 /* ============================================
    ACCESIBILIDAD
