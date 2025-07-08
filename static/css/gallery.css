@@ -498,31 +498,31 @@
    ============================================ */
 #bulk-edit-panel .btn-outline-secondary {
     background: rgba(113, 128, 150, 0.15) !important;
-    border-color: rgba(113, 128, 150, 0.3) !important;
+    border-color: rgba(113, 128, 150, 0.4) !important;
     color: #718096 !important;
 }
 
 #bulk-edit-panel .btn-outline-warning {
     background: rgba(237, 137, 54, 0.15) !important;
-    border-color: rgba(237, 137, 54, 0.3) !important;
+    border-color: rgba(237, 137, 54, 0.4) !important;
     color: #ed8936 !important;
 }
 
 #bulk-edit-panel .btn-outline-success {
     background: rgba(72, 187, 120, 0.15) !important;
-    border-color: rgba(72, 187, 120, 0.3) !important;
+    border-color: rgba(72, 187, 120, 0.4) !important;
     color: #48bb78 !important;
 }
 
 #bulk-edit-panel .btn-outline-info {
     background: rgba(66, 153, 225, 0.15) !important;
-    border-color: rgba(66, 153, 225, 0.3) !important;
+    border-color: rgba(66, 153, 225, 0.4) !important;
     color: #4299e1 !important;
 }
 
 #bulk-edit-panel .btn-outline-danger {
     background: rgba(245, 101, 101, 0.15) !important;
-    border-color: rgba(245, 101, 101, 0.3) !important;
+    border-color: rgba(245, 101, 101, 0.4) !important;
     color: #f56565 !important;
 }
 
