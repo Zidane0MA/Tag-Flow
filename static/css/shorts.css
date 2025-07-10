@@ -898,11 +898,6 @@
     }
 }
 
-/* Estados de carga mejorados - optimizado para tema oscuro */
-.video-preloader {
-    /* Styles already defined above */
-}
-
 /* Efectos de hover más suaves */
 .action-btn,
 .nav-btn {
@@ -1011,6 +1006,7 @@ input, textarea, select {
 .action-btn,
 .nav-btn {
     -webkit-transform: translateZ(0);
+    transform: translateZ(0);
     -webkit-backface-visibility: hidden;
     backface-visibility: hidden;
     perspective: 1000px;

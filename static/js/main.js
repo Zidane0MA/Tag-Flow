@@ -67,7 +67,7 @@ function initializeLoadingOverlay() {
         overlay.id = 'loading-overlay';
         overlay.className = 'loading-overlay';
         overlay.style.display = 'none';
-        overlay.style.background = '#000000'; // Negro instantáneo
+        overlay.style.background = 'transparent'; // Transparente para tema oscuro
         overlay.style.opacity = '1';
         overlay.innerHTML = `
             <div class="loading-content">

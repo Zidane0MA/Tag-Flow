@@ -548,12 +548,14 @@
 </nav>
 {% endif %}
 
-<!-- Indicador de carga para scroll infinito -->
+<!-- Indicador de carga para scroll infinito - tema oscuro -->
 <div id="infinite-loading" class="text-center py-4" style="display: none;">
-    <div class="spinner-border text-primary" role="status">
-        <span class="visually-hidden">Cargando más videos...</span>
+    <div class="d-inline-block p-3 rounded-3" style="background: rgba(0, 0, 0, 0.8); backdrop-filter: blur(10px);">
+        <div class="spinner-border text-light" role="status">
+            <span class="visually-hidden">Cargando más videos...</span>
+        </div>
+        <p class="mt-2 text-light mb-0">Cargando más videos...</p>
     </div>
-    <p class="mt-2 text-muted">Cargando más videos...</p>
 </div>
 
 <!-- Mensaje de fin para scroll infinito -->
@@ -968,12 +970,7 @@
 </div>
 
 
-<!-- Loading overlay -->
-<div id="loading-overlay" class="loading-overlay" style="display: none;">
-    <div class="spinner-border text-primary" role="status">
-        <span class="visually-hidden">Cargando...</span>
-    </div>
-</div>
+<!-- Loading overlay - eliminado porque se crea dinámicamente en JavaScript -->
 
 <!-- Toast para notificaciones - Diseño moderno tema oscuro -->
 <div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1080;">
