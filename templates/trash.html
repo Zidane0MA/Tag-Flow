@@ -43,19 +43,6 @@
     filter: grayscale(0.4) sepia(0.15) hue-rotate(340deg) saturate(0.9);
 }
 
-.trash-badge {
-    background: linear-gradient(135deg, #dc3545, #c82333) !important;
-    color: white !important;
-    font-weight: 700 !important;
-    padding: 0.5rem 1rem !important;
-    border-radius: 20px !important;
-    box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3) !important;
-    backdrop-filter: blur(5px) !important;
-    border: 1px solid rgba(255, 255, 255, 0.1) !important;
-    font-size: 0.8rem !important;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
-}
-
 .deleted-info {
     background: linear-gradient(135deg, rgba(220, 53, 69, 0.15), rgba(220, 53, 69, 0.1));
     border: 1px solid rgba(220, 53, 69, 0.3);
@@ -177,6 +164,375 @@
 .trash-card {
     animation: trashCardAppear 0.4s ease-out;
 }
+
+/* ============================================
+   MODAL TEMA OSCURO - ELIMINACIÓN PERMANENTE
+   ============================================ */
+
+#permanentDeleteModal .modal-content {
+    background: linear-gradient(135deg, rgba(45, 55, 72, 0.98) 0%, rgba(55, 65, 85, 0.98) 100%);
+    border: 1px solid rgba(220, 53, 69, 0.3);
+    border-radius: 16px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4), 0 0 40px rgba(220, 53, 69, 0.1);
+    backdrop-filter: blur(20px);
+    color: #e2e8f0;
+    overflow: hidden;
+}
+
+#permanentDeleteModal .modal-header {
+    background: linear-gradient(135deg, #dc3545, #c82333);
+    border-bottom: 1px solid rgba(220, 53, 69, 0.3);
+    border-radius: 16px 16px 0 0;
+    padding: 1.5rem;
+    color: white;
+    box-shadow: 0 2px 10px rgba(220, 53, 69, 0.2);
+}
+
+#permanentDeleteModal .modal-header .modal-title {
+    font-weight: 700;
+    font-size: 1.25rem;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+#permanentDeleteModal .modal-header .btn-close {
+    filter: invert(1);
+    opacity: 0.8;
+    transition: opacity 0.3s ease;
+}
+
+#permanentDeleteModal .modal-header .btn-close:hover {
+    opacity: 1;
+    transform: scale(1.1);
+}
+
+#permanentDeleteModal .modal-body {
+    padding: 2rem;
+    background: rgba(45, 55, 72, 0.95);
+    color: #e2e8f0;
+}
+
+#permanentDeleteModal .danger-zone {
+    background: linear-gradient(135deg, rgba(220, 53, 69, 0.15), rgba(220, 53, 69, 0.1));
+    border: 1px solid rgba(220, 53, 69, 0.4);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin: 0 0 1.5rem 0; /* Eliminar margin-top, mantener margin-bottom */
+    backdrop-filter: blur(10px);
+    box-shadow: 0 4px 15px rgba(220, 53, 69, 0.1);
+    position: relative;
+    overflow: hidden; /* Evitar que el ::before se salga */
+}
+
+#permanentDeleteModal .danger-zone::before {
+    content: '';
+    position: absolute;
+    top: -1px; /* Compensar el border del contenedor */
+    left: -1px; /* Compensar el border del contenedor */
+    right: -1px; /* Compensar el border del contenedor */
+    height: 4px;
+    background: linear-gradient(90deg, #dc3545, #c82333);
+    border-radius: 12px 12px 0 0;
+    z-index: 1;
+}
+
+#permanentDeleteModal .danger-zone h6 {
+    color: #f8d7da !important;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    font-size: 1.1rem;
+    position: relative;
+    z-index: 2; /* Asegurar que esté por encima del ::before */
+}
+
+#permanentDeleteModal .danger-zone p {
+    color: #e2e8f0 !important;
+    line-height: 1.6;
+    margin-bottom: 0.75rem;
+    position: relative;
+    z-index: 2; /* Asegurar que esté por encima del ::before */
+}
+
+#permanentDeleteModal .danger-zone strong {
+    color: #f8d7da !important;
+    font-weight: 700;
+}
+
+#permanentDeleteModal .form-check {
+    padding: 1rem;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    margin-top: 1.5rem;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+}
+
+#permanentDeleteModal .form-check:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(220, 53, 69, 0.3);
+}
+
+#permanentDeleteModal .form-check-input {
+    background: rgba(255, 255, 255, 0.1);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    width: 1.25rem;
+    height: 1.25rem;
+    margin: 0;
+    flex-shrink: 0;
+    margin-top: 0.125rem; /* Alinear con la primera línea del texto */
+}
+
+#permanentDeleteModal .form-check-input:checked {
+    background: #dc3545;
+    border-color: #dc3545;
+    box-shadow: 0 0 10px rgba(220, 53, 69, 0.3);
+}
+
+#permanentDeleteModal .form-check-label {
+    color: #e2e8f0 !important;
+    font-weight: 500;
+    line-height: 1.5;
+    cursor: pointer;
+    user-select: none;
+    flex: 1;
+    margin: 0;
+}
+
+#permanentDeleteModal .modal-footer {
+    background: rgba(45, 55, 72, 0.98);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 0 0 16px 16px;
+    padding: 1.5rem;
+}
+
+#permanentDeleteModal .modal-footer .btn {
+    padding: 0.75rem 1.5rem;
+    font-weight: 600;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+    min-width: 120px;
+}
+
+#permanentDeleteModal .modal-footer .btn-secondary {
+    background: rgba(113, 128, 150, 0.2);
+    border: 1px solid rgba(113, 128, 150, 0.4);
+    color: #a0aec0;
+}
+
+#permanentDeleteModal .modal-footer .btn-secondary:hover {
+    background: rgba(113, 128, 150, 0.3);
+    border-color: #718096;
+    color: #e2e8f0;
+    transform: translateY(-1px);
+}
+
+#permanentDeleteModal .modal-footer .btn-danger {
+    background: linear-gradient(135deg, #dc3545, #c82333);
+    border: 1px solid #dc3545;
+    color: white;
+    box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);
+}
+
+#permanentDeleteModal .modal-footer .btn-danger:hover:not(:disabled) {
+    background: linear-gradient(135deg, #c82333, #a71e2a);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(220, 53, 69, 0.4);
+}
+
+#permanentDeleteModal .modal-footer .btn-danger:disabled {
+    background: rgba(113, 128, 150, 0.3);
+    border-color: rgba(113, 128, 150, 0.3);
+    color: #6b7280;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+/* Animación del modal */
+#permanentDeleteModal.fade .modal-dialog {
+    transition: transform 0.3s ease-out;
+    transform: scale(0.8) translateY(-50px);
+}
+
+#permanentDeleteModal.show .modal-dialog {
+    transform: scale(1) translateY(0);
+}
+
+/* Overlay del modal */
+#permanentDeleteModal .modal-backdrop {
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(5px);
+}
+
+/* ============================================
+   RESPONSIVE DESIGN - MANTENER CONSISTENCIA
+   ============================================ */
+
+/* Asegurar que las trash-card mantengan el diseño en todas las pantallas */
+@media (max-width: 768px) {
+    .trash-card {
+        background: linear-gradient(135deg, rgba(45, 55, 72, 0.95) 0%, rgba(55, 65, 85, 0.95) 100%);
+        border: 2px solid rgba(220, 53, 69, 0.3);
+        border-radius: 16px;
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15), 0 0 20px rgba(220, 53, 69, 0.05);
+        backdrop-filter: blur(10px);
+    }
+    
+    .trash-card:hover {
+        transform: translateY(-6px);
+        box-shadow: 0 12px 35px rgba(0, 0, 0, 0.2), 0 0 30px rgba(220, 53, 69, 0.1);
+        border-color: rgba(220, 53, 69, 0.5);
+    }
+    
+    /* MANTENER THUMBNAILS EN MÓVIL - ESPECÍFICO PARA TRASH-CARD */
+    .trash-card .thumbnail-image,
+    .trash-card .card-img-top {
+        top: -1.5px !important;
+        left: -1.5px !important;
+        width: calc(100% + 3px) !important;
+        height: calc(100% + 1.5px) !important;
+        border-radius: 17.5px 17.5px 0 0 !important; /* 16px + 1.5px */
+        object-fit: cover !important;
+        position: absolute !important;
+        transition: all 0.3s ease !important;
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+    }
+    
+    .trash-card .card-img-top-container {
+        border-radius: 16px 16px 0 0 !important;
+        position: relative !important;
+        overflow: visible !important;
+        padding-top: 56.25% !important; /* 16:9 Aspect Ratio */
+        height: 0 !important;
+        background: transparent !important;
+    }
+    
+    .trash-card .card-overlay {
+        top: -1.5px !important;
+        left: -1.5px !important;
+        width: calc(100% + 3px) !important;
+        height: calc(100% + 7.3px) !important;
+        background: rgba(0, 0, 0, 0.7) !important;
+        border-radius: 17.5px 17.5px 0 0 !important; /* 16px + 1.5px */
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        opacity: 0 !important;
+        transition: all 0.3s ease !important;
+        position: absolute !important;
+        z-index: 6 !important;
+        pointer-events: none !important;
+    }
+    
+    .trash-card:hover .card-overlay {
+        opacity: 1 !important;
+        pointer-events: none !important;
+    }
+    
+    .trash-card .card-footer .btn-group .btn,
+    .trash-card .card-footer .btn-group .btn.active {
+        border: 2px solid transparent !important;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1) !important;
+        border-radius: 8px !important;
+    }
+    
+    .trash-card .card-footer .btn-outline-success {
+        border-color: rgba(72, 187, 120, 0.3) !important;
+    }
+    
+    .trash-card .card-footer .btn-outline-danger {
+        border-color: rgba(220, 53, 69, 0.3) !important;
+    }
+    
+    .trash-card .card-footer .btn-outline-success:hover {
+        background: rgba(72, 187, 120, 0.2) !important;
+        border-color: #48bb78 !important;
+        color: #48bb78 !important;
+        transform: scale(1.05) !important;
+    }
+    
+    .trash-card .card-footer .btn-outline-danger:hover {
+        background: rgba(220, 53, 69, 0.2) !important;
+        border-color: #dc3545 !important;
+        color: #dc3545 !important;
+        transform: scale(1.05) !important;
+    }
+}
+
+@media (max-width: 576px) {
+    .trash-card {
+        background: linear-gradient(135deg, rgba(45, 55, 72, 0.95) 0%, rgba(55, 65, 85, 0.95) 100%);
+        border: 2px solid rgba(220, 53, 69, 0.3);
+        border-radius: 16px;
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15), 0 0 20px rgba(220, 53, 69, 0.05);
+        backdrop-filter: blur(10px);
+    }
+    
+    .trash-card:hover {
+        transform: translateY(-6px);
+        box-shadow: 0 12px 35px rgba(0, 0, 0, 0.2), 0 0 30px rgba(220, 53, 69, 0.1);
+        border-color: rgba(220, 53, 69, 0.5);
+    }
+    
+    /* MANTENER THUMBNAILS EN MÓVIL PEQUEÑO - ESPECÍFICO PARA TRASH-CARD */
+    .trash-card .thumbnail-image,
+    .trash-card .card-img-top {
+        top: -1.5px !important;
+        left: -1.5px !important;
+        width: calc(100% + 3px) !important;
+        height: calc(100% + 1.5px) !important;
+        border-radius: 17.5px 17.5px 0 0 !important; /* 16px + 1.5px */
+        object-fit: cover !important;
+        position: absolute !important;
+        transition: all 0.3s ease !important;
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+    }
+    
+    .trash-card .card-img-top-container {
+        border-radius: 16px 16px 0 0 !important;
+        position: relative !important;
+        overflow: visible !important;
+        padding-top: 56.25% !important; /* 16:9 Aspect Ratio */
+        height: 0 !important;
+        background: transparent !important;
+    }
+    
+    .trash-card .card-overlay {
+        top: -1.5px !important;
+        left: -1.5px !important;
+        width: calc(100% + 3px) !important;
+        height: calc(100% + 7.3px) !important;
+        background: rgba(0, 0, 0, 0.7) !important;
+        border-radius: 17.5px 17.5px 0 0 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        opacity: 0 !important;
+        transition: all 0.3s ease !important;
+        position: absolute !important;
+        z-index: 6 !important;
+        pointer-events: none !important;
+    }
+    
+    .trash-card:hover .card-overlay {
+        opacity: 1 !important;
+        pointer-events: none !important;
+    }
+    
+    .trash-card .card-footer .btn-group .btn,
+    .trash-card .card-footer .btn-group .btn.active {
+        border: 2px solid transparent !important;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1) !important;
+        border-radius: 8px !important;
+        min-width: 44px;
+        min-height: 44px;
+    }
+}
 </style>
 {% endblock %}
 
@@ -220,7 +576,7 @@
 
     <!-- Filtros de selección -->
     {% if videos %}
-    <div class="row mb-3">
+    <div class="row mb-4">
         <div class="col-12">
             <div class="card">
                 <div class="card-body">
@@ -263,13 +619,6 @@
                              alt="Thumbnail de {{ video.file_name }}"
                              loading="lazy"
                              onerror="this.src='/static/img/no-thumbnail.svg'">
-                        
-                        <!-- Badge de eliminado -->
-                        <div class="position-absolute top-0 end-0 m-2">
-                            <span class="badge trash-badge">
-                                <i class="fas fa-trash me-1"></i>ELIMINADO
-                            </span>
-                        </div>
                         
                         <!-- Overlay con botones de restauración -->
                         <div class="card-overlay">
