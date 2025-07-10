@@ -71,7 +71,7 @@
     border: 1px solid rgba(220, 53, 69, 0.3);
     border-radius: 12px;
     padding: 1.5rem;
-    margin: 1.5rem 0;
+    margin: 0.1rem 0 1.5rem 0;
     backdrop-filter: blur(10px);
     box-shadow: 0 4px 15px rgba(220, 53, 69, 0.1);
 }
@@ -166,90 +166,101 @@
 }
 
 /* ============================================
-   MODAL TEMA OSCURO - ELIMINACIÓN PERMANENTE
+   MODALES DE ELIMINACIÓN - ESTILO GALLERY CONSISTENTE
    ============================================ */
 
+/* Modal Individual de Eliminación Permanente */
 #permanentDeleteModal .modal-content {
-    background: linear-gradient(135deg, rgba(45, 55, 72, 0.98) 0%, rgba(55, 65, 85, 0.98) 100%);
-    border: 1px solid rgba(220, 53, 69, 0.3);
-    border-radius: 16px;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4), 0 0 40px rgba(220, 53, 69, 0.1);
-    backdrop-filter: blur(20px);
-    color: #e2e8f0;
-    overflow: hidden;
+    background: var(--color-bg-dark);
+    color: var(--color-text-light);
+    border: 1px solid var(--color-secondary-dark);
 }
 
 #permanentDeleteModal .modal-header {
-    background: linear-gradient(135deg, #dc3545, #c82333);
-    border-bottom: 1px solid rgba(220, 53, 69, 0.3);
-    border-radius: 16px 16px 0 0;
-    padding: 1.5rem;
+    background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
     color: white;
-    box-shadow: 0 2px 10px rgba(220, 53, 69, 0.2);
+    border-bottom: 1px solid var(--color-secondary-dark);
 }
 
 #permanentDeleteModal .modal-header .modal-title {
     font-weight: 700;
     font-size: 1.25rem;
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
 #permanentDeleteModal .modal-header .btn-close {
     filter: invert(1);
     opacity: 0.8;
-    transition: opacity 0.3s ease;
 }
 
 #permanentDeleteModal .modal-header .btn-close:hover {
     opacity: 1;
-    transform: scale(1.1);
 }
 
 #permanentDeleteModal .modal-body {
-    padding: 2rem;
-    background: rgba(45, 55, 72, 0.95);
-    color: #e2e8f0;
+    max-height: 66vh;
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior: contain;
+    padding: 1.5rem;
+}
+
+#permanentDeleteModal .modal-body::-webkit-scrollbar {
+    width: 8px;
+}
+
+#permanentDeleteModal .modal-body::-webkit-scrollbar-track {
+    background: var(--color-bg-dark);
+    border-radius: 4px;
+}
+
+#permanentDeleteModal .modal-body::-webkit-scrollbar-thumb {
+    background: #dc3545;
+    border-radius: 4px;
+}
+
+#permanentDeleteModal .modal-body::-webkit-scrollbar-thumb:hover {
+    background: #c82333;
+}
+
+#permanentDeleteModal .modal-footer {
+    background: var(--color-bg-dark);
+    border-top: 1px solid var(--color-secondary-dark);
 }
 
 #permanentDeleteModal .danger-zone {
     background: linear-gradient(135deg, rgba(220, 53, 69, 0.15), rgba(220, 53, 69, 0.1));
     border: 1px solid rgba(220, 53, 69, 0.4);
-    border-radius: 12px;
+    border-radius: 8px;
     padding: 1.5rem;
-    margin: 0 0 1.5rem 0; /* Eliminar margin-top, mantener margin-bottom */
-    backdrop-filter: blur(10px);
-    box-shadow: 0 4px 15px rgba(220, 53, 69, 0.1);
+    margin-bottom: 1.5rem;
     position: relative;
-    overflow: hidden; /* Evitar que el ::before se salga */
 }
 
 #permanentDeleteModal .danger-zone::before {
     content: '';
     position: absolute;
-    top: -1px; /* Compensar el border del contenedor */
-    left: -1px; /* Compensar el border del contenedor */
-    right: -1px; /* Compensar el border del contenedor */
+    top: -1px;
+    left: -1px;
+    right: -1px;
     height: 4px;
     background: linear-gradient(90deg, #dc3545, #c82333);
-    border-radius: 12px 12px 0 0;
-    z-index: 1;
+    border-radius: 8px 8px 0 0;
 }
 
 #permanentDeleteModal .danger-zone h6 {
     color: #f8d7da !important;
     font-weight: 700;
     margin-bottom: 1rem;
-    font-size: 1.1rem;
     position: relative;
-    z-index: 2; /* Asegurar que esté por encima del ::before */
+    z-index: 2;
 }
 
 #permanentDeleteModal .danger-zone p {
-    color: #e2e8f0 !important;
+    color: var(--color-text-light) !important;
     line-height: 1.6;
     margin-bottom: 0.75rem;
     position: relative;
-    z-index: 2; /* Asegurar que esté por encima del ::before */
+    z-index: 2;
 }
 
 #permanentDeleteModal .danger-zone strong {
@@ -258,11 +269,11 @@
 }
 
 #permanentDeleteModal .form-check {
-    padding: 1rem;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: var(--color-secondary-dark);
+    border: 1px solid var(--color-secondary);
     border-radius: 8px;
-    margin-top: 1.5rem;
+    padding: 1rem;
+    margin-bottom: 1rem;
     transition: all 0.3s ease;
     display: flex;
     align-items: flex-start;
@@ -270,41 +281,39 @@
 }
 
 #permanentDeleteModal .form-check:hover {
-    background: rgba(255, 255, 255, 0.08);
-    border-color: rgba(220, 53, 69, 0.3);
+    background: rgba(113, 128, 150, 0.3);
+    border-color: #dc3545;
 }
 
 #permanentDeleteModal .form-check-input {
-    background: rgba(255, 255, 255, 0.1);
-    border: 2px solid rgba(255, 255, 255, 0.3);
+    background: var(--color-secondary-dark);
+    border: 2px solid var(--color-secondary);
     width: 1.25rem;
     height: 1.25rem;
     margin: 0;
     flex-shrink: 0;
-    margin-top: 0.125rem; /* Alinear con la primera línea del texto */
+    margin-top: 0.125rem;
+}
+
+#permanentDeleteModal .form-check-input:focus {
+    background: var(--color-secondary-dark);
+    border-color: #dc3545;
+    box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25);
 }
 
 #permanentDeleteModal .form-check-input:checked {
     background: #dc3545;
     border-color: #dc3545;
-    box-shadow: 0 0 10px rgba(220, 53, 69, 0.3);
 }
 
 #permanentDeleteModal .form-check-label {
-    color: #e2e8f0 !important;
+    color: var(--color-text-light) !important;
     font-weight: 500;
     line-height: 1.5;
     cursor: pointer;
     user-select: none;
     flex: 1;
     margin: 0;
-}
-
-#permanentDeleteModal .modal-footer {
-    background: rgba(45, 55, 72, 0.98);
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 0 0 16px 16px;
-    padding: 1.5rem;
 }
 
 #permanentDeleteModal .modal-footer .btn {
@@ -316,112 +325,99 @@
 }
 
 #permanentDeleteModal .modal-footer .btn-secondary {
-    background: rgba(113, 128, 150, 0.2);
-    border: 1px solid rgba(113, 128, 150, 0.4);
-    color: #a0aec0;
+    background: var(--color-secondary-dark);
+    border: 1px solid var(--color-secondary);
+    color: var(--color-text-muted);
 }
 
 #permanentDeleteModal .modal-footer .btn-secondary:hover {
     background: rgba(113, 128, 150, 0.3);
-    border-color: #718096;
-    color: #e2e8f0;
-    transform: translateY(-1px);
+    border-color: var(--color-secondary);
+    color: var(--color-text-light);
 }
 
 #permanentDeleteModal .modal-footer .btn-danger {
     background: linear-gradient(135deg, #dc3545, #c82333);
     border: 1px solid #dc3545;
     color: white;
-    box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);
 }
 
 #permanentDeleteModal .modal-footer .btn-danger:hover:not(:disabled) {
     background: linear-gradient(135deg, #c82333, #a71e2a);
-    transform: translateY(-2px);
-    box-shadow: 0 6px 16px rgba(220, 53, 69, 0.4);
 }
 
 #permanentDeleteModal .modal-footer .btn-danger:disabled {
-    background: rgba(113, 128, 150, 0.3);
-    border-color: rgba(113, 128, 150, 0.3);
+    background: var(--color-secondary-dark);
+    border-color: var(--color-secondary);
     color: #6b7280;
     cursor: not-allowed;
-    box-shadow: none;
 }
 
-/* Animación del modal */
-#permanentDeleteModal.fade .modal-dialog {
-    transition: transform 0.3s ease-out;
-    transform: scale(0.8) translateY(-50px);
-}
-
-#permanentDeleteModal.show .modal-dialog {
-    transform: scale(1) translateY(0);
-}
-
-/* Overlay del modal */
-#permanentDeleteModal .modal-backdrop,
-#bulkPermanentDeleteModal .modal-backdrop {
-    background: rgba(0, 0, 0, 0.7);
-    backdrop-filter: blur(5px);
-}
-
-/* ============================================
-   MODAL ELIMINACIÓN MASIVA - TEMA OSCURO
-   ============================================ */
-
+/* Modal Masivo de Eliminación Permanente */
 #bulkPermanentDeleteModal .modal-content {
-    background: linear-gradient(135deg, rgba(45, 55, 72, 0.98) 0%, rgba(55, 65, 85, 0.98) 100%);
-    border: 1px solid rgba(220, 53, 69, 0.3);
-    border-radius: 16px;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4), 0 0 40px rgba(220, 53, 69, 0.1);
-    backdrop-filter: blur(20px);
-    color: #e2e8f0;
-    overflow: hidden;
+    background: var(--color-bg-dark);
+    color: var(--color-text-light);
+    border: 1px solid var(--color-secondary-dark);
 }
 
 #bulkPermanentDeleteModal .modal-header {
-    background: linear-gradient(135deg, #dc3545, #c82333);
-    border-bottom: 1px solid rgba(220, 53, 69, 0.3);
-    border-radius: 16px 16px 0 0;
-    padding: 1.5rem;
+    background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
     color: white;
-    box-shadow: 0 2px 10px rgba(220, 53, 69, 0.2);
+    border-bottom: 1px solid var(--color-secondary-dark);
 }
 
 #bulkPermanentDeleteModal .modal-header .modal-title {
     font-weight: 700;
     font-size: 1.25rem;
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
 #bulkPermanentDeleteModal .modal-header .btn-close {
     filter: invert(1);
     opacity: 0.8;
-    transition: opacity 0.3s ease;
 }
 
 #bulkPermanentDeleteModal .modal-header .btn-close:hover {
     opacity: 1;
-    transform: scale(1.1);
 }
 
 #bulkPermanentDeleteModal .modal-body {
-    padding: 2rem;
-    background: rgba(45, 55, 72, 0.95);
-    color: #e2e8f0;
+    max-height: 68vh;
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior: contain;
+    padding: 1.5rem;
+}
+
+#bulkPermanentDeleteModal .modal-body::-webkit-scrollbar {
+    width: 8px;
+}
+
+#bulkPermanentDeleteModal .modal-body::-webkit-scrollbar-track {
+    background: var(--color-bg-dark);
+    border-radius: 4px;
+}
+
+#bulkPermanentDeleteModal .modal-body::-webkit-scrollbar-thumb {
+    background: #dc3545;
+    border-radius: 4px;
+}
+
+#bulkPermanentDeleteModal .modal-body::-webkit-scrollbar-thumb:hover {
+    background: #c82333;
+}
+
+#bulkPermanentDeleteModal .modal-footer {
+    background: var(--color-bg-dark);
+    border-top: 1px solid var(--color-secondary-dark);
 }
 
 #bulkPermanentDeleteModal .danger-zone {
     background: linear-gradient(135deg, rgba(220, 53, 69, 0.15), rgba(220, 53, 69, 0.1));
     border: 1px solid rgba(220, 53, 69, 0.4);
-    border-radius: 12px;
+    border-radius: 8px;
     padding: 1.5rem;
-    margin: 0 0 1.5rem 0;
-    backdrop-filter: blur(10px);
-    box-shadow: 0 4px 15px rgba(220, 53, 69, 0.1);
+    margin-bottom: 1.5rem;
     position: relative;
-    overflow: hidden;
 }
 
 #bulkPermanentDeleteModal .danger-zone::before {
@@ -432,15 +428,13 @@
     right: -1px;
     height: 4px;
     background: linear-gradient(90deg, #dc3545, #c82333);
-    border-radius: 12px 12px 0 0;
-    z-index: 1;
+    border-radius: 8px 8px 0 0;
 }
 
 #bulkPermanentDeleteModal .danger-zone h6 {
     color: #f8d7da !important;
     font-weight: 700;
     margin-bottom: 1rem;
-    font-size: 1.1rem;
     position: relative;
     z-index: 2;
 }
@@ -448,7 +442,7 @@
 #bulkPermanentDeleteModal .danger-zone p,
 #bulkPermanentDeleteModal .danger-zone ul,
 #bulkPermanentDeleteModal .danger-zone li {
-    color: #e2e8f0 !important;
+    color: var(--color-text-light) !important;
     line-height: 1.6;
     margin-bottom: 0.75rem;
     position: relative;
@@ -461,11 +455,11 @@
 }
 
 #bulkPermanentDeleteModal .form-check {
-    padding: 1rem;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: var(--color-secondary-dark);
+    border: 1px solid var(--color-secondary);
     border-radius: 8px;
-    margin-top: 1.5rem;
+    padding: 1rem;
+    margin-bottom: 1rem;
     transition: all 0.3s ease;
     display: flex;
     align-items: flex-start;
@@ -473,13 +467,13 @@
 }
 
 #bulkPermanentDeleteModal .form-check:hover {
-    background: rgba(255, 255, 255, 0.08);
-    border-color: rgba(220, 53, 69, 0.3);
+    background: rgba(113, 128, 150, 0.3);
+    border-color: #dc3545;
 }
 
 #bulkPermanentDeleteModal .form-check-input {
-    background: rgba(255, 255, 255, 0.1);
-    border: 2px solid rgba(255, 255, 255, 0.3);
+    background: var(--color-secondary-dark);
+    border: 2px solid var(--color-secondary);
     width: 1.25rem;
     height: 1.25rem;
     margin: 0;
@@ -487,27 +481,25 @@
     margin-top: 0.125rem;
 }
 
+#bulkPermanentDeleteModal .form-check-input:focus {
+    background: var(--color-secondary-dark);
+    border-color: #dc3545;
+    box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25);
+}
+
 #bulkPermanentDeleteModal .form-check-input:checked {
     background: #dc3545;
     border-color: #dc3545;
-    box-shadow: 0 0 10px rgba(220, 53, 69, 0.3);
 }
 
 #bulkPermanentDeleteModal .form-check-label {
-    color: #e2e8f0 !important;
+    color: var(--color-text-light) !important;
     font-weight: 500;
     line-height: 1.5;
     cursor: pointer;
     user-select: none;
     flex: 1;
     margin: 0;
-}
-
-#bulkPermanentDeleteModal .modal-footer {
-    background: rgba(45, 55, 72, 0.98);
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 0 0 16px 16px;
-    padding: 1.5rem;
 }
 
 #bulkPermanentDeleteModal .modal-footer .btn {
@@ -519,47 +511,32 @@
 }
 
 #bulkPermanentDeleteModal .modal-footer .btn-secondary {
-    background: rgba(113, 128, 150, 0.2);
-    border: 1px solid rgba(113, 128, 150, 0.4);
-    color: #a0aec0;
+    background: var(--color-secondary-dark);
+    border: 1px solid var(--color-secondary);
+    color: var(--color-text-muted);
 }
 
 #bulkPermanentDeleteModal .modal-footer .btn-secondary:hover {
     background: rgba(113, 128, 150, 0.3);
-    border-color: #718096;
-    color: #e2e8f0;
-    transform: translateY(-1px);
+    border-color: var(--color-secondary);
+    color: var(--color-text-light);
 }
 
 #bulkPermanentDeleteModal .modal-footer .btn-danger {
     background: linear-gradient(135deg, #dc3545, #c82333);
     border: 1px solid #dc3545;
     color: white;
-    box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);
 }
 
 #bulkPermanentDeleteModal .modal-footer .btn-danger:hover:not(:disabled) {
     background: linear-gradient(135deg, #c82333, #a71e2a);
-    transform: translateY(-2px);
-    box-shadow: 0 6px 16px rgba(220, 53, 69, 0.4);
 }
 
 #bulkPermanentDeleteModal .modal-footer .btn-danger:disabled {
-    background: rgba(113, 128, 150, 0.3);
-    border-color: rgba(113, 128, 150, 0.3);
+    background: var(--color-secondary-dark);
+    border-color: var(--color-secondary);
     color: #6b7280;
     cursor: not-allowed;
-    box-shadow: none;
-}
-
-/* Animación del modal masivo */
-#bulkPermanentDeleteModal.fade .modal-dialog {
-    transition: transform 0.3s ease-out;
-    transform: scale(0.8) translateY(-50px);
-}
-
-#bulkPermanentDeleteModal.show .modal-dialog {
-    transform: scale(1) translateY(0);
 }
 
 /* ============================================
@@ -729,6 +706,10 @@
         min-width: 44px;
         min-height: 44px;
     }
+
+    #bulkPermanentDeleteModal .modal-body {
+    max-height: 62vh;
+}
 }
 </style>
 {% endblock %}
@@ -973,8 +954,8 @@
 </div>
 
 <!-- Modal de confirmación para eliminación permanente -->
-<div class="modal fade" id="permanentDeleteModal" tabindex="-1">
-    <div class="modal-dialog">
+<div class="modal fade" id="permanentDeleteModal" tabindex="-1" aria-labelledby="permanentDeleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header bg-danger text-white">
                 <h5 class="modal-title">
@@ -986,7 +967,12 @@
                 <div class="danger-zone">
                     <h6 class="text-danger">⚠️ ADVERTENCIA</h6>
                     <p class="mb-2">Esta acción eliminará permanentemente el video y <strong>NO SE PUEDE DESHACER</strong>.</p>
-                    <p class="mb-0">¿Estás seguro de que quieres continuar?</p>
+                    <p class="mb-2">Los archivos de video serán:</p>
+                    <ul class="mb-2">
+                        <li><strong>Movidos a la papelera del sistema</strong> (pueden recuperarse desde allí)</li>
+                        <li><strong>Eliminados de la base de datos</strong> (registro permanente)</li>
+                    </ul>
+                    <p class="mb-0">¿Estás completamente seguro de que quieres continuar?</p>
                 </div>
                 <div class="form-check mt-3">
                     <input class="form-check-input" type="checkbox" id="confirmPermanentDelete">
@@ -1014,8 +1000,8 @@
 </div>
 
 <!-- Modal de confirmación para eliminación masiva permanente -->
-<div class="modal fade" id="bulkPermanentDeleteModal" tabindex="-1">
-    <div class="modal-dialog">
+<div class="modal fade" id="bulkPermanentDeleteModal" tabindex="-1" aria-labelledby="bulkPermanentDeleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header bg-danger text-white">
                 <h5 class="modal-title">
@@ -1053,7 +1039,7 @@
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                 <button type="button" class="btn btn-danger" id="confirmBulkPermanentBtn" disabled 
                         onclick="confirmBulkPermanentDelete()">
-                    <i class="fas fa-times me-1"></i>Eliminar <span id="bulk-count-button">0</span> Videos Permanentemente
+                    <i class="fas fa-times me-1"></i>Eliminar Permanentemente
                 </button>
             </div>
         </div>
@@ -1311,7 +1297,6 @@ function bulkPermanentDelete() {
     const count = selectedVideos.size;
     document.getElementById('bulk-count-display').textContent = count;
     document.getElementById('bulk-count-confirmation').textContent = count;
-    document.getElementById('bulk-count-button').textContent = count;
     
     // Resetear checkboxes
     document.getElementById('confirmBulkPermanentDelete').checked = false;
