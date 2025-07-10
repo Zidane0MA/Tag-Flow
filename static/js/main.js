@@ -59,7 +59,7 @@ function initializeTooltips() {
 }
 
 /**
- * Inicializar overlay de carga
+ * Inicializar overlay de carga - SIN PARPADEO
  */
 function initializeLoadingOverlay() {
     if (!document.getElementById('loading-overlay')) {
@@ -67,9 +67,14 @@ function initializeLoadingOverlay() {
         overlay.id = 'loading-overlay';
         overlay.className = 'loading-overlay';
         overlay.style.display = 'none';
+        overlay.style.background = '#000000'; // Negro instantáneo
+        overlay.style.opacity = '1';
         overlay.innerHTML = `
-            <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">Cargando...</span>
+            <div class="loading-content">
+                <div class="spinner-border text-light" role="status">
+                    <span class="visually-hidden">Cargando...</span>
+                </div>
+                <div class="loading-text">Cargando...</div>
             </div>
         `;
         document.body.appendChild(overlay);
@@ -102,22 +107,36 @@ function setupAjaxErrorHandling() {
 }
 
 /**
- * Mostrar overlay de carga
+ * Mostrar overlay de carga - INSTANTÁNEO
+ * @param {boolean} minimal - Si usar versión minimal (solo spinner pequeño)
  */
-function showLoading() {
+function showLoading(minimal = false) {
     const overlay = document.getElementById('loading-overlay');
     if (overlay) {
+        // Aplicar clase minimal si se requiere
+        if (minimal) {
+            overlay.classList.add('minimal');
+        } else {
+            overlay.classList.remove('minimal');
+        }
+        
         overlay.style.display = 'flex';
+        overlay.style.opacity = '1';
+        overlay.style.visibility = 'visible';
+        // Forzar render inmediato
+        overlay.offsetHeight;
     }
 }
 
 /**
- * Ocultar overlay de carga
+ * Ocultar overlay de carga - INSTANTÁNEO
  */
 function hideLoading() {
     const overlay = document.getElementById('loading-overlay');
     if (overlay) {
         overlay.style.display = 'none';
+        overlay.style.opacity = '0';
+        overlay.style.visibility = 'hidden';
     }
 }
 
@@ -318,7 +337,39 @@ window.TagFlow.utils = {
     formatDuration,
     formatFileSize,
     isValidString,
-    cleanText
+    cleanText,
+    
+    // Utilidad para mostrar loading específico con tema oscuro
+    showDarkLoading: function(message = 'Cargando...', minimal = false) {
+        const overlay = document.getElementById('loading-overlay');
+        if (overlay) {
+            const loadingText = overlay.querySelector('.loading-text');
+            if (loadingText) {
+                loadingText.textContent = message;
+            }
+            
+            // Aplicar versión minimal si se requiere
+            if (minimal) {
+                overlay.classList.add('minimal');
+            } else {
+                overlay.classList.remove('minimal');
+            }
+            
+            overlay.style.display = 'flex';
+        }
+    },
+    
+    // Utilidad para loading ultraminimal (solo para acciones rápidas)
+    showMinimalLoading: function(message = 'Cargando...') {
+        showLoading(true);
+        const overlay = document.getElementById('loading-overlay');
+        if (overlay) {
+            const loadingText = overlay.querySelector('.loading-text');
+            if (loadingText) {
+                loadingText.textContent = message;
+            }
+        }
+    }
 };
 
 console.log('📦 Tag-Flow V2 JavaScript cargado');

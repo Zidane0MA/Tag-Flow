@@ -154,11 +154,13 @@ function setupShortsEventListeners() {
         }
     }, { passive: false }); // passive: false para poder usar preventDefault
     
-    // Gestos táctiles para dispositivos móviles
+    // Gestos táctiles para dispositivos móviles - ANTI PULL-TO-REFRESH
     let startY = 0;
     let startTime = 0;
     let headerHideTimeout;
     let overlayInfoHideTimeout;
+    let isScrolling = false;
+    let scrollDirection = null;
     
     // Mostrar header y overlay-info al mover el mouse
     modalElement.addEventListener('mousemove', function() {
@@ -189,6 +191,11 @@ function setupShortsEventListeners() {
     modalElement.addEventListener('touchstart', function(e) {
         startY = e.touches[0].clientY;
         startTime = Date.now();
+        isScrolling = false;
+        scrollDirection = null;
+        
+        // PREVENIR PULL-TO-REFRESH
+        e.preventDefault();
         
         // Mostrar header y overlay-info al tocar
         const header = document.querySelector('.shorts-header');
@@ -209,7 +216,27 @@ function setupShortsEventListeners() {
                 overlayInfo.classList.add('auto-hide');
             }, 2000);
         }
-    }, { passive: true });
+    }, { passive: false }); // passive: false para poder usar preventDefault
+    
+    // Agregar touchmove para detectar dirección
+    modalElement.addEventListener('touchmove', function(e) {
+        if (!isScrolling) {
+            const currentY = e.touches[0].clientY;
+            const deltaY = startY - currentY;
+            
+            // Determinar dirección del scroll
+            if (Math.abs(deltaY) > 10) {
+                isScrolling = true;
+                scrollDirection = deltaY > 0 ? 'up' : 'down';
+                
+                // CRÍTICO: Prevenir pull-to-refresh
+                e.preventDefault();
+            }
+        } else {
+            // SIEMPRE prevenir durante el scroll
+            e.preventDefault();
+        }
+    }, { passive: false });
     
     modalElement.addEventListener('touchend', function(e) {
         const endY = e.changedTouches[0].clientY;
@@ -217,19 +244,32 @@ function setupShortsEventListeners() {
         const deltaY = startY - endY;
         const deltaTime = endTime - startTime;
         
+        // PREVENIR CUALQUIER COMPORTAMIENTO DE PULL-TO-REFRESH
+        e.preventDefault();
+        
         // Detectar swipe vertical rápido
-        if (Math.abs(deltaY) > 50 && deltaTime < 300) {
-            e.preventDefault();
+        if (Math.abs(deltaY) > 50 && deltaTime < 300 && isScrolling) {
             if (deltaY > 0) {
                 nextVideo(); // Swipe up = siguiente video
             } else {
                 previousVideo(); // Swipe down = video anterior
             }
         }
-    });
+        
+        // Reset de variables
+        isScrolling = false;
+        scrollDirection = null;
+    }, { passive: false });
     
-    // Ocultar instrucciones después de un tiempo
+    // Ocultar instrucciones después de un tiempo Y BLOQUEAR PULL-TO-REFRESH
     modalElement.addEventListener('shown.bs.modal', function() {
+        // BLOQUEAR PULL-TO-REFRESH INMEDIATAMENTE
+        document.body.classList.add('shorts-modal-open');
+        document.documentElement.classList.add('shorts-modal-open');
+        document.body.style.overscrollBehavior = 'none';
+        document.body.style.touchAction = 'manipulation';
+        document.documentElement.style.overscrollBehavior = 'none';
+        
         setTimeout(() => {
             const instructions = document.getElementById('shorts-instructions');
             if (instructions) {
@@ -275,6 +315,12 @@ function setupShortsEventListeners() {
     // Cleanup al cerrar modal
     modalElement.addEventListener('hidden.bs.modal', function() {
         cleanupShortsPlayer();
+        // RESTAURAR SCROLL NORMAL DEL BODY
+        document.body.classList.remove('shorts-modal-open');
+        document.documentElement.classList.remove('shorts-modal-open');
+        document.body.style.overscrollBehavior = '';
+        document.body.style.touchAction = '';
+        document.documentElement.style.overscrollBehavior = '';
     });
 }
 
@@ -290,7 +336,7 @@ async function playVideoShorts(videoId) {
     
     try {
         ShortsPlayer.isLoading = true;
-        TagFlow.utils.showLoading();
+        TagFlow.utils.showMinimalLoading('Cargando videos...');
         
         // Obtener lista de videos filtrados de la página actual
         await loadCurrentVideosList();
@@ -480,10 +526,10 @@ async function createVideoElements() {
         videoElement.dataset.videoId = video.id;
         videoElement.dataset.index = index;
         
-        // Placeholder inicial con preloader
+        // Placeholder inicial con preloader optimizado
         videoElement.innerHTML = `
             <div class="video-preloader">
-                <div class="spinner-border text-light" role="status">
+                <div class="spinner-border" role="status">
                     <span class="visually-hidden">Cargando video...</span>
                 </div>
             </div>
@@ -494,9 +540,9 @@ async function createVideoElements() {
         
         ShortsPlayer.container.appendChild(videoElement);
         
-        // Posicionar inicialmente
+        // Posicionar inicialmente con transform3d
         const offset = index * 100;
-        videoElement.style.transform = `translateY(${offset}vh)`;
+        videoElement.style.transform = `translate3d(0, ${offset}vh, 0)`;
         
         console.log(`📦 Elemento creado para video ${index}: ID=${video.id}`);
     });
@@ -594,18 +640,65 @@ async function loadVideoAtIndex(index) {
 }
 
 /**
- * Precargar videos adyacentes
+ * Precargar videos adyacentes - OPTIMIZADO
  */
 function preloadAdjacentVideos() {
     const currentIndex = ShortsPlayer.currentIndex;
     const start = Math.max(0, currentIndex - ShortsPlayer.preloadDistance);
     const end = Math.min(ShortsPlayer.videos.length, currentIndex + ShortsPlayer.preloadDistance + 1);
     
+    // Priorizar siguiente video (más probable de ser visitado)
+    const loadOrder = [];
+    if (currentIndex + 1 < ShortsPlayer.videos.length) loadOrder.push(currentIndex + 1);
+    if (currentIndex - 1 >= 0) loadOrder.push(currentIndex - 1);
+    
+    // Agregar el resto en orden de distancia
     for (let i = start; i < end; i++) {
-        if (i !== currentIndex && !ShortsPlayer.videos[i].loaded) {
-            setTimeout(() => loadVideoAtIndex(i), (Math.abs(i - currentIndex) * 100));
+        if (i !== currentIndex && !loadOrder.includes(i)) {
+            loadOrder.push(i);
         }
     }
+    
+    // Cargar con delay progresivo para evitar sobrecarga
+    loadOrder.forEach((index, priority) => {
+        if (!ShortsPlayer.videos[index].loaded) {
+            setTimeout(() => {
+                // Verificar que aún sea relevante cargar este video
+                if (Math.abs(index - ShortsPlayer.currentIndex) <= ShortsPlayer.preloadDistance) {
+                    loadVideoAtIndex(index);
+                }
+            }, priority * 200); // Delay progresivo
+        }
+    });
+    
+    // Limpiar videos lejanos para liberar memoria
+    cleanupDistantVideos();
+}
+
+/**
+ * Limpiar videos lejanos para optimizar memoria
+ */
+function cleanupDistantVideos() {
+    const currentIndex = ShortsPlayer.currentIndex;
+    const keepDistance = ShortsPlayer.preloadDistance + 1;
+    
+    ShortsPlayer.videos.forEach((video, index) => {
+        if (Math.abs(index - currentIndex) > keepDistance && video.loaded) {
+            const videoElement = document.getElementById(`shorts-video-${index}`);
+            if (videoElement) {
+                // Pausar y descargar el video
+                videoElement.pause();
+                videoElement.src = '';
+                videoElement.load();
+                
+                // Marcar como no cargado
+                video.loaded = false;
+                ShortsPlayer.loadedVideos.delete(index);
+                
+                console.log(`🗑️ Video ${index} descargado para optimizar memoria`);
+            }
+        }
+    });
 }
 
 /**
@@ -681,7 +774,7 @@ async function navigateToVideo(index) {
 }
 
 /**
- * Reproducir video en el índice especificado
+ * Reproducir video en el índice especificado - OPTIMIZADO
  */
 async function playVideoAtIndex(index) {
     const videoElement = document.getElementById(`shorts-video-${index}`);
@@ -698,6 +791,13 @@ async function playVideoAtIndex(index) {
     
     console.log(`▶️ Intentando reproducir video ${index}`);
     videoElement.dataset.isPlaying = 'true';
+    
+    // Optimización: Pausar inmediatamente otros videos para liberar recursos
+    ShortsPlayer.videos.forEach((_, i) => {
+        if (i !== index) {
+            pauseVideoAtIndex(i);
+        }
+    });
     
     // Esperar hasta que el video esté listo si no lo está
     if (videoElement.readyState < 3) { // HAVE_FUTURE_DATA
@@ -740,9 +840,9 @@ async function playVideoAtIndex(index) {
         // Asegurar que el loader esté oculto
         hideVideoLoader(index);
         
-        // SOLO reiniciar si el video no está cerca del inicio
-        // Esto evita el reinicio constante que causa el problema
-        if (videoElement.currentTime > 2) {
+        // OPTIMIZACIÓN: Solo reiniciar si el video está al final o muy avanzado
+        // Esto mejora la fluidez y reduce el buffering
+        if (videoElement.currentTime > videoElement.duration * 0.9 || videoElement.currentTime > 5) {
             videoElement.currentTime = 0;
         }
         
@@ -901,40 +1001,47 @@ function toggleCurrentVideo() {
 }
 
 /**
- * Hacer scroll suave al video
+ * Hacer scroll suave al video - OPTIMIZADO PARA 60FPS
  */
 function scrollToVideo(index) {
     console.log(`🎯 Scrolling a video ${index}`);
     
     const videoElements = ShortsPlayer.container.querySelectorAll('.shorts-video-item');
     
-    videoElements.forEach((el, i) => {
-        const offset = (i - index) * 100;
-        el.style.transform = `translateY(${offset}vh)`;
-        
-        // Gestión de clases para estados
-        el.classList.remove('active', 'prev', 'next');
-        
-        if (i === index) {
-            el.classList.add('active');
-            // Asegurar que el video esté visible
-            const video = el.querySelector('video');
-            if (video) {
-                video.style.opacity = '1';
+    // Usar requestAnimationFrame para animaciones más suaves
+    requestAnimationFrame(() => {
+        videoElements.forEach((el, i) => {
+            const offset = (i - index) * 100;
+            
+            // Usar transform3d para mejor rendimiento
+            el.style.transform = `translate3d(0, ${offset}vh, 0)`;
+            
+            // Gestión de clases para estados
+            el.classList.remove('active', 'prev', 'next');
+            
+            if (i === index) {
+                el.classList.add('active');
+                // Asegurar que el video esté visible
+                const video = el.querySelector('video');
+                if (video) {
+                    video.style.opacity = '1';
+                }
+                console.log(`✅ Video ${i} marcado como activo`);
+            } else if (i < index) {
+                el.classList.add('prev');
+            } else {
+                el.classList.add('next');
             }
-            console.log(`✅ Video ${i} marcado como activo`);
-        } else if (i < index) {
-            el.classList.add('prev');
-        } else {
-            el.classList.add('next');
-        }
+            
+            // Logging para debug
+            console.log(`📍 Video ${i}: transform=${el.style.transform}, classes=${el.className}`);
+        });
         
-        // Logging para debug
-        console.log(`📍 Video ${i}: transform=${el.style.transform}, classes=${el.className}`);
+        // Segundo frame para asegurar que las transformaciones se apliquen
+        requestAnimationFrame(() => {
+            ShortsPlayer.container.offsetHeight;
+        });
     });
-    
-    // Forzar reflow para asegurar que las transformaciones se apliquen
-    ShortsPlayer.container.offsetHeight;
 }
 
 /**

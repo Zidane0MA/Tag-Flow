@@ -18,11 +18,14 @@
     --transition: all 0.2s ease-in-out;
 }
 
-/* Estilos base */
+/* Estilos base - RESTAURADO AL ORIGINAL */
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     background-color: var(--light-color);
     line-height: 1.6;
+    /* Suavizado de fuentes */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
 
 /* Navbar personalizada */
@@ -70,18 +73,150 @@ body {
     box-shadow: 0 0 0 0.2rem rgba(111, 66, 193, 0.25);
 }
 
-/* Loading overlay */
+/* Loading overlay - SOLO SPINNER SIN FONDO */
 .loading-overlay {
     position: fixed;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0, 0, 0, 0.5);
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    background: transparent; /* Sin fondo */
     display: flex;
     justify-content: center;
     align-items: center;
     z-index: 9999;
+    pointer-events: none; /* No bloquear interacción */
+    opacity: 1;
+    visibility: visible;
+    /* Asegurar que esté por encima de todo */
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
+}
+
+/* Eliminar animación de overlay para evitar parpadeo */
+
+.loading-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 1rem;
+    background: rgba(0, 0, 0, 0.8); /* Fondo oscuro semi-transparente solo para el contenido */
+    border-radius: 12px;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    pointer-events: auto; /* Solo el spinner puede recibir eventos */
+    opacity: 1;
+    transform: translateY(0);
+}
+
+@keyframes slideUpLoading {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.loading-content .spinner-border {
+    width: 2.5rem;
+    height: 2.5rem;
+    border-width: 0.25rem;
+    color: #ffffff;
+    filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.4));
+    animation: spinGlow 1s linear infinite;
+}
+
+@keyframes spinGlow {
+    0% {
+        transform: rotate(0deg);
+        filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.3));
+    }
+    50% {
+        filter: drop-shadow(0 0 20px rgba(255, 255, 255, 0.5));
+    }
+    100% {
+        transform: rotate(360deg);
+        filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.3));
+    }
+}
+
+.loading-text {
+    color: #ffffff;
+    font-size: 0.85rem;
+    font-weight: 500;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+    opacity: 0.9;
+    white-space: nowrap;
+}
+
+@keyframes fadeInText {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 0.9;
+        transform: translateY(0);
+    }
+}
+
+/* Responsive para móviles */
+@media (max-width: 768px) {
+    .loading-content {
+        padding: 0.75rem;
+        margin: 0.5rem;
+        border-radius: 8px;
+    }
+    
+    .loading-content .spinner-border {
+        width: 2rem;
+        height: 2rem;
+        border-width: 0.2rem;
+    }
+    
+    .loading-text {
+        font-size: 0.8rem;
+    }
+}
+
+/* Versión ultraminimalista opcional */
+.loading-overlay.minimal {
+    background: transparent;
+}
+
+.loading-overlay.minimal .loading-content {
+    background: rgba(0, 0, 0, 0.6);
+    padding: 0.5rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+}
+
+.loading-overlay.minimal .loading-content .spinner-border {
+    width: 1.8rem;
+    height: 1.8rem;
+    border-width: 0.2rem;
+}
+
+.loading-overlay.minimal .loading-text {
+    font-size: 0.75rem;
+}
+
+/* Soporte para pantallas con notch */
+@supports (padding-top: env(safe-area-inset-top)) {
+    .loading-overlay {
+        padding-top: env(safe-area-inset-top);
+        padding-bottom: env(safe-area-inset-bottom);
+        padding-left: env(safe-area-inset-left);
+        padding-right: env(safe-area-inset-right);
+    }
 }
 
 /* Animaciones */
