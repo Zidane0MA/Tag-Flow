@@ -5,7 +5,10 @@
 {% block extra_css %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/gallery.css') }}">
 <style>
-/* Estilos específicos para papelera - TEMA OSCURO MEJORADO */
+/* ============================================
+   TRASH CARDS - ESTILOS PRINCIPALES
+   ============================================ */
+
 .trash-card {
     background: linear-gradient(135deg, rgba(45, 55, 72, 0.95) 0%, rgba(55, 65, 85, 0.95) 100%);
     border: 2px solid rgba(220, 53, 69, 0.3);
@@ -15,6 +18,7 @@
     box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15), 0 0 20px rgba(220, 53, 69, 0.05);
     backdrop-filter: blur(10px);
     position: relative;
+    animation: trashCardAppear 0.4s ease-out;
 }
 
 .trash-card::before {
@@ -43,51 +47,6 @@
     filter: grayscale(0.4) sepia(0.15) hue-rotate(340deg) saturate(0.9);
 }
 
-.deleted-info {
-    background: linear-gradient(135deg, rgba(220, 53, 69, 0.15), rgba(220, 53, 69, 0.1));
-    border: 1px solid rgba(220, 53, 69, 0.3);
-    border-left: 4px solid #dc3545;
-    padding: 0.75rem;
-    margin: 0.75rem 0;
-    border-radius: 8px;
-    color: #e2e8f0;
-    backdrop-filter: blur(5px);
-    box-shadow: 0 2px 8px rgba(220, 53, 69, 0.1);
-}
-
-.deleted-info small {
-    color: #cbd5e0 !important;
-    font-weight: 500;
-    line-height: 1.4;
-}
-
-.deleted-info strong {
-    color: #f8d7da !important;
-    font-weight: 600;
-}
-
-.danger-zone {
-    background: linear-gradient(135deg, rgba(220, 53, 69, 0.1), rgba(220, 53, 69, 0.05));
-    border: 1px solid rgba(220, 53, 69, 0.3);
-    border-radius: 12px;
-    padding: 1.5rem;
-    margin: 0.1rem 0 1.5rem 0;
-    backdrop-filter: blur(10px);
-    box-shadow: 0 4px 15px rgba(220, 53, 69, 0.1);
-}
-
-.danger-zone h6 {
-    color: #f8d7da !important;
-    font-weight: 700;
-    margin-bottom: 0.75rem;
-}
-
-.danger-zone p {
-    color: #e2e8f0 !important;
-    line-height: 1.5;
-}
-
-/* Mejorar el texto del contenido de las cards */
 .trash-card .card-body {
     background: rgba(45, 55, 72, 0.98);
     backdrop-filter: blur(8px);
@@ -120,12 +79,6 @@
     padding: 1rem 1.25rem;
 }
 
-.trash-card .card-footer .text-muted {
-    color: #a0aec0 !important;
-    font-weight: 500;
-}
-
-/* Mejorar los íconos de música y personajes */
 .trash-card .text-secondary {
     color: #9ca3af !important;
 }
@@ -134,7 +87,6 @@
     opacity: 0.8;
 }
 
-/* Efectos hover para los botones de acción */
 .trash-card .btn-outline-success:hover {
     background: rgba(72, 187, 120, 0.2);
     border-color: #48bb78;
@@ -149,7 +101,29 @@
     transform: scale(1.05);
 }
 
-/* Animación sutil para las cards */
+.deleted-info {
+    background: linear-gradient(135deg, rgba(220, 53, 69, 0.15), rgba(220, 53, 69, 0.1));
+    border: 1px solid rgba(220, 53, 69, 0.3);
+    border-left: 4px solid #dc3545;
+    padding: 0.75rem;
+    margin: 0.75rem 0;
+    border-radius: 8px;
+    color: #e2e8f0;
+    backdrop-filter: blur(5px);
+    box-shadow: 0 2px 8px rgba(220, 53, 69, 0.1);
+}
+
+.deleted-info small {
+    color: #cbd5e0 !important;
+    font-weight: 500;
+    line-height: 1.4;
+}
+
+.deleted-info strong {
+    color: #f8d7da !important;
+    font-weight: 600;
+}
+
 @keyframes trashCardAppear {
     from {
         opacity: 0;
@@ -161,42 +135,43 @@
     }
 }
 
-.trash-card {
-    animation: trashCardAppear 0.4s ease-out;
-}
-
 /* ============================================
-   MODALES DE ELIMINACIÓN - ESTILO GALLERY CONSISTENTE
+   MODALES - ESTILO CONSISTENTE
    ============================================ */
 
-/* Modal Individual de Eliminación Permanente */
-#permanentDeleteModal .modal-content {
+#permanentDeleteModal .modal-content,
+#bulkPermanentDeleteModal .modal-content {
     background: var(--color-bg-dark);
     color: var(--color-text-light);
     border: 1px solid var(--color-secondary-dark);
 }
 
-#permanentDeleteModal .modal-header {
+#permanentDeleteModal .modal-header,
+#bulkPermanentDeleteModal .modal-header {
     background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
     color: white;
     border-bottom: 1px solid var(--color-secondary-dark);
 }
 
-#permanentDeleteModal .modal-header .modal-title {
+#permanentDeleteModal .modal-header .modal-title,
+#bulkPermanentDeleteModal .modal-header .modal-title {
     font-weight: 700;
     font-size: 1.25rem;
 }
 
-#permanentDeleteModal .modal-header .btn-close {
+#permanentDeleteModal .modal-header .btn-close,
+#bulkPermanentDeleteModal .modal-header .btn-close {
     filter: invert(1);
     opacity: 0.8;
 }
 
-#permanentDeleteModal .modal-header .btn-close:hover {
+#permanentDeleteModal .modal-header .btn-close:hover,
+#bulkPermanentDeleteModal .modal-header .btn-close:hover {
     opacity: 1;
 }
 
-#permanentDeleteModal .modal-body {
+#permanentDeleteModal .modal-body,
+#bulkPermanentDeleteModal .modal-body {
     max-height: 66vh;
     overflow-y: auto;
     overflow-x: hidden;
@@ -204,214 +179,35 @@
     padding: 1.5rem;
 }
 
-#permanentDeleteModal .modal-body::-webkit-scrollbar {
-    width: 8px;
-}
-
-#permanentDeleteModal .modal-body::-webkit-scrollbar-track {
-    background: var(--color-bg-dark);
-    border-radius: 4px;
-}
-
-#permanentDeleteModal .modal-body::-webkit-scrollbar-thumb {
-    background: #dc3545;
-    border-radius: 4px;
-}
-
-#permanentDeleteModal .modal-body::-webkit-scrollbar-thumb:hover {
-    background: #c82333;
-}
-
-#permanentDeleteModal .modal-footer {
-    background: var(--color-bg-dark);
-    border-top: 1px solid var(--color-secondary-dark);
-}
-
-#permanentDeleteModal .danger-zone {
-    background: linear-gradient(135deg, rgba(220, 53, 69, 0.15), rgba(220, 53, 69, 0.1));
-    border: 1px solid rgba(220, 53, 69, 0.4);
-    border-radius: 8px;
-    padding: 1.5rem;
-    margin-bottom: 1.5rem;
-    position: relative;
-}
-
-#permanentDeleteModal .danger-zone::before {
-    content: '';
-    position: absolute;
-    top: -1px;
-    left: -1px;
-    right: -1px;
-    height: 4px;
-    background: linear-gradient(90deg, #dc3545, #c82333);
-    border-radius: 8px 8px 0 0;
-}
-
-#permanentDeleteModal .danger-zone h6 {
-    color: #f8d7da !important;
-    font-weight: 700;
-    margin-bottom: 1rem;
-    position: relative;
-    z-index: 2;
-}
-
-#permanentDeleteModal .danger-zone p {
-    color: var(--color-text-light) !important;
-    line-height: 1.6;
-    margin-bottom: 0.75rem;
-    position: relative;
-    z-index: 2;
-}
-
-#permanentDeleteModal .danger-zone strong {
-    color: #f8d7da !important;
-    font-weight: 700;
-}
-
-#permanentDeleteModal .form-check {
-    background: var(--color-secondary-dark);
-    border: 1px solid var(--color-secondary);
-    border-radius: 8px;
-    padding: 1rem;
-    margin-bottom: 1rem;
-    transition: all 0.3s ease;
-    display: flex;
-    align-items: flex-start;
-    gap: 0.75rem;
-}
-
-#permanentDeleteModal .form-check:hover {
-    background: rgba(113, 128, 150, 0.3);
-    border-color: #dc3545;
-}
-
-#permanentDeleteModal .form-check-input {
-    background: var(--color-secondary-dark);
-    border: 2px solid var(--color-secondary);
-    width: 1.25rem;
-    height: 1.25rem;
-    margin: 0;
-    flex-shrink: 0;
-    margin-top: 0.125rem;
-}
-
-#permanentDeleteModal .form-check-input:focus {
-    background: var(--color-secondary-dark);
-    border-color: #dc3545;
-    box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25);
-}
-
-#permanentDeleteModal .form-check-input:checked {
-    background: #dc3545;
-    border-color: #dc3545;
-}
-
-#permanentDeleteModal .form-check-label {
-    color: var(--color-text-light) !important;
-    font-weight: 500;
-    line-height: 1.5;
-    cursor: pointer;
-    user-select: none;
-    flex: 1;
-    margin: 0;
-}
-
-#permanentDeleteModal .modal-footer .btn {
-    padding: 0.75rem 1.5rem;
-    font-weight: 600;
-    border-radius: 8px;
-    transition: all 0.3s ease;
-    min-width: 120px;
-}
-
-#permanentDeleteModal .modal-footer .btn-secondary {
-    background: var(--color-secondary-dark);
-    border: 1px solid var(--color-secondary);
-    color: var(--color-text-muted);
-}
-
-#permanentDeleteModal .modal-footer .btn-secondary:hover {
-    background: rgba(113, 128, 150, 0.3);
-    border-color: var(--color-secondary);
-    color: var(--color-text-light);
-}
-
-#permanentDeleteModal .modal-footer .btn-danger {
-    background: linear-gradient(135deg, #dc3545, #c82333);
-    border: 1px solid #dc3545;
-    color: white;
-}
-
-#permanentDeleteModal .modal-footer .btn-danger:hover:not(:disabled) {
-    background: linear-gradient(135deg, #c82333, #a71e2a);
-}
-
-#permanentDeleteModal .modal-footer .btn-danger:disabled {
-    background: var(--color-secondary-dark);
-    border-color: var(--color-secondary);
-    color: #6b7280;
-    cursor: not-allowed;
-}
-
-/* Modal Masivo de Eliminación Permanente */
-#bulkPermanentDeleteModal .modal-content {
-    background: var(--color-bg-dark);
-    color: var(--color-text-light);
-    border: 1px solid var(--color-secondary-dark);
-}
-
-#bulkPermanentDeleteModal .modal-header {
-    background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
-    color: white;
-    border-bottom: 1px solid var(--color-secondary-dark);
-}
-
-#bulkPermanentDeleteModal .modal-header .modal-title {
-    font-weight: 700;
-    font-size: 1.25rem;
-}
-
-#bulkPermanentDeleteModal .modal-header .btn-close {
-    filter: invert(1);
-    opacity: 0.8;
-}
-
-#bulkPermanentDeleteModal .modal-header .btn-close:hover {
-    opacity: 1;
-}
-
-#bulkPermanentDeleteModal .modal-body {
-    max-height: 68vh;
-    overflow-y: auto;
-    overflow-x: hidden;
-    overscroll-behavior: contain;
-    padding: 1.5rem;
-}
-
+#permanentDeleteModal .modal-body::-webkit-scrollbar,
 #bulkPermanentDeleteModal .modal-body::-webkit-scrollbar {
     width: 8px;
 }
 
+#permanentDeleteModal .modal-body::-webkit-scrollbar-track,
 #bulkPermanentDeleteModal .modal-body::-webkit-scrollbar-track {
     background: var(--color-bg-dark);
     border-radius: 4px;
 }
 
+#permanentDeleteModal .modal-body::-webkit-scrollbar-thumb,
 #bulkPermanentDeleteModal .modal-body::-webkit-scrollbar-thumb {
     background: #dc3545;
     border-radius: 4px;
 }
 
+#permanentDeleteModal .modal-body::-webkit-scrollbar-thumb:hover,
 #bulkPermanentDeleteModal .modal-body::-webkit-scrollbar-thumb:hover {
     background: #c82333;
 }
 
+#permanentDeleteModal .modal-footer,
 #bulkPermanentDeleteModal .modal-footer {
     background: var(--color-bg-dark);
     border-top: 1px solid var(--color-secondary-dark);
 }
 
-#bulkPermanentDeleteModal .danger-zone {
+.danger-zone {
     background: linear-gradient(135deg, rgba(220, 53, 69, 0.15), rgba(220, 53, 69, 0.1));
     border: 1px solid rgba(220, 53, 69, 0.4);
     border-radius: 8px;
@@ -420,7 +216,7 @@
     position: relative;
 }
 
-#bulkPermanentDeleteModal .danger-zone::before {
+.danger-zone::before {
     content: '';
     position: absolute;
     top: -1px;
@@ -431,7 +227,7 @@
     border-radius: 8px 8px 0 0;
 }
 
-#bulkPermanentDeleteModal .danger-zone h6 {
+.danger-zone h6 {
     color: #f8d7da !important;
     font-weight: 700;
     margin-bottom: 1rem;
@@ -439,9 +235,9 @@
     z-index: 2;
 }
 
-#bulkPermanentDeleteModal .danger-zone p,
-#bulkPermanentDeleteModal .danger-zone ul,
-#bulkPermanentDeleteModal .danger-zone li {
+.danger-zone p,
+.danger-zone ul,
+.danger-zone li {
     color: var(--color-text-light) !important;
     line-height: 1.6;
     margin-bottom: 0.75rem;
@@ -449,12 +245,12 @@
     z-index: 2;
 }
 
-#bulkPermanentDeleteModal .danger-zone strong {
+.danger-zone strong {
     color: #f8d7da !important;
     font-weight: 700;
 }
 
-#bulkPermanentDeleteModal .form-check {
+.form-check {
     background: var(--color-secondary-dark);
     border: 1px solid var(--color-secondary);
     border-radius: 8px;
@@ -466,12 +262,12 @@
     gap: 0.75rem;
 }
 
-#bulkPermanentDeleteModal .form-check:hover {
+.form-check:hover {
     background: rgba(113, 128, 150, 0.3);
     border-color: #dc3545;
 }
 
-#bulkPermanentDeleteModal .form-check-input {
+.form-check-input {
     background: var(--color-secondary-dark);
     border: 2px solid var(--color-secondary);
     width: 1.25rem;
@@ -481,18 +277,18 @@
     margin-top: 0.125rem;
 }
 
-#bulkPermanentDeleteModal .form-check-input:focus {
+.form-check-input:focus {
     background: var(--color-secondary-dark);
     border-color: #dc3545;
     box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25);
 }
 
-#bulkPermanentDeleteModal .form-check-input:checked {
+.form-check-input:checked {
     background: #dc3545;
     border-color: #dc3545;
 }
 
-#bulkPermanentDeleteModal .form-check-label {
+.form-check-label {
     color: var(--color-text-light) !important;
     font-weight: 500;
     line-height: 1.5;
@@ -502,7 +298,7 @@
     margin: 0;
 }
 
-#bulkPermanentDeleteModal .modal-footer .btn {
+.modal-footer .btn {
     padding: 0.75rem 1.5rem;
     font-weight: 600;
     border-radius: 8px;
@@ -510,29 +306,29 @@
     min-width: 120px;
 }
 
-#bulkPermanentDeleteModal .modal-footer .btn-secondary {
+.modal-footer .btn-secondary {
     background: var(--color-secondary-dark);
     border: 1px solid var(--color-secondary);
     color: var(--color-text-muted);
 }
 
-#bulkPermanentDeleteModal .modal-footer .btn-secondary:hover {
+.modal-footer .btn-secondary:hover {
     background: rgba(113, 128, 150, 0.3);
     border-color: var(--color-secondary);
     color: var(--color-text-light);
 }
 
-#bulkPermanentDeleteModal .modal-footer .btn-danger {
+.modal-footer .btn-danger {
     background: linear-gradient(135deg, #dc3545, #c82333);
     border: 1px solid #dc3545;
     color: white;
 }
 
-#bulkPermanentDeleteModal .modal-footer .btn-danger:hover:not(:disabled) {
+.modal-footer .btn-danger:hover:not(:disabled) {
     background: linear-gradient(135deg, #c82333, #a71e2a);
 }
 
-#bulkPermanentDeleteModal .modal-footer .btn-danger:disabled {
+.modal-footer .btn-danger:disabled {
     background: var(--color-secondary-dark);
     border-color: var(--color-secondary);
     color: #6b7280;
@@ -540,295 +336,65 @@
 }
 
 /* ============================================
-   ESPACIADO RESPONSIVO CONSISTENTE CON GALLERY
+   CORRECCIÓN CONFLICTOS MAIN.CSS
    ============================================ */
 
-/* Ajustes de espaciado entre secciones para diferentes breakpoints */
-@media (max-width: 768px) {
-    /* Reducir espaciado general en móvil - máxima especificidad */
-    #trash-page-content .row.mb-4,
-    body .row.mb-4 {
-        margin-bottom: 1.5rem !important;
-    }
-    
-    /* Espaciado de container principal - máxima especificidad */
-    #trash-page-content .container-fluid,
-    body .container-fluid {
-        padding-left: 0.5rem !important;
-        padding-right: 0.5rem !important;
-    }
-    
-    /* Ajustes específicos para cards */
-    .card {
-        margin-bottom: 1.5rem;
-    }
-    
-    .card-body {
-        padding: 1rem;
-    }
-    
-    .card-footer {
-        padding: 0.75rem 1rem;
-    }
-    
-    /* Espaciado optimizado para filtros de selección */
-    #select-all {
-        margin-right: 0.5rem;
-    }
-    
-    /* Reducir spacing en paginación */
-    nav.mt-4 {
-        margin-top: 1.5rem !important;
-    }
-}
-
-@media (max-width: 576px) {
-    /* Espaciado más compacto para móviles pequeños - especificidad alta */
-    body .row.mb-4 {
-        margin-bottom: 1.5rem !important;
-    }
-    
-    /* Headers pegajosos con menos padding - especificidad alta */
-    body .card-header {
-        padding: 1rem 1.25rem !important;
-        position: sticky;
-        top: 0;
-        z-index: 10;
-    }
-    
-    /* Espaciado optimizado para controles */
-    .btn-group .btn {
-        margin-right: 0.25rem;
-    }
-    
-    /* Reducir margin de paginación */
-    nav.mt-4 {
-        margin-top: 1.5rem !important;
-    }
-    
-    /* Ajustar espaciado interno de danger-zone */
-    .danger-zone {
-        padding: 1rem;
-        margin-bottom: 1rem;
-    }
-
-    .card {
-        margin-bottom: 0rem !important;
-    }
-}
-
-@media (max-width: 350px) {
-    /* Espaciado ultra compacto para pantallas muy pequeñas - especificidad alta */
-    body .row.mb-4 {
-        margin-bottom: 1rem !important;
-    }
-    
-    body .card {
-        margin-bottom: 0rem !important;
-    }
-
-    body .card-header {
-        padding: 0.75rem 1rem !important;
-    }
-    
-    body .card-body {
-        padding: 0.75rem !important;
-    }
-    
-    nav.mt-4 {
-        margin-top: 1rem !important;
-    }
-}
-
-/* Desktop intermedio - ajustar padding de container */
-@media (min-width: 769px) and (max-width: 991.98px) {
-    .container-fluid {
-        padding-left: 10px;
-        padding-right: 10px;
-    }
-}
-
-/* ============================================
-   CORRECCIÓN CONFLICTO MAIN.CSS - TABLETS
-   ============================================ */
-
-/* Corregir conflicto con main.css para tablets (768px-1024px) que aplica margin-bottom: 1.5rem */
+/* Tablets (768px-1024px) */
 @media (min-width: 768px) and (max-width: 1024px) {
-    /* Anular margin-bottom de main.css para TODAS las cards en trash.html */
     body #trash-page-content .card,
     body .card {
-        margin-bottom: 0rem !important; /* Anular los 1.5rem de main.css */
+        margin-bottom: 0rem !important;
     }
     
-    /* Específicamente para trash-cards */
     body #trash-page-content .trash-card,
     body .trash-card {
         margin-bottom: 1rem !important;
     }
 }
 
-/* Corregir conflicto con main.css para móviles (max-width: 768px) */
+/* Móviles (max-width: 768px) */
 @media (max-width: 768px) {
-    /* Anular cualquier margin-bottom excesivo de main.css para TODAS las cards */
     body #trash-page-content .card,
     body .card {
-        margin-bottom: 0rem !important; /* Espaciado consistente en móviles */
+        margin-bottom: 0rem !important;
     }
     
-    /* Específicamente para trash-cards */
     body #trash-page-content .trash-card,
     body .trash-card {
-        margin-bottom: 0 !important; /* Las trash-cards usan el espaciado del wrapper */
-    }
-}
-
-/* Corregir conflicto con main.css para móviles pequeños (max-width: 576px) */
-@media (max-width: 576px) {
-    /* Anular cualquier margin-bottom excesivo de main.css para TODAS las cards */
-    body #trash-page-content .card,
-    body .card {
-        margin-bottom: 0rem !important; /* Espaciado más compacto en móviles pequeños */
-    }
-    
-    /* Específicamente para trash-cards */
-    body #trash-page-content .trash-card,
-    body .trash-card {
-        margin-bottom: 0 !important; /* Las trash-cards usan el espaciado del wrapper */
-    }
-}
-
-/* ============================================
-   RESPONSIVE DESIGN - MANTENER CONSISTENCIA
-   ============================================ */
-
-/* Asegurar que las trash-card mantengan el diseño en todas las pantallas */
-@media (max-width: 768px) {
-    /* Espaciado específico para video cards */
-    .video-card-wrapper {
-        margin-bottom: 1.5rem !important;
-    }
-    
-    .trash-card {
-        background: linear-gradient(135deg, rgba(45, 55, 72, 0.95) 0%, rgba(55, 65, 85, 0.95) 100%);
-        border: 2px solid rgba(220, 53, 69, 0.3);
-        border-radius: 16px;
-        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15), 0 0 20px rgba(220, 53, 69, 0.05);
-        backdrop-filter: blur(10px);
-        margin-bottom: 0 !important; /* Remover margin propio de la card */
-    }
-    
-    .trash-card:hover {
-        transform: translateY(-6px);
-        box-shadow: 0 12px 35px rgba(0, 0, 0, 0.2), 0 0 30px rgba(220, 53, 69, 0.1);
-        border-color: rgba(220, 53, 69, 0.5);
-    }
-    
-    /* MANTENER THUMBNAILS EN MÓVIL - ESPECÍFICO PARA TRASH-CARD */
-    .trash-card .thumbnail-image,
-    .trash-card .card-img-top {
-        top: -1.5px !important;
-        left: -1.5px !important;
-        width: calc(100% + 3px) !important;
-        height: calc(100% + 1.5px) !important;
-        border-radius: 17.5px 17.5px 0 0 !important; /* 16px + 1.5px */
-        object-fit: cover !important;
-        position: absolute !important;
-        transition: all 0.3s ease !important;
-        display: block !important;
-        visibility: visible !important;
-        opacity: 1 !important;
-    }
-    
-    .trash-card .card-img-top-container {
-        border-radius: 16px 16px 0 0 !important;
-        position: relative !important;
-        overflow: visible !important;
-        padding-top: 56.25% !important; /* 16:9 Aspect Ratio */
-        height: 0 !important;
-        background: transparent !important;
-    }
-    
-    .trash-card .card-overlay {
-        top: -1.5px !important;
-        left: -1.5px !important;
-        width: calc(100% + 3px) !important;
-        height: calc(100% + 7.3px) !important;
-        background: rgba(0, 0, 0, 0.7) !important;
-        border-radius: 17.5px 17.5px 0 0 !important; /* 16px + 1.5px */
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        opacity: 0 !important;
-        transition: all 0.3s ease !important;
-        position: absolute !important;
-        z-index: 6 !important;
-        pointer-events: none !important;
-    }
-    
-    .trash-card:hover .card-overlay {
-        opacity: 1 !important;
-        pointer-events: none !important;
-    }
-    
-    .trash-card .card-footer .btn-group .btn,
-    .trash-card .card-footer .btn-group .btn.active {
-        border: 2px solid transparent !important;
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1) !important;
-        border-radius: 8px !important;
-    }
-    
-    .trash-card .card-footer .btn-outline-success {
-        border-color: rgba(72, 187, 120, 0.3) !important;
-    }
-    
-    .trash-card .card-footer .btn-outline-danger {
-        border-color: rgba(220, 53, 69, 0.3) !important;
-    }
-    
-    .trash-card .card-footer .btn-outline-success:hover {
-        background: rgba(72, 187, 120, 0.2) !important;
-        border-color: #48bb78 !important;
-        color: #48bb78 !important;
-        transform: scale(1.05) !important;
-    }
-    
-    .trash-card .card-footer .btn-outline-danger:hover {
-        background: rgba(220, 53, 69, 0.2) !important;
-        border-color: #dc3545 !important;
-        color: #dc3545 !important;
-        transform: scale(1.05) !important;
-    }
-}
-
-@media (max-width: 576px) {
-    /* Espaciado más compacto para video cards */
-    .video-card-wrapper {
-        margin-bottom: 1rem !important;
-    }
-    
-    .trash-card {
-        background: linear-gradient(135deg, rgba(45, 55, 72, 0.95) 0%, rgba(55, 65, 85, 0.95) 100%);
-        border: 2px solid rgba(220, 53, 69, 0.3);
-        border-radius: 16px;
-        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15), 0 0 20px rgba(220, 53, 69, 0.05);
-        backdrop-filter: blur(10px);
         margin-bottom: 0 !important;
     }
-    
-    .trash-card:hover {
-        transform: translateY(-6px);
-        box-shadow: 0 12px 35px rgba(0, 0, 0, 0.2), 0 0 30px rgba(220, 53, 69, 0.1);
-        border-color: rgba(220, 53, 69, 0.5);
+}
+
+/* Móviles pequeños (max-width: 576px) */
+@media (max-width: 576px) {
+    body #trash-page-content .card,
+    body .card {
+        margin-bottom: 0rem !important;
     }
     
-    /* MANTENER THUMBNAILS EN MÓVIL PEQUEÑO - ESPECÍFICO PARA TRASH-CARD */
+    body #trash-page-content .trash-card,
+    body .trash-card {
+        margin-bottom: 0 !important;
+    }
+}
+
+/* ============================================
+   RESPONSIVE DESIGN
+   ============================================ */
+
+/* Móviles (max-width: 768px) */
+@media (max-width: 768px) {
+    .video-card-wrapper {
+        margin-bottom: 1.5rem !important;
+    }
+    
     .trash-card .thumbnail-image,
     .trash-card .card-img-top {
         top: -1.5px !important;
         left: -1.5px !important;
         width: calc(100% + 3px) !important;
         height: calc(100% + 1.5px) !important;
-        border-radius: 17.5px 17.5px 0 0 !important; /* 16px + 1.5px */
+        border-radius: 17.5px 17.5px 0 0 !important;
         object-fit: cover !important;
         position: absolute !important;
         transition: all 0.3s ease !important;
@@ -841,7 +407,7 @@
         border-radius: 16px 16px 0 0 !important;
         position: relative !important;
         overflow: visible !important;
-        padding-top: 56.25% !important; /* 16:9 Aspect Ratio */
+        padding-top: 56.25% !important;
         height: 0 !important;
         background: transparent !important;
     }
@@ -868,18 +434,57 @@
         pointer-events: none !important;
     }
     
-    .trash-card .card-footer .btn-group .btn,
-    .trash-card .card-footer .btn-group .btn.active {
+    .trash-card .card-footer .btn-group .btn {
         border: 2px solid transparent !important;
         box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1) !important;
         border-radius: 8px !important;
+    }
+    
+    .trash-card .card-footer .btn-outline-success {
+        border-color: rgba(72, 187, 120, 0.3) !important;
+    }
+    
+    .trash-card .card-footer .btn-outline-danger {
+        border-color: rgba(220, 53, 69, 0.3) !important;
+    }
+    
+    .trash-card .card-footer .btn-outline-success:hover {
+        background: rgba(72, 187, 120, 0.2) !important;
+        border-color: #48bb78 !important;
+        color: #48bb78 !important;
+        transform: scale(1.05) !important;
+    }
+    
+    .trash-card .card-footer .btn-outline-danger:hover {
+        background: rgba(220, 53, 69, 0.2) !important;
+        border-color: #dc3545 !important;
+        color: #dc3545 !important;
+        transform: scale(1.05) !important;
+    }
+    
+    #bulkPermanentDeleteModal .modal-body {
+        max-height: 62vh;
+    }
+}
+
+/* Móviles pequeños (max-width: 576px) */
+@media (max-width: 576px) {
+    .video-card-wrapper {
+        margin-bottom: 1rem !important;
+    }
+    
+    .trash-card .card-footer .btn-group .btn {
         min-width: 44px;
         min-height: 44px;
     }
-
-    #bulkPermanentDeleteModal .modal-body {
-    max-height: 62vh;
 }
+
+/* Pantallas muy pequeñas (max-width: 350px) */
+@media (max-width: 350px) {
+    .danger-zone {
+        padding: 1rem;
+        margin-bottom: 1rem;
+    }
 }
 </style>
 {% endblock %}
@@ -1216,8 +821,6 @@
         </div>
     </div>
 </div>
-
-<!-- Loading overlay - eliminado porque se crea dinámicamente en JavaScript -->
 {% endblock %}
 
 {% block extra_js %}
@@ -1379,7 +982,7 @@ async function confirmPermanentDelete() {
             method: 'POST',
             body: JSON.stringify({ 
                 confirm: true,
-                move_to_system_trash: true // Nueva funcionalidad
+                move_to_system_trash: true
             })
         });
         
@@ -1489,7 +1092,7 @@ async function confirmBulkPermanentDelete() {
             method: 'POST',
             body: JSON.stringify({
                 video_ids: Array.from(selectedVideos),
-                move_to_system_trash: true // Nueva funcionalidad
+                move_to_system_trash: true
             })
         });
         
@@ -1529,7 +1132,6 @@ async function confirmBulkPermanentDelete() {
 
 // Ver detalles de video eliminado
 function viewDeletedVideoDetails(videoId) {
-    // Por ahora, solo mostrar información básica
     TagFlow.utils.showNotification(`Ver detalles del video ID: ${videoId}`, 'info');
 }
 
