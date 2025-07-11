@@ -540,17 +540,181 @@
 }
 
 /* ============================================
+   ESPACIADO RESPONSIVO CONSISTENTE CON GALLERY
+   ============================================ */
+
+/* Ajustes de espaciado entre secciones para diferentes breakpoints */
+@media (max-width: 768px) {
+    /* Reducir espaciado general en móvil - máxima especificidad */
+    #trash-page-content .row.mb-4,
+    body .row.mb-4 {
+        margin-bottom: 1.5rem !important;
+    }
+    
+    /* Espaciado de container principal - máxima especificidad */
+    #trash-page-content .container-fluid,
+    body .container-fluid {
+        padding-left: 0.5rem !important;
+        padding-right: 0.5rem !important;
+    }
+    
+    /* Ajustes específicos para cards */
+    .card {
+        margin-bottom: 1.5rem;
+    }
+    
+    .card-body {
+        padding: 1rem;
+    }
+    
+    .card-footer {
+        padding: 0.75rem 1rem;
+    }
+    
+    /* Espaciado optimizado para filtros de selección */
+    #select-all {
+        margin-right: 0.5rem;
+    }
+    
+    /* Reducir spacing en paginación */
+    nav.mt-4 {
+        margin-top: 1.5rem !important;
+    }
+}
+
+@media (max-width: 576px) {
+    /* Espaciado más compacto para móviles pequeños - especificidad alta */
+    body .row.mb-4 {
+        margin-bottom: 1.5rem !important;
+    }
+    
+    /* Headers pegajosos con menos padding - especificidad alta */
+    body .card-header {
+        padding: 1rem 1.25rem !important;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+    
+    /* Espaciado optimizado para controles */
+    .btn-group .btn {
+        margin-right: 0.25rem;
+    }
+    
+    /* Reducir margin de paginación */
+    nav.mt-4 {
+        margin-top: 1.5rem !important;
+    }
+    
+    /* Ajustar espaciado interno de danger-zone */
+    .danger-zone {
+        padding: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .card {
+        margin-bottom: 0rem !important;
+    }
+}
+
+@media (max-width: 350px) {
+    /* Espaciado ultra compacto para pantallas muy pequeñas - especificidad alta */
+    body .row.mb-4 {
+        margin-bottom: 1rem !important;
+    }
+    
+    body .card {
+        margin-bottom: 0rem !important;
+    }
+
+    body .card-header {
+        padding: 0.75rem 1rem !important;
+    }
+    
+    body .card-body {
+        padding: 0.75rem !important;
+    }
+    
+    nav.mt-4 {
+        margin-top: 1rem !important;
+    }
+}
+
+/* Desktop intermedio - ajustar padding de container */
+@media (min-width: 769px) and (max-width: 991.98px) {
+    .container-fluid {
+        padding-left: 10px;
+        padding-right: 10px;
+    }
+}
+
+/* ============================================
+   CORRECCIÓN CONFLICTO MAIN.CSS - TABLETS
+   ============================================ */
+
+/* Corregir conflicto con main.css para tablets (768px-1024px) que aplica margin-bottom: 1.5rem */
+@media (min-width: 768px) and (max-width: 1024px) {
+    /* Anular margin-bottom de main.css para TODAS las cards en trash.html */
+    body #trash-page-content .card,
+    body .card {
+        margin-bottom: 0rem !important; /* Anular los 1.5rem de main.css */
+    }
+    
+    /* Específicamente para trash-cards */
+    body #trash-page-content .trash-card,
+    body .trash-card {
+        margin-bottom: 1rem !important;
+    }
+}
+
+/* Corregir conflicto con main.css para móviles (max-width: 768px) */
+@media (max-width: 768px) {
+    /* Anular cualquier margin-bottom excesivo de main.css para TODAS las cards */
+    body #trash-page-content .card,
+    body .card {
+        margin-bottom: 0rem !important; /* Espaciado consistente en móviles */
+    }
+    
+    /* Específicamente para trash-cards */
+    body #trash-page-content .trash-card,
+    body .trash-card {
+        margin-bottom: 0 !important; /* Las trash-cards usan el espaciado del wrapper */
+    }
+}
+
+/* Corregir conflicto con main.css para móviles pequeños (max-width: 576px) */
+@media (max-width: 576px) {
+    /* Anular cualquier margin-bottom excesivo de main.css para TODAS las cards */
+    body #trash-page-content .card,
+    body .card {
+        margin-bottom: 0rem !important; /* Espaciado más compacto en móviles pequeños */
+    }
+    
+    /* Específicamente para trash-cards */
+    body #trash-page-content .trash-card,
+    body .trash-card {
+        margin-bottom: 0 !important; /* Las trash-cards usan el espaciado del wrapper */
+    }
+}
+
+/* ============================================
    RESPONSIVE DESIGN - MANTENER CONSISTENCIA
    ============================================ */
 
 /* Asegurar que las trash-card mantengan el diseño en todas las pantallas */
 @media (max-width: 768px) {
+    /* Espaciado específico para video cards */
+    .video-card-wrapper {
+        margin-bottom: 1.5rem !important;
+    }
+    
     .trash-card {
         background: linear-gradient(135deg, rgba(45, 55, 72, 0.95) 0%, rgba(55, 65, 85, 0.95) 100%);
         border: 2px solid rgba(220, 53, 69, 0.3);
         border-radius: 16px;
         box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15), 0 0 20px rgba(220, 53, 69, 0.05);
         backdrop-filter: blur(10px);
+        margin-bottom: 0 !important; /* Remover margin propio de la card */
     }
     
     .trash-card:hover {
@@ -637,12 +801,18 @@
 }
 
 @media (max-width: 576px) {
+    /* Espaciado más compacto para video cards */
+    .video-card-wrapper {
+        margin-bottom: 1rem !important;
+    }
+    
     .trash-card {
         background: linear-gradient(135deg, rgba(45, 55, 72, 0.95) 0%, rgba(55, 65, 85, 0.95) 100%);
         border: 2px solid rgba(220, 53, 69, 0.3);
         border-radius: 16px;
         box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15), 0 0 20px rgba(220, 53, 69, 0.05);
         backdrop-filter: blur(10px);
+        margin-bottom: 0 !important;
     }
     
     .trash-card:hover {
@@ -715,6 +885,7 @@
 {% endblock %}
 
 {% block content %}
+<div id="trash-page-content">
     <!-- Header de papelera -->
     <div class="row mb-4">
         <div class="col-12">
@@ -779,7 +950,7 @@
     {% endif %}
 
     <!-- Galería de videos eliminados -->
-    <div class="row" id="trash-container">
+    <div class="row mb-4" id="trash-container">
         {% if videos %}
             {% for video in videos %}
             <div class="col-xl-3 col-lg-4 col-sm-6 mb-4 video-card-wrapper" data-video-id="{{ video.id }}">
