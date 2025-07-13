@@ -221,30 +221,104 @@ async function executeCleanCache() {
 
 // Acciones peligrosas (con confirmación)
 function executeEmptyTrash() {
-    showConfirmAction(
+    showDangerAction(
         'Vaciar Papelera',
-        '⚠️ Esta acción eliminará PERMANENTEMENTE todos los videos en la papelera.\n\nEsta acción NO SE PUEDE DESHACER.\n\n¿Continuar?',
-        'danger',
+        '💀',
+        'Esta acción eliminará PERMANENTEMENTE todos los videos en la papelera.',
+        'Esta acción NO SE PUEDE DESHACER',
+        [
+            'Todos los videos en papelera serán eliminados para siempre',
+            'Los archivos de video se borrarán del sistema de archivos',
+            'Los metadatos asociados se perderán permanentemente',
+            'No será posible recuperar ningún contenido eliminado'
+        ],
         'confirmEmptyTrash'
     );
 }
 
 function executeResetDatabase() {
-    showConfirmAction(
+    showDangerAction(
         'Reset Completo de Base de Datos',
-        '💀 PELIGRO EXTREMO: Esta acción eliminará TODA la base de datos.\n\nSe perderán TODOS los videos, metadatos y configuraciones.\n\nEsta acción es IRREVERSIBLE.\n\n¿Estás ABSOLUTAMENTE seguro?',
-        'danger',
-        'confirmResetDatabase'
+        '☠️',
+        'Esta acción eliminará COMPLETAMENTE la base de datos del sistema.',
+        'PELIGRO EXTREMO - Esta acción es IRREVERSIBLE',
+        [
+            'TODOS los videos registrados se perderán',
+            'TODOS los metadatos y configuraciones se eliminarán',
+            'TODAS las estadísticas y análisis se borrarán',
+            'El sistema volverá al estado inicial',
+            'Deberás repoblar la base de datos desde cero'
+        ],
+        'confirmResetDatabase',
+        true // Requiere confirmación por escrito
     );
 }
 
-// Sistema de confirmación
+// Sistema de confirmación avanzado
+function showDangerAction(title, icon, description, warning, consequences, action, requiresConfirmation = false) {
+    document.getElementById('confirmActionTitle').textContent = title;
+    
+    // Crear contenido estructurado
+    const modalBody = document.getElementById('confirmActionBody');
+    modalBody.innerHTML = `
+        <div class="modal-danger-content">
+            <div class="modal-danger-icon">${icon}</div>
+            <h4 class="modal-danger-title">${title}</h4>
+            <div class="modal-danger-description">${description}</div>
+            <div class="modal-danger-warning">${warning}</div>
+            <div class="modal-danger-consequences">
+                <h6>Consecuencias de esta acción:</h6>
+                <ul>
+                    ${consequences.map(item => `<li>${item}</li>`).join('')}
+                </ul>
+            </div>
+            ${requiresConfirmation ? `
+                <div class="modal-confirmation-input">
+                    <label for="confirmationText">Para continuar, escribe "CONFIRMAR" en mayúsculas:</label>
+                    <input type="text" id="confirmationText" placeholder="Escribe CONFIRMAR para habilitar el botón" autocomplete="off">
+                    <div class="form-text">Esta confirmación adicional es requerida para acciones extremadamente peligrosas.</div>
+                </div>
+            ` : ''}
+        </div>
+    `;
+    
+    const confirmBtn = document.getElementById('confirmActionBtn');
+    confirmBtn.className = 'btn btn-danger';
+    
+    if (requiresConfirmation) {
+        confirmBtn.disabled = true;
+        confirmBtn.textContent = 'Confirmación requerida';
+        
+        const confirmInput = document.getElementById('confirmationText');
+        confirmInput.addEventListener('input', function() {
+            if (this.value === 'CONFIRMAR') {
+                confirmBtn.disabled = false;
+                confirmBtn.textContent = 'Ejecutar Acción Peligrosa';
+                confirmBtn.classList.add('pulse-ready');
+            } else {
+                confirmBtn.disabled = true;
+                confirmBtn.textContent = 'Confirmación requerida';
+                confirmBtn.classList.remove('pulse-ready');
+            }
+        });
+    } else {
+        confirmBtn.disabled = false;
+        confirmBtn.textContent = 'Confirmar';
+    }
+    
+    currentAction = action;
+    confirmModal.show();
+}
+
+// Función legacy para compatibilidad
 function showConfirmAction(title, message, type, action) {
     document.getElementById('confirmActionTitle').textContent = title;
     document.getElementById('confirmActionBody').innerHTML = message.replace(/\n/g, '<br>');
     
     const confirmBtn = document.getElementById('confirmActionBtn');
     confirmBtn.className = `btn btn-${type}`;
+    confirmBtn.disabled = false;
+    confirmBtn.textContent = 'Confirmar';
     
     currentAction = action;
     confirmModal.show();

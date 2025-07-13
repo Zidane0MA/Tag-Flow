@@ -347,3 +347,341 @@
         height: 40px;
     }
 }
+
+/* ============================================
+   MODALES DE CONFIRMACIÓN - TEMA OSCURO
+   ============================================ */
+
+/* Modal de confirmación para acciones peligrosas */
+#confirmActionModal .modal-dialog {
+    max-height: 90vh;
+}
+
+#confirmActionModal .modal-content {
+    background-color: var(--color-bg-dark);
+    border: 1px solid rgba(245, 101, 101, 0.3);
+    color: var(--color-text-light);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+    height: 90vh;
+    display: flex;
+    flex-direction: column;
+}
+
+#confirmActionModal .modal-header {
+    background: linear-gradient(135deg, rgba(245, 101, 101, 0.2) 0%, rgba(229, 62, 62, 0.2) 100%);
+    border-bottom: 1px solid rgba(245, 101, 101, 0.3);
+    color: var(--color-text-light);
+    flex-shrink: 0;
+}
+
+#confirmActionModal .modal-title {
+    color: var(--color-danger);
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+#confirmActionModal .modal-title::before {
+    content: "⚠️";
+    font-size: 1.2em;
+}
+
+#confirmActionModal .modal-body {
+    background-color: var(--color-bg-dark);
+    color: var(--color-text-light);
+    padding: 1.5rem;
+    line-height: 1.6;
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+}
+
+/* Contenido estructurado del modal */
+.modal-danger-content {
+    display: flex;
+    flex-direction: column;
+    gap: 1.2rem;
+    text-align: center;
+    width: 100%;
+    min-height: 100%;
+    justify-content: flex-start;
+}
+
+.modal-danger-icon {
+    font-size: 3rem;
+    color: var(--color-danger);
+    animation: pulse-danger 2s infinite;
+    text-shadow: 0 0 20px rgba(245, 101, 101, 0.3);
+    margin-bottom: 0.5rem;
+}
+
+.modal-danger-title {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--color-danger);
+    margin: 0;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 0.5rem;
+}
+
+.modal-danger-description {
+    background: rgba(245, 101, 101, 0.1);
+    border: 1px solid rgba(245, 101, 101, 0.3);
+    border-radius: 8px;
+    padding: 1rem;
+    margin: 0;
+    font-size: 0.95rem;
+    line-height: 1.4;
+}
+
+.modal-danger-warning {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    background: rgba(255, 193, 7, 0.1);
+    border: 1px solid rgba(255, 193, 7, 0.3);
+    border-radius: 8px;
+    padding: 0.75rem;
+    color: var(--color-warning);
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.modal-danger-warning::before {
+    content: "🔒";
+    font-size: 1.2rem;
+}
+
+.modal-danger-consequences {
+    text-align: left;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+.modal-danger-consequences h6 {
+    color: var(--color-text-light);
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.modal-danger-consequences h6::before {
+    content: "📋";
+    font-size: 1.1rem;
+}
+
+.modal-danger-consequences ul {
+    margin: 0;
+    padding-left: 1.5rem;
+    color: var(--color-text-secondary);
+}
+
+.modal-danger-consequences li {
+    margin-bottom: 0.5rem;
+    position: relative;
+}
+
+.modal-danger-consequences li::marker {
+    color: var(--color-danger);
+}
+
+.modal-confirmation-input {
+    text-align: left;
+    margin-top: 1rem;
+}
+
+.modal-confirmation-input label {
+    display: block;
+    color: var(--color-text-light);
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+}
+
+.modal-confirmation-input input {
+    width: 100%;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 6px;
+    padding: 0.75rem;
+    color: var(--color-text-light);
+    font-family: monospace;
+    font-size: 0.9rem;
+}
+
+.modal-confirmation-input input:focus {
+    outline: none;
+    border-color: var(--color-danger);
+    box-shadow: 0 0 0 2px rgba(245, 101, 101, 0.2);
+}
+
+.modal-confirmation-input .form-text {
+    color: var(--color-text-muted);
+    font-size: 0.8rem;
+    margin-top: 0.5rem;
+    font-style: italic;
+}
+
+/* Animaciones */
+@keyframes pulse-danger {
+    0%, 100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+    50% {
+        transform: scale(1.05);
+        opacity: 0.8;
+    }
+}
+
+/* Hover effects para elementos interactivos */
+.modal-danger-description:hover {
+    background: rgba(245, 101, 101, 0.15);
+    transition: background-color 0.3s ease;
+}
+
+.modal-danger-warning:hover {
+    background: rgba(255, 193, 7, 0.15);
+    transition: background-color 0.3s ease;
+}
+
+/* Estado del botón cuando está listo para confirmar */
+.pulse-ready {
+    animation: pulse-ready 1.5s infinite;
+}
+
+@keyframes pulse-ready {
+    0%, 100% {
+        box-shadow: 0 2px 8px rgba(245, 101, 101, 0.3);
+    }
+    50% {
+        box-shadow: 0 4px 16px rgba(245, 101, 101, 0.6);
+        transform: translateY(-1px);
+    }
+}
+
+#confirmActionModal .modal-footer {
+    background-color: var(--color-bg-dark);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 1rem 1.5rem;
+    flex-shrink: 0;
+}
+
+#confirmActionModal .btn-close {
+    filter: invert(1) grayscale(100%) brightness(200%);
+    opacity: 0.8;
+}
+
+#confirmActionModal .btn-close:hover {
+    opacity: 1;
+}
+
+#confirmActionModal .btn-secondary {
+    background-color: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.3);
+    color: var(--color-text-light);
+}
+
+#confirmActionModal .btn-secondary:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+    border-color: rgba(255, 255, 255, 0.5);
+    color: white;
+}
+
+#confirmActionModal .btn-danger {
+    background: linear-gradient(135deg, var(--color-danger) 0%, rgba(229, 62, 62, 1) 100%);
+    border-color: var(--color-danger);
+    color: white;
+    font-weight: 600;
+    box-shadow: 0 2px 8px rgba(245, 101, 101, 0.3);
+}
+
+#confirmActionModal .btn-danger:hover {
+    background: linear-gradient(135deg, rgba(229, 62, 62, 1) 0%, rgba(197, 48, 48, 1) 100%);
+    border-color: rgba(229, 62, 62, 1);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(245, 101, 101, 0.4);
+}
+
+/* Responsive para modales en móvil */
+@media (max-width: 576px) {
+    #confirmActionModal .modal-dialog {
+        margin: 1rem 0.5rem;
+        max-height: 80vh;
+    }
+    
+    #confirmActionModal .modal-content {
+        height: 80vh;
+    }
+    
+    #confirmActionModal .modal-body {
+        padding: 1.5rem 1rem;
+        font-size: 0.9rem;
+    }
+    
+    #confirmActionModal .modal-footer {
+        padding: 0.75rem 1rem;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    
+    #confirmActionModal .modal-footer .btn {
+        width: 100%;
+        order: 2;
+    }
+    
+    #confirmActionModal .modal-footer .btn-secondary {
+        order: 1;
+    }
+    
+    /* Ajustes para contenido estructurado en móvil */
+    .modal-danger-content {
+        gap: 0.8rem;
+    }
+    
+    .modal-danger-icon {
+        font-size: 2.5rem;
+        margin-bottom: 0.25rem;
+    }
+    
+    .modal-danger-title {
+        font-size: 1rem;
+        margin-bottom: 0.25rem;
+    }
+    
+    .modal-danger-description,
+    .modal-danger-warning,
+    .modal-danger-consequences {
+        padding: 0.75rem;
+        font-size: 0.85rem;
+    }
+    
+    .modal-danger-consequences ul {
+        padding-left: 1.25rem;
+    }
+    
+    .modal-danger-consequences li {
+        margin-bottom: 0.4rem;
+    }
+    
+    .modal-confirmation-input {
+        margin-top: 0.75rem;
+    }
+    
+    .modal-confirmation-input input {
+        padding: 0.6rem;
+        font-size: 0.85rem;
+    }
+    
+    .modal-confirmation-input .form-text {
+        font-size: 0.75rem;
+    }
+}
