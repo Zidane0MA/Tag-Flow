@@ -38,18 +38,20 @@
 }
 
 .command-card .card-header {
-    background: linear-gradient(135deg, #6f42c1 0%, #5a32a3 100%);
-    color: white;
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--color-text-light);
     border-bottom: 1px solid rgba(255, 255, 255, 0.2);
     font-weight: 600;
+    backdrop-filter: blur(10px);
 }
 
 .stats-card {
-    background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%);
+    background: linear-gradient(135deg, rgba(45, 55, 72, 0.95) 0%, rgba(74, 85, 104, 0.95) 100%);
     color: white;
-    border: none;
+    border: 1px solid rgba(255, 255, 255, 0.1);
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
     border-radius: 12px;
+    backdrop-filter: blur(10px);
 }
 
 .stats-number {
