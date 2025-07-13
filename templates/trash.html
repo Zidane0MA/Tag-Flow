@@ -707,43 +707,73 @@
 
     <!-- Paginación -->
     {% if total_deleted > 20 %}
-    <nav aria-label="Paginación de papelera" class="mt-4">
-        <div class="row align-items-center">
-            <div class="col-md-6">
-                <p class="text-muted mb-0">
+    <nav aria-label="Paginación de papelera" class="mt-4" id="pagination-controls">
+        <div class="row align-items-center g-2">
+            <div class="col-lg-6 col-md-12 col-sm-12">
+                <p class="text-muted mb-0 pagination-info">
                     Mostrando {{ ((page - 1) * per_page) + 1 }} - {{ [total_deleted, page * per_page] | min }} 
                     de {{ total_deleted }} videos eliminados
                 </p>
             </div>
-            <div class="col-md-6">
-                <ul class="pagination justify-content-end mb-0">
+            <div class="col-lg-6 col-md-12 col-sm-12">
+                <ul class="pagination justify-content-lg-end justify-content-center mb-0 flex-wrap pagination-controls">
+                    <!-- Primera página -->
+                    {% if page > 2 %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page=1">
+                            <i class="fas fa-angle-double-left"></i>
+                        </a>
+                    </li>
+                    {% endif %}
+                    
+                    <!-- Página anterior -->
                     <li class="page-item {% if page <= 1 %}disabled{% endif %}">
                         {% if page > 1 %}
-                        <a class="page-link" href="?page={{ page - 1 }}">Anterior</a>
+                        <a class="page-link" href="?page={{ page - 1 }}">
+                            <i class="fas fa-angle-left"></i> Anterior
+                        </a>
                         {% else %}
-                        <span class="page-link">Anterior</span>
+                        <span class="page-link">
+                            <i class="fas fa-angle-left"></i> Anterior
+                        </span>
                         {% endif %}
                     </li>
                     
-                    {% for p in range(1, total_pages + 1) %}
-                        {% if p == page or (p <= 3) or (p >= total_pages - 2) or (page - 2 <= p <= page + 2) %}
-                        <li class="page-item {% if p == page %}active{% endif %}">
-                            <a class="page-link" href="?page={{ p }}">{{ p }}</a>
-                        </li>
-                        {% elif p == 4 and page > 6 %}
-                        <li class="page-item disabled"><span class="page-link">...</span></li>
-                        {% elif p == total_pages - 3 and page < total_pages - 5 %}
-                        <li class="page-item disabled"><span class="page-link">...</span></li>
+                    <!-- Páginas numéricas -->
+                    {% set start_page = [1, page - 2] | max %}
+                    {% set end_page = [total_pages, page + 2] | min %}
+                    
+                    {% for p in range(start_page, end_page + 1) %}
+                    <li class="page-item {% if p == page %}active{% endif %}">
+                        {% if p == page %}
+                        <span class="page-link">{{ p }}</span>
+                        {% else %}
+                        <a class="page-link" href="?page={{ p }}">{{ p }}</a>
                         {% endif %}
+                    </li>
                     {% endfor %}
                     
+                    <!-- Página siguiente -->
                     <li class="page-item {% if page >= total_pages %}disabled{% endif %}">
                         {% if page < total_pages %}
-                        <a class="page-link" href="?page={{ page + 1 }}">Siguiente</a>
+                        <a class="page-link" href="?page={{ page + 1 }}">
+                            Siguiente <i class="fas fa-angle-right"></i>
+                        </a>
                         {% else %}
-                        <span class="page-link">Siguiente</span>
+                        <span class="page-link">
+                            Siguiente <i class="fas fa-angle-right"></i>
+                        </span>
                         {% endif %}
                     </li>
+                    
+                    <!-- Última página -->
+                    {% if page < total_pages - 1 %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ total_pages }}">
+                            <i class="fas fa-angle-double-right"></i>
+                        </a>
+                    </li>
+                    {% endif %}
                 </ul>
             </div>
         </div>
@@ -762,7 +792,7 @@
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <div class="danger-zone">
+                <div class="danger-zone mt-3">
                     <h6 class="text-danger">⚠️ ADVERTENCIA</h6>
                     <p class="mb-2">Esta acción eliminará permanentemente el video y <strong>NO SE PUEDE DESHACER</strong>.</p>
                     <p class="mb-2">Los archivos de video serán:</p>
@@ -779,7 +809,7 @@
                     </label>
                 </div>
                 
-                <div class="form-check mt-2">
+                <div class="form-check mb-3">
                     <input class="form-check-input" type="checkbox" id="confirmSystemTrash">
                     <label class="form-check-label" for="confirmSystemTrash">
                         Confirmo que el archivo se moverá a la papelera del sistema
@@ -808,7 +838,7 @@
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <div class="danger-zone">
+                <div class="danger-zone mt-3">
                     <h6 class="text-danger">⚠️ ADVERTENCIA CRÍTICA</h6>
                     <p class="mb-2">Estás a punto de eliminar permanentemente <strong id="bulk-count-display">0</strong> videos y <strong>NO SE PUEDE DESHACER</strong>.</p>
                     <p class="mb-2">Los archivos de video serán:</p>
@@ -826,7 +856,7 @@
                     </label>
                 </div>
                 
-                <div class="form-check mt-2">
+                <div class="form-check mb-3">
                     <input class="form-check-input" type="checkbox" id="confirmBulkSystemTrash">
                     <label class="form-check-label" for="confirmBulkSystemTrash">
                         Confirmo que los archivos se moverán a la papelera del sistema

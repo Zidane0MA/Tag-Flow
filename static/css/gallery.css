@@ -368,7 +368,7 @@
 
 /* Estados hover para botones del panel */
 #bulk-edit-panel .btn-group-sm .btn:hover {
-    transform: scale(1.03);
+    transform: scale(1.05);
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
 }
 
@@ -384,7 +384,7 @@
     background: rgba(113, 128, 150, 0.25) !important;
     border-color: var(--color-secondary) !important;
     color: var(--color-secondary) !important;
-    transform: scale(1.03);
+    transform: scale(1.05);
 }
 
 #bulk-edit-panel .btn-outline-secondary.active,
@@ -405,7 +405,7 @@
     background: rgba(237, 137, 54, 0.25) !important;
     border-color: var(--color-warning) !important;
     color: var(--color-warning) !important;
-    transform: scale(1.03);
+    transform: scale(1.05);
 }
 
 #bulk-edit-panel .btn-outline-warning.active,
@@ -426,7 +426,7 @@
     background: rgba(72, 187, 120, 0.25) !important;
     border-color: var(--color-success) !important;
     color: var(--color-success) !important;
-    transform: scale(1.03);
+    transform: scale(1.05);
 }
 
 #bulk-edit-panel .btn-outline-success.active,
@@ -447,7 +447,7 @@
     background: rgba(66, 153, 225, 0.25) !important;
     border-color: var(--color-info) !important;
     color: var(--color-info) !important;
-    transform: scale(1.03);
+    transform: scale(1.05);
 }
 
 #bulk-edit-panel .btn-outline-info.active,
@@ -468,7 +468,7 @@
     background: rgba(245, 101, 101, 0.25) !important;
     border-color: var(--color-danger) !important;
     color: var(--color-danger) !important;
-    transform: scale(1.03);
+    transform: scale(1.05);
 }
 
 #bulk-edit-panel .btn-outline-danger.active,
@@ -477,6 +477,20 @@
     border-color: var(--color-danger) !important;
     color: white !important;
     box-shadow: none;
+}
+
+#bulk-edit-panel .form-check-label {
+    color: white;
+    font-weight: 500;
+    margin-bottom: 0.75rem;
+}
+
+#bulk-edit-panel .col {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: center;
 }
 
 /* ============================================
@@ -499,7 +513,7 @@
     #bulk-edit-panel .card-body .row {
         display: grid !important;
         grid-template-columns: repeat(3, 1fr);
-        gap: 0.5rem;
+        gap: 0.75rem;
         margin: 0;
         width: 100%;
     }
@@ -993,6 +1007,11 @@
 #bulkEditModal .alert-info {
     background: rgba(102, 126, 234, 0.2);
     border: 1px solid rgba(102, 126, 234, 0.3);
+    color: var(--color-text-light);
+}
+
+#editVideoModal .form-check-label,
+#bulkEditModal .form-check-label {
     color: var(--color-text-light);
 }
 
@@ -1493,7 +1512,7 @@ body.modal-open {
     }
     
     #filters-container {
-        margin-bottom: 1.5rem;
+        margin-bottom: 1.25rem;
     }
     
     #stats-container .col-6,
