@@ -577,7 +577,7 @@
     {% endif %}
 
     <!-- Galería de videos eliminados -->
-    <div class="row mb-4" id="trash-container">
+    <div class="row mb-4" id="trash-container" data-total-videos="{{ total_deleted }}" data-per-page="{{ per_page }}" data-current-page="{{ page }}">
         {% if videos %}
             {% for video in videos %}
             <div class="col-xl-3 col-lg-4 col-sm-6 mb-4 video-card-wrapper" data-video-id="{{ video.id }}">
@@ -703,6 +703,24 @@
                 </a>
             </div>
         {% endif %}
+    </div>
+
+    <!-- Indicador de carga para scroll infinito -->
+    <div id="infinite-loading" class="text-center py-4" style="display: none;">
+        <div class="d-inline-block p-3 rounded-3" style="background: rgba(0, 0, 0, 0.8); backdrop-filter: blur(10px);">
+            <div class="spinner-border text-light" role="status">
+                <span class="visually-hidden">Cargando más videos...</span>
+            </div>
+            <p class="mt-2 text-light mb-0">Cargando más videos...</p>
+        </div>
+    </div>
+
+    <!-- Mensaje de fin para scroll infinito -->
+    <div id="infinite-end" class="text-center py-4" style="display: none;">
+        <p class="text-muted mb-0">
+            <i class="fas fa-check-circle text-success me-2"></i>
+            Has visto todos los videos eliminados disponibles
+        </p>
     </div>
 
     <!-- Paginación -->
@@ -883,10 +901,21 @@ let currentVideoForDeletion = null;
 let permanentDeleteModal = null;
 let bulkPermanentDeleteModal = null;
 
+// Variables para el manejo de modos (paginación vs scroll infinito)
+let isInfiniteScrollMode = false;
+let currentPage = parseInt(document.getElementById('trash-container')?.getAttribute('data-current-page')) || 1;
+let totalVideos = parseInt(document.getElementById('trash-container')?.getAttribute('data-total-videos')) || 0;
+let perPage = parseInt(document.getElementById('trash-container')?.getAttribute('data-per-page')) || 20;
+let isLoading = false;
+let allVideosLoaded = false;
+
 // Inicializar cuando el DOM esté listo
 document.addEventListener('DOMContentLoaded', function() {
     permanentDeleteModal = new bootstrap.Modal(document.getElementById('permanentDeleteModal'));
     bulkPermanentDeleteModal = new bootstrap.Modal(document.getElementById('bulkPermanentDeleteModal'));
+    
+    // Inicializar el modo de visualización
+    initializeViewMode();
     
     // Event listeners para los checkboxes de confirmación individual
     const confirmCheckbox = document.getElementById('confirmPermanentDelete');
@@ -928,6 +957,181 @@ document.addEventListener('DOMContentLoaded', function() {
         bulkSystemTrashCheckbox.addEventListener('change', updateBulkConfirmButton);
     }
 });
+
+// Función para inicializar el modo de visualización
+function initializeViewMode() {
+    // Leer el modo desde localStorage o usar paginación por defecto
+    const savedMode = localStorage.getItem('trashViewMode') || 'pagination';
+    setTrashLoadingMode(savedMode);
+    
+    // Sincronizar con el toggle global del navbar
+    syncWithGlobalToggle(savedMode);
+}
+
+// Función para sincronizar con el toggle global
+function syncWithGlobalToggle(mode) {
+    const paginationRadio = document.getElementById('global-pagination-mode');
+    const infiniteRadio = document.getElementById('global-infinite-mode');
+    
+    if (mode === 'infinite') {
+        if (infiniteRadio) infiniteRadio.checked = true;
+        if (paginationRadio) paginationRadio.checked = false;
+    } else {
+        if (paginationRadio) paginationRadio.checked = true;
+        if (infiniteRadio) infiniteRadio.checked = false;
+    }
+}
+
+// Función para cambiar el modo de carga específico para trash
+function setTrashLoadingMode(mode) {
+    const paginationControls = document.getElementById('pagination-controls');
+    const infiniteLoading = document.getElementById('infinite-loading');
+    const infiniteEnd = document.getElementById('infinite-end');
+    
+    if (mode === 'infinite') {
+        isInfiniteScrollMode = true;
+        localStorage.setItem('trashViewMode', 'infinite');
+        
+        // Ocultar paginación
+        if (paginationControls) {
+            paginationControls.style.display = 'none';
+        }
+        
+        // Configurar scroll infinito
+        setupInfiniteScroll();
+        
+        console.log('🔄 Modo scroll infinito activado para papelera');
+    } else {
+        isInfiniteScrollMode = false;
+        localStorage.setItem('trashViewMode', 'pagination');
+        
+        // Mostrar paginación
+        if (paginationControls) {
+            paginationControls.style.display = 'block';
+        }
+        
+        // Ocultar elementos de scroll infinito
+        if (infiniteLoading) infiniteLoading.style.display = 'none';
+        if (infiniteEnd) infiniteEnd.style.display = 'none';
+        
+        // Remover listeners de scroll infinito
+        removeInfiniteScrollListeners();
+        
+        console.log('📄 Modo paginación activado para papelera');
+    }
+}
+
+// Función para configurar scroll infinito
+function setupInfiniteScroll() {
+    if (totalVideos <= currentPage * perPage) {
+        showInfiniteEnd();
+        return;
+    }
+    
+    // Listener para scroll
+    window.addEventListener('scroll', handleInfiniteScroll);
+    window.addEventListener('resize', handleInfiniteScroll);
+}
+
+// Función para remover listeners de scroll infinito
+function removeInfiniteScrollListeners() {
+    window.removeEventListener('scroll', handleInfiniteScroll);
+    window.removeEventListener('resize', handleInfiniteScroll);
+}
+
+// Manejar scroll infinito con throttle
+const handleInfiniteScroll = TagFlow.utils.throttle(function() {
+    if (!isInfiniteScrollMode || isLoading || allVideosLoaded) return;
+    
+    const scrollPosition = window.innerHeight + window.scrollY;
+    const documentHeight = document.documentElement.offsetHeight;
+    const threshold = 200; // Cargar cuando queden 200px por scrollear
+    
+    if (scrollPosition >= documentHeight - threshold) {
+        loadMoreTrashVideos();
+    }
+}, 100);
+
+// Cargar más videos eliminados
+async function loadMoreTrashVideos() {
+    if (isLoading || allVideosLoaded) return;
+    
+    isLoading = true;
+    showInfiniteLoading();
+    
+    try {
+        const nextPage = currentPage + 1;
+        const response = await fetch(`/trash?page=${nextPage}&per_page=${perPage}`, {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error('Error cargando más videos');
+        }
+        
+        const html = await response.text();
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        const newVideos = doc.querySelectorAll('.video-card-wrapper');
+        
+        if (newVideos.length === 0) {
+            allVideosLoaded = true;
+            showInfiniteEnd();
+        } else {
+            const container = document.getElementById('trash-container');
+            newVideos.forEach(video => {
+                container.appendChild(video);
+            });
+            
+            currentPage = nextPage;
+            
+            // Verificar si se cargaron todos los videos
+            const totalLoadedVideos = document.querySelectorAll('.video-card-wrapper').length;
+            if (totalLoadedVideos >= totalVideos) {
+                allVideosLoaded = true;
+                showInfiniteEnd();
+            }
+        }
+    } catch (error) {
+        console.error('Error cargando más videos de papelera:', error);
+        TagFlow.utils.showNotification('Error cargando más videos', 'error');
+    } finally {
+        isLoading = false;
+        hideInfiniteLoading();
+    }
+}
+
+// Mostrar indicador de carga
+function showInfiniteLoading() {
+    const loading = document.getElementById('infinite-loading');
+    if (loading) {
+        loading.style.display = 'block';
+    }
+}
+
+// Ocultar indicador de carga
+function hideInfiniteLoading() {
+    const loading = document.getElementById('infinite-loading');
+    if (loading) {
+        loading.style.display = 'none';
+    }
+}
+
+// Mostrar mensaje de fin
+function showInfiniteEnd() {
+    const end = document.getElementById('infinite-end');
+    if (end) {
+        end.style.display = 'block';
+    }
+    hideInfiniteLoading();
+}
+
+// Función global para cambiar el modo (llamada desde el navbar)
+window.setLoadingMode = function(mode) {
+    setTrashLoadingMode(mode);
+};
 
 // Alternar selección de todos los videos
 function toggleSelectAll() {
