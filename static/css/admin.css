@@ -1,0 +1,347 @@
+/* Variables CSS para tema oscuro consistente */
+:root {
+    --color-primary: #667eea;
+    --color-primary-dark: #764ba2;
+    --color-secondary: #718096;
+    --color-secondary-dark: #4a5568;
+    --color-bg-dark: #2d3748;
+    --color-text-light: #e2e8f0;
+    --color-text-muted: #a0aec0;
+    --color-text-secondary: #cbd5e0;
+    --color-success: #48bb78;
+    --color-warning: #ed8936;
+    --color-danger: #f56565;
+    --color-info: #4299e1;
+}
+
+/* Estilos específicos para el dashboard admin */
+.admin-header {
+    background: linear-gradient(135deg, #6f42c1 0%, #5a32a3 100%);
+    color: white;
+    border-radius: 8px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+}
+
+.command-card {
+    background-color: rgba(45, 55, 72, 0.95);
+    border: none;
+    box-shadow: 0 8px 15px rgba(0, 0, 0, 0.2);
+    transition: all 0.3s ease;
+    border-radius: 12px;
+    color: #e2e8f0;
+}
+
+.command-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 15px rgba(0, 0, 0, 0.15);
+}
+
+.command-card .card-header {
+    background: linear-gradient(135deg, #6f42c1 0%, #5a32a3 100%);
+    color: white;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    font-weight: 600;
+}
+
+.stats-card {
+    background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%);
+    color: white;
+    border: none;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+    border-radius: 12px;
+}
+
+.stats-number {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin: 0;
+    color: white;
+}
+
+.stats-card .card-title {
+    color: white !important;
+}
+
+.stats-card .card-text {
+    color: rgba(255, 255, 255, 0.9) !important;
+}
+
+/* Estilos para formularios en tema oscuro */
+.command-form .form-label {
+    color: var(--color-text-light);
+    font-weight: 600;
+}
+
+.command-form .form-control,
+.command-form .form-select {
+    background-color: rgba(255, 255, 255, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: var(--color-bg-dark);
+}
+
+.command-form .form-control:focus,
+.command-form .form-select:focus {
+    background-color: #ffffff;
+    border-color: var(--color-primary);
+    color: var(--color-bg-dark);
+}
+
+.command-form h6 {
+    color: var(--color-text-light);
+}
+
+.command-form .text-muted {
+    color: var(--color-text-muted) !important;
+}
+
+.terminal-output {
+    background: #1a1a1a;
+    color: #00ff00;
+    font-family: 'Courier New', monospace;
+    border-radius: 8px;
+    padding: 1rem;
+    max-height: 400px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.command-form {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin: 1rem 0;
+}
+
+.progress-container {
+    margin: 1rem 0;
+    display: none;
+}
+
+.status-indicator {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    margin-right: 8px;
+}
+
+.status-online { background: #28a745; }
+.status-offline { background: #dc3545; }
+.status-warning { background: #ffc107; }
+
+.danger-zone {
+    background: rgba(245, 101, 101, 0.1);
+    border: 1px solid rgba(245, 101, 101, 0.3);
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin: 1rem 0;
+}
+
+.quick-action-btn {
+    width: 100%;
+    height: 60px;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+    border-radius: 8px;
+}
+
+.log-entry {
+    padding: 0.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    font-family: monospace;
+    font-size: 0.9rem;
+    color: #e2e8f0;
+}
+
+.log-entry.error { background: rgba(245, 101, 101, 0.15); color: #f56565; }
+.log-entry.warning { background: rgba(237, 137, 54, 0.15); color: #ed8936; }
+.log-entry.info { background: rgba(66, 153, 225, 0.15); color: #4299e1; }
+.log-entry.success { background: rgba(72, 187, 120, 0.15); color: #48bb78; }
+
+/* Estilos para estado del sistema */
+.card-body {
+    color: var(--color-text-light);
+}
+
+.card-body strong {
+    color: var(--color-text-light);
+}
+
+/* Responsive para dashboard admin */
+@media (max-width: 768px) {
+    .admin-header {
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+    }
+    
+    .admin-header h1 {
+        font-size: 1.5rem;
+        margin-bottom: 0.5rem;
+    }
+    
+    .stats-number {
+        font-size: 2rem;
+    }
+    
+    .command-form {
+        padding: 1rem;
+        margin: 0.75rem 0;
+    }
+    
+    .command-form .row {
+        --bs-gutter-x: 0.5rem;
+    }
+    
+    .quick-action-btn {
+        height: 50px;
+        font-size: 0.9rem;
+    }
+    
+    .terminal-output {
+        max-height: 300px;
+        padding: 0.75rem;
+        font-size: 0.8rem;
+    }
+    
+    .log-entry {
+        padding: 0.4rem;
+        font-size: 0.8rem;
+    }
+    
+    .card-body {
+        padding: 1rem;
+    }
+    
+    .status-indicator {
+        width: 10px;
+        height: 10px;
+    }
+}
+
+@media (max-width: 576px) {
+    .admin-header {
+        padding: 1rem;
+        margin-bottom: 1rem;
+        text-align: left;
+    }
+    
+    .admin-header h1 {
+        font-size: 1.3rem;
+    }
+    
+    .stats-number {
+        font-size: 1.8rem;
+    }
+    
+    .stats-card .card-body {
+        padding: 0.75rem;
+    }
+    
+    .command-form {
+        padding: 0.75rem;
+    }
+    
+    .command-form .col-md-6,
+    .command-form .col-md-4,
+    .command-form .col-md-3,
+    .command-form .col-md-2 {
+        margin-bottom: 0.5rem;
+    }
+    
+    .form-label {
+        font-size: 0.9rem;
+        margin-bottom: 0.25rem;
+    }
+    
+    .form-control,
+    .form-select {
+        font-size: 0.9rem;
+        padding: 0.5rem;
+    }
+    
+    .quick-action-btn {
+        height: 45px;
+        font-size: 0.85rem;
+        margin-bottom: 0.4rem;
+    }
+    
+    .terminal-output {
+        max-height: 250px;
+        padding: 0.5rem;
+        font-size: 0.75rem;
+    }
+    
+    .log-entry {
+        padding: 0.3rem;
+        font-size: 0.75rem;
+    }
+    
+    .danger-zone {
+        padding: 1rem;
+    }
+    
+    .modal-dialog {
+        margin: 0.5rem;
+    }
+    
+    .modal-body {
+        padding: 1rem;
+    }
+    
+    /* Ocultar algunos elementos en pantallas muy pequeñas */
+    .card-header .me-2 {
+        display: none;
+    }
+    
+    /* Ajustar grid para móviles */
+    .col-lg-8,
+    .col-lg-4 {
+        margin-bottom: 1rem;
+    }
+}
+
+/* Mejoras táctiles para admin */
+@media (pointer: coarse) {
+    .quick-action-btn {
+        min-height: 48px;
+    }
+    
+    .btn {
+        min-height: 44px;
+        padding: 0.6rem 1rem;
+    }
+    
+    .form-control,
+    .form-select {
+        min-height: 44px;
+        font-size: 16px; /* Prevenir zoom en iOS */
+    }
+    
+    .command-card:hover {
+        transform: none;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+}
+
+/* Orientación landscape en móviles */
+@media (orientation: landscape) and (max-height: 600px) {
+    .admin-header {
+        padding: 0.75rem;
+        margin-bottom: 0.75rem;
+    }
+    
+    .stats-number {
+        font-size: 1.5rem;
+    }
+    
+    .terminal-output {
+        max-height: 200px;
+    }
+    
+    .quick-action-btn {
+        height: 40px;
+    }
+}
