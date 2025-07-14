@@ -969,21 +969,41 @@ def api_admin_populate_db():
                 cmd.append('--force')
         
         logger.info(f"Ejecutando comando: {' '.join(cmd)}")
+        logger.info(f"Directorio de trabajo: {Path(__file__).parent}")
         
         result = subprocess.run(
             cmd,
             cwd=Path(__file__).parent,
             capture_output=True,
             text=True,
-            timeout=300  # 5 minutos timeout
+            timeout=300,  # 5 minutos timeout
+            env=os.environ.copy()  # Heredar variables de entorno
         )
+        
+        # Procesar salida para el terminal del frontend
+        terminal_output = []
+        
+        # Agregar STDOUT línea por línea
+        if result.stdout:
+            for line in result.stdout.strip().split('\n'):
+                if line.strip():
+                    terminal_output.append(line.strip())
+        
+        # Agregar STDERR línea por línea (típicamente contiene los logs INFO)
+        if result.stderr:
+            for line in result.stderr.strip().split('\n'):
+                if line.strip():
+                    terminal_output.append(line.strip())
+        
+        # Log básico para debug del servidor
+        logger.info(f"Return code: {result.returncode}")
         
         if result.returncode == 0:
             message = 'Archivo importado exitosamente' if file_path else 'Poblado completado exitosamente'
             response_data = {
                 'success': True,
                 'message': message,
-                'output': result.stdout,
+                'terminal_output': terminal_output,  # Líneas para mostrar en terminal
                 'force': force
             }
             
@@ -998,10 +1018,19 @@ def api_admin_populate_db():
                 
             return jsonify(response_data)
         else:
+            logger.error(f"Comando falló con código {result.returncode}")
+            
+            # En caso de error, también enviar la salida al terminal
+            error_output = []
+            if result.stderr:
+                error_output.extend(result.stderr.strip().split('\n'))
+            if result.stdout:
+                error_output.extend(result.stdout.strip().split('\n'))
+                
             return jsonify({
                 'success': False,
-                'error': f'Error ejecutando comando: {result.stderr}',
-                'output': result.stdout
+                'error': f'Error ejecutando comando: Código de salida {result.returncode}',
+                'terminal_output': error_output
             }), 500
             
     except subprocess.TimeoutExpired:

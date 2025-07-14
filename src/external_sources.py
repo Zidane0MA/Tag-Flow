@@ -25,6 +25,15 @@ class ExternalSourcesManager:
         self.tiktok_db_path = config.EXTERNAL_TIKTOK_DB  
         self.instagram_db_path = config.EXTERNAL_INSTAGRAM_DB
         
+        # Debug: Verificar que la ruta esté limpia
+        if self.external_youtube_db:
+            path_str = str(self.external_youtube_db)
+            # Detectar caracteres de control
+            control_chars = [char for char in path_str if ord(char) < 32 and char not in '\t\n\r']
+            if control_chars:
+                logger.warning(f"Caracteres de control detectados en EXTERNAL_YOUTUBE_DB: {[hex(ord(c)) for c in control_chars]}")
+            logger.info(f"YouTube DB configurada: {self.external_youtube_db.exists()}")
+        
         # Rutas de las carpetas organizadas (desde config)
         self.organized_base_path = config.ORGANIZED_BASE_PATH
         self.organized_youtube_path = config.ORGANIZED_YOUTUBE_PATH

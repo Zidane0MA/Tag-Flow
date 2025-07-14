@@ -193,11 +193,23 @@ async function executePopulateDB() {
             });
             
             if (response.success) {
-                addTerminalOutput(`✅ Archivo importado: ${response.message}`);
+                // Mostrar toda la salida del comando en el terminal
+                if (response.terminal_output && response.terminal_output.length > 0) {
+                    response.terminal_output.forEach(line => {
+                        addTerminalOutput(line);
+                    });
+                }
+                addTerminalOutput(`✅ ${response.message}`);
                 addLogEntry(`Archivo importado - Ruta: ${filePath}`, 'success');
                 loadSystemStats();
             } else {
-                addTerminalOutput(`❌ Error ejecutando comando: ${response.error}`);
+                // Mostrar salida de error en el terminal
+                if (response.terminal_output && response.terminal_output.length > 0) {
+                    response.terminal_output.forEach(line => {
+                        addTerminalOutput(line);
+                    });
+                }
+                addTerminalOutput(`❌ Error: ${response.error}`);
                 addLogEntry(`Error importando archivo: ${response.error}`, 'error');
             }
         } catch (error) {
@@ -243,11 +255,23 @@ async function executePopulateDB() {
         });
         
         if (response.success) {
-            addTerminalOutput(`✅ Poblado completado: ${response.message}`);
+            // Mostrar toda la salida del comando en el terminal
+            if (response.terminal_output && response.terminal_output.length > 0) {
+                response.terminal_output.forEach(line => {
+                    addTerminalOutput(line);
+                });
+            }
+            addTerminalOutput(`✅ ${response.message}`);
             addLogEntry(`Poblado de BD completado - Fuente: ${source}, Plataforma: ${platform || 'todas'}, Límite: ${limit}`, 'success');
             loadSystemStats(); // Actualizar estadísticas
         } else {
-            addTerminalOutput(`❌ Error ejecutando comando: ${response.error}`);
+            // Mostrar salida de error en el terminal
+            if (response.terminal_output && response.terminal_output.length > 0) {
+                response.terminal_output.forEach(line => {
+                    addTerminalOutput(line);
+                });
+            }
+            addTerminalOutput(`❌ Error: ${response.error}`);
             addLogEntry(`Error en poblado de BD: ${response.error}`, 'error');
         }
     } catch (error) {
@@ -543,7 +567,19 @@ function confirmResetDatabase() {
 function addTerminalOutput(text) {
     const terminal = document.getElementById('terminal-output');
     const timestamp = new Date().toLocaleTimeString();
-    terminal.textContent += `[${timestamp}] ${text}\n`;
+    
+    // Limpiar y formatear el texto
+    let cleanText = text;
+    
+    // Remover prefijos de logging comunes
+    cleanText = cleanText.replace(/^(INFO|DEBUG|WARNING|ERROR):[^:]*:\s*/, '');
+    
+    // Manejar emojis Unicode que pueden aparecer como códigos
+    cleanText = cleanText.replace(/\\U0001f680/g, '🚀');
+    cleanText = cleanText.replace(/\\U0001f4e5/g, '📥');
+    cleanText = cleanText.replace(/\\U0001f50d/g, '🔍');
+    
+    terminal.textContent += `[${timestamp}] ${cleanText}\n`;
     terminal.scrollTop = terminal.scrollHeight;
 }
 
