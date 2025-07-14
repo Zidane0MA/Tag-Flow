@@ -932,17 +932,41 @@ def api_admin_populate_db():
     try:
         data = request.get_json() or {}
         source = data.get('source', 'all')
+        platform = data.get('platform')
         limit = data.get('limit', 50)
+        force = data.get('force', False)
+        file_path = data.get('file')
         
         # Ejecutar comando maintenance.py populate-db
         import subprocess
         import sys
         
-        cmd = [
-            sys.executable, 'maintenance.py', 'populate-db',
-            '--source', str(source),
-            '--limit', str(limit)
-        ]
+        # Manejar archivo específico
+        if file_path:
+            cmd = [
+                sys.executable, 'maintenance.py', 'populate-db',
+                '--file', str(file_path)
+            ]
+            
+            # Agregar --force si se especifica
+            if force:
+                cmd.append('--force')
+                
+        else:
+            # Comando normal con source
+            cmd = [
+                sys.executable, 'maintenance.py', 'populate-db',
+                '--source', str(source),
+                '--limit', str(limit)
+            ]
+            
+            # Agregar parámetro platform si se especifica
+            if platform:
+                cmd.extend(['--platform', str(platform)])
+                
+            # Agregar --force si se especifica
+            if force:
+                cmd.append('--force')
         
         logger.info(f"Ejecutando comando: {' '.join(cmd)}")
         
@@ -955,13 +979,24 @@ def api_admin_populate_db():
         )
         
         if result.returncode == 0:
-            return jsonify({
+            message = 'Archivo importado exitosamente' if file_path else 'Poblado completado exitosamente'
+            response_data = {
                 'success': True,
-                'message': f'Poblado completado exitosamente',
+                'message': message,
                 'output': result.stdout,
-                'source': source,
-                'limit': limit
-            })
+                'force': force
+            }
+            
+            if file_path:
+                response_data['file'] = file_path
+            else:
+                response_data.update({
+                    'source': source,
+                    'platform': platform,
+                    'limit': limit
+                })
+                
+            return jsonify(response_data)
         else:
             return jsonify({
                 'success': False,
@@ -1242,6 +1277,49 @@ def api_admin_empty_trash():
     except Exception as e:
         logger.error(f"Error vaciando papelera: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/admin/platforms', methods=['GET'])
+def api_admin_platforms():
+    """API para obtener plataformas disponibles"""
+    try:
+        from src.external_sources import ExternalSourcesManager
+        
+        external_sources = ExternalSourcesManager()
+        platforms = external_sources.get_available_platforms()
+        
+        # Formatear las plataformas para el frontend
+        formatted_platforms = {
+            'main': {},
+            'additional': {}
+        }
+        
+        # Plataformas principales
+        for platform_key, platform_info in platforms.get('main', {}).items():
+            formatted_platforms['main'][platform_key] = {
+                'name': platform_key.title(),
+                'has_db': platform_info.get('has_db', False),
+                'has_organized': platform_info.get('has_organized', False)
+            }
+        
+        # Plataformas adicionales (autodetectadas)
+        for platform_key, platform_info in platforms.get('additional', {}).items():
+            formatted_platforms['additional'][platform_key] = {
+                'name': platform_info.get('folder_name', platform_key.title()),
+                'has_db': False,
+                'has_organized': True
+            }
+        
+        return jsonify({
+            'success': True,
+            'platforms': formatted_platforms
+        })
+        
+    except Exception as e:
+        logger.error(f"Error obteniendo plataformas: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
 @app.errorhandler(404)
 def not_found(error):

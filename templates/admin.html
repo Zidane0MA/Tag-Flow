@@ -104,27 +104,57 @@
                                     <option value="all">Todas las fuentes</option>
                                     <option value="db">Solo bases de datos externas</option>
                                     <option value="organized">Solo carpetas organizadas</option>
+                                    <option value="file">Archivo específico...</option>
                                 </select>
                             </div>
                             <div class="col-md-3">
                                 <label class="form-label">Plataforma</label>
                                 <select class="form-select" id="populate-platform">
-                                    <option value="">Todas las plataformas</option>
-                                    <option value="youtube">YouTube</option>
-                                    <option value="tiktok">TikTok</option>
-                                    <option value="instagram">Instagram</option>
+                                    <option value="">Plataformas principales</option>
                                     <option value="other">Solo adicionales</option>
-                                    <option value="all-platforms">Todas (principales + adicionales)</option>
+                                    <option value="all-platforms">Todas las plataformas</option>
+                                    <option value="custom">Personalizada...</option>
                                 </select>
                             </div>
-                            <div class="col-md-3">
+                            <div class="col-md-2">
                                 <label class="form-label">Límite</label>
                                 <input type="number" class="form-control" id="populate-limit" value="50" min="1" max="1000">
                             </div>
-                            <div class="col-md-3">
+                            <div class="col-md-2">
+                                <label class="form-label d-flex align-items-center">
+                                    <input type="checkbox" class="form-check-input me-2" id="populate-force">
+                                    Force
+                                    <i class="fas fa-info-circle ms-1 text-info" title="Forzar reimportación de videos existentes" style="cursor: help;"></i>
+                                </label>
+                            </div>
+                            <div class="col-md-2">
                                 <label class="form-label">&nbsp;</label>
                                 <button class="btn btn-primary d-block w-100" onclick="executePopulateDB()">
                                     <i class="fas fa-play me-1"></i>Ejecutar
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Input personalizado para plataformas -->
+                        <div class="row mt-3" id="custom-platform-container" style="display: none;">
+                            <div class="col-md-6">
+                                <label class="form-label">Nombre de plataforma personalizada</label>
+                                <input type="text" class="form-control" id="custom-platform-name" placeholder="Ej: iwara, newgrounds, etc.">
+                                <small class="form-text text-muted">Ingresa el nombre exacto de la carpeta en D:\4K All\</small>
+                            </div>
+                        </div>
+                        
+                        <!-- Input para archivo específico -->
+                        <div class="row mt-3" id="file-source-container" style="display: none;">
+                            <div class="col-md-9">
+                                <label class="form-label">Ruta del archivo de video</label>
+                                <input type="text" class="form-control" id="file-source-path" placeholder="Ej: D:\Videos\mi_video.mp4">
+                                <small class="form-text text-muted">Ingresa la ruta completa del archivo de video a importar</small>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">&nbsp;</label>
+                                <button type="button" class="btn btn-outline-secondary d-block w-100" onclick="openFileSelector()">
+                                    <i class="fas fa-folder-open me-1"></i>Examinar
                                 </button>
                             </div>
                         </div>

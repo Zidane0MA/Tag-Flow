@@ -16,6 +16,12 @@ function initializeAdminDashboard() {
     // Cargar estadísticas iniciales
     loadSystemStats();
     
+    // Cargar plataformas disponibles
+    loadAvailablePlatforms();
+    
+    // Configurar evento para input personalizado
+    setupCustomPlatformInput();
+    
     // Configurar actualización automática cada 30 segundos
     setInterval(loadSystemStats, 30000);
     
@@ -44,15 +50,182 @@ async function loadSystemStats() {
     }
 }
 
+// Cargar plataformas disponibles dinámicamente
+async function loadAvailablePlatforms() {
+    try {
+        const response = await TagFlow.utils.apiRequest('/api/admin/platforms');
+        
+        if (response.success) {
+            const platforms = response.platforms;
+            const platformSelect = document.getElementById('populate-platform');
+            
+            // Guardar las opciones especiales actuales
+            const specialOptions = [
+                { value: '', text: 'Plataformas principales' },
+                { value: 'other', text: 'Solo adicionales' },
+                { value: 'all-platforms', text: 'Todas las plataformas' },
+                { value: 'custom', text: 'Personalizada...' }
+            ];
+            
+            // Limpiar el select
+            platformSelect.innerHTML = '';
+            
+            // Agregar la primera opción especial
+            const firstOption = document.createElement('option');
+            firstOption.value = '';
+            firstOption.textContent = 'Plataformas principales';
+            platformSelect.appendChild(firstOption);
+            
+            // Agregar plataformas principales
+            if (platforms.main) {
+                Object.entries(platforms.main).forEach(([key, info]) => {
+                    const option = document.createElement('option');
+                    option.value = key;
+                    option.textContent = `${info.name} (${info.has_db ? 'BD' : ''}${info.has_db && info.has_organized ? ' + ' : ''}${info.has_organized ? 'Carpetas' : ''})`;
+                    platformSelect.appendChild(option);
+                });
+            }
+            
+            // Agregar plataformas adicionales si existen
+            if (platforms.additional && Object.keys(platforms.additional).length > 0) {
+                // Crear separador
+                const separator = document.createElement('option');
+                separator.disabled = true;
+                separator.textContent = '── Plataformas Adicionales ──';
+                platformSelect.appendChild(separator);
+                
+                Object.entries(platforms.additional).forEach(([key, info]) => {
+                    const option = document.createElement('option');
+                    option.value = key;
+                    option.textContent = `${info.name} (Carpeta)`;
+                    platformSelect.appendChild(option);
+                });
+            }
+            
+            // Agregar separador para opciones especiales
+            const specialSeparator = document.createElement('option');
+            specialSeparator.disabled = true;
+            specialSeparator.textContent = '── Opciones Especiales ──';
+            platformSelect.appendChild(specialSeparator);
+            
+            // Agregar el resto de opciones especiales
+            specialOptions.slice(1).forEach(special => {
+                const option = document.createElement('option');
+                option.value = special.value;
+                option.textContent = special.text;
+                platformSelect.appendChild(option);
+            });
+            
+            console.log('✅ Plataformas cargadas dinámicamente');
+        } else {
+            console.error('Error cargando plataformas:', response.error);
+            addLogEntry('Error cargando plataformas disponibles', 'error');
+        }
+    } catch (error) {
+        console.error('Error cargando plataformas:', error);
+        addLogEntry('Error cargando plataformas disponibles', 'error');
+    }
+}
+
+// Configurar evento para inputs personalizados
+function setupCustomPlatformInput() {
+    const platformSelect = document.getElementById('populate-platform');
+    const customPlatformContainer = document.getElementById('custom-platform-container');
+    const sourceSelect = document.getElementById('populate-source');
+    const fileSourceContainer = document.getElementById('file-source-container');
+    
+    // Manejar plataforma personalizada
+    platformSelect.addEventListener('change', function() {
+        if (this.value === 'custom') {
+            customPlatformContainer.style.display = 'block';
+        } else {
+            customPlatformContainer.style.display = 'none';
+        }
+    });
+    
+    // Manejar archivo específico
+    sourceSelect.addEventListener('change', function() {
+        if (this.value === 'file') {
+            fileSourceContainer.style.display = 'block';
+        } else {
+            fileSourceContainer.style.display = 'none';
+        }
+    });
+}
+
+// Función para abrir selector de archivos (simulado)
+function openFileSelector() {
+    addTerminalOutput('ℹ️ Funcionalidad de selector de archivos no implementada. Ingresa la ruta manualmente.');
+    addLogEntry('Solicitud de selector de archivos (funcionalidad pendiente)', 'info');
+}
+
 // Ejecutar poblado de base de datos
 async function executePopulateDB() {
     const source = document.getElementById('populate-source').value;
-    const platform = document.getElementById('populate-platform').value;
+    let platform = document.getElementById('populate-platform').value;
     const limit = document.getElementById('populate-limit').value;
+    const forceOption = document.getElementById('populate-force').checked;
     
+    // Manejar fuente de archivo específico
+    if (source === 'file') {
+        const filePath = document.getElementById('file-source-path').value.trim();
+        if (!filePath) {
+            addTerminalOutput('❌ Error: Debes especificar la ruta del archivo de video');
+            return;
+        }
+        
+        // Construir comando para archivo específico
+        let command = `python maintenance.py populate-db --file "${filePath}"`;
+        if (forceOption) {
+            command += ' --force';
+        }
+        
+        addTerminalOutput(`Ejecutando: ${command}`);
+        showProgress('populate-progress');
+        
+        try {
+            const response = await TagFlow.utils.apiRequest('/api/admin/populate-db', {
+                method: 'POST',
+                body: JSON.stringify({
+                    file: filePath,
+                    force: forceOption
+                })
+            });
+            
+            if (response.success) {
+                addTerminalOutput(`✅ Archivo importado: ${response.message}`);
+                addLogEntry(`Archivo importado - Ruta: ${filePath}`, 'success');
+                loadSystemStats();
+            } else {
+                addTerminalOutput(`❌ Error ejecutando comando: ${response.error}`);
+                addLogEntry(`Error importando archivo: ${response.error}`, 'error');
+            }
+        } catch (error) {
+            addTerminalOutput(`❌ Error ejecutando comando: ${error.message}`);
+            addLogEntry(`Error importando archivo: ${error.message}`, 'error');
+        } finally {
+            hideProgress('populate-progress');
+        }
+        return;
+    }
+    
+    // Manejar plataforma personalizada
+    if (platform === 'custom') {
+        const customPlatformName = document.getElementById('custom-platform-name').value.trim();
+        if (!customPlatformName) {
+            addTerminalOutput('❌ Error: Debes especificar el nombre de la plataforma personalizada');
+            return;
+        }
+        platform = customPlatformName;
+    }
+    
+    // Construir comando para fuentes normales
     let command = `python maintenance.py populate-db --source ${source} --limit ${limit}`;
     if (platform) {
         command += ` --platform ${platform}`;
+    }
+    if (forceOption) {
+        command += ' --force';
     }
     
     addTerminalOutput(`Ejecutando: ${command}`);
@@ -64,7 +237,8 @@ async function executePopulateDB() {
             body: JSON.stringify({
                 source: source,
                 platform: platform || null,
-                limit: parseInt(limit)
+                limit: parseInt(limit),
+                force: forceOption
             })
         });
         
