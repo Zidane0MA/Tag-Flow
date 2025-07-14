@@ -59,42 +59,62 @@ async function loadAvailablePlatforms() {
             const platforms = response.platforms;
             const platformSelect = document.getElementById('populate-platform');
             
-            // Guardar las opciones especiales actuales
-            const specialOptions = [
-                { value: '', text: 'Plataformas principales' },
-                { value: 'other', text: 'Solo adicionales' },
-                { value: 'all-platforms', text: 'Todas las plataformas' },
-                { value: 'custom', text: 'Personalizada...' }
-            ];
-            
             // Limpiar el select
             platformSelect.innerHTML = '';
             
-            // Agregar la primera opción especial
-            const firstOption = document.createElement('option');
-            firstOption.value = '';
-            firstOption.textContent = 'Plataformas principales';
-            platformSelect.appendChild(firstOption);
+            // 1. Todas las plataformas (primera opción)
+            const allPlatformsOption = document.createElement('option');
+            allPlatformsOption.value = 'all-platforms';
+            allPlatformsOption.textContent = 'Todas las plataformas';
+            platformSelect.appendChild(allPlatformsOption);
             
-            // Agregar plataformas principales
-            if (platforms.main) {
-                Object.entries(platforms.main).forEach(([key, info]) => {
+            // 2. Separador - Plataformas Principales
+            const mainSeparator = document.createElement('option');
+            mainSeparator.disabled = true;
+            mainSeparator.textContent = '— Plataformas Principales —';
+            platformSelect.appendChild(mainSeparator);
+            
+            // 3. Solo principales
+            const mainOnlyOption = document.createElement('option');
+            mainOnlyOption.value = '';
+            mainOnlyOption.textContent = 'Solo principales';
+            platformSelect.appendChild(mainOnlyOption);
+            
+            // 4. Plataformas principales individuales (orden específico)
+            const mainPlatformsOrder = ['instagram', 'tiktok', 'youtube'];
+            const mainPlatformsNames = {
+                'instagram': 'Instagram',
+                'tiktok': 'Tiktok', 
+                'youtube': 'Youtube'
+            };
+            
+            mainPlatformsOrder.forEach(platformKey => {
+                if (platforms.main && platforms.main[platformKey]) {
+                    const info = platforms.main[platformKey];
                     const option = document.createElement('option');
-                    option.value = key;
-                    option.textContent = `${info.name} (${info.has_db ? 'BD' : ''}${info.has_db && info.has_organized ? ' + ' : ''}${info.has_organized ? 'Carpetas' : ''})`;
+                    option.value = platformKey;
+                    option.textContent = `${mainPlatformsNames[platformKey]} (${info.has_db ? 'BD' : ''}${info.has_db && info.has_organized ? ' + ' : ''}${info.has_organized ? 'Carpetas' : ''})`;
                     platformSelect.appendChild(option);
-                });
-            }
+                }
+            });
             
-            // Agregar plataformas adicionales si existen
+            // 5. Separador - Plataformas Adicionales (solo si existen)
             if (platforms.additional && Object.keys(platforms.additional).length > 0) {
-                // Crear separador
-                const separator = document.createElement('option');
-                separator.disabled = true;
-                separator.textContent = '── Plataformas Adicionales ──';
-                platformSelect.appendChild(separator);
+                const additionalSeparator = document.createElement('option');
+                additionalSeparator.disabled = true;
+                additionalSeparator.textContent = '— Plataformas Adicionales —';
+                platformSelect.appendChild(additionalSeparator);
                 
-                Object.entries(platforms.additional).forEach(([key, info]) => {
+                // 6. Solo adicionales
+                const additionalOnlyOption = document.createElement('option');
+                additionalOnlyOption.value = 'other';
+                additionalOnlyOption.textContent = 'Solo adicionales';
+                platformSelect.appendChild(additionalOnlyOption);
+                
+                // 7. Plataformas adicionales individuales (orden alfabético)
+                const additionalKeys = Object.keys(platforms.additional).sort();
+                additionalKeys.forEach(key => {
+                    const info = platforms.additional[key];
                     const option = document.createElement('option');
                     option.value = key;
                     option.textContent = `${info.name} (Carpeta)`;
@@ -102,19 +122,17 @@ async function loadAvailablePlatforms() {
                 });
             }
             
-            // Agregar separador para opciones especiales
+            // 8. Separador - Opciones Especiales
             const specialSeparator = document.createElement('option');
             specialSeparator.disabled = true;
-            specialSeparator.textContent = '── Opciones Especiales ──';
+            specialSeparator.textContent = '— Opciones Especiales —';
             platformSelect.appendChild(specialSeparator);
             
-            // Agregar el resto de opciones especiales
-            specialOptions.slice(1).forEach(special => {
-                const option = document.createElement('option');
-                option.value = special.value;
-                option.textContent = special.text;
-                platformSelect.appendChild(option);
-            });
+            // 9. Personalizada
+            const customOption = document.createElement('option');
+            customOption.value = 'custom';
+            customOption.textContent = 'Personalizada...';
+            platformSelect.appendChild(customOption);
             
             console.log('✅ Plataformas cargadas dinámicamente');
         } else {
