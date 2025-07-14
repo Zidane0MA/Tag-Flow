@@ -98,14 +98,23 @@
                         <h6>Poblar Base de Datos</h6>
                         <p class="text-muted">Importar videos desde fuentes externas</p>
                         <div class="row">
-                            <div class="col-md-6">
+                            <div class="col-md-3">
                                 <label class="form-label">Fuente</label>
                                 <select class="form-select" id="populate-source">
                                     <option value="all">Todas las fuentes</option>
-                                    <option value="youtube">4K Video Downloader (YouTube)</option>
-                                    <option value="tiktok">4K Tokkit (TikTok)</option>
-                                    <option value="instagram">4K Stogram (Instagram)</option>
-                                    <option value="organized">Carpetas organizadas</option>
+                                    <option value="db">Solo bases de datos externas</option>
+                                    <option value="organized">Solo carpetas organizadas</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Plataforma</label>
+                                <select class="form-select" id="populate-platform">
+                                    <option value="">Todas las plataformas</option>
+                                    <option value="youtube">YouTube</option>
+                                    <option value="tiktok">TikTok</option>
+                                    <option value="instagram">Instagram</option>
+                                    <option value="other">Solo adicionales</option>
+                                    <option value="all-platforms">Todas (principales + adicionales)</option>
                                 </select>
                             </div>
                             <div class="col-md-3">

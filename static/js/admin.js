@@ -47,9 +47,15 @@ async function loadSystemStats() {
 // Ejecutar poblado de base de datos
 async function executePopulateDB() {
     const source = document.getElementById('populate-source').value;
+    const platform = document.getElementById('populate-platform').value;
     const limit = document.getElementById('populate-limit').value;
     
-    addTerminalOutput(`Ejecutando: python maintenance.py populate-db --source ${source} --limit ${limit}`);
+    let command = `python maintenance.py populate-db --source ${source} --limit ${limit}`;
+    if (platform) {
+        command += ` --platform ${platform}`;
+    }
+    
+    addTerminalOutput(`Ejecutando: ${command}`);
     showProgress('populate-progress');
     
     try {
@@ -57,16 +63,17 @@ async function executePopulateDB() {
             method: 'POST',
             body: JSON.stringify({
                 source: source,
+                platform: platform || null,
                 limit: parseInt(limit)
             })
         });
         
         if (response.success) {
             addTerminalOutput(`✅ Poblado completado: ${response.message}`);
-            addLogEntry(`Poblado de BD completado - Fuente: ${source}, Límite: ${limit}`, 'success');
+            addLogEntry(`Poblado de BD completado - Fuente: ${source}, Plataforma: ${platform || 'todas'}, Límite: ${limit}`, 'success');
             loadSystemStats(); // Actualizar estadísticas
         } else {
-            addTerminalOutput(`❌ Error: ${response.error}`);
+            addTerminalOutput(`❌ Error ejecutando comando: ${response.error}`);
             addLogEntry(`Error en poblado de BD: ${response.error}`, 'error');
         }
     } catch (error) {
