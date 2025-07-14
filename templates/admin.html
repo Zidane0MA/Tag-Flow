@@ -147,16 +147,15 @@
                         
                         <!-- Input para archivo específico -->
                         <div class="row mt-3" id="file-source-container" style="display: none;">
-                            <div class="col-md-3">
+                            <div class="col-md-6">
                                 <label class="form-label">Ruta del archivo de video</label>
-                                <input type="text" class="form-control" id="file-source-path" placeholder="Ej: D:\Videos\mi_video.mp4">
+                                <div class="input-group">
+                                    <input type="text" class="form-control" id="file-source-path" placeholder="Ej: D:\Videos\mi_video.mp4">
+                                    <button type="button" class="btn btn-outline-secondary" onclick="openFileSelector()">
+                                        <i class="fas fa-folder-open me-1"></i>Examinar
+                                    </button>
+                                </div>
                                 <small class="form-text text-muted">Ingresa la ruta completa del archivo de video a importar</small>
-                            </div>
-                            <div class="col-md-3">
-                                <label class="form-label">&nbsp;</label>
-                                <button type="button" class="btn btn-outline-secondary d-block w-100" onclick="openFileSelector()">
-                                    <i class="fas fa-folder-open me-1"></i>Examinar
-                                </button>
                             </div>
                         </div>
                         

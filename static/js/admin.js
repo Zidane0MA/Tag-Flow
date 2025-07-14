@@ -171,10 +171,43 @@ function setupCustomPlatformInput() {
     });
 }
 
-// Función para abrir selector de archivos (simulado)
+// Función para abrir selector de archivos
 function openFileSelector() {
-    addTerminalOutput('ℹ️ Funcionalidad de selector de archivos no implementada. Ingresa la ruta manualmente.');
-    addLogEntry('Solicitud de selector de archivos (funcionalidad pendiente)', 'info');
+    // Crear input file invisible
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = '.mp4,.avi,.mov,.mkv,.wmv,.flv,.webm,.m4v'; // Extensiones de video
+    fileInput.style.display = 'none';
+    
+    // Agregar al DOM temporalmente
+    document.body.appendChild(fileInput);
+    
+    // Manejar selección de archivo
+    fileInput.addEventListener('change', function(event) {
+        const file = event.target.files[0];
+        if (file) {
+            // En navegadores modernos, obtener la ruta real del archivo no es posible por seguridad
+            // Solo tenemos acceso al nombre del archivo, no a la ruta completa
+            const fileName = file.name;
+            const filePath = file.webkitRelativePath || fileName;
+            
+            // Mostrar información en el terminal
+            addTerminalOutput(`📁 Archivo seleccionado: ${fileName}`);
+            addTerminalOutput(`⚠️ Nota: Por seguridad del navegador, debes copiar la ruta completa manualmente`);
+            addLogEntry(`Archivo seleccionado: ${fileName}`, 'info');
+            
+            // Sugerir al usuario que copie la ruta manualmente
+            const pathInput = document.getElementById('file-source-path');
+            pathInput.placeholder = `Seleccionado: ${fileName} - Copia la ruta completa aquí`;
+            pathInput.focus();
+        }
+        
+        // Limpiar el input temporal
+        document.body.removeChild(fileInput);
+    });
+    
+    // Activar el selector de archivos
+    fileInput.click();
 }
 
 // Ejecutar poblado de base de datos
