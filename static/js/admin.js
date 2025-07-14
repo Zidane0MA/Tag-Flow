@@ -210,6 +210,22 @@ function openFileSelector() {
     fileInput.click();
 }
 
+// Función para limpiar selección de archivo
+function clearFileSelection() {
+    const pathInput = document.getElementById('file-source-path');
+    
+    // Limpiar el campo
+    pathInput.value = '';
+    pathInput.placeholder = 'Ej: D:\\Videos\\mi_video.mp4';
+    
+    // Mostrar en terminal
+    addTerminalOutput('🗑️ Selección de archivo limpiada');
+    addLogEntry('Selección de archivo limpiada', 'info');
+    
+    // Enfocar el campo para nueva entrada
+    pathInput.focus();
+}
+
 // Ejecutar poblado de base de datos
 async function executePopulateDB() {
     const source = document.getElementById('populate-source').value;
