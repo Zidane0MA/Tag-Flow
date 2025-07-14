@@ -399,6 +399,25 @@
     justify-content: flex-start;
 }
 
+/* Estilos de la barra de desplazamiento para el modal de admin */
+#confirmActionModal .modal-body::-webkit-scrollbar {
+    width: 8px;
+}
+
+#confirmActionModal .modal-body::-webkit-scrollbar-track {
+    background: var(--color-bg-dark);
+    border-radius: 4px;
+}
+
+#confirmActionModal .modal-body::-webkit-scrollbar-thumb {
+    background: #dc3545;
+    border-radius: 4px;
+}
+
+#confirmActionModal .modal-body::-webkit-scrollbar-thumb:hover {
+    background: #c82333;
+}
+
 /* Contenido estructurado del modal */
 .modal-danger-content {
     display: flex;
