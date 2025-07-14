@@ -1307,6 +1307,57 @@ def api_admin_empty_trash():
         logger.error(f"Error vaciando papelera: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@app.route('/api/admin/reset-database', methods=['POST'])
+def api_admin_reset_database():
+    """API para reset completo de base de datos"""
+    try:
+        # Construir comando
+        command = ['python', 'maintenance.py', 'clear-db', '--force']
+        
+        logger.warning("🔥 INICIANDO RESET COMPLETO DE BASE DE DATOS")
+        logger.warning(f"Comando: {' '.join(command)}")
+        
+        # Ejecutar comando con timeout de 2 minutos
+        result = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            timeout=120,  # 2 minutos
+            cwd=str(Path(__file__).parent)
+        )
+        
+        # Procesar salida para el terminal
+        terminal_output = []
+        if result.stdout:
+            terminal_output.extend(result.stdout.strip().split('\n'))
+        if result.stderr:
+            terminal_output.extend(result.stderr.strip().split('\n'))
+        
+        if result.returncode == 0:
+            logger.warning("💀 RESET DE BASE DE DATOS COMPLETADO")
+            return jsonify({
+                'success': True,
+                'message': 'Base de datos reseteada completamente',
+                'terminal_output': terminal_output
+            })
+        else:
+            logger.error(f"Error en reset de BD: {result.stderr}")
+            return jsonify({
+                'success': False,
+                'error': result.stderr or 'Error desconocido en reset',
+                'terminal_output': terminal_output
+            }), 500
+            
+    except subprocess.TimeoutExpired:
+        logger.error("Timeout en reset de BD")
+        return jsonify({
+            'success': False,
+            'error': 'Reset expiró (timeout de 2 minutos)'
+        }), 500
+    except Exception as e:
+        logger.error(f"Error en reset de BD: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @app.route('/api/admin/platforms', methods=['GET'])
 def api_admin_platforms():
     """API para obtener plataformas disponibles"""

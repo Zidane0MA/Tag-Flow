@@ -576,9 +576,43 @@ async function confirmEmptyTrash() {
     }
 }
 
-function confirmResetDatabase() {
-    addTerminalOutput('💀 RESET COMPLETO DE BASE DE DATOS - IMPLEMENTACIÓN PENDIENTE');
-    addLogEntry('Intento de reset de BD (no implementado)', 'error');
+async function confirmResetDatabase() {
+    addTerminalOutput('💀 INICIANDO RESET COMPLETO DE BASE DE DATOS...');
+    addLogEntry('Reset completo de BD iniciado', 'warning');
+    
+    try {
+        const response = await TagFlow.utils.apiRequest('/api/admin/reset-database', {
+            method: 'POST'
+        });
+        
+        if (response.success) {
+            // Mostrar salida del comando en el terminal
+            if (response.terminal_output && response.terminal_output.length > 0) {
+                response.terminal_output.forEach(line => {
+                    addTerminalOutput(line);
+                });
+            }
+            addTerminalOutput(`💀 ${response.message}`);
+            addLogEntry('Reset completo de BD completado', 'warning');
+            
+            // Actualizar estadísticas después del reset
+            setTimeout(() => {
+                loadSystemStats();
+            }, 2000);
+        } else {
+            // Mostrar salida de error en el terminal
+            if (response.terminal_output && response.terminal_output.length > 0) {
+                response.terminal_output.forEach(line => {
+                    addTerminalOutput(line);
+                });
+            }
+            addTerminalOutput(`❌ Error en reset: ${response.error}`);
+            addLogEntry(`Error en reset de BD: ${response.error}`, 'error');
+        }
+    } catch (error) {
+        addTerminalOutput(`❌ Error ejecutando reset: ${error.message}`);
+        addLogEntry(`Error ejecutando reset de BD: ${error.message}`, 'error');
+    }
 }
 
 // Utilidades del terminal
