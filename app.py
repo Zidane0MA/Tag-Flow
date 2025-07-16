@@ -761,20 +761,60 @@ def api_bulk_edit_videos():
         if not processed_updates and not any(options.values()):
             return jsonify({'success': False, 'error': 'No changes to apply'}), 400
         
-        # Preparar updates para batch
-        video_updates = []
-        for video_id in video_ids:
-            video_updates.append({
-                'video_id': video_id,
-                'updates': processed_updates
-            })
+        # Si solo se va a reprocesar sin cambios de datos, no necesitamos actualizar la BD aún
+        if not processed_updates and options.get('reprocess'):
+            successful, failed = len(video_ids), 0
+        else:
+            # Preparar updates para batch
+            video_updates = []
+            for video_id in video_ids:
+                video_updates.append({
+                    'video_id': video_id,
+                    'updates': processed_updates
+                })
+            
+            successful, failed = db.batch_update_videos(video_updates)
         
-        successful, failed = db.batch_update_videos(video_updates)
-        
-        # Manejar opciones avanzadas (placeholder para futuras funcionalidades)
+        # Manejar opciones avanzadas
         additional_actions = []
+        
+        # Ejecutar reprocesamiento automático
         if options.get('reprocess'):
-            additional_actions.append('reprocesar (pendiente de implementar)')
+            try:
+                # Ejecutar comando de reprocesamiento para todos los videos seleccionados
+                cmd = [
+                    sys.executable, 'main.py',
+                    '--reanalyze-video', ','.join(map(str, video_ids)),
+                    '--force'  # Forzar para asegurar que se actualicen los datos
+                ]
+                
+                # Ejecutar comando
+                env = os.environ.copy()
+                env['PYTHONIOENCODING'] = 'utf-8'
+                env['PYTHONUNBUFFERED'] = '1'
+                
+                result = subprocess.run(
+                    cmd, 
+                    capture_output=True, 
+                    text=True, 
+                    timeout=300,  # 5 minutos de timeout
+                    env=env,
+                    cwd=Path(__file__).parent
+                )
+                
+                if result.returncode == 0:
+                    additional_actions.append('reprocesamiento completado exitosamente')
+                else:
+                    additional_actions.append(f'reprocesamiento falló: {result.stderr}')
+                    logger.error(f"Error en reprocesamiento: {result.stderr}")
+                    
+            except subprocess.TimeoutExpired:
+                additional_actions.append('reprocesamiento timeout (proceso muy largo)')
+                logger.error("Timeout en reprocesamiento masivo")
+            except Exception as e:
+                additional_actions.append(f'error en reprocesamiento: {str(e)}')
+                logger.error(f"Error ejecutando reprocesamiento: {e}")
+        
         if options.get('regenerate_thumbnails'):
             additional_actions.append('regenerar thumbnails (pendiente de implementar)')
         if options.get('revert_analysis'):

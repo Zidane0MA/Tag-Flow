@@ -731,8 +731,35 @@ document.addEventListener('DOMContentLoaded', function() {
         bulkModalElement.addEventListener('hidden.bs.modal', function() {
             clearBulkEditForm();
         });
+        
+        // Configurar exclusión mutua entre reprocesar y revertir análisis
+        setupMutualExclusion();
     }
 });
+
+/**
+ * Configurar exclusión mutua entre reprocesar y revertir análisis
+ */
+function setupMutualExclusion() {
+    const reprocessCheckbox = document.getElementById('bulk-reprocess');
+    const revertCheckbox = document.getElementById('bulk-revert-analysis');
+    
+    if (reprocessCheckbox && revertCheckbox) {
+        // Cuando se selecciona reprocesar, deseleccionar revertir
+        reprocessCheckbox.addEventListener('change', function() {
+            if (this.checked) {
+                revertCheckbox.checked = false;
+            }
+        });
+        
+        // Cuando se selecciona revertir, deseleccionar reprocesar
+        revertCheckbox.addEventListener('change', function() {
+            if (this.checked) {
+                reprocessCheckbox.checked = false;
+            }
+        });
+    }
+}
 
 /**
  * Actualizar selección de videos para edición masiva
@@ -980,7 +1007,7 @@ function previewBulkChanges() {
     
     if (Object.keys(changes.updates).length === 0 && !changes.options.clear_music && 
         !changes.options.clear_artist && !changes.options.clear_characters && !changes.options.clear_notes &&
-        !changes.options.revert_analysis) {
+        !changes.options.revert_analysis && !changes.options.reprocess) {
         TagFlow.utils.showNotification('No hay cambios para aplicar', 'warning');
         return;
     }
@@ -1081,7 +1108,7 @@ async function applyBulkChanges() {
     
     if (Object.keys(changes.updates).length === 0 && !changes.options.clear_music && 
         !changes.options.clear_artist && !changes.options.clear_characters && !changes.options.clear_notes &&
-        !changes.options.revert_analysis) {
+        !changes.options.revert_analysis && !changes.options.reprocess) {
         TagFlow.utils.showNotification('No hay cambios para aplicar', 'warning');
         return;
     }
