@@ -747,6 +747,17 @@ def api_bulk_edit_videos():
         if options.get('clear_notes'):
             processed_updates['notes'] = None
         
+        # Aplicar revert analysis (limpiar información detectada automáticamente)
+        if options.get('revert_analysis'):
+            processed_updates.update({
+                'detected_music': None,
+                'detected_music_artist': None,
+                'detected_music_confidence': None,
+                'detected_characters': '[]',
+                'music_source': None,
+                'processing_status': 'pendiente'
+            })
+        
         if not processed_updates and not any(options.values()):
             return jsonify({'success': False, 'error': 'No changes to apply'}), 400
         
@@ -766,6 +777,8 @@ def api_bulk_edit_videos():
             additional_actions.append('reprocesar (pendiente de implementar)')
         if options.get('regenerate_thumbnails'):
             additional_actions.append('regenerar thumbnails (pendiente de implementar)')
+        if options.get('revert_analysis'):
+            additional_actions.append('información detectada revertida')
         
         message = f'{successful} videos editados, {failed} fallidos'
         if additional_actions:

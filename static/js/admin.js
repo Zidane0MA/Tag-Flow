@@ -830,34 +830,6 @@ async function executeReanalyzeVideos() {
     }
 }
 
-// Mostrar ejemplos de reanálisis
-function showReanalyzeExamples() {
-    const examples = `
-<h6>Ejemplos de Reanálisis de Videos:</h6>
-<div class="mt-3">
-    <h6 class="text-primary">Reanálisis Individual:</h6>
-    <code>123</code> - Reanalizar video con ID 123
-    
-    <h6 class="text-primary mt-3">Reanálisis Múltiple:</h6>
-    <code>1,2,3</code> - Reanalizar videos con IDs 1, 2 y 3<br>
-    <code>10,20,30</code> - Reanalizar videos con IDs 10, 20 y 30
-    
-    <h6 class="text-primary mt-3">Con Force:</h6>
-    <p class="text-muted">Marcar la casilla "Force" para forzar el reanálisis aunque ya estén procesados</p>
-    
-    <h6 class="text-primary mt-3">Notas:</h6>
-    <ul class="text-muted">
-        <li>Los IDs deben ser números enteros</li>
-        <li>Separe múltiples IDs con comas</li>
-        <li>No incluya espacios innecesarios</li>
-        <li>El proceso es mucho más eficiente que el reanálisis individual</li>
-    </ul>
-</div>
-    `;
-    
-    showModal('Ejemplos de Reanálisis', examples);
-}
-
 // Ejecutar generación de thumbnails
 async function executeGenerateThumbnails() {
     const platform = document.getElementById('thumbnail-platform').value;

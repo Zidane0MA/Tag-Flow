@@ -965,7 +965,7 @@ function clearBulkEditForm() {
         
         // Limpiar checkboxes específicos
         ['bulk-clear-music', 'bulk-clear-artist', 'bulk-clear-characters', 'bulk-clear-notes', 
-         'bulk-reprocess', 'bulk-regenerate-thumbnails'].forEach(id => {
+         'bulk-reprocess', 'bulk-regenerate-thumbnails', 'bulk-revert-analysis'].forEach(id => {
             const checkbox = document.getElementById(id);
             if (checkbox) checkbox.checked = false;
         });
@@ -979,7 +979,8 @@ function previewBulkChanges() {
     const changes = getBulkChangesData();
     
     if (Object.keys(changes.updates).length === 0 && !changes.options.clear_music && 
-        !changes.options.clear_artist && !changes.options.clear_characters && !changes.options.clear_notes) {
+        !changes.options.clear_artist && !changes.options.clear_characters && !changes.options.clear_notes &&
+        !changes.options.revert_analysis) {
         TagFlow.utils.showNotification('No hay cambios para aplicar', 'warning');
         return;
     }
@@ -1020,6 +1021,7 @@ function previewBulkChanges() {
     // Opciones avanzadas
     if (changes.options.reprocess) preview += `• 🔄 Reprocesar automáticamente\n`;
     if (changes.options.regenerate_thumbnails) preview += `• 🖼️ Regenerar thumbnails\n`;
+    if (changes.options.revert_analysis) preview += `• 🔄 Revertir análisis - Borrar información detectada\n`;
     
     alert(preview);
 }
@@ -1061,6 +1063,7 @@ function getBulkChangesData() {
     // Opciones avanzadas
     options.reprocess = document.getElementById('bulk-reprocess').checked;
     options.regenerate_thumbnails = document.getElementById('bulk-regenerate-thumbnails').checked;
+    options.revert_analysis = document.getElementById('bulk-revert-analysis').checked;
     
     return { updates, options };
 }
@@ -1077,7 +1080,8 @@ async function applyBulkChanges() {
     const changes = getBulkChangesData();
     
     if (Object.keys(changes.updates).length === 0 && !changes.options.clear_music && 
-        !changes.options.clear_artist && !changes.options.clear_characters && !changes.options.clear_notes) {
+        !changes.options.clear_artist && !changes.options.clear_characters && !changes.options.clear_notes &&
+        !changes.options.revert_analysis) {
         TagFlow.utils.showNotification('No hay cambios para aplicar', 'warning');
         return;
     }
