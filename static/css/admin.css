@@ -46,7 +46,7 @@ input:disabled {
     color: white;
     border-radius: 8px;
     padding: 2rem;
-    margin-bottom: 1.5rem;  /*Ajustar en @media*/
+    margin-bottom: 1.5rem;
 }
 
 .command-card {
@@ -252,7 +252,6 @@ input:disabled {
 @media (max-width: 576px) {
     .admin-header {
         padding: 1rem;
-        margin-bottom: 1rem;
         text-align: left;
     }
     

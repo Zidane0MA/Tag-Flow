@@ -384,7 +384,7 @@
 
 @media (max-width: 768px) {
     .card {
-        margin-bottom: var(--space-lg);
+        margin-bottom: 0;
         border-radius: var(--radius-md);
     }
     
