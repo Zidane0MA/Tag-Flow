@@ -880,6 +880,128 @@ def api_reanalyze_video(video_id):
         logger.error(f"Error reanalizing video {video_id}: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@app.route('/api/videos/bulk-reanalyze', methods=['POST'])
+def api_bulk_reanalyze_videos():
+    """API para reanalizar múltiples videos usando una sola llamada al subprocess"""
+    try:
+        data = request.get_json() or {}
+        video_ids = data.get('video_ids', [])
+        force = data.get('force', False)
+        
+        if not video_ids:
+            return jsonify({'success': False, 'error': 'No se proporcionaron IDs de videos'}), 400
+        
+        # Validar que todos los IDs sean números enteros
+        try:
+            video_ids = [int(vid) for vid in video_ids]
+        except (ValueError, TypeError):
+            return jsonify({'success': False, 'error': 'Todos los IDs deben ser números enteros'}), 400
+        
+        # Verificar que todos los videos existen
+        missing_videos = []
+        for video_id in video_ids:
+            video = db.get_video(video_id)
+            if not video:
+                missing_videos.append(video_id)
+        
+        if missing_videos:
+            return jsonify({
+                'success': False, 
+                'error': f'Videos no encontrados: {", ".join(map(str, missing_videos))}'
+            }), 404
+        
+        # Marcar todos los videos como procesando
+        for video_id in video_ids:
+            db.update_video(video_id, {
+                'processing_status': 'procesando',
+                'error_message': None
+            })
+        
+        # Ejecutar reanálisis masivo en background usando subprocess
+        try:
+            cmd = [
+                sys.executable, 'main.py', 
+                '--reanalyze-video', ','.join(map(str, video_ids))
+            ]
+            
+            if force:
+                cmd.append('--force')
+            
+            # Ejecutar comando con encoding UTF-8
+            env = os.environ.copy()
+            env['PYTHONIOENCODING'] = 'utf-8'
+            env['PYTHONUNBUFFERED'] = '1'
+            
+            process = subprocess.run(
+                cmd,
+                cwd=str(Path(__file__).parent),
+                capture_output=True,
+                text=True,
+                encoding='utf-8',
+                env=env,
+                timeout=600  # 10 minutos máximo para procesos masivos
+            )
+            
+            logger.info(f"Ejecutado reanálisis masivo de {len(video_ids)} videos con código de salida: {process.returncode}")
+            
+            # Debug: Log stdout and stderr
+            if process.stdout:
+                logger.info(f"STDOUT: {process.stdout}")
+            if process.stderr:
+                logger.warning(f"STDERR: {process.stderr}")
+            
+            if process.returncode == 0:
+                return jsonify({
+                    'success': True,
+                    'message': f'Reanálisis masivo completado exitosamente para {len(video_ids)} videos',
+                    'video_ids': video_ids,
+                    'total_videos': len(video_ids)
+                })
+            else:
+                error_msg = process.stderr or 'Error desconocido en el reanálisis masivo'
+                logger.error(f"Error en reanálisis masivo: {error_msg}")
+                
+                # Marcar videos como error en BD
+                for video_id in video_ids:
+                    db.update_video(video_id, {
+                        'processing_status': 'error',
+                        'error_message': error_msg
+                    })
+                
+                return jsonify({
+                    'success': False,
+                    'error': error_msg
+                }), 500
+            
+        except subprocess.TimeoutExpired:
+            error_msg = 'Timeout: El reanálisis masivo tomó demasiado tiempo'
+            logger.error(f"Timeout en reanálisis masivo: {error_msg}")
+            
+            # Marcar videos como error
+            for video_id in video_ids:
+                db.update_video(video_id, {
+                    'processing_status': 'error',
+                    'error_message': error_msg
+                })
+            
+            return jsonify({
+                'success': False,
+                'error': error_msg
+            }), 504
+            
+        except Exception as e:
+            # Revertir estado en caso de error
+            for video_id in video_ids:
+                db.update_video(video_id, {
+                    'processing_status': 'error',
+                    'error_message': f'Error iniciando reanálisis masivo: {str(e)}'
+                })
+            raise e
+            
+    except Exception as e:
+        logger.error(f"Error en reanálisis masivo: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 
 @app.route('/trash')
 def trash():

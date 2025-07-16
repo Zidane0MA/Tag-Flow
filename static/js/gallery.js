@@ -1256,63 +1256,28 @@ async function bulkReanalyzeVideos(force = false) {
         TagFlow.utils.showLoading();
         
         const videoIds = Array.from(selectedVideos);
-        let successCount = 0;
-        let errorCount = 0;
-        const errors = [];
         
-        // Procesar videos en lotes de 3 para no sobrecargar el servidor
-        const batchSize = 3;
-        for (let i = 0; i < videoIds.length; i += batchSize) {
-            const batch = videoIds.slice(i, i + batchSize);
-            
-            // Procesar lote actual en paralelo
-            const batchPromises = batch.map(async (videoId) => {
-                try {
-                    const response = await TagFlow.utils.apiRequest(
-                        `${TagFlow.apiBase}/video/${videoId}/reanalyze`,
-                        {
-                            method: 'POST',
-                            body: JSON.stringify({ force: force })
-                        }
-                    );
-                    
-                    if (response.success) {
-                        successCount++;
-                        return { videoId, success: true };
-                    } else {
-                        errorCount++;
-                        errors.push(`Video ${videoId}: ${response.error}`);
-                        return { videoId, success: false, error: response.error };
-                    }
-                } catch (error) {
-                    errorCount++;
-                    errors.push(`Video ${videoId}: ${error.message}`);
-                    return { videoId, success: false, error: error.message };
-                }
-            });
-            
-            // Esperar a que termine el lote actual
-            await Promise.all(batchPromises);
-            
-            // Pequeña pausa entre lotes para no sobrecargar el servidor
-            if (i + batchSize < videoIds.length) {
-                await new Promise(resolve => setTimeout(resolve, 500));
+        // Usar el nuevo endpoint de reanálisis masivo
+        const response = await TagFlow.utils.apiRequest(
+            `${TagFlow.apiBase}/videos/bulk-reanalyze`,
+            {
+                method: 'POST',
+                body: JSON.stringify({ 
+                    video_ids: videoIds,
+                    force: force 
+                })
             }
-        }
+        );
         
-        // Mostrar resultados
-        if (successCount > 0) {
+        if (response.success) {
             TagFlow.utils.showNotification(
-                `Reanálisis iniciado para ${successCount} video(s). Los procesos continuarán en segundo plano.`,
+                `Reanálisis masivo completado exitosamente para ${response.total_videos} videos`,
                 'success'
             );
-        }
-        
-        if (errorCount > 0) {
-            console.error('Errores en reanálisis masivo:', errors);
+        } else {
             TagFlow.utils.showNotification(
-                `${errorCount} video(s) fallaron. Revisa la consola para detalles.`,
-                'warning'
+                `Error en reanálisis masivo: ${response.error}`,
+                'error'
             );
         }
         
@@ -1320,11 +1285,9 @@ async function bulkReanalyzeVideos(force = false) {
         clearBulkSelection();
         
         // Recargar página después de un tiempo para mostrar cambios
-        if (successCount > 0) {
-            setTimeout(() => {
-                window.location.reload();
-            }, 2000);
-        }
+        setTimeout(() => {
+            window.location.reload();
+        }, 3000);
         
     } catch (error) {
         console.error('Error en reanálisis masivo:', error);

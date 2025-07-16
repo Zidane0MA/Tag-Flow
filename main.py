@@ -709,11 +709,67 @@ class VideoAnalyzer:
             logger.error(f"Error en ejecución principal: {e}")
             raise
 
-def reanalyze_single_video(video_id, force=False):
+def reanalyze_videos(video_ids_str, force=False):
+    """Reanalizar uno o múltiples videos por sus IDs"""
+    try:
+        # Parsear IDs: puede ser un ID único o múltiples separados por comas
+        video_ids = []
+        for id_str in video_ids_str.split(','):
+            id_str = id_str.strip()
+            if id_str:
+                try:
+                    video_ids.append(int(id_str))
+                except ValueError:
+                    print(f"Error: ID inválido '{id_str}'. Debe ser un número entero.")
+                    return False
+        
+        if not video_ids:
+            print("Error: No se proporcionaron IDs válidos.")
+            return False
+        
+        print(f"Tag-Flow V2 - Reanálisis de {len(video_ids)} Video(s)")
+        print("=" * 60)
+        
+        successful_count = 0
+        failed_count = 0
+        errors = []
+        
+        # Procesar cada video
+        for video_id in video_ids:
+            print(f"\n[{video_ids.index(video_id) + 1}/{len(video_ids)}] Procesando video ID: {video_id}")
+            print("-" * 40)
+            
+            success = reanalyze_single_video(video_id, force, show_header=False)
+            if success:
+                successful_count += 1
+            else:
+                failed_count += 1
+                errors.append(video_id)
+        
+        # Mostrar resumen final
+        print("\n" + "=" * 60)
+        print("RESUMEN DE REANÁLISIS")
+        print("=" * 60)
+        print(f"Total videos procesados: {len(video_ids)}")
+        print(f"✅ Exitosos: {successful_count}")
+        print(f"❌ Fallidos: {failed_count}")
+        
+        if errors:
+            print(f"Videos con errores: {', '.join(map(str, errors))}")
+        
+        return successful_count > 0
+        
+    except Exception as e:
+        print(f"❌ Error fatal en reanálisis múltiple: {e}")
+        logger.error(f"Error reanalizing videos {video_ids_str}: {e}")
+        return False
+
+def reanalyze_single_video(video_id, force=False, show_header=True):
     """Reanalizar un video específico por su ID"""
     try:
-        print(f"Tag-Flow V2 - Reanálisis de Video ID: {video_id}")
-        print("=" * 60)
+        if show_header:
+            print(f"Tag-Flow V2 - Reanálisis de Video ID: {video_id}")
+            print("=" * 60)
         
         # Verificar que el video existe
         video = db.get_video(video_id)
@@ -806,7 +862,9 @@ Ejemplos de uso:
   python main.py --platform other --limit 10       # Procesar 10 videos de plataformas adicionales
   python main.py --platform all-platforms          # Procesar videos de todas las plataformas
   python main.py --reanalyze-video 123             # Reanalizar video específico por ID
+  python main.py --reanalyze-video 1,2,3           # Reanalizar videos específicos por IDs
   python main.py --reanalyze-video 123 --force     # Forzar reanálisis sobrescribiendo datos
+  python main.py --reanalyze-video 10,20,30 --force # Forzar reanálisis múltiple sobrescribiendo datos
 
 Opciones de source:
   db        = Solo bases de datos externas (4K Apps)
@@ -858,8 +916,8 @@ Notas:
     # Opción para reanálisis de video específico
     parser.add_argument(
         '--reanalyze-video',
-        type=int,
-        help='ID del video específico a reanalizar (fuerza re-procesamiento de música y personajes)'
+        type=str,
+        help='ID(s) del video específico a reanalizar (fuerza re-procesamiento de música y personajes). Puede ser un ID único o múltiples IDs separados por comas (ej: 1,2,3)'
     )
     
     parser.add_argument(
@@ -875,9 +933,9 @@ Notas:
         print("Error: El límite debe ser un número positivo")
         sys.exit(1)
     
-    # Modo especial: reanálisis de video específico
+    # Modo especial: reanálisis de video específico o múltiple
     if args.reanalyze_video:
-        return reanalyze_single_video(args.reanalyze_video, args.force)
+        return reanalyze_videos(args.reanalyze_video, args.force)
     
     # Mostrar información de configuración
     print("Tag-Flow V2 - Procesador con Flags Profesionales")
