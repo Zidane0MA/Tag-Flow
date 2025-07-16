@@ -51,90 +51,202 @@ async function loadSystemStats() {
 }
 
 // Cargar plataformas disponibles dinámicamente
-async function loadAvailablePlatforms() {
+async function loadAvailablePlatforms(sourceFilter = null) {
     try {
         const response = await TagFlow.utils.apiRequest('/api/admin/platforms');
         
         if (response.success) {
             const platforms = response.platforms;
             const platformSelect = document.getElementById('populate-platform');
+            const sourceSelect = document.getElementById('populate-source');
+            
+            // Obtener fuente actual si no se especifica
+            const currentSource = sourceFilter || sourceSelect.value;
             
             // Limpiar el select
             platformSelect.innerHTML = '';
             
-            // 1. Todas las plataformas (primera opción)
-            const allPlatformsOption = document.createElement('option');
-            allPlatformsOption.value = 'all-platforms';
-            allPlatformsOption.textContent = 'Todas las plataformas';
-            platformSelect.appendChild(allPlatformsOption);
-            
-            // 2. Separador - Plataformas Principales
-            const mainSeparator = document.createElement('option');
-            mainSeparator.disabled = true;
-            mainSeparator.textContent = '— Plataformas Principales —';
-            platformSelect.appendChild(mainSeparator);
-            
-            // 3. Solo principales
-            const mainOnlyOption = document.createElement('option');
-            mainOnlyOption.value = '';
-            mainOnlyOption.textContent = 'Solo principales';
-            platformSelect.appendChild(mainOnlyOption);
-            
-            // 4. Plataformas principales individuales (orden específico)
-            const mainPlatformsOrder = ['instagram', 'tiktok', 'youtube'];
-            const mainPlatformsNames = {
-                'instagram': 'Instagram',
-                'tiktok': 'Tiktok', 
-                'youtube': 'Youtube'
-            };
-            
-            mainPlatformsOrder.forEach(platformKey => {
-                if (platforms.main && platforms.main[platformKey]) {
-                    const info = platforms.main[platformKey];
-                    const option = document.createElement('option');
-                    option.value = platformKey;
-                    option.textContent = `${mainPlatformsNames[platformKey]} (${info.has_db ? 'BD' : ''}${info.has_db && info.has_organized ? ' + ' : ''}${info.has_organized ? 'Carpetas' : ''})`;
-                    platformSelect.appendChild(option);
-                }
-            });
-            
-            // 5. Separador - Plataformas Adicionales (solo si existen)
-            if (platforms.additional && Object.keys(platforms.additional).length > 0) {
-                const additionalSeparator = document.createElement('option');
-                additionalSeparator.disabled = true;
-                additionalSeparator.textContent = '— Plataformas Adicionales —';
-                platformSelect.appendChild(additionalSeparator);
+            // Configurar opciones según la fuente
+            if (currentSource === 'db') {
+                // Solo BD: mostrar solo plataformas principales
+                // 1. Separador - Plataformas Principales
+                const mainSeparator = document.createElement('option');
+                mainSeparator.disabled = true;
+                mainSeparator.textContent = '— Plataformas Principales —';
+                platformSelect.appendChild(mainSeparator);
                 
-                // 6. Solo adicionales
-                const additionalOnlyOption = document.createElement('option');
-                additionalOnlyOption.value = 'other';
-                additionalOnlyOption.textContent = 'Solo adicionales';
-                platformSelect.appendChild(additionalOnlyOption);
+                // 2. Solo principales
+                const mainOnlyOption = document.createElement('option');
+                mainOnlyOption.value = '';
+                mainOnlyOption.textContent = 'Solo principales';
+                platformSelect.appendChild(mainOnlyOption);
                 
-                // 7. Plataformas adicionales individuales (orden alfabético)
-                const additionalKeys = Object.keys(platforms.additional).sort();
-                additionalKeys.forEach(key => {
-                    const info = platforms.additional[key];
-                    const option = document.createElement('option');
-                    option.value = key;
-                    option.textContent = `${info.name} (Carpeta)`;
-                    platformSelect.appendChild(option);
+                // 3. Plataformas principales individuales (solo BD)
+                const mainPlatformsOrder = ['instagram', 'tiktok', 'youtube'];
+                const mainPlatformsNames = {
+                    'instagram': 'Instagram (BD)',
+                    'tiktok': 'TikTok (BD)', 
+                    'youtube': 'YouTube (BD)'
+                };
+                
+                mainPlatformsOrder.forEach(platformKey => {
+                    if (platforms.main && platforms.main[platformKey] && platforms.main[platformKey].has_db) {
+                        const option = document.createElement('option');
+                        option.value = platformKey;
+                        option.textContent = mainPlatformsNames[platformKey];
+                        platformSelect.appendChild(option);
+                    }
                 });
+                
+            } else if (currentSource === 'organized') {
+                // Solo carpetas: mostrar todas las plataformas
+                // 1. Todas las plataformas
+                const allPlatformsOption = document.createElement('option');
+                allPlatformsOption.value = 'all-platforms';
+                allPlatformsOption.textContent = 'Todas las plataformas';
+                platformSelect.appendChild(allPlatformsOption);
+                
+                // 2. Separador - Plataformas Principales
+                const mainSeparator = document.createElement('option');
+                mainSeparator.disabled = true;
+                mainSeparator.textContent = '— Plataformas Principales —';
+                platformSelect.appendChild(mainSeparator);
+                
+                // 3. Solo principales
+                const mainOnlyOption = document.createElement('option');
+                mainOnlyOption.value = '';
+                mainOnlyOption.textContent = 'Solo principales';
+                platformSelect.appendChild(mainOnlyOption);
+                
+                // 4. Plataformas principales individuales (solo carpetas)
+                const mainPlatformsOrder = ['instagram', 'tiktok', 'youtube'];
+                const mainPlatformsNames = {
+                    'instagram': 'Instagram (Carpetas)',
+                    'tiktok': 'TikTok (Carpetas)', 
+                    'youtube': 'YouTube (Carpetas)'
+                };
+                
+                mainPlatformsOrder.forEach(platformKey => {
+                    if (platforms.main && platforms.main[platformKey] && platforms.main[platformKey].has_organized) {
+                        const option = document.createElement('option');
+                        option.value = platformKey;
+                        option.textContent = mainPlatformsNames[platformKey];
+                        platformSelect.appendChild(option);
+                    }
+                });
+                
+                // 5. Separador - Plataformas Adicionales (solo si existen)
+                if (platforms.additional && Object.keys(platforms.additional).length > 0) {
+                    const additionalSeparator = document.createElement('option');
+                    additionalSeparator.disabled = true;
+                    additionalSeparator.textContent = '— Plataformas Adicionales —';
+                    platformSelect.appendChild(additionalSeparator);
+                    
+                    // 6. Solo adicionales
+                    const additionalOnlyOption = document.createElement('option');
+                    additionalOnlyOption.value = 'other';
+                    additionalOnlyOption.textContent = 'Solo adicionales';
+                    platformSelect.appendChild(additionalOnlyOption);
+                    
+                    // 7. Plataformas adicionales individuales (orden alfabético)
+                    const additionalKeys = Object.keys(platforms.additional).sort();
+                    additionalKeys.forEach(key => {
+                        const info = platforms.additional[key];
+                        const option = document.createElement('option');
+                        option.value = key;
+                        option.textContent = `${info.name} (Carpeta)`;
+                        platformSelect.appendChild(option);
+                    });
+                }
+                
+                // 8. Separador - Opciones Especiales
+                const specialSeparator = document.createElement('option');
+                specialSeparator.disabled = true;
+                specialSeparator.textContent = '— Opciones Especiales —';
+                platformSelect.appendChild(specialSeparator);
+                
+                // 9. Personalizada
+                const customOption = document.createElement('option');
+                customOption.value = 'custom';
+                customOption.textContent = 'Personalizada...';
+                platformSelect.appendChild(customOption);
+                
+            } else {
+                // Todas las fuentes: mostrar todo como estaba originalmente
+                // 1. Todas las plataformas (primera opción)
+                const allPlatformsOption = document.createElement('option');
+                allPlatformsOption.value = 'all-platforms';
+                allPlatformsOption.textContent = 'Todas las plataformas';
+                platformSelect.appendChild(allPlatformsOption);
+                
+                // 2. Separador - Plataformas Principales
+                const mainSeparator = document.createElement('option');
+                mainSeparator.disabled = true;
+                mainSeparator.textContent = '— Plataformas Principales —';
+                platformSelect.appendChild(mainSeparator);
+                
+                // 3. Solo principales
+                const mainOnlyOption = document.createElement('option');
+                mainOnlyOption.value = '';
+                mainOnlyOption.textContent = 'Solo principales';
+                platformSelect.appendChild(mainOnlyOption);
+                
+                // 4. Plataformas principales individuales (orden específico)
+                const mainPlatformsOrder = ['instagram', 'tiktok', 'youtube'];
+                const mainPlatformsNames = {
+                    'instagram': 'Instagram',
+                    'tiktok': 'TikTok', 
+                    'youtube': 'YouTube'
+                };
+                
+                mainPlatformsOrder.forEach(platformKey => {
+                    if (platforms.main && platforms.main[platformKey]) {
+                        const info = platforms.main[platformKey];
+                        const option = document.createElement('option');
+                        option.value = platformKey;
+                        option.textContent = `${mainPlatformsNames[platformKey]} (${info.has_db ? 'BD' : ''}${info.has_db && info.has_organized ? ' + ' : ''}${info.has_organized ? 'Carpetas' : ''})`;
+                        platformSelect.appendChild(option);
+                    }
+                });
+                
+                // 5. Separador - Plataformas Adicionales (solo si existen)
+                if (platforms.additional && Object.keys(platforms.additional).length > 0) {
+                    const additionalSeparator = document.createElement('option');
+                    additionalSeparator.disabled = true;
+                    additionalSeparator.textContent = '— Plataformas Adicionales —';
+                    platformSelect.appendChild(additionalSeparator);
+                    
+                    // 6. Solo adicionales
+                    const additionalOnlyOption = document.createElement('option');
+                    additionalOnlyOption.value = 'other';
+                    additionalOnlyOption.textContent = 'Solo adicionales';
+                    platformSelect.appendChild(additionalOnlyOption);
+                    
+                    // 7. Plataformas adicionales individuales (orden alfabético)
+                    const additionalKeys = Object.keys(platforms.additional).sort();
+                    additionalKeys.forEach(key => {
+                        const info = platforms.additional[key];
+                        const option = document.createElement('option');
+                        option.value = key;
+                        option.textContent = `${info.name} (Carpeta)`;
+                        platformSelect.appendChild(option);
+                    });
+                }
+                
+                // 8. Separador - Opciones Especiales
+                const specialSeparator = document.createElement('option');
+                specialSeparator.disabled = true;
+                specialSeparator.textContent = '— Opciones Especiales —';
+                platformSelect.appendChild(specialSeparator);
+                
+                // 9. Personalizada
+                const customOption = document.createElement('option');
+                customOption.value = 'custom';
+                customOption.textContent = 'Personalizada...';
+                platformSelect.appendChild(customOption);
             }
             
-            // 8. Separador - Opciones Especiales
-            const specialSeparator = document.createElement('option');
-            specialSeparator.disabled = true;
-            specialSeparator.textContent = '— Opciones Especiales —';
-            platformSelect.appendChild(specialSeparator);
-            
-            // 9. Personalizada
-            const customOption = document.createElement('option');
-            customOption.value = 'custom';
-            customOption.textContent = 'Personalizada...';
-            platformSelect.appendChild(customOption);
-            
-            console.log('✅ Plataformas cargadas dinámicamente');
+            console.log('✅ Plataformas cargadas dinámicamente para fuente:', currentSource);
         } else {
             console.error('Error cargando plataformas:', response.error);
             addLogEntry('Error cargando plataformas disponibles', 'error');
@@ -173,6 +285,8 @@ function setupCustomPlatformInput() {
             // Habilitar campos normales
             platformSelect.disabled = false;
             limitInput.disabled = false;
+            // Recargar plataformas según la fuente seleccionada
+            loadAvailablePlatforms(this.value);
             // Manejar plataforma personalizada si corresponde
             if (platformSelect.value === 'custom') {
                 customPlatformContainer.style.display = 'block';
