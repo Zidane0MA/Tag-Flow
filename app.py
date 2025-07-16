@@ -1191,46 +1191,69 @@ def api_admin_populate_db():
 
 @app.route('/api/admin/analyze-videos', methods=['POST'])
 def api_admin_analyze_videos():
-    """API para analizar videos desde dashboard"""
+    """API para analizar videos desde dashboard con opciones modernas"""
     try:
         data = request.get_json() or {}
+        source = data.get('source', 'all')
         platform = data.get('platform')
-        limit = data.get('limit', 10)
-        pending_only = data.get('pending_only', True)
+        limit = data.get('limit')
+        force = data.get('force', False)
         
         # Construir comando main.py
         import subprocess
         import sys
         
-        cmd = [sys.executable, 'main.py', '--limit', str(limit)]
+        cmd = [sys.executable, 'main.py']
+        
+        if limit:
+            cmd.extend(['--limit', str(limit)])
+        
+        if source != 'all':
+            cmd.extend(['--source', source])
         
         if platform:
             cmd.extend(['--platform', platform])
         
-        if pending_only:
-            cmd.extend(['--source', 'db'])
+        if force:
+            cmd.append('--force')
         
         logger.info(f"Ejecutando análisis: {' '.join(cmd)}")
+        
+        # Ejecutar comando con encoding UTF-8
+        env = os.environ.copy()
+        env['PYTHONIOENCODING'] = 'utf-8'
+        env['PYTHONUNBUFFERED'] = '1'
         
         result = subprocess.run(
             cmd,
             cwd=Path(__file__).parent,
             capture_output=True,
             text=True,
+            encoding='utf-8',
+            env=env,
             timeout=600  # 10 minutos timeout
         )
+        
+        logger.info(f"Análisis completado con código de salida: {result.returncode}")
+        
+        # Debug: Log stdout and stderr
+        if result.stdout:
+            logger.info(f"STDOUT: {result.stdout}")
+        if result.stderr:
+            logger.warning(f"STDERR: {result.stderr}")
         
         if result.returncode == 0:
             return jsonify({
                 'success': True,
                 'message': 'Análisis completado exitosamente',
                 'output': result.stdout,
-                'processed': limit  # Aproximado
+                'processed': limit or 'sin límite'
             })
         else:
+            error_msg = result.stderr or 'Error desconocido en análisis'
             return jsonify({
                 'success': False,
-                'error': f'Error en análisis: {result.stderr}',
+                'error': f'Error en análisis: {error_msg}',
                 'output': result.stdout
             }), 500
             

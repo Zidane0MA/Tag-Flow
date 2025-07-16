@@ -22,6 +22,9 @@ function initializeAdminDashboard() {
     // Configurar evento para input personalizado
     setupCustomPlatformInput();
     
+    // Configurar eventos para análisis de videos
+    setupAnalyzePlatformInput();
+    
     // Configurar actualización automática cada 30 segundos
     setInterval(loadSystemStats, 30000);
     
@@ -309,6 +312,242 @@ function setupCustomPlatformInput() {
     });
 }
 
+// Cargar plataformas disponibles dinámicamente para análisis
+async function loadAnalyzePlatforms(sourceFilter = null) {
+    try {
+        const response = await TagFlow.utils.apiRequest('/api/admin/platforms');
+        
+        if (response.success) {
+            const platforms = response.platforms;
+            const platformSelect = document.getElementById('analyze-platform');
+            const sourceSelect = document.getElementById('analyze-source');
+            
+            // Obtener fuente actual si no se especifica
+            const currentSource = sourceFilter || sourceSelect.value;
+            
+            // Limpiar el select
+            platformSelect.innerHTML = '';
+            
+            // Configurar opciones según la fuente
+            if (currentSource === 'db') {
+                // Solo BD: mostrar solo plataformas principales
+                // 1. Separador - Plataformas Principales
+                const mainSeparator = document.createElement('option');
+                mainSeparator.disabled = true;
+                mainSeparator.textContent = '— Plataformas Principales —';
+                platformSelect.appendChild(mainSeparator);
+                
+                // 2. Solo principales
+                const mainOnlyOption = document.createElement('option');
+                mainOnlyOption.value = '';
+                mainOnlyOption.textContent = 'Solo principales';
+                platformSelect.appendChild(mainOnlyOption);
+                
+                // 3. Plataformas principales individuales (solo BD)
+                const mainPlatformsOrder = ['instagram', 'tiktok', 'youtube'];
+                const mainPlatformsNames = {
+                    'instagram': 'Instagram (BD)',
+                    'tiktok': 'TikTok (BD)', 
+                    'youtube': 'YouTube (BD)'
+                };
+                
+                mainPlatformsOrder.forEach(platformKey => {
+                    if (platforms.main && platforms.main[platformKey] && platforms.main[platformKey].has_db) {
+                        const option = document.createElement('option');
+                        option.value = platformKey;
+                        option.textContent = mainPlatformsNames[platformKey];
+                        platformSelect.appendChild(option);
+                    }
+                });
+                
+            } else if (currentSource === 'organized') {
+                // Solo carpetas: mostrar todas las plataformas
+                // 1. Todas las plataformas
+                const allPlatformsOption = document.createElement('option');
+                allPlatformsOption.value = 'all-platforms';
+                allPlatformsOption.textContent = 'Todas las plataformas';
+                platformSelect.appendChild(allPlatformsOption);
+                
+                // 2. Separador - Plataformas Principales
+                const mainSeparator = document.createElement('option');
+                mainSeparator.disabled = true;
+                mainSeparator.textContent = '— Plataformas Principales —';
+                platformSelect.appendChild(mainSeparator);
+                
+                // 3. Solo principales
+                const mainOnlyOption = document.createElement('option');
+                mainOnlyOption.value = '';
+                mainOnlyOption.textContent = 'Solo principales';
+                platformSelect.appendChild(mainOnlyOption);
+                
+                // 4. Plataformas principales individuales (solo carpetas)
+                const mainPlatformsOrder = ['instagram', 'tiktok', 'youtube'];
+                const mainPlatformsNames = {
+                    'instagram': 'Instagram (Carpetas)',
+                    'tiktok': 'TikTok (Carpetas)', 
+                    'youtube': 'YouTube (Carpetas)'
+                };
+                
+                mainPlatformsOrder.forEach(platformKey => {
+                    if (platforms.main && platforms.main[platformKey] && platforms.main[platformKey].has_organized) {
+                        const option = document.createElement('option');
+                        option.value = platformKey;
+                        option.textContent = mainPlatformsNames[platformKey];
+                        platformSelect.appendChild(option);
+                    }
+                });
+                
+                // 5. Separador - Plataformas Adicionales (solo si existen)
+                if (platforms.additional && Object.keys(platforms.additional).length > 0) {
+                    const additionalSeparator = document.createElement('option');
+                    additionalSeparator.disabled = true;
+                    additionalSeparator.textContent = '— Plataformas Adicionales —';
+                    platformSelect.appendChild(additionalSeparator);
+                    
+                    // 6. Solo adicionales
+                    const additionalOnlyOption = document.createElement('option');
+                    additionalOnlyOption.value = 'other';
+                    additionalOnlyOption.textContent = 'Solo adicionales';
+                    platformSelect.appendChild(additionalOnlyOption);
+                    
+                    // 7. Plataformas adicionales individuales (orden alfabético)
+                    const additionalKeys = Object.keys(platforms.additional).sort();
+                    additionalKeys.forEach(key => {
+                        const info = platforms.additional[key];
+                        const option = document.createElement('option');
+                        option.value = key;
+                        option.textContent = `${info.name} (Carpeta)`;
+                        platformSelect.appendChild(option);
+                    });
+                }
+                
+                // 8. Separador - Opciones Especiales
+                const specialSeparator = document.createElement('option');
+                specialSeparator.disabled = true;
+                specialSeparator.textContent = '— Opciones Especiales —';
+                platformSelect.appendChild(specialSeparator);
+                
+                // 9. Personalizada
+                const customOption = document.createElement('option');
+                customOption.value = 'custom';
+                customOption.textContent = 'Personalizada...';
+                platformSelect.appendChild(customOption);
+                
+            } else {
+                // Todas las fuentes: mostrar todo como estaba originalmente
+                // 1. Todas las plataformas (primera opción)
+                const allPlatformsOption = document.createElement('option');
+                allPlatformsOption.value = 'all-platforms';
+                allPlatformsOption.textContent = 'Todas las plataformas';
+                platformSelect.appendChild(allPlatformsOption);
+                
+                // 2. Separador - Plataformas Principales
+                const mainSeparator = document.createElement('option');
+                mainSeparator.disabled = true;
+                mainSeparator.textContent = '— Plataformas Principales —';
+                platformSelect.appendChild(mainSeparator);
+                
+                // 3. Solo principales
+                const mainOnlyOption = document.createElement('option');
+                mainOnlyOption.value = '';
+                mainOnlyOption.textContent = 'Solo principales';
+                platformSelect.appendChild(mainOnlyOption);
+                
+                // 4. Plataformas principales individuales (orden específico)
+                const mainPlatformsOrder = ['instagram', 'tiktok', 'youtube'];
+                const mainPlatformsNames = {
+                    'instagram': 'Instagram',
+                    'tiktok': 'TikTok', 
+                    'youtube': 'YouTube'
+                };
+                
+                mainPlatformsOrder.forEach(platformKey => {
+                    if (platforms.main && platforms.main[platformKey]) {
+                        const info = platforms.main[platformKey];
+                        const option = document.createElement('option');
+                        option.value = platformKey;
+                        option.textContent = `${mainPlatformsNames[platformKey]} (${info.has_db ? 'BD' : ''}${info.has_db && info.has_organized ? ' + ' : ''}${info.has_organized ? 'Carpetas' : ''})`;
+                        platformSelect.appendChild(option);
+                    }
+                });
+                
+                // 5. Separador - Plataformas Adicionales (solo si existen)
+                if (platforms.additional && Object.keys(platforms.additional).length > 0) {
+                    const additionalSeparator = document.createElement('option');
+                    additionalSeparator.disabled = true;
+                    additionalSeparator.textContent = '— Plataformas Adicionales —';
+                    platformSelect.appendChild(additionalSeparator);
+                    
+                    // 6. Solo adicionales
+                    const additionalOnlyOption = document.createElement('option');
+                    additionalOnlyOption.value = 'other';
+                    additionalOnlyOption.textContent = 'Solo adicionales';
+                    platformSelect.appendChild(additionalOnlyOption);
+                    
+                    // 7. Plataformas adicionales individuales (orden alfabético)
+                    const additionalKeys = Object.keys(platforms.additional).sort();
+                    additionalKeys.forEach(key => {
+                        const info = platforms.additional[key];
+                        const option = document.createElement('option');
+                        option.value = key;
+                        option.textContent = `${info.name} (Carpeta)`;
+                        platformSelect.appendChild(option);
+                    });
+                }
+                
+                // 8. Separador - Opciones Especiales
+                const specialSeparator = document.createElement('option');
+                specialSeparator.disabled = true;
+                specialSeparator.textContent = '— Opciones Especiales —';
+                platformSelect.appendChild(specialSeparator);
+                
+                // 9. Personalizada
+                const customOption = document.createElement('option');
+                customOption.value = 'custom';
+                customOption.textContent = 'Personalizada...';
+                platformSelect.appendChild(customOption);
+            }
+            
+            console.log('✅ Plataformas de análisis cargadas dinámicamente para fuente:', currentSource);
+        } else {
+            console.error('Error cargando plataformas para análisis:', response.error);
+            addLogEntry('Error cargando plataformas disponibles para análisis', 'error');
+        }
+    } catch (error) {
+        console.error('Error cargando plataformas para análisis:', error);
+        addLogEntry('Error cargando plataformas disponibles para análisis', 'error');
+    }
+}
+
+// Configurar evento para inputs personalizados de análisis
+function setupAnalyzePlatformInput() {
+    const platformSelect = document.getElementById('analyze-platform');
+    const customPlatformContainer = document.getElementById('analyze-custom-platform-container');
+    const sourceSelect = document.getElementById('analyze-source');
+    
+    if (platformSelect && customPlatformContainer && sourceSelect) {
+        // Manejar cambios en fuente de análisis
+        sourceSelect.addEventListener('change', function() {
+            // Recargar plataformas según la fuente seleccionada
+            loadAnalyzePlatforms(this.value);
+            // Ocultar input personalizado cuando cambie la fuente
+            customPlatformContainer.style.display = 'none';
+        });
+        
+        // Manejar cambios en plataforma de análisis
+        platformSelect.addEventListener('change', function() {
+            if (this.value === 'custom') {
+                customPlatformContainer.style.display = 'block';
+            } else {
+                customPlatformContainer.style.display = 'none';
+            }
+        });
+        
+        // Cargar plataformas iniciales
+        loadAnalyzePlatforms();
+    }
+}
+
 // Función para abrir selector de archivos
 function openFileSelector() {
     // Crear input file invisible
@@ -489,38 +728,134 @@ async function executePopulateDB() {
 
 // Ejecutar análisis de videos
 async function executeAnalyzeVideos() {
+    const source = document.getElementById('analyze-source').value;
     const platform = document.getElementById('analyze-platform').value;
     const limit = document.getElementById('analyze-limit').value;
-    const pendingOnly = document.getElementById('analyze-pending-only').checked;
+    const force = document.getElementById('analyze-force').checked;
+    const customPlatform = document.getElementById('analyze-custom-platform-name').value;
     
-    let command = `python main.py --limit ${limit}`;
-    if (platform) command += ` --platform ${platform}`;
-    if (pendingOnly) command += ` --source db`;
+    // Determinar plataforma final
+    let finalPlatform = platform;
+    if (platform === 'custom' && customPlatform) {
+        finalPlatform = customPlatform;
+    }
+    
+    // Construir comando
+    let command = `python main.py`;
+    if (limit) command += ` --limit ${limit}`;
+    if (source !== 'all') command += ` --source ${source}`;
+    if (finalPlatform) command += ` --platform ${finalPlatform}`;
+    if (force) command += ` --force`;
     
     addTerminalOutput(`Ejecutando: ${command}`);
+    showProgress('analyze-progress');
     
     try {
         const response = await TagFlow.utils.apiRequest('/api/admin/analyze-videos', {
             method: 'POST',
             body: JSON.stringify({
-                platform: platform || null,
-                limit: parseInt(limit),
-                pending_only: pendingOnly
+                source: source,
+                platform: finalPlatform || null,
+                limit: limit ? parseInt(limit) : null,
+                force: force
             })
         });
         
+        hideProgress('analyze-progress');
+        
         if (response.success) {
             addTerminalOutput(`✅ Análisis completado: ${response.message}`);
-            addLogEntry(`Análisis de videos completado - ${response.processed} videos procesados`, 'success');
+            addLogEntry(`Análisis de videos completado - ${response.processed || 0} videos procesados`, 'success');
             loadSystemStats();
         } else {
             addTerminalOutput(`❌ Error: ${response.error}`);
             addLogEntry(`Error en análisis: ${response.error}`, 'error');
         }
     } catch (error) {
+        hideProgress('analyze-progress');
         addTerminalOutput(`❌ Error ejecutando análisis: ${error.message}`);
         addLogEntry(`Error ejecutando análisis: ${error.message}`, 'error');
     }
+}
+
+// Ejecutar reanálisis de videos específicos
+async function executeReanalyzeVideos() {
+    const videoIds = document.getElementById('reanalyze-video-ids').value.trim();
+    const force = document.getElementById('reanalyze-force').checked;
+    
+    if (!videoIds) {
+        addTerminalOutput('❌ Error: Debe proporcionar al menos un ID de video');
+        return;
+    }
+    
+    // Validar formato de IDs
+    const idsArray = videoIds.split(',').map(id => id.trim()).filter(id => id);
+    const invalidIds = idsArray.filter(id => !/^\d+$/.test(id));
+    
+    if (invalidIds.length > 0) {
+        addTerminalOutput(`❌ Error: IDs inválidos: ${invalidIds.join(', ')}`);
+        return;
+    }
+    
+    // Construir comando
+    let command = `python main.py --reanalyze-video ${videoIds}`;
+    if (force) command += ` --force`;
+    
+    addTerminalOutput(`Ejecutando: ${command}`);
+    showProgress('analyze-progress');
+    
+    try {
+        const response = await TagFlow.utils.apiRequest('/api/videos/bulk-reanalyze', {
+            method: 'POST',
+            body: JSON.stringify({
+                video_ids: idsArray,
+                force: force
+            })
+        });
+        
+        hideProgress('analyze-progress');
+        
+        if (response.success) {
+            addTerminalOutput(`✅ Reanálisis completado: ${response.message}`);
+            addLogEntry(`Reanálisis completado - ${response.total_videos || idsArray.length} videos procesados`, 'success');
+            loadSystemStats();
+        } else {
+            addTerminalOutput(`❌ Error: ${response.error}`);
+            addLogEntry(`Error en reanálisis: ${response.error}`, 'error');
+        }
+    } catch (error) {
+        hideProgress('analyze-progress');
+        addTerminalOutput(`❌ Error ejecutando reanálisis: ${error.message}`);
+        addLogEntry(`Error ejecutando reanálisis: ${error.message}`, 'error');
+    }
+}
+
+// Mostrar ejemplos de reanálisis
+function showReanalyzeExamples() {
+    const examples = `
+<h6>Ejemplos de Reanálisis de Videos:</h6>
+<div class="mt-3">
+    <h6 class="text-primary">Reanálisis Individual:</h6>
+    <code>123</code> - Reanalizar video con ID 123
+    
+    <h6 class="text-primary mt-3">Reanálisis Múltiple:</h6>
+    <code>1,2,3</code> - Reanalizar videos con IDs 1, 2 y 3<br>
+    <code>10,20,30</code> - Reanalizar videos con IDs 10, 20 y 30
+    
+    <h6 class="text-primary mt-3">Con Force:</h6>
+    <p class="text-muted">Marcar la casilla "Force" para forzar el reanálisis aunque ya estén procesados</p>
+    
+    <h6 class="text-primary mt-3">Notas:</h6>
+    <ul class="text-muted">
+        <li>Los IDs deben ser números enteros</li>
+        <li>Separe múltiples IDs con comas</li>
+        <li>No incluya espacios innecesarios</li>
+        <li>El proceso es mucho más eficiente que el reanálisis individual</li>
+    </ul>
+</div>
+    `;
+    
+    showModal('Ejemplos de Reanálisis', examples);
 }
 
 // Ejecutar generación de thumbnails
