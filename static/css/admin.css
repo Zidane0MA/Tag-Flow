@@ -32,13 +32,21 @@
     border-radius: 0 8px 8px 0; /* Solo redondear esquinas derechas */
 }
 
+/* Estilos para campos deshabilitados en modo archivo específico */
+select:disabled,
+input:disabled {
+    background-color: rgba(108, 117, 125, 0.3) !important;
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
 /* Estilos específicos para el dashboard admin */
 .admin-header {
     background: linear-gradient(135deg, #6f42c1 0%, #5a32a3 100%);
     color: white;
     border-radius: 8px;
     padding: 2rem;
-    margin-bottom: 2rem;
+    margin-bottom: 1.5rem;  /*Ajustar en @media*/
 }
 
 .command-card {

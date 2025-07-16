@@ -151,22 +151,46 @@ function setupCustomPlatformInput() {
     const customPlatformContainer = document.getElementById('custom-platform-container');
     const sourceSelect = document.getElementById('populate-source');
     const fileSourceContainer = document.getElementById('file-source-container');
+    const limitInput = document.getElementById('populate-limit');
     
-    // Manejar plataforma personalizada
-    platformSelect.addEventListener('change', function() {
-        if (this.value === 'custom') {
-            customPlatformContainer.style.display = 'block';
-        } else {
+    // Manejar cambios en fuente
+    sourceSelect.addEventListener('change', function() {
+        const isFileSelected = this.value === 'file';
+        
+        if (isFileSelected) {
+            // Mostrar input de archivo específico
+            fileSourceContainer.style.display = 'block';
+            // Ocultar input de plataforma personalizada
             customPlatformContainer.style.display = 'none';
+            // Resetear plataforma a opción por defecto
+            platformSelect.value = 'all-platforms';
+            // Deshabilitar campos no necesarios para archivo específico
+            platformSelect.disabled = true;
+            limitInput.disabled = true;
+        } else {
+            // Ocultar input de archivo específico
+            fileSourceContainer.style.display = 'none';
+            // Habilitar campos normales
+            platformSelect.disabled = false;
+            limitInput.disabled = false;
+            // Manejar plataforma personalizada si corresponde
+            if (platformSelect.value === 'custom') {
+                customPlatformContainer.style.display = 'block';
+            }
         }
     });
     
-    // Manejar archivo específico
-    sourceSelect.addEventListener('change', function() {
-        if (this.value === 'file') {
-            fileSourceContainer.style.display = 'block';
-        } else {
-            fileSourceContainer.style.display = 'none';
+    // Manejar cambios en plataforma
+    platformSelect.addEventListener('change', function() {
+        // Solo mostrar input personalizado si no está seleccionado "archivo específico"
+        if (sourceSelect.value !== 'file') {
+            if (this.value === 'custom') {
+                customPlatformContainer.style.display = 'block';
+                // Ocultar input de archivo si estaba visible
+                fileSourceContainer.style.display = 'none';
+            } else {
+                customPlatformContainer.style.display = 'none';
+            }
         }
     });
 }
