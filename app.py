@@ -817,31 +817,56 @@ def api_reanalyze_video(video_id):
         # Ejecutar reanálisis en background usando subprocess
         try:
             cmd = [
-                'python', 'main.py', 
-                '--reanalyze-video', str(video_id),
-                '--limit', '1'
+                sys.executable, 'main.py', 
+                '--reanalyze-video', str(video_id)
             ]
             
             if force:
                 cmd.append('--force')
             
-            # Ejecutar comando de forma asíncrona
-            process = subprocess.Popen(
+            # Ejecutar comando de forma síncrona para garantizar resultado
+            env = os.environ.copy()
+            env['PYTHONIOENCODING'] = 'utf-8'  # Forzar UTF-8 para stdout/stderr
+            env['PYTHONUNBUFFERED'] = '1'  # Asegurar output en tiempo real
+            
+            process = subprocess.run(
                 cmd,
                 cwd=str(Path(__file__).parent),
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True
+                capture_output=True,
+                text=True,
+                encoding='utf-8',  # Especificar UTF-8 para manejar caracteres Unicode
+                env=env,  # Usar entorno modificado
+                timeout=300  # 5 minutos máximo
             )
             
-            logger.info(f"Iniciado reanálisis del video {video_id} con PID {process.pid}")
+            logger.info(f"Ejecutado reanálisis del video {video_id} con código de salida: {process.returncode}")
             
-            return jsonify({
-                'success': True,
-                'message': f'Reanálisis iniciado para video {video_id}',
-                'video_id': video_id,
-                'process_id': process.pid
-            })
+            # Debug: Log stdout and stderr para diagnóstico
+            if process.stdout:
+                logger.info(f"STDOUT: {process.stdout}")
+            if process.stderr:
+                logger.warning(f"STDERR: {process.stderr}")
+            
+            if process.returncode == 0:
+                return jsonify({
+                    'success': True,
+                    'message': f'Reanálisis completado exitosamente para video {video_id}',
+                    'video_id': video_id
+                })
+            else:
+                error_msg = process.stderr or 'Error desconocido en el reanálisis'
+                logger.error(f"Error en reanálisis del video {video_id}: {error_msg}")
+                
+                # Marcar como error en BD
+                db.update_video(video_id, {
+                    'processing_status': 'error',
+                    'error_message': error_msg
+                })
+                
+                return jsonify({
+                    'success': False,
+                    'error': error_msg
+                }), 500
             
         except Exception as e:
             # Revertir estado en caso de error

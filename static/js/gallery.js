@@ -376,6 +376,7 @@ function updateVideoCardInDOM(updatedVideo) {
         // Actualizar badges de estado de edición
         const statusBadges = videoCard.querySelectorAll('.badge');
         statusBadges.forEach(badge => {
+            // Actualizar badge de estado de edición
             if (badge.textContent.includes('Sin Edición') || badge.textContent.includes('En proceso') || badge.textContent.includes('Completado')) {
                 const statusMap = {
                     'nulo': { text: 'Sin Edición', class: 'bg-secondary' },
@@ -386,15 +387,28 @@ function updateVideoCardInDOM(updatedVideo) {
                 badge.textContent = status.text;
                 badge.className = `badge ${status.class}`;
             }
+            // Actualizar badge de estado de procesamiento
+            else if (badge.textContent.includes('Pendiente') || badge.textContent.includes('Procesando') || badge.textContent.includes('Completo') || badge.textContent.includes('Error')) {
+                const processingStatusMap = {
+                    'pendiente': { text: 'Pendiente', class: 'bg-light text-dark' },
+                    'procesando': { text: 'Procesando', class: 'bg-info' },
+                    'completado': { text: 'Completo', class: 'bg-success' },
+                    'error': { text: 'Error', class: 'bg-danger' }
+                };
+                const processingStatus = processingStatusMap[updatedVideo.processing_status] || processingStatusMap['pendiente'];
+                badge.textContent = processingStatus.text;
+                badge.className = `badge ${processingStatus.class}`;
+            }
         });
         
         // Actualizar información de música (con truncado)
         const musicInfo = videoCard.querySelector('.fa-music')?.parentElement;
         const truncate = (str, n) => str && str.length > n ? str.slice(0, n) + '...' : str;
+        const music = updatedVideo.final_music || updatedVideo.detected_music;
+        const artist = updatedVideo.final_music_artist || updatedVideo.detected_music_artist;
+        const isAutoDetected = !updatedVideo.final_music && updatedVideo.detected_music;
+        
         if (musicInfo) {
-            const music = updatedVideo.final_music || updatedVideo.detected_music;
-            const artist = updatedVideo.final_music_artist || updatedVideo.detected_music_artist;
-            const isAutoDetected = !updatedVideo.final_music && updatedVideo.detected_music;
             if (music) {
                 musicInfo.innerHTML = `
                     <i class="fas fa-music text-primary me-1"></i>
@@ -405,6 +419,20 @@ function updateVideoCardInDOM(updatedVideo) {
                     </small>
                 `;
             }
+        } else if (music) {
+            // Si no existía la sección de música pero ahora hay música, crearla
+            const cardBody = videoCard.querySelector('.card-body');
+            const musicDiv = document.createElement('div');
+            musicDiv.className = 'mt-2';
+            musicDiv.innerHTML = `
+                <small class="text-primary">
+                    <i class="fas fa-music text-primary me-1"></i>
+                    <strong>${truncate(music, 60)}</strong>
+                    ${artist ? ` - ${truncate(artist, 40)}` : ''}
+                    ${isAutoDetected ? ' <span class="text-muted">(auto)</span>' : ''}
+                </small>
+            `;
+            cardBody.appendChild(musicDiv);
         }
         
         // Actualizar información de personajes
@@ -419,6 +447,21 @@ function updateVideoCardInDOM(updatedVideo) {
                     <small>${displayChars} ${moreText}</small>
                 `;
             }
+        } else if (updatedVideo.final_characters?.length > 0 || updatedVideo.detected_characters?.length > 0) {
+            // Si no existía la sección de personajes pero ahora hay personajes, crearla
+            const cardBody = videoCard.querySelector('.card-body');
+            const charactersDiv = document.createElement('div');
+            charactersDiv.className = 'mt-2';
+            const characters = updatedVideo.final_characters || updatedVideo.detected_characters || [];
+            const displayChars = characters.slice(0, 2).join(', ');
+            const moreText = characters.length > 2 ? `<span class="text-muted">+${characters.length - 2} más</span>` : '';
+            charactersDiv.innerHTML = `
+                <small class="text-success">
+                    <i class="fas fa-user-friends text-success me-1"></i>
+                    ${displayChars} ${moreText}
+                </small>
+            `;
+            cardBody.appendChild(charactersDiv);
         }
         
         // Actualizar notas si existen
@@ -1081,7 +1124,7 @@ async function applyBulkChanges() {
  * @param {string|number} videoId - ID del video a reanalizar
  * @param {boolean} force - Forzar reanálisis aunque ya esté procesado
  */
-async function reanalyzeVideo(videoId, force = false) {
+async function reanalyzeVideo(videoId, force = true) {
     const numericVideoId = parseInt(videoId);
     if (!numericVideoId) {
         TagFlow.utils.showNotification('ID de video inválido', 'error');
@@ -1122,13 +1165,42 @@ async function reanalyzeVideo(videoId, force = false) {
             }
         );
         
-        if (response.success) {
+        console.log('Reanalysis response:', response); // Debug
+        
+        if (response && response.success) {
             TagFlow.utils.showNotification(
-                `Reanálisis iniciado para video ${numericVideoId}. El proceso continuará en segundo plano.`,
+                `Reanálisis completado para video ${numericVideoId}`,
                 'success'
             );
             
-            // El indicador se removera cuando se recargue la página o se actualice el estado
+            // Actualizar datos del video después de un breve delay
+            setTimeout(async () => {
+                try {
+                    // Recargar los datos del video desde la API
+                    const videoResponse = await TagFlow.utils.apiRequest(
+                        `${TagFlow.apiBase}/video/${numericVideoId}`
+                    );
+                    
+                    if (videoResponse && videoResponse.success) {
+                        // Actualizar la tarjeta del video con los nuevos datos
+                        updateVideoCardInDOM(videoResponse.video);
+                    } else {
+                        // Si falla la actualización individual, recargar toda la galería
+                        console.log('Fallback: recargando galería completa');
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 2500);
+                    }
+                } catch (error) {
+                    console.error('Error updating video data after reanalysis:', error);
+                    // En caso de error, recargar la galería completa
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 2500);
+                }
+            }, 2500);
+            
+            // Remover indicador después de 3 segundos
             setTimeout(() => {
                 if (videoCard) {
                     const indicator = videoCard.querySelector('.reanalyze-indicator');
