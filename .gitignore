@@ -57,7 +57,6 @@ tag_flow_processing.log
 backups/
 migration_backups/
 *_backup_*
-backup_*
 
 # Archivos temporales
 *.tmp

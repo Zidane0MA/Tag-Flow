@@ -816,7 +816,41 @@ def api_bulk_edit_videos():
                 logger.error(f"Error ejecutando reprocesamiento: {e}")
         
         if options.get('regenerate_thumbnails'):
-            additional_actions.append('regenerar thumbnails (pendiente de implementar)')
+            try:
+                from src.maintenance_api import get_maintenance_api
+                
+                logger.info(f"🖼️ Regenerando thumbnails para {len(video_ids)} videos usando API asíncrona...")
+                api = get_maintenance_api()
+                operation_id = api.regenerate_thumbnails_bulk(video_ids, force=True)
+                
+                # Esperar brevemente para obtener estado inicial
+                import time
+                time.sleep(0.5)
+                
+                operation = api.get_operation_progress(operation_id)
+                if operation:
+                    additional_actions.append(f"regeneración iniciada: {operation_id[:8]}...")
+                else:
+                    additional_actions.append("regeneración iniciada (procesando en segundo plano)")
+                    
+            except Exception as e:
+                # Fallback a método síncrono
+                logger.warning(f"Error con API asíncrona, usando método síncrono: {e}")
+                try:
+                    from src.maintenance.thumbnail_ops import regenerate_thumbnails_by_ids
+                    
+                    result = regenerate_thumbnails_by_ids(video_ids, force=True)
+                    
+                    if result['success']:
+                        additional_actions.append(f"thumbnails regenerados: {result['successful']}")
+                        if result.get('duration'):
+                            additional_actions.append(f"tiempo: {result['duration']:.2f}s")
+                    else:
+                        additional_actions.append(f"error regenerando thumbnails: {result.get('error', 'Unknown error')}")
+                        
+                except Exception as e2:
+                    additional_actions.append(f'error regenerando thumbnails: {str(e2)}')
+                    logger.error(f"Error regenerando thumbnails: {e2}")
         if options.get('revert_analysis'):
             additional_actions.append('información detectada revertida')
         
@@ -1452,6 +1486,304 @@ def api_admin_optimize_db():
     except Exception as e:
         logger.error(f"Error en optimize-db: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# 🚀 NUEVOS ENDPOINTS PARA MAINTENANCE API (FASE 2)
+
+@app.route('/api/maintenance/operations', methods=['GET'])
+def api_maintenance_operations():
+    """Obtener todas las operaciones de mantenimiento"""
+    try:
+        from src.maintenance_api import get_maintenance_api
+        
+        api = get_maintenance_api()
+        operations = api.get_all_operations()
+        
+        return jsonify({
+            'success': True,
+            'operations': operations,
+            'total': len(operations)
+        })
+        
+    except Exception as e:
+        logger.error(f"Error obteniendo operaciones: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/maintenance/operation/<operation_id>', methods=['GET'])
+def api_maintenance_operation_status(operation_id):
+    """Obtener estado de una operación específica"""
+    try:
+        from src.maintenance_api import get_maintenance_api
+        
+        api = get_maintenance_api()
+        operation = api.get_operation_progress(operation_id)
+        
+        if operation:
+            return jsonify({
+                'success': True,
+                'operation': operation
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Operación no encontrada'
+            }), 404
+            
+    except Exception as e:
+        logger.error(f"Error obteniendo estado de operación: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/maintenance/operation/<operation_id>/cancel', methods=['POST'])
+def api_maintenance_cancel_operation(operation_id):
+    """Cancelar una operación específica"""
+    try:
+        from src.maintenance_api import get_maintenance_api
+        
+        api = get_maintenance_api()
+        cancelled = api.cancel_operation(operation_id)
+        
+        if cancelled:
+            return jsonify({
+                'success': True,
+                'message': 'Operación cancelada exitosamente'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'No se pudo cancelar la operación'
+            }), 400
+            
+    except Exception as e:
+        logger.error(f"Error cancelando operación: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/maintenance/thumbnails/regenerate', methods=['POST'])
+def api_maintenance_regenerate_thumbnails():
+    """Iniciar regeneración asíncrona de thumbnails"""
+    try:
+        from src.maintenance_api import get_maintenance_api
+        
+        data = request.get_json() or {}
+        video_ids = data.get('video_ids', [])
+        force = data.get('force', False)
+        
+        if not video_ids:
+            return jsonify({
+                'success': False,
+                'error': 'Se requieren video_ids'
+            }), 400
+        
+        api = get_maintenance_api()
+        operation_id = api.regenerate_thumbnails_bulk(video_ids, force)
+        
+        return jsonify({
+            'success': True,
+            'operation_id': operation_id,
+            'message': f'Regeneración iniciada para {len(video_ids)} videos'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error iniciando regeneración: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/maintenance/thumbnails/populate', methods=['POST'])
+def api_maintenance_populate_thumbnails():
+    """Iniciar población asíncrona de thumbnails"""
+    try:
+        from src.maintenance_api import get_maintenance_api
+        
+        data = request.get_json() or {}
+        platform = data.get('platform')
+        limit = data.get('limit')
+        force = data.get('force', False)
+        
+        api = get_maintenance_api()
+        operation_id = api.populate_thumbnails_bulk(platform, limit, force)
+        
+        return jsonify({
+            'success': True,
+            'operation_id': operation_id,
+            'message': f'Población iniciada para {platform or "todas las plataformas"}'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error iniciando población: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/maintenance/thumbnails/clean', methods=['POST'])
+def api_maintenance_clean_thumbnails():
+    """Iniciar limpieza asíncrona de thumbnails"""
+    try:
+        from src.maintenance_api import get_maintenance_api
+        
+        data = request.get_json() or {}
+        force = data.get('force', False)
+        
+        api = get_maintenance_api()
+        operation_id = api.clean_thumbnails_bulk(force)
+        
+        return jsonify({
+            'success': True,
+            'operation_id': operation_id,
+            'message': 'Limpieza de thumbnails iniciada'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error iniciando limpieza: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/maintenance/system/health', methods=['GET'])
+def api_maintenance_system_health():
+    """Obtener salud del sistema"""
+    try:
+        from src.maintenance_api import get_maintenance_api
+        
+        api = get_maintenance_api()
+        health = api.get_system_health()
+        
+        return jsonify({
+            'success': True,
+            'health': health
+        })
+        
+    except Exception as e:
+        logger.error(f"Error obteniendo salud del sistema: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/maintenance/operations/cleanup', methods=['POST'])
+def api_maintenance_cleanup_operations():
+    """Limpiar operaciones completadas antiguas"""
+    try:
+        from src.maintenance_api import get_maintenance_api
+        
+        data = request.get_json() or {}
+        max_age_hours = data.get('max_age_hours', 24)
+        
+        api = get_maintenance_api()
+        cleaned = api.cleanup_completed_operations(max_age_hours)
+        
+        return jsonify({
+            'success': True,
+            'cleaned_operations': cleaned,
+            'message': f'Limpiadas {cleaned} operaciones antiguas'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error limpiando operaciones: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# 🗃️ NUEVOS ENDPOINTS PARA DATABASE OPERATIONS (FASE 3)
+
+@app.route('/api/maintenance/database/populate', methods=['POST'])
+def api_maintenance_populate_database():
+    """Iniciar población asíncrona de base de datos"""
+    try:
+        from src.maintenance_api import get_maintenance_api
+        
+        data = request.get_json() or {}
+        source = data.get('source', 'all')
+        platform = data.get('platform')
+        limit = data.get('limit')
+        force = data.get('force', False)
+        
+        api = get_maintenance_api()
+        operation_id = api.populate_database_bulk(source, platform, limit, force)
+        
+        return jsonify({
+            'success': True,
+            'operation_id': operation_id,
+            'message': f'Población de BD iniciada desde {source}'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error iniciando población de BD: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/maintenance/database/optimize', methods=['POST'])
+def api_maintenance_optimize_database():
+    """Iniciar optimización asíncrona de base de datos"""
+    try:
+        from src.maintenance_api import get_maintenance_api
+        
+        api = get_maintenance_api()
+        operation_id = api.optimize_database_bulk()
+        
+        return jsonify({
+            'success': True,
+            'operation_id': operation_id,
+            'message': 'Optimización de BD iniciada'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error iniciando optimización de BD: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/maintenance/database/clear', methods=['POST'])
+def api_maintenance_clear_database():
+    """Iniciar limpieza asíncrona de base de datos"""
+    try:
+        from src.maintenance_api import get_maintenance_api
+        
+        data = request.get_json() or {}
+        platform = data.get('platform')
+        force = data.get('force', False)
+        
+        api = get_maintenance_api()
+        operation_id = api.clear_database_bulk(platform, force)
+        
+        return jsonify({
+            'success': True,
+            'operation_id': operation_id,
+            'message': f'Limpieza de BD iniciada para {platform or "todas las plataformas"}'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error iniciando limpieza de BD: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/maintenance/database/backup', methods=['POST'])
+def api_maintenance_backup_database():
+    """Iniciar backup asíncrono de base de datos"""
+    try:
+        from src.maintenance_api import get_maintenance_api
+        
+        data = request.get_json() or {}
+        backup_path = data.get('backup_path')
+        
+        api = get_maintenance_api()
+        operation_id = api.backup_database_bulk(backup_path)
+        
+        return jsonify({
+            'success': True,
+            'operation_id': operation_id,
+            'message': 'Backup de BD iniciado'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error iniciando backup de BD: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/maintenance/database/stats', methods=['GET'])
+def api_maintenance_database_stats():
+    """Obtener estadísticas detalladas de la base de datos"""
+    try:
+        from src.maintenance.database_ops import get_database_stats
+        
+        stats = get_database_stats()
+        
+        return jsonify({
+            'success': True,
+            'stats': stats
+        })
+        
+    except Exception as e:
+        logger.error(f"Error obteniendo estadísticas de BD: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/maintenance-monitor')
+def maintenance_monitor():
+    """Página del monitor de operaciones de mantenimiento"""
+    return render_template('maintenance_monitor.html')
 
 @app.route('/api/admin/verify', methods=['POST'])
 def api_admin_verify():
