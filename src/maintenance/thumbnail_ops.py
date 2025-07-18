@@ -20,12 +20,10 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 import config
-from src.database import Database
+from src.database import DatabaseManager
 from src.thumbnail_generator import ThumbnailGenerator
 
-# Instancias globales
-db = Database()
-thumbnail_generator = ThumbnailGenerator()
+# Instancias globales - movidas a funciones para evitar inicialización múltiple
 
 
 class ThumbnailOperations:
@@ -41,7 +39,7 @@ class ThumbnailOperations:
     """
     
     def __init__(self):
-        self.db = Database()
+        self.db = DatabaseManager()
         self.thumbnail_generator = ThumbnailGenerator()
     
     def regenerate_thumbnails(self, force: bool = False) -> Dict[str, Any]:

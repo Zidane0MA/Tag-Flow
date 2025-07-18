@@ -65,17 +65,10 @@ class Config:
     # Limpiar caracteres de control de la ruta de YouTube
     raw_youtube_path = os.getenv('EXTERNAL_YOUTUBE_DB', r'C:\Users\loler\AppData\Local\4kdownload.com\4K Video Downloader+\4K Video Downloader+\faefbcd1-76a6-4fbc-b730-724f2735eee4.sqlite')
     
-    # Debug: Mostrar transformación (sin emojis para evitar problemas de encoding)
-    print(f"DEBUG CONFIG: Raw path: {repr(raw_youtube_path)}")
-    print(f"DEBUG CONFIG: Longitud raw: {len(raw_youtube_path)}")
-    
     # Limpieza específica: reemplazar caracteres de control por barra invertida
     import re
     # Reemplazar caracteres de control (except \t\n\r) por barra invertida - doble escape para regex
     clean_youtube_path = re.sub(r'[\x00-\x1f\x7f-\x9f]', r'\\', raw_youtube_path)
-    
-    print(f"DEBUG CONFIG: Clean path: {repr(clean_youtube_path)}")
-    print(f"DEBUG CONFIG: Longitud clean: {len(clean_youtube_path)}")
     
     EXTERNAL_YOUTUBE_DB = Path(clean_youtube_path)
     EXTERNAL_TIKTOK_DB = Path(os.getenv('EXTERNAL_TIKTOK_DB', r'D:\4K Tokkit\data.sqlite'))

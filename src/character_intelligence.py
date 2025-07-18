@@ -27,10 +27,23 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+# Instancia global para evitar múltiples inicializaciones
+_character_intelligence_instance = None
+
 class CharacterIntelligence:
     """Sistema inteligente para reconocimiento automático de personajes"""
     
+    def __new__(cls):
+        global _character_intelligence_instance
+        if _character_intelligence_instance is None:
+            _character_intelligence_instance = super().__new__(cls)
+        return _character_intelligence_instance
+    
     def __init__(self):
+        # Evitar reinicialización si ya se ha inicializado
+        if hasattr(self, '_initialized'):
+            return
+        
         self.character_db_path = config.DATA_DIR / 'character_database.json'
         self.known_faces_path = config.KNOWN_FACES_PATH
         
@@ -54,6 +67,7 @@ class CharacterIntelligence:
             logger.info("Detector optimizado no disponible, usando detector legacy")
         
         logger.info("Character Intelligence inicializado")
+        self._initialized = True
     
     def _load_character_database(self) -> Dict:
         """Cargar base de datos de personajes conocidos"""

@@ -23,12 +23,10 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 import config
-from src.database import Database
+from src.database import DatabaseManager
 from src.character_intelligence import CharacterIntelligence
 
-# Instancias globales
-db = Database()
-character_intelligence = CharacterIntelligence()
+# Instancias globales - movidas a funciones para evitar inicialización múltiple
 
 
 class CharacterOperations:
@@ -45,7 +43,7 @@ class CharacterOperations:
     """
     
     def __init__(self):
-        self.db = Database()
+        self.db = DatabaseManager()
         self.character_intelligence = CharacterIntelligence()
     
     def show_character_stats(self) -> Dict[str, Any]:

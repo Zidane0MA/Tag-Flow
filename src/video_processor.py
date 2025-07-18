@@ -24,9 +24,12 @@ class VideoProcessor:
         self.thumbnails_path = config.THUMBNAILS_PATH
         self.thumbnails_path.mkdir(parents=True, exist_ok=True)
     
-    def extract_metadata(self, video_path: Path) -> Dict:
+    def extract_metadata(self, video_path) -> Dict:
         """Extraer metadatos completos del video"""
         try:
+            # Convertir a Path si es string
+            if isinstance(video_path, str):
+                video_path = Path(video_path)
             metadata = {
                 'file_path': str(video_path),
                 'file_name': video_path.name,

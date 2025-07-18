@@ -18,10 +18,23 @@ from config import config
 
 logger = logging.getLogger(__name__)
 
+# Instancia global para evitar múltiples inicializaciones
+_thumbnail_generator_instance = None
+
 class ThumbnailGenerator:
     """Generador avanzado de thumbnails para videos"""
     
+    def __new__(cls):
+        global _thumbnail_generator_instance
+        if _thumbnail_generator_instance is None:
+            _thumbnail_generator_instance = super().__new__(cls)
+        return _thumbnail_generator_instance
+    
     def __init__(self):
+        # Evitar reinicialización si ya se ha inicializado
+        if hasattr(self, '_initialized'):
+            return
+            
         self.output_path = config.THUMBNAILS_PATH
         self.output_path.mkdir(parents=True, exist_ok=True)
         
@@ -267,6 +280,8 @@ class ThumbnailGenerator:
         self._gpu_decoder = self._detect_gpu_support()
         self._gpu_mode = 'max_quality'  # Modo GPU de máxima calidad
         logger.info(f"🎨 Modo de calidad GPU activado - Mejor imagen (calidad {self.quality}, GPU: {self._gpu_decoder or 'CPU fallback'})")
+        
+        self._initialized = True
         
     def generate_thumbnail(self, video_path: Path, timestamp: float = 3.0, 
                           force_regenerate: bool = False) -> Optional[Path]:

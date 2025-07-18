@@ -131,6 +131,92 @@ class DatabaseManager:
             logger.info(f"Video agregado con ID {video_id}: {video_data['file_name']}")
             return video_id
     
+    def batch_insert_videos(self, videos_data: List[Dict], force: bool = False) -> Tuple[int, int]:
+        """Insertar múltiples videos en una sola transacción (optimizado)"""
+        if not videos_data:
+            return 0, 0
+            
+        successful = 0
+        failed = 0
+        
+        with self.get_connection() as conn:
+            try:
+                if force:
+                    # Modo force: usar INSERT OR REPLACE para actualizar existentes
+                    insert_data = []
+                    for video_data in videos_data:
+                        insert_row = (
+                            video_data['file_path'],
+                            video_data['file_name'],
+                            video_data['creator_name'],
+                            video_data.get('platform', 'tiktok'),
+                            video_data.get('file_size'),
+                            video_data.get('duration_seconds'),
+                            video_data.get('detected_music'),
+                            video_data.get('detected_music_artist'),
+                            video_data.get('detected_music_confidence'),
+                            json.dumps(video_data.get('detected_characters', [])),
+                            video_data.get('music_source'),
+                            video_data.get('processing_status', 'pendiente'),
+                            video_data.get('description')
+                        )
+                        insert_data.append(insert_row)
+                    
+                    # Inserción con reemplazo para forzar actualización
+                    conn.executemany('''
+                        INSERT OR REPLACE INTO videos (
+                            file_path, file_name, creator_name, platform,
+                            file_size, duration_seconds, detected_music, detected_music_artist,
+                            detected_music_confidence, detected_characters, music_source,
+                            processing_status, description
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ''', insert_data)
+                    
+                    successful = len(insert_data)
+                    logger.info(f"Inserción por lotes con FORCE exitosa: {successful} videos")
+                else:
+                    # Modo normal: insertar solo videos nuevos
+                    insert_data = []
+                    for video_data in videos_data:
+                        insert_row = (
+                            video_data['file_path'],
+                            video_data['file_name'],
+                            video_data['creator_name'],
+                            video_data.get('platform', 'tiktok'),
+                            video_data.get('file_size'),
+                            video_data.get('duration_seconds'),
+                            video_data.get('detected_music'),
+                            video_data.get('detected_music_artist'),
+                            video_data.get('detected_music_confidence'),
+                            json.dumps(video_data.get('detected_characters', [])),
+                            video_data.get('music_source'),
+                            video_data.get('processing_status', 'pendiente'),
+                            video_data.get('description')
+                        )
+                        insert_data.append(insert_row)
+                    
+                    # Inserción normal
+                    conn.executemany('''
+                        INSERT INTO videos (
+                            file_path, file_name, creator_name, platform,
+                            file_size, duration_seconds, detected_music, detected_music_artist,
+                            detected_music_confidence, detected_characters, music_source,
+                            processing_status, description
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ''', insert_data)
+                    
+                    successful = len(insert_data)
+                    logger.info(f"Inserción por lotes exitosa: {successful} videos")
+                
+                conn.commit()
+                
+            except Exception as e:
+                logger.error(f"Error en inserción por lotes: {e}")
+                conn.rollback()
+                failed = len(videos_data)
+                
+        return successful, failed
+    
     def get_video(self, video_id: int, include_deleted: bool = False) -> Optional[Dict]:
         """Obtener un video por ID"""
         with self.get_connection() as conn:

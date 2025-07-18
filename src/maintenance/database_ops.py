@@ -24,14 +24,11 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 import config
-from src.database import Database
-from src.external_sources import ExternalSources
+from src.database import DatabaseManager
+from src.external_sources import ExternalSourcesManager
 from src.video_processor import VideoProcessor
 
-# Instancias globales
-db = Database()
-external_sources = ExternalSources()
-video_processor = VideoProcessor()
+# Instancias globales - movidas a funciones para evitar inicialización múltiple
 
 
 class DatabaseOperations:
@@ -47,8 +44,8 @@ class DatabaseOperations:
     """
     
     def __init__(self):
-        self.db = Database()
-        self.external_sources = ExternalSources()
+        self.db = DatabaseManager()
+        self.external_sources = ExternalSourcesManager()
         self.video_processor = VideoProcessor()
     
     def populate_database(self, source: str = 'all', platform: Optional[str] = None, 
@@ -800,8 +797,8 @@ class DatabaseOperations:
                 for video in batch:
                     batch_data.append(video)
                 
-                # Insertar lote
-                batch_success, batch_failed = self.db.batch_insert_videos(batch_data)
+                # Insertar lote usando método optimizado
+                batch_success, batch_failed = self.db.batch_insert_videos(batch_data, force=force)
                 imported += batch_success
                 errors += batch_failed
                 
@@ -819,13 +816,17 @@ class DatabaseOperations:
     
     def _prepare_db_data(self, video_data: Dict) -> Dict:
         """Preparar datos para inserción en BD"""
+        # Convertir título a descripción para TikTok/Instagram (como en backup)
+        description = video_data.get('description')
+        if 'title' in video_data and video_data['title']:
+            description = video_data['title']
+        
         return {
             'file_path': video_data['file_path'],
             'file_name': video_data['file_name'],
             'platform': video_data.get('platform', 'unknown'),
             'creator_name': video_data.get('creator_name'),
-            'title': video_data.get('title'),
-            'description': video_data.get('description'),
+            'description': description,  # Usar título como descripción para mostrar en frontend
             'upload_date': video_data.get('upload_date'),
             'duration': video_data.get('duration'),
             'file_size': video_data.get('file_size'),

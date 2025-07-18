@@ -24,7 +24,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 import config
-from src.database import Database
+from src.database import DatabaseManager
 
 
 class BackupOperations:
@@ -40,7 +40,7 @@ class BackupOperations:
     """
     
     def __init__(self, backup_dir: Optional[Path] = None):
-        self.db = Database()
+        self.db = DatabaseManager()
         self.backup_dir = backup_dir or Path('backups')
         self.backup_dir.mkdir(exist_ok=True)
     

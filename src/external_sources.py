@@ -16,10 +16,23 @@ from config import config
 
 logger = logging.getLogger(__name__)
 
+# Instancia global para evitar múltiples inicializaciones
+_external_sources_instance = None
+
 class ExternalSourcesManager:
     """Gestor para extraer datos de fuentes externas (4K Downloader apps + carpetas organizadas)"""
     
+    def __new__(cls):
+        global _external_sources_instance
+        if _external_sources_instance is None:
+            _external_sources_instance = super().__new__(cls)
+        return _external_sources_instance
+    
     def __init__(self):
+        # Evitar reinicialización si ya se ha inicializado
+        if hasattr(self, '_initialized'):
+            return
+            
         # Rutas de las bases de datos externas (desde config)
         self.external_youtube_db = config.EXTERNAL_YOUTUBE_DB
         self.tiktok_db_path = config.EXTERNAL_TIKTOK_DB  
@@ -33,6 +46,8 @@ class ExternalSourcesManager:
             if control_chars:
                 logger.warning(f"Caracteres de control detectados en EXTERNAL_YOUTUBE_DB: {[hex(ord(c)) for c in control_chars]}")
             logger.info(f"YouTube DB configurada: {self.external_youtube_db.exists()}")
+            logger.info(f"TikTok DB configurada: {self.tiktok_db_path.exists()}")
+            logger.info(f"Instagram DB configurada: {self.instagram_db_path.exists()}")
         
         # Rutas de las carpetas organizadas (desde config)
         self.organized_base_path = config.ORGANIZED_BASE_PATH
@@ -43,6 +58,8 @@ class ExternalSourcesManager:
         # Extensiones de video soportadas
         self.video_extensions = {'.mp4', '.avi', '.mov', '.mkv', '.wmv', '.flv', '.webm', '.m4v'}
         self.image_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'}
+        
+        self._initialized = True
     
     def _get_connection(self, db_path: Path) -> Optional[sqlite3.Connection]:
         """Crear conexión segura a una base de datos externa"""

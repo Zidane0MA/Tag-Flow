@@ -23,7 +23,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 import config
-from src.database import Database
+from src.database import DatabaseManager
 from src.character_intelligence import CharacterIntelligence
 
 
@@ -41,7 +41,7 @@ class IntegrityOperations:
     """
     
     def __init__(self):
-        self.db = Database()
+        self.db = DatabaseManager()
         self.character_intelligence = CharacterIntelligence()
     
     def verify_database_integrity(self, fix_issues: bool = False) -> Dict[str, Any]:
@@ -155,7 +155,7 @@ class IntegrityOperations:
                         })
                 
                 # Verificar metadatos requeridos
-                required_fields = ['title', 'platform', 'creator_name']
+                required_fields = ['platform', 'creator_name']
                 for field in required_fields:
                     if not video.get(field):
                         integrity_report['video_records']['invalid_metadata'] += 1
@@ -164,6 +164,20 @@ class IntegrityOperations:
                             'description': f'Missing {field} for video {video["id"]}',
                             'severity': 'low',
                             'video_id': video['id']
+                        })
+                
+                # Verificar descripciones específicas para TikTok/Instagram
+                platform = video.get('platform', '').lower()
+                if platform in ['tiktok', 'instagram']:
+                    if not video.get('description'):
+                        integrity_report['video_records']['invalid_metadata'] += 1
+                        integrity_report['issues_found'].append({
+                            'type': 'missing_description_tiktok_instagram',
+                            'description': f'Missing description for {platform} video {video["id"]} - can extract from external DB',
+                            'severity': 'medium',
+                            'video_id': video['id'],
+                            'platform': platform,
+                            'file_path': video.get('file_path')
                         })
             
             # 3. Verificar thumbnails
@@ -843,6 +857,21 @@ class IntegrityOperations:
                                 fixed_count += 1
                                 logger.info(f"✅ Corregido metadatos para video {video_id}")
                 
+                elif issue_type == 'missing_description_tiktok_instagram':
+                    # Extraer descripción de bases de datos externas
+                    video_id = issue.get('video_id')
+                    platform = issue.get('platform')
+                    file_path = issue.get('file_path')
+                    
+                    if video_id and platform and file_path:
+                        description = self._extract_description_from_external_db(file_path, platform)
+                        if description:
+                            self.db.update_video(video_id, {'description': description})
+                            fixed_count += 1
+                            logger.info(f"✅ Corregida descripción para video {platform} {video_id}: {description[:50]}...")
+                        else:
+                            logger.warning(f"⚠️ No se pudo extraer descripción para video {video_id}")
+                
                 elif issue_type == 'orphaned_thumbnail':
                     # Eliminar thumbnails huérfanos
                     file_name = issue.get('file_name')
@@ -869,6 +898,72 @@ class IntegrityOperations:
                 continue
         
         return fixed_count
+    
+    def _extract_description_from_external_db(self, file_path: str, platform: str) -> Optional[str]:
+        """Extraer descripción desde bases de datos externas de 4K Apps"""
+        try:
+            from src.external_sources import ExternalSourcesManager
+            
+            # Usar ExternalSourcesManager para acceder a las BDs externas
+            external_manager = ExternalSourcesManager()
+            
+            if platform == 'tiktok':
+                # Buscar en BD de TikTok
+                if not external_manager.tiktok_db_path or not external_manager.tiktok_db_path.exists():
+                    return None
+                
+                conn = external_manager._get_connection(external_manager.tiktok_db_path)
+                if not conn:
+                    return None
+                
+                # Extraer nombre del archivo desde la ruta completa
+                file_name = Path(file_path).name
+                
+                # Buscar por nombre de archivo en la BD de TikTok
+                cursor = conn.execute("""
+                    SELECT description 
+                    FROM MediaItems 
+                    WHERE relativePath LIKE ? 
+                    LIMIT 1
+                """, (f'%{file_name}',))
+                
+                result = cursor.fetchone()
+                conn.close()
+                
+                if result and result[0]:
+                    return result[0].strip()
+                    
+            elif platform == 'instagram':
+                # Buscar en BD de Instagram
+                if not external_manager.instagram_db_path or not external_manager.instagram_db_path.exists():
+                    return None
+                
+                conn = external_manager._get_connection(external_manager.instagram_db_path)
+                if not conn:
+                    return None
+                
+                # Extraer nombre del archivo desde la ruta completa
+                file_name = Path(file_path).name
+                
+                # Buscar por nombre de archivo en la BD de Instagram
+                cursor = conn.execute("""
+                    SELECT title 
+                    FROM photos 
+                    WHERE file LIKE ? 
+                    LIMIT 1
+                """, (f'%{file_name}',))
+                
+                result = cursor.fetchone()
+                conn.close()
+                
+                if result and result[0]:
+                    return result[0].strip()
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error extrayendo descripción desde BD externa para {platform}: {e}")
+            return None
 
 
 # Funciones de conveniencia para compatibilidad
