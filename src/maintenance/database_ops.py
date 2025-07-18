@@ -100,6 +100,11 @@ class DatabaseOperations:
                 logger.info("🔍 Verificando duplicados (optimizado)...")
                 external_videos = self._filter_duplicates_optimized(external_videos)
             
+            # 🔧 ARREGLADO: Aplicar límite DESPUÉS del filtro de duplicados
+            if limit and len(external_videos) > limit:
+                logger.info(f"🔢 Aplicando límite: {len(external_videos)} -> {limit} videos")
+                external_videos = external_videos[:limit]
+            
             if not external_videos:
                 logger.info("✅ Todos los videos ya están en la base de datos")
                 return {
@@ -709,27 +714,38 @@ class DatabaseOperations:
             }
     
     def _filter_duplicates_optimized(self, external_videos: List[Dict]) -> List[Dict]:
-        """Filtrar duplicados usando consulta optimizada"""
+        """🚀 NUEVA ESTRATEGIA: Filtrar duplicados usando consulta optimizada con búsqueda inteligente"""
         if not external_videos:
             return []
         
         # Crear mapping de rutas para consulta rápida
         file_paths = [video['file_path'] for video in external_videos]
         
-        # Consultar BD por todas las rutas de una vez
+        # 🚀 NUEVA ESTRATEGIA: Consultar BD por todas las rutas de una vez (incluyendo eliminados)
         existing_paths = set()
         if file_paths:
-            placeholders = ','.join(['?' for _ in file_paths])
-            query = f"SELECT file_path FROM videos WHERE file_path IN ({placeholders})"
-            
-            with self.db.get_connection() as conn:
-                cursor = conn.execute(query, file_paths)
-                existing_paths = {row[0] for row in cursor.fetchall()}
+            # Dividir en lotes para evitar límites SQL con muchos parámetros
+            batch_size = 900  # SQLite tiene límite de ~1000 parámetros
+            for i in range(0, len(file_paths), batch_size):
+                batch_paths = file_paths[i:i + batch_size]
+                placeholders = ','.join(['?' for _ in batch_paths])
+                query = f"SELECT file_path FROM videos WHERE file_path IN ({placeholders}) AND deleted_at IS NULL"
+                
+                with self.db.get_connection() as conn:
+                    cursor = conn.execute(query, batch_paths)
+                    existing_paths.update(row[0] for row in cursor.fetchall())
         
         # Filtrar videos que no existen en BD
         unique_videos = [video for video in external_videos if video['file_path'] not in existing_paths]
         
+        # 🚀 NUEVA ESTRATEGIA: Ordenar por ID descendente para priorizar videos más recientes
+        # Esto ayuda a importar los videos más nuevos primero
+        unique_videos.sort(key=lambda v: v.get('external_id', 0), reverse=True)
+        
         logger.info(f"🔍 Duplicados filtrados: {len(external_videos)} -> {len(unique_videos)}")
+        if len(unique_videos) > 0:
+            logger.info(f"📊 Rango de IDs externos: {unique_videos[-1].get('external_id', 'N/A')} - {unique_videos[0].get('external_id', 'N/A')}")
+        
         return unique_videos
     
     def _extract_metadata_parallel(self, videos: List[Dict], force: bool = False, 

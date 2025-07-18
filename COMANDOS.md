@@ -274,20 +274,6 @@ python maintenance.py populate-db [opciones]
 - `--force`: Forzar reimportación de videos existentes
 - `--file "RUTA"`: **🆕 Importar un video específico por ruta**
 
-**🆕 NUEVA FUNCIONALIDAD: Importar Video Específico**
-```bash
-# Importar un video específico desde cualquier ubicación
-python maintenance.py populate-db --file "D:\Videos\mi_video.mp4"
-
-# Importar y forzar actualización si ya existe
-python maintenance.py populate-db --file "C:\Users\Usuario\Downloads\video.mp4" --force
-
-# Ejemplos con rutas de apps 4K (obtendrá metadatos completos automáticamente)
-python maintenance.py populate-db --file "D:\4K Tokkit\Username\video.mp4"
-python maintenance.py populate-db --file "C:\Users\Usuario\Downloads\4K Video Downloader+\Canal\video.mp4"
-python maintenance.py populate-db --file "D:\4K All\Youtube\Creador\video.mp4"
-```
-
 **Detección Automática Inteligente:**
 - **Apps 4K**: Si el video pertenece a una app 4K, extrae automáticamente metadatos completos (título/descripción, creador, etc.)
 - **Carpetas Organizadas**: Detecta plataforma y creador desde la estructura de carpetas
@@ -305,28 +291,25 @@ python maintenance.py populate-db --file "D:\4K All\Youtube\Creador\video.mp4"
 # Poblar desde todas las fuentes disponibles
 python maintenance.py populate-db --source all
 
-# Solo videos de YouTube (953 total: 675 BD + 278 carpetas)
+# Solo videos de YouTube de 4K
 python maintenance.py populate-db --source db --platform youtube --limit 50
 
-# 🆕 Solo videos de Iwara (89 disponibles)
-python maintenance.py populate-db --platform iwara --limit 20
+# Solo videos de X
+python maintenance.py populate-db --platform X --limit 20
 
-# 🆕 Solo plataformas adicionales (Iwara, etc.)
+# Solo plataformas adicionales (X, etc.)
 python maintenance.py populate-db --platform other --source organized
 
-# 🆕 Todas las plataformas (principales + adicionales)
+# Todas las plataformas
 python maintenance.py populate-db --platform all-platforms --limit 100
 
-# Forzar actualización completa de TikTok (496 disponibles)
+# Forzar actualización completa de TikTok
 python maintenance.py populate-db --platform tiktok --force
 
-# Solo desde carpetas organizadas (278 elementos principales + adicionales)
+# Solo desde carpetas organizadas
 python maintenance.py populate-db --source organized --limit 100
 
-# Poblado masivo para testing de rendimiento
-python maintenance.py populate-db --limit 1000
-
-# 🆕 NUEVOS EJEMPLOS - Archivos Específicos
+# Archivos Específicos
 python maintenance.py populate-db --file "D:\MisVideos\baile_hutao.mp4"
 python maintenance.py populate-db --file "E:\Descargas\tiktok_trend.mp4" --force
 ```

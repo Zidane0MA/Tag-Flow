@@ -127,9 +127,12 @@ class ExternalSourcesManager:
         
         return videos
     
-    def extract_tiktok_videos(self) -> List[Dict]:
+    def extract_tiktok_videos(self, offset: int = 0, limit: int = None) -> List[Dict]:
         """Extraer videos de la base de datos de 4K Tokkit"""
-        logger.info("Extrayendo videos de TikTok...")
+        if limit is not None:
+            logger.info(f"Extrayendo videos de TikTok (offset: {offset}, limit: {limit})...")
+        else:
+            logger.info("Extrayendo videos de TikTok...")
         videos = []
         
         conn = self._get_connection(self.tiktok_db_path)
@@ -137,18 +140,33 @@ class ExternalSourcesManager:
             return videos
         
         try:
-            query = """
-            SELECT 
-                id,
-                authorName as creator_name,
-                description as video_title,
-                relativePath as relative_path
-            FROM MediaItems
-            WHERE relativePath IS NOT NULL
-            ORDER BY id DESC
-            """
+            if limit is not None:
+                query = """
+                SELECT 
+                    id,
+                    authorName as creator_name,
+                    description as video_title,
+                    relativePath as relative_path
+                FROM MediaItems
+                WHERE relativePath IS NOT NULL
+                ORDER BY id DESC
+                LIMIT ? OFFSET ?
+                """
+                cursor = conn.execute(query, (limit, offset))
+            else:
+                query = """
+                SELECT 
+                    id,
+                    authorName as creator_name,
+                    description as video_title,
+                    relativePath as relative_path
+                FROM MediaItems
+                WHERE relativePath IS NOT NULL
+                ORDER BY id DESC
+                LIMIT -1 OFFSET ?
+                """
+                cursor = conn.execute(query, (offset,))
             
-            cursor = conn.execute(query)
             rows = cursor.fetchall()
             
             # 🆕 MEJORADO: Extraer ruta base dinámicamente de EXTERNAL_TIKTOK_DB
@@ -189,9 +207,12 @@ class ExternalSourcesManager:
         
         return videos
     
-    def extract_instagram_content(self) -> List[Dict]:
+    def extract_instagram_content(self, offset: int = 0, limit: int = None) -> List[Dict]:
         """Extraer contenido de la base de datos de 4K Stogram"""
-        logger.info("Extrayendo contenido de Instagram...")
+        if limit is not None:
+            logger.info(f"Extrayendo contenido de Instagram (offset: {offset}, limit: {limit})...")
+        else:
+            logger.info("Extrayendo contenido de Instagram...")
         content = []
         
         conn = self._get_connection(self.instagram_db_path)
@@ -199,18 +220,33 @@ class ExternalSourcesManager:
             return content
         
         try:
-            query = """
-            SELECT 
-                id,
-                title,
-                file as relative_path,
-                ownerName as creator_name
-            FROM photos
-            WHERE file IS NOT NULL
-            ORDER BY id DESC
-            """
+            if limit is not None:
+                query = """
+                SELECT 
+                    id,
+                    title,
+                    file as relative_path,
+                    ownerName as creator_name
+                FROM photos
+                WHERE file IS NOT NULL
+                ORDER BY id DESC
+                LIMIT ? OFFSET ?
+                """
+                cursor = conn.execute(query, (limit, offset))
+            else:
+                query = """
+                SELECT 
+                    id,
+                    title,
+                    file as relative_path,
+                    ownerName as creator_name
+                FROM photos
+                WHERE file IS NOT NULL
+                ORDER BY id DESC
+                LIMIT -1 OFFSET ?
+                """
+                cursor = conn.execute(query, (offset,))
             
-            cursor = conn.execute(query)
             rows = cursor.fetchall()
             
             # 🆕 MEJORADO: Extraer ruta base dinámicamente de EXTERNAL_INSTAGRAM_DB
@@ -410,7 +446,8 @@ class ExternalSourcesManager:
     
     def get_all_videos_from_source(self, source: str, platform: Optional[str] = None, limit: Optional[int] = None) -> List[Dict]:
         """
-        Obtener videos de una fuente específica
+        🚀 NUEVA ESTRATEGIA: Obtener videos de una fuente específica
+        Busca videos nuevos en todo el rango, no solo después del offset
         
         Args:
             source: 'db' para bases de datos, 'organized' para carpetas organizadas, 'all' para ambas
@@ -419,16 +456,37 @@ class ExternalSourcesManager:
         """
         all_videos = []
         
+        # 🚀 NUEVA ESTRATEGIA: Obtener rutas ya importadas para filtrado inteligente
+        def get_imported_paths(platform_name: str) -> set:
+            try:
+                from src.database import DatabaseManager
+                db = DatabaseManager()
+                with db.get_connection() as conn:
+                    cursor = conn.execute(
+                        "SELECT file_path FROM videos WHERE platform = ? AND deleted_at IS NULL",
+                        (platform_name,)
+                    )
+                    return {row[0] for row in cursor.fetchall()}
+            except Exception as e:
+                logger.debug(f"Error obteniendo rutas importadas para {platform_name}: {e}")
+                return set()
+        
         if source in ['db', 'all']:
             # Extraer de bases de datos
             if platform is None or platform == 'youtube':
                 all_videos.extend(self.extract_youtube_videos())
             
             if platform is None or platform == 'tiktok':
-                all_videos.extend(self.extract_tiktok_videos())
+                # 🚀 NUEVA ESTRATEGIA: Extraer TODOS los videos de TikTok (sin offset)
+                # Luego filtraremos por duplicados de manera inteligente
+                logger.info("🔍 Extrayendo TODOS los videos de TikTok para búsqueda inteligente...")
+                all_videos.extend(self.extract_tiktok_videos(offset=0, limit=None))
             
             if platform is None or platform == 'instagram':
-                all_videos.extend(self.extract_instagram_content())
+                # 🚀 NUEVA ESTRATEGIA: Extraer TODOS los videos de Instagram (sin offset)
+                # Luego filtraremos por duplicados de manera inteligente
+                logger.info("🔍 Extrayendo TODOS los videos de Instagram para búsqueda inteligente...")
+                all_videos.extend(self.extract_instagram_content(offset=0, limit=None))
         
         if source in ['organized', 'all']:
             # 🆕 Usar extractor extendido para manejar plataformas adicionales
@@ -447,9 +505,8 @@ class ExternalSourcesManager:
                 seen_paths.add(video['file_path'])
                 unique_videos.append(video)
         
-        # Aplicar límite si se especifica
-        if limit and len(unique_videos) > limit:
-            unique_videos = unique_videos[:limit]
+        # 🔧 ARREGLADO: NO aplicar límite aquí, dejarlo para después del filtro de duplicados
+        # El límite se aplicará en database_ops.py después de filtrar duplicados
         
         logger.info(f"Total de videos únicos extraídos: {len(unique_videos)}")
         return unique_videos
@@ -515,10 +572,10 @@ class ExternalSourcesManager:
             yt_videos = self.extract_youtube_videos()
             stats['main']['youtube']['db'] = len(yt_videos)
             
-            tt_videos = self.extract_tiktok_videos()
+            tt_videos = self.extract_tiktok_videos(offset=0, limit=None)  # Para stats usar offset 0
             stats['main']['tiktok']['db'] = len(tt_videos)
             
-            ig_content = self.extract_instagram_content()
+            ig_content = self.extract_instagram_content(offset=0, limit=None)  # Para stats usar offset 0
             stats['main']['instagram']['db'] = len(ig_content)
             
             # Stats de carpetas organizadas (principales + adicionales)
@@ -550,10 +607,10 @@ class ExternalSourcesManager:
             yt_videos = self.extract_youtube_videos()
             stats['youtube']['db'] = len(yt_videos)
             
-            tt_videos = self.extract_tiktok_videos()
+            tt_videos = self.extract_tiktok_videos(offset=0, limit=None)  # Para stats usar offset 0
             stats['tiktok']['db'] = len(tt_videos)
             
-            ig_content = self.extract_instagram_content()
+            ig_content = self.extract_instagram_content(offset=0, limit=None)  # Para stats usar offset 0
             stats['instagram']['db'] = len(ig_content)
             
             # Stats de carpetas organizadas
