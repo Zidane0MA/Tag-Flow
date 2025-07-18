@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard de Mantenimiento - Tag-Flow V2</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #1a1a1a;
+            color: #ffffff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        .navbar {
+            background-color: #2d2d2d !important;
+            border-bottom: 2px solid #444;
+        }
+        
+        .card {
+            background-color: #2d2d2d;
+            border: 1px solid #444;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .card-header {
+            background-color: #3d3d3d;
+            border-bottom: 1px solid #555;
+            font-weight: bold;
+        }
+        
+        .progress {
+            background-color: #444;
+            height: 8px;
+        }
+        
+        .progress-bar {
+            transition: width 0.3s ease;
+        }
+        
+        .status-pending { color: #ffc107; }
+        .status-running { color: #17a2b8; }
+        .status-completed { color: #28a745; }
+        .status-failed { color: #dc3545; }
+        .status-cancelled { color: #6c757d; }
+        .status-paused { color: #fd7e14; }
+        
+        .metric-card {
+            background: linear-gradient(135deg, #2d2d2d 0%, #3d3d3d 100%);
+            border-left: 4px solid #007bff;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+        
+        .metric-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #007bff;
+        }
+        
+        .metric-label {
+            color: #aaa;
+            font-size: 0.9rem;
+        }
+        
+        .log-entry {
+            background-color: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 4px;
+            padding: 8px 12px;
+            margin-bottom: 5px;
+            font-family: 'Consolas', monospace;
+            font-size: 0.85rem;
+        }
+        
+        .log-info { border-left: 3px solid #17a2b8; }
+        .log-success { border-left: 3px solid #28a745; }
+        .log-warning { border-left: 3px solid #ffc107; }
+        .log-error { border-left: 3px solid #dc3545; }
+        
+        .connection-status {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+        }
+        
+        .connection-connected {
+            background-color: #28a745;
+            color: white;
+        }
+        
+        .connection-disconnected {
+            background-color: #dc3545;
+            color: white;
+        }
+        
+        .operation-actions {
+            display: flex;
+            gap: 5px;
+        }
+        
+        .btn-sm {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.75rem;
+        }
+        
+        .health-score {
+            font-size: 3rem;
+            font-weight: bold;
+            text-align: center;
+        }
+        
+        .health-excellent { color: #28a745; }
+        .health-good { color: #17a2b8; }
+        .health-warning { color: #ffc107; }
+        .health-critical { color: #dc3545; }
+        
+        .real-time-chart {
+            height: 200px;
+            background-color: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 4px;
+            padding: 10px;
+        }
+        
+        .sidebar {
+            background-color: #2d2d2d;
+            height: 100vh;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 250px;
+            padding-top: 60px;
+            border-right: 1px solid #444;
+        }
+        
+        .main-content {
+            margin-left: 250px;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        
+        .sidebar-nav {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        
+        .sidebar-nav li {
+            border-bottom: 1px solid #333;
+        }
+        
+        .sidebar-nav a {
+            display: block;
+            padding: 15px 20px;
+            color: #aaa;
+            text-decoration: none;
+            transition: all 0.3s;
+        }
+        
+        .sidebar-nav a:hover,
+        .sidebar-nav a.active {
+            background-color: #3d3d3d;
+            color: #007bff;
+        }
+        
+        .notification-toast {
+            position: fixed;
+            top: 70px;
+            right: 20px;
+            z-index: 1050;
+            min-width: 300px;
+            max-width: 500px;
+        }
+        
+        .toast {
+            background-color: #2d2d2d;
+            border: 1px solid #444;
+            color: #fff;
+        }
+        
+        .toast-header {
+            background-color: #3d3d3d;
+            border-bottom: 1px solid #555;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .operation-card {
+            background: linear-gradient(135deg, #2d2d2d 0%, #3d3d3d 100%);
+            border-radius: 8px;
+            padding: 20px;
+            border: 1px solid #444;
+        }
+        
+        .operation-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .operation-title {
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: #007bff;
+        }
+        
+        .operation-status {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        
+        .operation-metrics {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        .metric-small {
+            text-align: center;
+            padding: 10px;
+            background-color: #1a1a1a;
+            border-radius: 4px;
+        }
+        
+        .metric-small .value {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #007bff;
+        }
+        
+        .metric-small .label {
+            font-size: 0.7rem;
+            color: #aaa;
+            text-transform: uppercase;
+        }
+    </style>
+</head>
+<body>
+    <!-- Connection Status -->
+    <div id="connectionStatus" class="connection-status connection-disconnected">
+        <i class="fas fa-wifi"></i> Desconectado
+    </div>
+    
+    <!-- Notification Container -->
+    <div id="notificationContainer" class="notification-toast"></div>
+    
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark fixed-top">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#"><i class="fas fa-cogs"></i> Tag-Flow V2 - Dashboard</a>
+            <div class="navbar-nav ms-auto">
+                <span class="navbar-text">
+                    <i class="fas fa-clock"></i> <span id="currentTime"></span>
+                </span>
+            </div>
+        </div>
+    </nav>
+    
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <ul class="sidebar-nav">
+            <li><a href="#overview" class="nav-link active"><i class="fas fa-tachometer-alt"></i> Overview</a></li>
+            <li><a href="#operations" class="nav-link"><i class="fas fa-tasks"></i> Operaciones</a></li>
+            <li><a href="#system" class="nav-link"><i class="fas fa-server"></i> Sistema</a></li>
+            <li><a href="#websockets" class="nav-link"><i class="fas fa-broadcast-tower"></i> WebSockets</a></li>
+            <li><a href="#logs" class="nav-link"><i class="fas fa-file-alt"></i> Logs</a></li>
+            <li><a href="#settings" class="nav-link"><i class="fas fa-cog"></i> Configuración</a></li>
+        </ul>
+    </div>
+    
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Overview Section -->
+        <div id="overview" class="content-section">
+            <div class="row">
+                <div class="col-md-3">
+                    <div class="card">
+                        <div class="card-header">
+                            <i class="fas fa-heart"></i> Salud del Sistema
+                        </div>
+                        <div class="card-body text-center">
+                            <div id="healthScore" class="health-score health-excellent">95</div>
+                            <div class="metric-label">Puntuación General</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-9">
+                    <div class="stats-grid">
+                        <div class="metric-card">
+                            <div class="metric-value" id="activeOperations">0</div>
+                            <div class="metric-label">Operaciones Activas</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-value" id="totalOperations">0</div>
+                            <div class="metric-label">Total Operaciones</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-value" id="completedOperations">0</div>
+                            <div class="metric-label">Completadas</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-value" id="failedOperations">0</div>
+                            <div class="metric-label">Fallidas</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <i class="fas fa-microchip"></i> CPU
+                        </div>
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <span>Uso:</span>
+                                <span id="cpuUsage">0%</span>
+                            </div>
+                            <div class="progress mt-2">
+                                <div id="cpuProgress" class="progress-bar bg-info" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <i class="fas fa-memory"></i> Memoria
+                        </div>
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <span>Uso:</span>
+                                <span id="memoryUsage">0%</span>
+                            </div>
+                            <div class="progress mt-2">
+                                <div id="memoryProgress" class="progress-bar bg-warning" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <i class="fas fa-hdd"></i> Disco
+                        </div>
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <span>Uso:</span>
+                                <span id="diskUsage">0%</span>
+                            </div>
+                            <div class="progress mt-2">
+                                <div id="diskProgress" class="progress-bar bg-danger" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Operations Section -->
+        <div id="operations" class="content-section" style="display: none;">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between">
+                    <span><i class="fas fa-tasks"></i> Operaciones en Tiempo Real</span>
+                    <div>
+                        <button class="btn btn-sm btn-primary" onclick="refreshOperations()">
+                            <i class="fas fa-sync"></i> Actualizar
+                        </button>
+                        <button class="btn btn-sm btn-warning" onclick="pauseAllOperations()">
+                            <i class="fas fa-pause"></i> Pausar Todas
+                        </button>
+                        <button class="btn btn-sm btn-danger" onclick="cancelAllOperations()">
+                            <i class="fas fa-stop"></i> Cancelar Todas
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div id="operationsList" class="row">
+                        <div class="col-12 text-center text-muted">
+                            No hay operaciones activas
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- System Section -->
+        <div id="system" class="content-section" style="display: none;">
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <i class="fas fa-database"></i> Base de Datos
+                        </div>
+                        <div class="card-body">
+                            <div class="metric-small">
+                                <div class="value" id="dbTotalVideos">0</div>
+                                <div class="label">Videos Totales</div>
+                            </div>
+                            <div class="metric-small">
+                                <div class="value" id="dbSize">0 MB</div>
+                                <div class="label">Tamaño BD</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <i class="fas fa-images"></i> Thumbnails
+                        </div>
+                        <div class="card-body">
+                            <div class="metric-small">
+                                <div class="value" id="thumbnailsTotal">0</div>
+                                <div class="label">Total Thumbnails</div>
+                            </div>
+                            <div class="metric-small">
+                                <div class="value" id="thumbnailsSize">0 MB</div>
+                                <div class="label">Tamaño Total</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- WebSockets Section -->
+        <div id="websockets" class="content-section" style="display: none;">
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-broadcast-tower"></i> Estado WebSockets
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="metric-small">
+                                <div class="value" id="wsActiveConnections">0</div>
+                                <div class="label">Conexiones Activas</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="metric-small">
+                                <div class="value" id="wsTotalConnections">0</div>
+                                <div class="label">Total Conexiones</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="metric-small">
+                                <div class="value" id="wsMessagesSent">0</div>
+                                <div class="label">Mensajes Enviados</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="metric-small">
+                                <div class="value" id="wsMessagesFailed">0</div>
+                                <div class="label">Mensajes Fallidos</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Logs Section -->
+        <div id="logs" class="content-section" style="display: none;">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between">
+                    <span><i class="fas fa-file-alt"></i> Logs en Tiempo Real</span>
+                    <div>
+                        <button class="btn btn-sm btn-secondary" onclick="clearLogs()">
+                            <i class="fas fa-trash"></i> Limpiar
+                        </button>
+                        <button class="btn btn-sm btn-primary" onclick="toggleAutoScroll()">
+                            <i class="fas fa-arrows-alt-v"></i> Auto-scroll
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div id="logContainer" style="max-height: 400px; overflow-y: auto;">
+                        <!-- Los logs se agregarán dinámicamente aquí -->
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Settings Section -->
+        <div id="settings" class="content-section" style="display: none;">
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-cog"></i> Configuración
+                </div>
+                <div class="card-body">
+                    <form id="settingsForm">
+                        <div class="mb-3">
+                            <label class="form-label">Intervalo de Actualización (segundos)</label>
+                            <input type="number" class="form-control" id="updateInterval" value="1" min="0.5" max="10" step="0.5">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Notificaciones</label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="enableNotifications" checked>
+                                <label class="form-check-label" for="enableNotifications">
+                                    Habilitar notificaciones
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Nivel de Log</label>
+                            <select class="form-select" id="logLevel">
+                                <option value="debug">Debug</option>
+                                <option value="info" selected>Info</option>
+                                <option value="warning">Warning</option>
+                                <option value="error">Error</option>
+                            </select>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary">Guardar Configuración</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/maintenance-dashboard.js') }}"></script>
+</body>
+</html>

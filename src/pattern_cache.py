@@ -4,11 +4,68 @@ Sistema de cache para mejorar rendimiento de consultas frecuentes en main.py
 """
 
 import time
-from typing import Set, List, Dict, Optional, Any
+from typing import Set, List, Dict, Optional, Any, Callable
 from functools import lru_cache
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+class PatternCache:
+    """Cache LRU para patrones de personajes con gestión automática"""
+    
+    def __init__(self, max_size=1000):
+        self.max_size = max_size
+        self.cache = {}
+        self.access_order = []
+        self.hits = 0
+        self.misses = 0
+        
+    def get_or_compute(self, key: str, compute_func: Callable, *args, **kwargs):
+        """Obtener valor del cache o computarlo"""
+        if key in self.cache:
+            self.hits += 1
+            # Mover al final (más reciente)
+            self.access_order.remove(key)
+            self.access_order.append(key)
+            return self.cache[key]
+        
+        # Cache miss - computar valor
+        self.misses += 1
+        value = compute_func(*args, **kwargs)
+        
+        # Agregar al cache
+        self.cache[key] = value
+        self.access_order.append(key)
+        
+        # Limpiar si excede tamaño máximo
+        if len(self.cache) > self.max_size:
+            oldest_key = self.access_order.pop(0)
+            del self.cache[oldest_key]
+            
+        return value
+    
+    def get_stats(self) -> Dict:
+        """Obtener estadísticas del cache"""
+        total_requests = self.hits + self.misses
+        hit_rate = (self.hits / max(1, total_requests)) * 100
+        
+        return {
+            'max_size': self.max_size,
+            'current_size': len(self.cache),
+            'hits': self.hits,
+            'misses': self.misses,
+            'total_requests': total_requests,
+            'hit_rate': round(hit_rate, 1),
+            'efficiency_score': round(hit_rate, 1)
+        }
+    
+    def clear(self):
+        """Limpiar cache"""
+        self.cache.clear()
+        self.access_order.clear()
+        self.hits = 0
+        self.misses = 0
 
 class DatabaseCache:
     """Cache LRU para consultas frecuentes de main.py con gestión automática"""
@@ -147,9 +204,17 @@ class DatabaseCache:
 
 # Instancia global del cache para usar en toda la aplicación
 _global_cache = None
+_global_pattern_cache = None
 
-def get_global_cache() -> DatabaseCache:
-    """Obtener instancia global del cache"""
+def get_global_cache() -> PatternCache:
+    """Obtener instancia global del cache de patrones"""
+    global _global_pattern_cache
+    if _global_pattern_cache is None:
+        _global_pattern_cache = PatternCache()
+    return _global_pattern_cache
+
+def get_global_database_cache() -> DatabaseCache:
+    """Obtener instancia global del cache de base de datos"""
     global _global_cache
     if _global_cache is None:
         _global_cache = DatabaseCache()
@@ -157,6 +222,8 @@ def get_global_cache() -> DatabaseCache:
 
 def clear_global_cache():
     """Limpiar cache global"""
-    global _global_cache
+    global _global_cache, _global_pattern_cache
     if _global_cache:
         _global_cache.clear_detection_cache()
+    if _global_pattern_cache:
+        _global_pattern_cache.clear()

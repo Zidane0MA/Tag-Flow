@@ -1783,7 +1783,7 @@ def api_maintenance_database_stats():
 @app.route('/maintenance-monitor')
 def maintenance_monitor():
     """Página del monitor de operaciones de mantenimiento"""
-    return render_template('maintenance_monitor.html')
+    return render_template('maintenance_dashboard.html')
 
 @app.route('/api/admin/verify', methods=['POST'])
 def api_admin_verify():
