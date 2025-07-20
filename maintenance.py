@@ -13,17 +13,70 @@ from typing import Dict, List, Optional, Any
 # Agregar src al path
 sys.path.append(str(Path(__file__).parent / 'src'))
 
-# Importar los módulos especializados
-from src.maintenance.backup_ops import BackupOperations
-from src.maintenance.character_ops import CharacterOperations
-from src.maintenance.integrity_ops import IntegrityOperations
-from src.maintenance.thumbnail_ops import ThumbnailOperations
-from src.maintenance.database_ops import DatabaseOperations
-from src.maintenance.utils import format_bytes, format_number, TimeUtils
+# Los módulos se importarán dinámicamente para evitar logs innecesarios en --help
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
+
+def show_help():
+    """Muestra ayuda personalizada sin inicializar el sistema"""
+    help_text = """
+🔧 Tag-Flow V2 - Sistema de Mantenimiento Modular
+
+USO:
+    python maintenance.py <COMANDO> [OPCIONES]
+
+📦 OPERACIONES DE BACKUP:
+    backup                   Crear backup completo del sistema
+    restore                  Restaurar desde backup
+    list-backups            Listar backups disponibles
+    cleanup-backups         Limpiar backups antiguos
+
+🔍 OPERACIONES DE INTEGRIDAD:
+    verify                   Verificación completa del sistema
+    verify-files            Verificar archivos de video únicamente
+    integrity-report        Generar reporte de salud del sistema
+
+🖼️ OPERACIONES DE THUMBNAILS:
+    regenerate-thumbnails   Regenerar thumbnails faltantes/corruptos
+    populate-thumbnails     Generar thumbnails masivamente
+    clean-thumbnails        Eliminar thumbnails huérfanos
+    thumbnail-stats         Estadísticas de thumbnails
+
+🗃️ OPERACIONES DE BASE DE DATOS:
+    populate-db             Importar videos desde fuentes externas
+    optimize-db             Optimizar y defragmentar base de datos
+    clear-db                Limpiar registros de base de datos
+    db-stats                Estadísticas de base de datos
+
+👤 OPERACIONES DE PERSONAJES:
+    character-stats         Estadísticas del sistema de IA
+    add-character           Añadir personaje personalizado
+    clean-false-positives   Limpiar detecciones incorrectas
+    update-creator-mappings Actualizar mapeos creador→personaje
+    analyze-titles          Analizar patrones en títulos
+    download-character-images Descargar imágenes de referencia
+    character-detection-report Reporte de detección de personajes
+
+🔧 OPCIONES COMUNES:
+    --help, -h              Mostrar esta ayuda
+    --force                 Forzar acción sin confirmación
+    --limit N               Límite de elementos a procesar
+    --verbose, -v           Información detallada
+    --platform PLATAFORMA   youtube|tiktok|instagram|other|all-platforms
+
+📚 EJEMPLOS RÁPIDOS:
+    python maintenance.py character-stats
+    python maintenance.py verify --fix-issues
+    python maintenance.py backup --compress
+    python maintenance.py populate-db --platform tiktok --limit 50
+    python maintenance.py populate-thumbnails --platform youtube
+
+📖 Para documentación completa: MAINTENANCE.md
+    """
+    print(help_text)
 
 
 class MaintenanceDispatcher:
@@ -395,13 +448,37 @@ class MaintenanceDispatcher:
         return result
 
 
+def lazy_import_modules():
+    """Importar módulos solo cuando se necesiten (evita logs en --help)"""
+    global BackupOperations, CharacterOperations, IntegrityOperations
+    global ThumbnailOperations, DatabaseOperations, format_bytes, format_number, TimeUtils
+    
+    from src.maintenance.backup_ops import BackupOperations
+    from src.maintenance.character_ops import CharacterOperations
+    from src.maintenance.integrity_ops import IntegrityOperations
+    from src.maintenance.thumbnail_ops import ThumbnailOperations
+    from src.maintenance.database_ops import DatabaseOperations
+    from src.maintenance.utils import format_bytes, format_number, TimeUtils
+
 def main():
     """Función principal con CLI"""
+    # Verificar si solo se solicita ayuda (evitar inicialización innecesaria)
+    if len(sys.argv) == 2 and sys.argv[1] in ['-h', '--help']:
+        show_help()
+        return 0
+    
+    # Si no hay argumentos, mostrar ayuda personalizada también
+    if len(sys.argv) == 1:
+        show_help()
+        return 0
+    
     parser = argparse.ArgumentParser(
         description='🔧 Tag-Flow V2 - Sistema de Mantenimiento Modular',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-Ejemplos de uso:
+📖 Para documentación completa: MAINTENANCE.md
+
+🔥 Ejemplos rápidos:
   python maintenance.py backup --compress
   python maintenance.py character-stats
   python maintenance.py verify --fix-issues
@@ -459,6 +536,9 @@ Ejemplos de uso:
     # Configurar logging
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
+    
+    # Importar módulos ahora que sabemos que no es --help
+    lazy_import_modules()
     
     # Inicializar dispatcher
     dispatcher = MaintenanceDispatcher()
