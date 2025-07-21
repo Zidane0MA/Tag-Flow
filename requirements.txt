@@ -13,6 +13,7 @@ Pillow==10.1.0
 
 # AI/ML Recognition
 deepface  # Momentaneo
+tf-keras
 #tensorflow==2.18.0 # Momentaneo
 # insightface==0.7.3  # pensado en implementar
 # torch==2.1.0+cu118

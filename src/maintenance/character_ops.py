@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 👥 Character Operations Module
-Módulo especializado para operaciones de personajes extraído de maintenance.py
+Módulo especializado para operaciones de personajes extraído de main.py
 """
 
 import os
@@ -480,13 +480,23 @@ class CharacterOperations:
                     
                     # Registrar menciones de personajes
                     for char in detected_chars:
-                        char_name = char.get('name', 'Unknown')
+                        # Verificar que char es un diccionario
+                        if isinstance(char, dict):
+                            char_name = char.get('name', 'Unknown')
+                            confidence = char.get('confidence', 0)
+                        elif isinstance(char, str):
+                            char_name = char
+                            confidence = 0
+                        else:
+                            char_name = str(char)
+                            confidence = 0
+                            
                         if char_name not in character_mentions:
                             character_mentions[char_name] = []
                         character_mentions[char_name].append({
                             'video_id': video['id'],
                             'title': title,
-                            'confidence': char.get('confidence', 0)
+                            'confidence': confidence
                         })
                     
                     # Patrones de título
@@ -702,7 +712,13 @@ class CharacterOperations:
                             detection_stats['creator_stats'][creator]['with_characters'] += 1
                             
                             for char in characters:
-                                char_name = char.get('name', 'Unknown')
+                                # Verificar que char es un diccionario
+                                if isinstance(char, dict):
+                                    char_name = char.get('name', 'Unknown')
+                                elif isinstance(char, str):
+                                    char_name = char
+                                else:
+                                    char_name = str(char)
                                 
                                 # Frecuencia global
                                 if char_name not in detection_stats['character_frequency']:

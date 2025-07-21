@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 🔍 Integrity Operations Module
-Módulo especializado para verificaciones de integridad extraído de maintenance.py
+Módulo especializado para verificaciones de integridad extraído de main.py
 """
 
 import os
@@ -752,7 +752,7 @@ class IntegrityOperations:
                     'priority': 'high',
                     'component': 'database',
                     'action': 'Ejecutar verificación de integridad con corrección automática',
-                    'command': 'python maintenance.py verify --fix-issues'
+                    'command': 'python main.py verify --fix-issues'
                 })
             
             if integrity_report['components']['video_files']['score'] < 90:
@@ -760,7 +760,7 @@ class IntegrityOperations:
                     'priority': 'medium',
                     'component': 'video_files',
                     'action': 'Revisar archivos de video faltantes y actualizar rutas',
-                    'command': 'python maintenance.py verify-files'
+                    'command': 'python main.py verify-files'
                 })
             
             if integrity_report['components']['thumbnails']['score'] < 70:
@@ -768,7 +768,7 @@ class IntegrityOperations:
                     'priority': 'medium',
                     'component': 'thumbnails',
                     'action': 'Regenerar thumbnails faltantes',
-                    'command': 'python maintenance.py populate-thumbnails --force'
+                    'command': 'python main.py populate-thumbnails --force'
                 })
             
             if integrity_report['components']['configuration']['score'] < 80:

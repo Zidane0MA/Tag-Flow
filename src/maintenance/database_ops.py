@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 🗃️ Database Operations Module
-Módulo especializado para operaciones de base de datos extraído de maintenance.py
+Módulo especializado para operaciones de base de datos extraído de main.py
 """
 
 import os

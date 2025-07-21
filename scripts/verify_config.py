@@ -85,7 +85,7 @@ class ConfigVerifier:
         required_files = [
             "main.py",
             "app.py", 
-            "maintenance.py",
+            "main.py",
             "config.py",
             "requirements.txt",
             ".env.example"
@@ -624,12 +624,12 @@ class ConfigVerifier:
         # Comandos sugeridos
         print(f"\nPROXIMOS PASOS RECOMENDADOS:")
         if not self.issues and success_rate >= 90:
-            print(f"  • python maintenance.py character-stats  # Ver estadisticas del sistema")
+            print(f"  • python main.py character-stats  # Ver estadisticas del sistema")
             print(f"  • python main.py 10                      # Procesar algunos videos")
             print(f"  • python app.py                          # Abrir interfaz web")
         elif self.warnings:
             print(f"  • Revisar y resolver advertencias si es necesario")
-            print(f"  • python maintenance.py show-stats       # Ver estado de fuentes")
+            print(f"  • python main.py show-stats       # Ver estado de fuentes")
         
         if self.issues:
             print(f"  • Resolver errores criticos listados arriba")

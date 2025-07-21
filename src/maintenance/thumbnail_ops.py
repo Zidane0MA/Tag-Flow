@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 🖼️ Thumbnail Operations Module
-Módulo especializado para operaciones de thumbnails extraído de maintenance.py
+Módulo especializado para operaciones de thumbnails extraído de main.py
 """
 
 import os

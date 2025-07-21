@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 💾 Backup Operations Module
-Módulo especializado para operaciones de backup y restore extraído de maintenance.py
+Módulo especializado para operaciones de backup y restore extraído de main.py
 """
 
 import os

@@ -125,7 +125,7 @@ python verify_config.py
 
 ```bash
 # Ver estadísticas completas del sistema optimizado
-python maintenance.py character-stats
+python main.py character-stats
 
 # Output incluye:
 # - 266 personajes en estructura jerárquica
@@ -139,16 +139,16 @@ python maintenance.py character-stats
 
 ```bash
 # Poblar base de datos desde todas las fuentes
-python maintenance.py populate-db --source all --limit 20
+python main.py populate-db --source all --limit 20
 
 # Poblar solo desde una plataforma específica
-python maintenance.py populate-db --platform youtube --limit 10
+python main.py populate-db --platform youtube --limit 10
 
 # 🆕 NUEVA FUNCIONALIDAD: Importar video específico por ruta
-python maintenance.py populate-db --file "D:\Videos\mi_video.mp4"
+python main.py populate-db --file "D:\Videos\mi_video.mp4"
 
 # Generar thumbnails para videos importados
-python maintenance.py populate-thumbnails --platform youtube
+python main.py populate-thumbnails --platform youtube
 ```
 
 ### 🎬 Procesamiento Ultra-Rápido con Flags Profesionales
@@ -184,16 +184,16 @@ python app.py                                          # → http://localhost:50
 
 ```bash
 # Ver estadísticas del sistema de IA
-python maintenance.py character-stats
+python main.py character-stats
 
 # Agregar personajes con estructura optimizada
-python maintenance.py add-character --character "Nahida" --game "genshin_impact" --aliases "Buer" "Lesser Lord Kusanali"
+python main.py add-character --character "Nahida" --game "genshin_impact" --aliases "Buer" "Lesser Lord Kusanali"
 
 # Analizar títulos con detector optimizado
-python maintenance.py analyze-titles --limit 50
+python main.py analyze-titles --limit 50
 
 # Actualizar mapeos automáticamente
-python maintenance.py update-creator-mappings --limit 100
+python main.py update-creator-mappings --limit 100
 ```
 
 ## 📂 Estructura del Proyecto (Actualizada)
@@ -210,7 +210,7 @@ Tag-Flow-V2/
 ├── 🚀 SCRIPTS PRINCIPALES OPTIMIZADOS
 │   ├── main.py                     # Motor de procesamiento optimizado
 │   ├── app.py                      # Interfaz web con rendimiento mejorado
-│   ├── maintenance.py              # 15+ herramientas con métricas enterprise
+│   ├── main.py              # 15+ herramientas con métricas enterprise
 │   ├── verify_config.py            # Verificación de configuración actualizada
 │   └── quickstart.py               # Configuración automática mejorada
 │
@@ -324,19 +324,19 @@ python quickstart.py
 python verify_config.py
 
 # Ver fuentes disponibles y métricas
-python maintenance.py show-stats
+python main.py show-stats
 ```
 
 ### 2️⃣ Importación de Datos
 ```bash
 # Poblar con videos de muestra de YouTube
-python maintenance.py populate-db --source db --platform youtube --limit 20
+python main.py populate-db --source db --platform youtube --limit 20
 
 # Generar thumbnails
-python maintenance.py populate-thumbnails --platform youtube
+python main.py populate-thumbnails --platform youtube
 
 # Ver estadísticas del sistema optimizado
-python maintenance.py character-stats
+python main.py character-stats
 ```
 
 ### 3️⃣ Procesamiento Ultra-Rápido con Flags Profesionales
@@ -354,22 +354,22 @@ python app.py                                         # → http://localhost:500
 ### 4️⃣ Gestión Continua
 ```bash
 # Backup periódico
-python maintenance.py backup
+python main.py backup
 
 # Analizar títulos con detector optimizado
-python maintenance.py analyze-titles --limit 100
+python main.py analyze-titles --limit 100
 
 # Ver métricas de rendimiento
-python maintenance.py character-stats
+python main.py character-stats
 
 # Optimizar base de datos
-python maintenance.py optimize-db
+python main.py optimize-db
 ```
 
 ### 5️⃣ Monitoreo Enterprise
 ```bash
 # Ver estadísticas completas del sistema
-python maintenance.py character-stats
+python main.py character-stats
 
 # Limpiar cache si es necesario
 python -c "from src.character_intelligence import CharacterIntelligence; ci = CharacterIntelligence(); ci.clear_detection_cache()"
@@ -386,11 +386,11 @@ python -c "from src.character_intelligence import CharacterIntelligence; import 
 python verify_config.py
 
 # Estadísticas del sistema optimizado
-python maintenance.py show-stats
-python maintenance.py character-stats
+python main.py show-stats
+python main.py character-stats
 
 # Verificar integridad
-python maintenance.py verify
+python main.py verify
 ```
 
 ### Problemas Comunes
@@ -404,13 +404,13 @@ pip install -r requirements.txt
 
 **Rendimiento lento**
 - El sistema ahora es 749x más rápido. Si experimentas lentitud:
-- Verifica que el detector optimizado esté activo: `python maintenance.py character-stats`
+- Verifica que el detector optimizado esté activo: `python main.py character-stats`
 - Revisa el cache hit rate (debe ser >90%)
 - Limpia cache si es necesario
 
 **No se encuentran videos**
 - Verifica que las rutas en `.env` sean correctas
-- Usa `python maintenance.py show-stats` para verificar fuentes
+- Usa `python main.py show-stats` para verificar fuentes
 - Revisa que las aplicaciones 4K estén instaladas y hayan descargado videos
 
 **APIs no funcionan**

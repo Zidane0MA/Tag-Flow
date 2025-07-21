@@ -619,7 +619,7 @@ async function executePopulateDB() {
         }
         
         // Construir comando para archivo específico
-        let command = `python maintenance.py populate-db --file "${filePath}"`;
+        let command = `python main.py populate-db --file "${filePath}"`;
         if (forceOption) {
             command += ' --force';
         }
@@ -676,7 +676,7 @@ async function executePopulateDB() {
     }
     
     // Construir comando para fuentes normales
-    let command = `python maintenance.py populate-db --source ${source} --limit ${limit}`;
+    let command = `python main.py populate-db --source ${source} --limit ${limit}`;
     if (platform) {
         command += ` --platform ${platform}`;
     }
