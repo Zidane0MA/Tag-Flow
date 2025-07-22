@@ -41,10 +41,9 @@ class BackupOperations:
     
     # Archivos y directorios excluidos del backup
     EXCLUDED_PATHS = {'.git', '.claude', '__pycache__', '.pytest_cache', '.vscode'}
-    EXCLUDED_FILES = {'CLAUDE.md'}
+    EXCLUDED_FILES = {'CLAUDE.md', 'GEMINI.md'}
     
     def __init__(self, backup_dir: Optional[Path] = None):
-        self.db = DatabaseManager()
         self.backup_dir = backup_dir or Path('backups')
         self.backup_dir.mkdir(exist_ok=True)
     
@@ -175,13 +174,9 @@ class BackupOperations:
         backup_path = Path(backup_path)
         temp_dir = None  # Para limpieza en caso de error
         
-        # Si no es una ruta absoluta, intentar resolverla relativa al directorio de backups
+        # Si no es una ruta absoluta, construirla relativa al directorio de backups
         if not backup_path.is_absolute():
-            # Intentar primero como ruta relativa al proyecto
-            if not backup_path.exists():
-                # Intentar como nombre de archivo en el directorio de backups
-                backup_name = backup_path.name if backup_path.suffix else f"{backup_path}.zip"
-                backup_path = self.backup_dir / backup_name
+            backup_path = self.backup_dir / backup_path.name
         
         logger.info(f"🔄 Restaurando desde backup: {backup_path}")
         logger.info(f"🔍 Ruta absoluta: {backup_path.absolute()}")
@@ -257,6 +252,9 @@ class BackupOperations:
             
             if 'known_faces' in components:
                 restored_components['known_faces'] = self._restore_known_faces(restore_path, manifest)
+
+            if 'additional_files' in components:
+                restored_components['additional_files'] = self._restore_additional_files(restore_path, manifest)
             
             # Limpiar directorio temporal
             if temp_dir:
@@ -292,7 +290,7 @@ class BackupOperations:
     
     def list_backups(self, limit: Optional[int] = None) -> Dict[str, Any]:
         """
-        📋 Listar backups disponibles
+        📋 Listar backups disponibles (comprimidos y sin comprimir)
         
         Args:
             limit: número máximo de backups a mostrar
@@ -303,14 +301,15 @@ class BackupOperations:
         try:
             backups = []
             
-            # Buscar backups en el directorio
-            for backup_file in self.backup_dir.glob('tag_flow_backup_*.zip'):
-                try:
-                    backup_info = self._get_backup_info(backup_file)
-                    if backup_info:
-                        backups.append(backup_info)
-                except Exception as e:
-                    logger.warning(f"Error leyendo backup {backup_file}: {e}")
+            # Buscar backups en el directorio (archivos y carpetas)
+            for backup_path in self.backup_dir.iterdir():
+                if backup_path.name.startswith('tag_flow_backup_'):
+                    try:
+                        backup_info = self._get_backup_info(backup_path)
+                        if backup_info:
+                            backups.append(backup_info)
+                    except Exception as e:
+                        logger.warning(f"Error leyendo backup {backup_path}: {e}")
             
             # Ordenar por fecha (más reciente primero)
             backups.sort(key=lambda x: x['created'], reverse=True)
@@ -384,8 +383,14 @@ class BackupOperations:
                 try:
                     backup_path = Path(backup['path'])
                     if backup_path.exists():
-                        deleted_size += backup_path.stat().st_size
-                        backup_path.unlink()
+                        # Usar rmtree para carpetas y unlink para archivos
+                        if backup_path.is_dir():
+                            deleted_size += self._get_backup_size(backup_path)
+                            shutil.rmtree(backup_path)
+                        else:
+                            deleted_size += backup_path.stat().st_size
+                            backup_path.unlink()
+                        
                         deleted_count += 1
                         logger.info(f"🗑️  Eliminado backup: {backup_path.name}")
                 except Exception as e:
@@ -609,7 +614,7 @@ class BackupOperations:
     def _backup_additional_files(self, backup_path: Path, backup_info: Dict) -> int:
         """Backup de archivos adicionales"""
         try:
-            additional_files = ['requirements.txt', 'README.md', 'PROYECTO_ESTADO.md']
+            additional_files = ['requirements.txt', 'README.md', 'COMANDOS.md']
             files_backed_up = 0
             
             for file_name in additional_files:
@@ -651,9 +656,24 @@ class BackupOperations:
             return 0
     
     def _get_backup_info(self, backup_path: Path) -> Optional[Dict]:
-        """Obtener información de un backup"""
+        """Obtener información de un backup, ya sea un archivo ZIP o una carpeta."""
         try:
-            if backup_path.suffix == '.zip':
+            if backup_path.is_dir():
+                manifest_path = backup_path / 'manifest.json'
+                if manifest_path.exists():
+                    with open(manifest_path, 'r', encoding='utf-8') as f:
+                        manifest = json.load(f)
+                    
+                    return {
+                        'path': str(backup_path),
+                        'name': backup_path.name,
+                        'size_mb': self._get_backup_size(backup_path) / 1024 / 1024,
+                        'created': manifest.get('created', 'unknown'),
+                        'version': manifest.get('version', 'unknown'),
+                        'components': manifest.get('components', {}),
+                        'compressed': False
+                    }
+            elif backup_path.suffix == '.zip':
                 with zipfile.ZipFile(backup_path, 'r') as zip_ref:
                     if 'manifest.json' in zip_ref.namelist():
                         with zip_ref.open('manifest.json') as f:
@@ -669,7 +689,8 @@ class BackupOperations:
                             'compressed': True
                         }
             return None
-        except Exception:
+        except Exception as e:
+            logger.warning(f"No se pudo leer la información del backup {backup_path}: {e}")
             return None
     
     def _get_component_path(self, component: str) -> str:
@@ -765,7 +786,7 @@ class BackupOperations:
             if not manifest.get('components', {}).get('configuration', False):
                 return False
             
-            config_files = ['.env', 'config.py', 'CLAUDE.md']
+            config_files = ['.env', 'config.py']
             restored = False
             
             for config_file in config_files:
@@ -799,6 +820,28 @@ class BackupOperations:
             return False
         except Exception as e:
             logger.error(f"Error restaurando caras conocidas: {e}")
+            return False
+
+    def _restore_additional_files(self, restore_path: Path, manifest: Dict) -> bool:
+        """Restaurar archivos adicionales"""
+        try:
+            if not manifest.get('components', {}).get('additional_files', 0) > 0:
+                return False
+
+            additional_files = ['requirements.txt', 'README.md', 'COMANDOS.md']
+            restored_count = 0
+
+            for file_name in additional_files:
+                source = restore_path / file_name
+                if source.exists():
+                    shutil.copy2(source, Path(file_name))
+                    restored_count += 1
+            
+            if restored_count > 0:
+                logger.info(f"✓ {restored_count} archivos adicionales restaurados")
+            return restored_count > 0
+        except Exception as e:
+            logger.error(f"Error restaurando archivos adicionales: {e}")
             return False
 
 

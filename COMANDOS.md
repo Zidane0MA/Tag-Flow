@@ -41,9 +41,9 @@ Gestiona la creación, restauración y limpieza de backups del sistema para salv
   - **Función:** Restaura el sistema desde un archivo o carpeta de backup. Antes de sobrescribir los datos, crea automáticamente un **backup de seguridad** del estado actual (a menos que se use `--force`).
   - **Opciones:**
     - `--backup-path RUTA`: **(Obligatorio)** Especifica la ruta al archivo `.zip` o carpeta del backup a restaurar.
-    - `--components [COMP...]`: Restaura solo componentes específicos. Los componentes válidos son: `database`, `thumbnails`, `configuration`, `known_faces`.
+    - `--components [COMP...]`: Restaura solo componentes específicos. Los componentes válidos son: `database` (videos.db, character_database.json), `thumbnails` (data/thumbnails), `configuration` (.env, config.py), `known_faces` (caras_conocidas), `additional_files` (README.md, COMANDOS.md, requirements.txt).
     - `--force`: Evita la creación del backup de seguridad previo y ejecuta la restauración directamente.
-  - **Ejemplo:** `python -X utf8 main.py restore --backup-path "backups/backup-2025-07-19.zip" --components database configuration`
+  - **Ejemplo:** `python -X utf8 main.py restore --backup-path "backups/backup-2025-07-19.zip" --components database configuration --force`
 
 - **`list-backups`**
   - **Función:** Muestra una lista de todos los backups disponibles en el directorio `backups/`, ordenados del más reciente al más antiguo.
@@ -53,6 +53,8 @@ Gestiona la creación, restauración y limpieza de backups del sistema para salv
   - **Función:** Realiza una limpieza automática de backups antiguos para gestionar el espacio en disco. Por defecto, elimina los backups que cumplen cualquiera de estas condiciones:
     - Son más antiguos de **30 días**.
     - Hay más de **5 backups** en total (elimina los más viejos).
+  - **Opciones:**
+    - `--force`: Fuerza la eliminacion de todos los backups del directorio.
   - **Ejemplo:** `python -X utf8 main.py cleanup-backups`
 
 ---
