@@ -39,10 +39,24 @@ class BackupOperations:
     - Backup incremental
     """
     
+    # Archivos y directorios excluidos del backup
+    EXCLUDED_PATHS = {'.git', '.claude', '__pycache__', '.pytest_cache', '.vscode'}
+    EXCLUDED_FILES = {'CLAUDE.md'}
+    
     def __init__(self, backup_dir: Optional[Path] = None):
         self.db = DatabaseManager()
         self.backup_dir = backup_dir or Path('backups')
         self.backup_dir.mkdir(exist_ok=True)
+    
+    def _should_exclude_path(self, path: Path) -> bool:
+        """Verificar si una ruta debe ser excluida del backup"""
+        if path.name in self.EXCLUDED_PATHS or path.name in self.EXCLUDED_FILES:
+            return True
+        # Verificar si alguna parte del path contiene directorios excluidos
+        for part in path.parts:
+            if part in self.EXCLUDED_PATHS:
+                return True
+        return False
     
     def create_backup(self, include_thumbnails: bool = True, 
                      thumbnail_limit: int = 100,
@@ -159,15 +173,35 @@ class BackupOperations:
         """
         start_time = time.time()
         backup_path = Path(backup_path)
+        temp_dir = None  # Para limpieza en caso de error
+        
+        # Si no es una ruta absoluta, intentar resolverla relativa al directorio de backups
+        if not backup_path.is_absolute():
+            # Intentar primero como ruta relativa al proyecto
+            if not backup_path.exists():
+                # Intentar como nombre de archivo en el directorio de backups
+                backup_name = backup_path.name if backup_path.suffix else f"{backup_path}.zip"
+                backup_path = self.backup_dir / backup_name
         
         logger.info(f"🔄 Restaurando desde backup: {backup_path}")
+        logger.info(f"🔍 Ruta absoluta: {backup_path.absolute()}")
         
         try:
             # Verificar que el backup existe
             if not backup_path.exists():
+                # Información adicional para debug
+                possible_paths = []
+                if not backup_path.is_absolute():
+                    possible_paths.append(f"Relativa: {Path.cwd() / backup_path}")
+                possible_paths.append(f"En backups/: {self.backup_dir / backup_path.name}")
+                
+                error_msg = f'Backup no encontrado: {backup_path}'
+                if possible_paths:
+                    error_msg += f'\nRutas intentadas: {possible_paths}'
+                
                 return {
                     'success': False,
-                    'error': f'Backup no encontrado: {backup_path}',
+                    'error': error_msg,
                     'duration': time.time() - start_time
                 }
             
@@ -184,6 +218,10 @@ class BackupOperations:
             # Leer manifiesto
             manifest_path = restore_path / 'manifest.json'
             if not manifest_path.exists():
+                # Limpiar directorio temporal si se creó
+                if temp_dir:
+                    shutil.rmtree(temp_dir, ignore_errors=True)
+                
                 return {
                     'success': False,
                     'error': 'Backup inválido: falta manifest.json',
@@ -242,6 +280,10 @@ class BackupOperations:
             
         except Exception as e:
             logger.error(f"Error restaurando backup: {e}")
+            # Limpiar directorio temporal si se creó
+            if temp_dir:
+                shutil.rmtree(temp_dir, ignore_errors=True)
+            
             return {
                 'success': False,
                 'error': str(e),
@@ -292,13 +334,14 @@ class BackupOperations:
             }
     
     def cleanup_old_backups(self, keep_count: int = 5, 
-                           max_age_days: int = 30) -> Dict[str, Any]:
+                           max_age_days: int = 30, force: bool = False) -> Dict[str, Any]:
         """
         🧹 Limpiar backups antiguos
         
         Args:
             keep_count: número de backups recientes a mantener
             max_age_days: edad máxima en días
+            force: eliminar TODOS los backups sin excepción
             
         Returns:
             Dict con resultados de la limpieza
@@ -313,19 +356,25 @@ class BackupOperations:
             # Determinar backups a eliminar
             to_delete = []
             
-            # Por edad
-            cutoff_date = datetime.now().timestamp() - (max_age_days * 24 * 3600)
-            for backup in backups:
-                backup_date = datetime.fromisoformat(backup['created']).timestamp()
-                if backup_date < cutoff_date:
-                    to_delete.append(backup)
-            
-            # Por cantidad (mantener los más recientes)
-            if len(backups) > keep_count:
-                to_delete.extend(backups[keep_count:])
-            
-            # Eliminar duplicados
-            to_delete = list({backup['path']: backup for backup in to_delete}.values())
+            if force:
+                # Con --force, eliminar TODOS los backups
+                logger.info("⚠️  Modo --force: Eliminando TODOS los backups")
+                to_delete = backups
+            else:
+                # Lógica normal: por edad y cantidad
+                # Por edad
+                cutoff_date = datetime.now().timestamp() - (max_age_days * 24 * 3600)
+                for backup in backups:
+                    backup_date = datetime.fromisoformat(backup['created']).timestamp()
+                    if backup_date < cutoff_date:
+                        to_delete.append(backup)
+                
+                # Por cantidad (mantener los más recientes)
+                if len(backups) > keep_count:
+                    to_delete.extend(backups[keep_count:])
+                
+                # Eliminar duplicados
+                to_delete = list({backup['path']: backup for backup in to_delete}.values())
             
             # Eliminar backups
             deleted_count = 0
@@ -457,19 +506,33 @@ class BackupOperations:
     # Métodos privados auxiliares
     
     def _backup_database(self, backup_path: Path, backup_info: Dict) -> bool:
-        """Backup de la base de datos"""
+        """Backup de la base de datos y archivos relacionados"""
         try:
-            db_source = Path(config.DATABASE_PATH if hasattr(config, 'DATABASE_PATH') else 'data/videos.db')
+            # Backup de la base de datos principal
+            db_source = config.DATABASE_PATH
+            database_backed_up = False
+            
             if db_source.exists():
                 shutil.copy2(db_source, backup_path / 'videos.db')
-                backup_info['components']['database'] = True
+                database_backed_up = True
                 backup_info['database_size'] = db_source.stat().st_size
-                logger.info("✓ Base de datos respaldada")
+                logger.info("✓ Base de datos principal respaldada")
+            
+            # Backup del character_database.json
+            char_db_source = Path('data/character_database.json')
+            if char_db_source.exists():
+                shutil.copy2(char_db_source, backup_path / 'character_database.json')
+                database_backed_up = True
+                logger.info("✓ Base de datos de caracteres respaldada")
+            
+            backup_info['components']['database'] = database_backed_up
+            
+            if database_backed_up:
                 return True
             else:
-                backup_info['components']['database'] = False
-                logger.warning("Base de datos no encontrada")
+                logger.warning("No se encontraron archivos de base de datos")
                 return False
+                
         except Exception as e:
             logger.error(f"Error respaldando BD: {e}")
             backup_info['components']['database'] = False
@@ -478,7 +541,7 @@ class BackupOperations:
     def _backup_thumbnails(self, backup_path: Path, limit: int, backup_info: Dict) -> int:
         """Backup de thumbnails"""
         try:
-            thumbnails_source = Path(config.THUMBNAILS_PATH if hasattr(config, 'THUMBNAILS_PATH') else 'data/thumbnails')
+            thumbnails_source = config.THUMBNAILS_PATH
             if not thumbnails_source.exists():
                 backup_info['components']['thumbnails'] = False
                 return 0
@@ -504,9 +567,10 @@ class BackupOperations:
             return 0
     
     def _backup_configuration(self, backup_path: Path, backup_info: Dict) -> bool:
-        """Backup de configuración"""
+        """Backup de configuración (excluye archivos innecesarios)"""
         try:
-            config_files = ['.env', 'config.py', 'CLAUDE.md']
+            # Solo incluir archivos de configuración esenciales, excluir CLAUDE.md
+            config_files = ['.env', 'config.py']
             config_backed_up = False
             
             for config_file in config_files:
@@ -517,7 +581,7 @@ class BackupOperations:
             
             backup_info['components']['configuration'] = config_backed_up
             if config_backed_up:
-                logger.info("✓ Configuración respaldada")
+                logger.info("✓ Configuración respaldada (excluidas instrucciones de desarrollo)")
             return config_backed_up
             
         except Exception as e:
@@ -528,7 +592,7 @@ class BackupOperations:
     def _backup_known_faces(self, backup_path: Path, backup_info: Dict) -> bool:
         """Backup de caras conocidas"""
         try:
-            faces_source = Path(config.KNOWN_FACES_PATH if hasattr(config, 'KNOWN_FACES_PATH') else 'caras_conocidas')
+            faces_source = config.KNOWN_FACES_PATH
             if faces_source.exists():
                 shutil.copytree(faces_source, backup_path / 'caras_conocidas')
                 backup_info['components']['known_faces'] = True
@@ -630,13 +694,16 @@ class BackupOperations:
             return False
     
     def _restore_database(self, restore_path: Path, manifest: Dict) -> bool:
-        """Restaurar base de datos"""
+        """Restaurar base de datos y archivos relacionados"""
         try:
             if not manifest.get('components', {}).get('database', False):
                 return False
             
+            restored = False
+            
+            # Restaurar base de datos principal
             source = restore_path / 'videos.db'
-            target = Path(config.DATABASE_PATH if hasattr(config, 'DATABASE_PATH') else 'data/videos.db')
+            target = config.DATABASE_PATH
             
             if source.exists():
                 # Crear backup del actual
@@ -647,9 +714,27 @@ class BackupOperations:
                 # Restaurar
                 target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(source, target)
-                logger.info("✓ Base de datos restaurada")
-                return True
-            return False
+                logger.info("✓ Base de datos principal restaurada")
+                restored = True
+            
+            # Restaurar character_database.json
+            char_source = restore_path / 'character_database.json'
+            char_target = Path('data/character_database.json')
+            
+            if char_source.exists():
+                # Crear backup del actual
+                if char_target.exists():
+                    char_backup = char_target.with_suffix('.json.backup')
+                    shutil.copy2(char_target, char_backup)
+                
+                # Restaurar
+                char_target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(char_source, char_target)
+                logger.info("✓ Base de datos de caracteres restaurada")
+                restored = True
+            
+            return restored
+            
         except Exception as e:
             logger.error(f"Error restaurando BD: {e}")
             return False
@@ -661,7 +746,7 @@ class BackupOperations:
                 return False
             
             source = restore_path / 'thumbnails'
-            target = Path(config.THUMBNAILS_PATH if hasattr(config, 'THUMBNAILS_PATH') else 'data/thumbnails')
+            target = config.THUMBNAILS_PATH
             
             if source.exists():
                 target.mkdir(parents=True, exist_ok=True)
@@ -703,7 +788,7 @@ class BackupOperations:
                 return False
             
             source = restore_path / 'caras_conocidas'
-            target = Path(config.KNOWN_FACES_PATH if hasattr(config, 'KNOWN_FACES_PATH') else 'caras_conocidas')
+            target = config.KNOWN_FACES_PATH
             
             if source.exists():
                 if target.exists():
@@ -733,10 +818,10 @@ def list_backups(limit: Optional[int] = None) -> Dict[str, Any]:
     ops = BackupOperations()
     return ops.list_backups(limit)
 
-def cleanup_old_backups(keep_count: int = 5, max_age_days: int = 30) -> Dict[str, Any]:
+def cleanup_old_backups(keep_count: int = 5, max_age_days: int = 30, force: bool = False) -> Dict[str, Any]:
     """Función de conveniencia para limpiar backups antiguos"""
     ops = BackupOperations()
-    return ops.cleanup_old_backups(keep_count, max_age_days)
+    return ops.cleanup_old_backups(keep_count, max_age_days, force)
 
 def verify_backup(backup_path: str) -> Dict[str, Any]:
     """Función de conveniencia para verificar backup"""

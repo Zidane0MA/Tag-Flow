@@ -86,7 +86,7 @@ class IntegrityOperations:
             }
             
             # 1. Verificar archivo de base de datos
-            db_path = Path(config.DATABASE_PATH if hasattr(config, 'DATABASE_PATH') else 'data/videos.db')
+            db_path = config.DATABASE_PATH
             if db_path.exists():
                 integrity_report['database_file']['exists'] = True
                 integrity_report['database_file']['size_mb'] = db_path.stat().st_size / (1024 * 1024)
@@ -181,7 +181,7 @@ class IntegrityOperations:
                         })
             
             # 3. Verificar thumbnails
-            thumbnails_dir = Path(config.THUMBNAILS_PATH if hasattr(config, 'THUMBNAILS_PATH') else 'data/thumbnails')
+            thumbnails_dir = config.THUMBNAILS_PATH
             if thumbnails_dir.exists():
                 thumbnail_files = set(f.name for f in thumbnails_dir.glob('*.jpg'))
                 integrity_report['thumbnails']['total_thumbnails'] = len(thumbnail_files)
@@ -240,7 +240,16 @@ class IntegrityOperations:
             integrity_report['integrity_score'] = integrity_score
             integrity_report['total_issues'] = total_issues
             
-            logger.info(f"✅ Verificación completada: {total_issues} problemas encontrados")
+            # Mostrar detalles de los problemas encontrados
+            if total_issues > 0:
+                self._display_verification_details(integrity_report['issues_found'], fix_issues)
+            
+            # Mostrar resumen final
+            if fix_issues and integrity_report.get('fixed_issues', 0) > 0:
+                logger.info(f"✅ Verificación completada: {integrity_report['fixed_issues']} problemas corregidos, {total_issues - integrity_report['fixed_issues']} restantes")
+            else:
+                logger.info(f"✅ Verificación completada: {total_issues} problemas encontrados")
+            
             logger.info(f"   🎯 Puntuación de integridad: {integrity_score}/100")
             
             return {
@@ -249,7 +258,7 @@ class IntegrityOperations:
                 'integrity_score': integrity_score,
                 'total_issues': total_issues,
                 'issues_fixed': integrity_report['fixed_issues'],
-                'message': f'Verificación completada: {total_issues} problemas encontrados'
+                'message': f'Verificación completada: {integrity_report.get("fixed_issues", 0)} problemas corregidos' if fix_issues and integrity_report.get('fixed_issues', 0) > 0 else f'Verificación completada: {total_issues} problemas encontrados'
             }
             
         except Exception as e:
@@ -372,7 +381,7 @@ class IntegrityOperations:
         logger.info("🖼️ Verificando thumbnails...")
         
         try:
-            thumbnails_dir = Path(config.THUMBNAILS_PATH if hasattr(config, 'THUMBNAILS_PATH') else 'data/thumbnails')
+            thumbnails_dir = config.THUMBNAILS_PATH
             
             verification_results = {
                 'thumbnails_directory': {
@@ -599,9 +608,9 @@ class IntegrityOperations:
             
             # 3. Verificar directorios
             directories = {
-                'data_dir': Path(config.DATABASE_PATH if hasattr(config, 'DATABASE_PATH') else 'data').parent,
-                'thumbnails_dir': Path(config.THUMBNAILS_PATH if hasattr(config, 'THUMBNAILS_PATH') else 'data/thumbnails'),
-                'known_faces_dir': Path(config.KNOWN_FACES_PATH if hasattr(config, 'KNOWN_FACES_PATH') else 'caras_conocidas')
+                'data_dir': config.DATA_DIR,
+                'thumbnails_dir': config.THUMBNAILS_PATH,
+                'known_faces_dir': config.KNOWN_FACES_PATH
             }
             
             for dir_name, dir_path in directories.items():
@@ -800,10 +809,31 @@ class IntegrityOperations:
             
             integrity_report['overall_status'] = overall_status
             
+            # Mostrar reporte en consola
             logger.info(f"✅ Reporte de integridad generado:")
             logger.info(f"   🎯 Puntuación general: {integrity_report['overall_score']:.1f}/100 ({overall_status})")
             logger.info(f"   📊 BD: {integrity_report['components']['database']['score']:.1f}, Archivos: {integrity_report['components']['video_files']['score']:.1f}, Thumbnails: {integrity_report['components']['thumbnails']['score']:.1f}, Config: {integrity_report['components']['configuration']['score']:.1f}")
-            logger.info(f"   💡 {len(integrity_report['recommendations'])} recomendaciones")
+            
+            # Mostrar recomendaciones
+            if integrity_report['recommendations']:
+                logger.info(f"\n💡 Recomendaciones ({len(integrity_report['recommendations'])}):") 
+                for i, rec in enumerate(integrity_report['recommendations'], 1):
+                    priority_icon = {'high': '🔴', 'medium': '🟡', 'low': '🔵'}.get(rec['priority'], '🟡')
+                    logger.info(f"  {i}. {priority_icon} {rec['action']}")
+                    logger.info(f"     Comando: {rec['command']}")
+            else:
+                logger.info("   🎉 No hay recomendaciones - Sistema en buen estado")
+            
+            # Exportar a JSON si se solicita
+            if include_details:
+                json_path = Path('integrity_report.json')
+                try:
+                    import json
+                    with open(json_path, 'w', encoding='utf-8') as f:
+                        json.dump(integrity_report, f, indent=2, ensure_ascii=False)
+                    logger.info(f"\n📄 Reporte detallado exportado: {json_path}")
+                except Exception as e:
+                    logger.warning(f"Error exportando reporte JSON: {e}")
             
             return {
                 'success': True,
@@ -811,7 +841,7 @@ class IntegrityOperations:
                 'overall_score': integrity_report['overall_score'],
                 'overall_status': overall_status,
                 'recommendations_count': len(integrity_report['recommendations']),
-                'message': f'Reporte generado: {overall_status} ({integrity_report["overall_score"]:.1f}/100)'
+                'message': f'Reporte generado: {overall_status} ({integrity_report["overall_score"]:.1f}/100)' + (f', exportado a integrity_report.json' if include_details else '')
             }
             
         except Exception as e:
@@ -876,7 +906,7 @@ class IntegrityOperations:
                     # Eliminar thumbnails huérfanos
                     file_name = issue.get('file_name')
                     if file_name:
-                        thumbnails_dir = Path(config.THUMBNAILS_PATH if hasattr(config, 'THUMBNAILS_PATH') else 'data/thumbnails')
+                        thumbnails_dir = config.THUMBNAILS_PATH
                         orphaned_file = thumbnails_dir / file_name
                         if orphaned_file.exists():
                             orphaned_file.unlink()
@@ -964,6 +994,57 @@ class IntegrityOperations:
         except Exception as e:
             logger.error(f"Error extrayendo descripción desde BD externa para {platform}: {e}")
             return None
+    
+    def _display_verification_details(self, issues: List[Dict[str, Any]], fix_issues: bool = False) -> None:
+        """Mostrar detalles de los problemas encontrados en verificación"""
+        if not issues:
+            return
+            
+        # Agrupar problemas por tipo
+        issues_by_type = {}
+        for issue in issues:
+            issue_type = issue.get('type', 'unknown')
+            if issue_type not in issues_by_type:
+                issues_by_type[issue_type] = []
+            issues_by_type[issue_type].append(issue)
+        
+        logger.info("\n🔍 Detalles de problemas encontrados:")
+        
+        # Mostrar cada tipo de problema
+        for issue_type, type_issues in issues_by_type.items():
+            count = len(type_issues)
+            severity_icon = {
+                'critical': '🔴',
+                'high': '🟠', 
+                'medium': '🟡',
+                'low': '🔵'
+            }.get(type_issues[0].get('severity', 'medium'), '🟡')
+            
+            type_name = {
+                'missing_file': 'Archivos faltantes',
+                'missing_thumbnail': 'Thumbnails faltantes',
+                'orphaned_thumbnail': 'Thumbnails huérfanos',
+                'missing_metadata': 'Metadatos faltantes',
+                'duplicate_paths': 'Rutas duplicadas',
+                'corrupted_file': 'Archivos corruptos'
+            }.get(issue_type, issue_type.replace('_', ' ').title())
+            
+            logger.info(f"  {severity_icon} {type_name}: {count} problemas")
+            
+            # Mostrar algunos ejemplos (máximo 3 por tipo para no saturar)
+            for i, issue in enumerate(type_issues[:3]):
+                description = issue.get('description', 'Sin descripción')
+                if 'video_id' in issue:
+                    logger.info(f"    - Video ID {issue['video_id']}: {description}")
+                else:
+                    logger.info(f"    - {description}")
+            
+            # Si hay más, indicar el número
+            if len(type_issues) > 3:
+                logger.info(f"    ... y {len(type_issues) - 3} más")
+        
+        if not fix_issues:
+            logger.info("\n💡 Para intentar corregir automáticamente, usa --fix-issues")
 
 
 # Funciones de conveniencia para compatibilidad

@@ -63,7 +63,7 @@ Nota: THUMBNAILS_PATH se encuentra definido en mi archivo .env.
 ## Comando: `populate-db`
 
 - **Problema:** El comando funcional pero es inestable y presenta múltiples errores críticos.
-    1.  **Error fatal (`TypeError`):** El comando falla con un error `TypeError: '<' not supported between instances of 'str' and 'int'` cuando se utiliza con `--source all`, `--source db` sin especificar una plataforma o cuando no se especifica `--source`. Aunque no son combinaciones tan importantes de importación, estaria bien solucionarlos.
+    1.  **Error fatal (`TypeError`):** El comando falla con un error `TypeError: '< ' not supported between instances of 'str' and 'int'` cuando se utiliza con `--source all`, `--source db` sin especificar una plataforma o cuando no se especifica `--source`. Aunque no son combinaciones tan importantes de importación, estaria bien solucionarlos.
     2.  **Fuente `db` no operativa:** La opción `--source db --platform all-platforms` se ejecuta pero no encuentra ningún video para importar, a pesar de que debería hacerlo.
     3.  **Funcionalidad a eliminar:** El comando acepta los argumentos `--file-path` y `--file`, que ya no se requieren para (`populate-db`).
     4.  **Funcionalidad a agregar:** Para la flag `--platform` una opcion para solo aceptar plataformas principales (`youtube`, `tiktok`, `instagram`).
@@ -88,3 +88,9 @@ Nota: THUMBNAILS_PATH se encuentra definido en mi archivo .env.
 - **Problema:** El comando falla con un `AttributeError` porque intenta llamar a un método (`get_performance_stats`) que ya no existe en el objeto `CharacterIntelligence`. El mensaje de error sugiere que el método correcto podría ser `get_performance_report`.
 - **Solución Sugerida:** Actualizar el código para que llame al método correcto (`get_performance_report`) en el objeto `CharacterIntelligence`.
 
+## Comando: `add-character`
+
+- **Problema:** 
+    1. Aparentemente este comando no funciona en todos los entornos de ejecucion pero si lo hace en otros como la shell de windows. 
+    2. El formato de estructura json generada por el comando esta desactualizada con respecto al usado en data/character_database.json, tambien falta pulir la logica del comando para adaptarse a los casos como "variant".
+- **Solución Sugerida:** Investigar y corregir el parseo de argumentos para que funcione de manera consistente en diferentes entornos de shell. Actualizar la estructura del JSON generado para que coincida con el formato de `character_database.json` y mejorar la lógica para manejar casos de "variant".

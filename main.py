@@ -71,7 +71,7 @@ Ejemplos de uso:
   python main.py clean-thumbnails           # Limpiar thumbnails huérfanos
 
 👤 PERSONAJES:
-  python main.py add-character --character "Nahida" --game "genshin_impact"
+  python main.py add-character --character "Nahida" --game "Genshin Impact" --aliases "Kusanali" "Dendro Archon"
   python main.py clean-false-positives      # Limpiar falsos positivos
   python main.py update-creator-mappings    # Actualizar mapeos creador→personaje
   python main.py analyze-titles --limit 100 # Analizar patrones en títulos
@@ -124,7 +124,8 @@ Ejemplos de uso:
         restore_parser.add_argument('--force', action='store_true', help='Forzar restauración sin confirmación')
         
         subparsers.add_parser('list-backups', help='Listar backups disponibles')
-        subparsers.add_parser('cleanup-backups', help='Limpiar backups antiguos')
+        cleanup_parser = subparsers.add_parser('cleanup-backups', help='Limpiar backups antiguos')
+        cleanup_parser.add_argument('--force', action='store_true', help='Eliminar todos los backups sin confirmación')
         
         # Base de datos
         populate_parser = subparsers.add_parser('populate-db', help='Poblar BD desde fuentes externas')
@@ -133,7 +134,6 @@ Ejemplos de uso:
         populate_parser.add_argument('--platform', help='Plataforma específica (youtube, tiktok, instagram, other, all-platforms)')
         populate_parser.add_argument('--limit', type=int, help='Límite de videos a importar')
         populate_parser.add_argument('--force', action='store_true', help='Forzar importación y sobrescribir videos existentes')
-        populate_parser.add_argument('--file-path', help='Importar únicamente el archivo especificado')
         
         subparsers.add_parser('optimize-db', help='Optimizar y defragmentar base de datos')
         
@@ -162,16 +162,16 @@ Ejemplos de uso:
         verify_parser.add_argument('--fix-issues', action='store_true', help='Intentar corregir problemas automáticamente')
         
         verify_files_parser = subparsers.add_parser('verify-files', help='Verificar solo archivos de video')
-        verify_files_parser.add_argument('--video-ids', nargs='+', type=int, help='IDs específicos de videos a verificar')
+        verify_files_parser.add_argument('--video-id', nargs='+', type=int, help='IDs específicos de videos a verificar')
         
         integrity_parser = subparsers.add_parser('integrity-report', help='Generar reporte detallado de integridad')
         integrity_parser.add_argument('--include-details', action='store_true', help='Incluir detalles completos en formato JSON')
         
         # Personajes
         add_char_parser = subparsers.add_parser('add-character', help='Agregar personaje personalizado')
-        add_char_parser.add_argument('--character', required=True, help='Nombre del personaje')
-        add_char_parser.add_argument('--game', required=True, help='Juego o serie del personaje')
-        add_char_parser.add_argument('--aliases', nargs='*', help='Alias del personaje')
+        add_char_parser.add_argument('--character', required=True, help='Nombre del personaje (usar comillas si contiene espacios)')
+        add_char_parser.add_argument('--game', required=True, help='Juego o serie del personaje (usar comillas si contiene espacios)')
+        add_char_parser.add_argument('--aliases', nargs='*', default=[], help='Alias del personaje separados por espacios (usar comillas para alias con espacios)')
         
         clean_fp_parser = subparsers.add_parser('clean-false-positives', help='Limpiar falsos positivos de personajes')
         clean_fp_parser.add_argument('--force', action='store_true', help='Ejecutar limpieza sin confirmación')
@@ -277,8 +277,7 @@ Ejemplos de uso:
             source=params.get('source', 'all'),
             platform=params.get('platform'),
             limit=params.get('limit'),
-            force=params.get('force', False),
-            file_path=params.get('file_path')
+            force=params.get('force', False)
         )
         
         if result['success']:
@@ -317,15 +316,14 @@ Ejemplos de uso:
         elif command == 'cleanup-backups':
             from src.maintenance.backup_ops import BackupOperations
             ops = BackupOperations()
-            result = ops.cleanup_old_backups()
+            result = ops.cleanup_old_backups(force=getattr(args, 'force', False))
             
         elif command == 'populate-db':
             self.execute_populate_db({
                 'source': args.source,
                 'platform': getattr(args, 'platform', None),
                 'limit': getattr(args, 'limit', None),
-                'force': getattr(args, 'force', False),
-                'file_path': getattr(args, 'file_path', None)
+                'force': getattr(args, 'force', False)
             })
             return
             
@@ -371,7 +369,7 @@ Ejemplos de uso:
             if command == 'verify':
                 result = ops.verify_database_integrity(fix_issues=getattr(args, 'fix_issues', False))
             elif command == 'verify-files':
-                result = ops.verify_video_files(video_ids=getattr(args, 'video_ids', None))
+                result = ops.verify_video_files(video_ids=getattr(args, 'video_id', None))
             elif command == 'integrity-report':
                 result = ops.generate_integrity_report(include_details=getattr(args, 'include_details', False))
                 
@@ -417,7 +415,7 @@ Ejemplos de uso:
                 # Character stats usando character intelligence
                 from src.character_intelligence import CharacterIntelligence
                 ci = CharacterIntelligence()
-                stats = ci.get_performance_stats()
+                stats = ci.get_performance_report()
                 logger.info("🎭 Estadísticas de personajes:")
                 for key, value in stats.items():
                     logger.info(f"  {key}: {value}")
@@ -438,11 +436,50 @@ Ejemplos de uso:
                 self._display_character_stats(result)
             elif command == 'analyze-titles':
                 self._display_analyze_titles_result(result)
+            elif command == 'list-backups':
+                self._display_backup_list(result)
             elif command in ['backup', 'restore']:
                 if 'backup_path' in result:
                     logger.info(f"📁 Ubicación: {result['backup_path']}")
         else:
             logger.error(f"❌ {command}: {result.get('error', 'Error desconocido')}")
+    
+    def _display_backup_list(self, result):
+        """Mostrar lista de backups disponibles"""
+        if not result.get('success'):
+            return
+            
+        backups = result.get('backups', [])
+        if not backups:
+            logger.info("📋 No se encontraron backups")
+            return
+            
+        logger.info(f"📋 Backups disponibles ({len(backups)}):")        
+        for i, backup in enumerate(backups, 1):
+            size_mb = backup.get('size_mb', 0)
+            created = backup.get('created', 'Desconocido')
+            # Formatear fecha de YYYYMMDD_HHMMSS a formato legible
+            try:
+                from datetime import datetime
+                if '_' in created:
+                    date_part, time_part = created.split('_')
+                    dt = datetime.strptime(f"{date_part}_{time_part}", "%Y%m%d_%H%M%S")
+                    formatted_date = dt.strftime("%d/%m/%Y %H:%M:%S")
+                else:
+                    formatted_date = created
+            except:
+                formatted_date = created
+                
+            components = backup.get('components', {})
+            comp_count = len([k for k, v in components.items() if v])
+            
+            logger.info(f"  {i}. {backup.get('name', 'Sin nombre')}")
+            logger.info(f"     📅 Fecha: {formatted_date}")
+            logger.info(f"     📊 Tamaño: {size_mb:.1f} MB")
+            logger.info(f"     🧩 Componentes: {comp_count}")
+            logger.info(f"     📁 Ruta: {backup.get('path', '')}")
+            if i < len(backups):
+                logger.info("")
     
     def _display_character_detection_report(self, result):
         """Mostrar reporte de detección de personajes"""

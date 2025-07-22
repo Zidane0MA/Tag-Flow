@@ -155,8 +155,8 @@ class CharacterOperations:
                     'error': 'Nombre de personaje y juego son requeridos'
                 }
             
-            # Cargar base de datos de personajes
-            character_db_path = Path('data/character_database.json')
+            # Cargar base de datos de personajes desde configuración centralizada
+            character_db_path = config.CHARACTER_DATABASE_PATH
             if not character_db_path.exists():
                 return {
                     'success': False,
@@ -176,16 +176,37 @@ class CharacterOperations:
                     'characters': {}
                 }
             
-            # Crear patrones para el personaje
-            patterns = [character_name]
-            if aliases:
-                patterns.extend(aliases)
+            # Crear estructura de variantes según formato actual de character_database.json
+            variants = {
+                'exact': [character_name],  # Nombre exacto
+                'joined': [],               # Versiones sin espacios
+                'native': [],               # Idiomas nativos
+                'common': []                # Variaciones comunes/alias
+            }
             
-            # Agregar personaje
+            # Procesar aliases si existen
+            if aliases:
+                for alias in aliases:
+                    # Si el alias no tiene espacios, ponerlo en joined
+                    if ' ' not in alias and alias != character_name:
+                        variants['joined'].append(alias)
+                    # Si es diferente al nombre original, ponerlo en common
+                    elif alias != character_name:
+                        variants['common'].append(alias)
+            
+            # Generar joined version automáticamente si no existe
+            joined_version = character_name.replace(' ', '')
+            if joined_version != character_name and joined_version not in variants['joined']:
+                variants['joined'].append(joined_version)
+            
+            # Agregar personaje con formato moderno
             character_db[game_key]['characters'][character_name] = {
-                'name': character_name,
-                'patterns': patterns,
-                'custom': True,
+                'canonical_name': character_name,
+                'priority': 1,  # Prioridad alta para personajes personalizados
+                'variants': variants,
+                'detection_weight': 0.90,  # Peso ligeramente menor que personajes principales
+                'context_hints': [game.lower(), game_key],  # Hints basados en el juego
+                'custom': True,  # Marcador de que es personalizado
                 'added_date': datetime.now().isoformat()
             }
             
@@ -203,8 +224,9 @@ class CharacterOperations:
                 'character_name': character_name,
                 'game': game,
                 'aliases': aliases or [],
-                'patterns': patterns,
-                'message': f'Personaje {character_name} agregado exitosamente'
+                'variants': variants,
+                'detection_weight': 0.90,
+                'message': f'Personaje {character_name} agregado exitosamente a {game}'
             }
             
         except Exception as e:

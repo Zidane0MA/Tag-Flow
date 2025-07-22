@@ -226,15 +226,14 @@ Los comandos de procesamiento se encargan del análisis inteligente de videos, i
 - **Función:** Comando principal para el procesamiento y análisis de videos. Puede funcionar en modo de análisis de videos nuevos o reanálisis de videos específicos. Opcionalmente puede poblar la base de datos antes del análisis.
 - **Opciones:**
   - `--limit N`: Límite de videos a procesar.
-  - `--platform {youtube,tiktok,instagram,other,all-platforms}`: Filtrar por plataforma específica.
-    - `youtube`, `tiktok`, `instagram`: Plataformas principales
-    - `other`: Solo plataformas adicionales (no principales)
-    - `all-platforms`: Todas las plataformas (principales + adicionales)
   - `--source {db,organized,all}`: Fuente de videos para procesar.
     - `db`: Solo bases de datos externas (4K Apps)
     - `organized`: Solo carpetas organizadas
     - `all`: Ambas fuentes (por defecto)
-  - `--populate`: Poblar base de datos desde fuentes externas antes de analizar.
+  - `--platform {youtube,tiktok,instagram,other,all-platforms}`: Filtrar por plataforma específica.
+    - `youtube`, `tiktok`, `instagram`: Plataformas principales
+    - `other`: Solo plataformas adicionales (no principales)
+    - `all-platforms`: Todas las plataformas (principales + adicionales)
   - `--reanalyze-video IDS`: ID(s) de video(s) a reanalizar (separados por coma).
   - `--force`: Forzar reanálisis sobrescribiendo datos existentes.
 

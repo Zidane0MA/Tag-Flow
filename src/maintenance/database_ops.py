@@ -50,27 +50,21 @@ class DatabaseOperations:
     
     def populate_database(self, source: str = 'all', platform: Optional[str] = None, 
                          limit: Optional[int] = None, force: bool = False, 
-                         file_path: Optional[str] = None, 
                          progress_callback: Optional[Callable] = None) -> Dict[str, Any]:
         """
-        🚀 OPTIMIZADO: Poblar la base de datos desde fuentes externas o un archivo específico
+        🚀 OPTIMIZADO: Poblar la base de datos desde fuentes externas
         
         Args:
             source: 'db', 'organized', 'all' - fuente de datos
-            platform: 'youtube', 'tiktok', 'instagram' o None para todas
+            platform: 'youtube', 'tiktok', 'instagram', 'all-platforms' o None para todas
             limit: número máximo de videos a importar
             force: forzar reimportación de videos existentes
-            file_path: ruta específica de un video para importar
             progress_callback: función para reportar progreso (processed, total, current_item)
             
         Returns:
             Dict con resultados de la operación
         """
         start_time = time.time()
-        
-        # NUEVA FUNCIONALIDAD: Importar archivo específico
-        if file_path:
-            return self._populate_single_file(file_path, force)
         
         # FUNCIONALIDAD OPTIMIZADA: Importar desde fuentes múltiples
         logger.info(f"🚀 Poblando base de datos OPTIMIZADO desde {source} (plataforma: {platform or 'todas'})")
@@ -324,7 +318,7 @@ class DatabaseOperations:
             backup_path = Path(backup_path)
             
             # Obtener ruta de la BD actual
-            db_path = Path(config.DATABASE_PATH if hasattr(config, 'DATABASE_PATH') else 'data/videos.db')
+            db_path = config.DATABASE_PATH
             
             if not db_path.exists():
                 return {
@@ -431,7 +425,7 @@ class DatabaseOperations:
                 }
             
             # Obtener ruta de la BD actual
-            db_path = Path(config.DATABASE_PATH if hasattr(config, 'DATABASE_PATH') else 'data/videos.db')
+            db_path = config.DATABASE_PATH
             
             if not force and db_path.exists():
                 # Contar videos actuales
@@ -590,7 +584,7 @@ class DatabaseOperations:
                         COUNT(CASE WHEN thumbnail_path IS NOT NULL THEN 1 END) as with_thumbnails,
                         COUNT(CASE WHEN detected_characters IS NOT NULL AND detected_characters != '[]' THEN 1 END) as with_characters,
                         COUNT(CASE WHEN detected_music IS NOT NULL THEN 1 END) as with_music,
-                        COUNT(CASE WHEN is_deleted = 1 THEN 1 END) as deleted
+                        COUNT(CASE WHEN deleted_at IS NOT NULL THEN 1 END) as deleted
                     FROM videos
                 """)
                 status_stats = dict(cursor.fetchone())
@@ -640,7 +634,7 @@ class DatabaseOperations:
                     'database_info': {
                         'size_mb': db_size / 1024 / 1024,
                         'version': db_version,
-                        'path': str(Path(config.DATABASE_PATH if hasattr(config, 'DATABASE_PATH') else 'data/videos.db').resolve())
+                        'path': str(config.DATABASE_PATH.resolve())
                     },
                     'time_stats': time_stats,
                     'timestamp': datetime.now().isoformat()
@@ -654,64 +648,6 @@ class DatabaseOperations:
             }
     
     # Métodos privados auxiliares
-    
-    def _populate_single_file(self, file_path: str, force: bool = False) -> Dict[str, Any]:
-        """Importar un archivo específico"""
-        logger.info(f"📁 Importando archivo específico: {file_path}")
-        
-        try:
-            # Extraer información del video específico
-            video_data = self.external_sources.extract_single_video_info(file_path)
-            
-            if not video_data:
-                return {
-                    'success': False,
-                    'error': 'No se pudo extraer información del archivo',
-                    'imported': 0,
-                    'errors': 1
-                }
-            
-            # Verificar si ya existe en la BD
-            existing = self.db.get_video_by_path(video_data['file_path'])
-            if existing and not force:
-                return {
-                    'success': True,
-                    'imported': 0,
-                    'errors': 0,
-                    'message': f'El video ya existe en la BD (ID: {existing["id"]}), usar force=True para actualizar'
-                }
-            
-            # Preparar datos para la BD
-            db_data = self._prepare_db_data(video_data)
-            
-            # Obtener metadatos del archivo
-            db_data.update(self._extract_file_metadata(video_data))
-            
-            # Agregar o actualizar en la BD
-            if existing and force:
-                # Actualizar registro existente
-                self.db.update_video(existing['id'], db_data)
-                logger.info(f"✅ Video actualizado: {video_data['file_name']}")
-            else:
-                # Insertar nuevo registro
-                video_id = self.db.add_video(db_data)
-                logger.info(f"✅ Video agregado: {video_data['file_name']} (ID: {video_id})")
-            
-            return {
-                'success': True,
-                'imported': 1,
-                'errors': 0,
-                'message': f'Video importado exitosamente: {video_data["file_name"]}'
-            }
-            
-        except Exception as e:
-            logger.error(f"Error importando archivo: {e}")
-            return {
-                'success': False,
-                'error': str(e),
-                'imported': 0,
-                'errors': 1
-            }
     
     def _filter_duplicates_optimized(self, external_videos: List[Dict]) -> List[Dict]:
         """🚀 NUEVA ESTRATEGIA: Filtrar duplicados usando consulta optimizada con búsqueda inteligente"""
@@ -879,8 +815,8 @@ class DatabaseOperations:
             "CREATE INDEX IF NOT EXISTS idx_videos_creator ON videos(creator_name)",
             "CREATE INDEX IF NOT EXISTS idx_videos_file_path ON videos(file_path)",
             "CREATE INDEX IF NOT EXISTS idx_videos_created_at ON videos(created_at)",
-            "CREATE INDEX IF NOT EXISTS idx_videos_is_deleted ON videos(is_deleted)",
-            "CREATE INDEX IF NOT EXISTS idx_videos_upload_date ON videos(upload_date)"
+            "CREATE INDEX IF NOT EXISTS idx_videos_deleted_at ON videos(deleted_at)",
+            "CREATE INDEX IF NOT EXISTS idx_videos_processing_status ON videos(processing_status)"
         ]
         
         for index_sql in indexes:

@@ -473,29 +473,35 @@ class ExternalSourcesManager:
         
         if source in ['db', 'all']:
             # Extraer de bases de datos
-            if platform is None or platform == 'youtube':
+            # Normalizar plataforma: 'all-platforms' -> None para procesamiento
+            normalized_platform = None if platform in [None, 'all-platforms'] else platform
+            
+            if normalized_platform is None or normalized_platform == 'youtube':
                 all_videos.extend(self.extract_youtube_videos())
             
-            if platform is None or platform == 'tiktok':
+            if normalized_platform is None or normalized_platform == 'tiktok':
                 # 🚀 NUEVA ESTRATEGIA: Extraer TODOS los videos de TikTok (sin offset)
                 # Luego filtraremos por duplicados de manera inteligente
                 logger.info("🔍 Extrayendo TODOS los videos de TikTok para búsqueda inteligente...")
                 all_videos.extend(self.extract_tiktok_videos(offset=0, limit=None))
             
-            if platform is None or platform == 'instagram':
+            if normalized_platform is None or normalized_platform == 'instagram':
                 # 🚀 NUEVA ESTRATEGIA: Extraer TODOS los videos de Instagram (sin offset)
                 # Luego filtraremos por duplicados de manera inteligente
                 logger.info("🔍 Extrayendo TODOS los videos de Instagram para búsqueda inteligente...")
                 all_videos.extend(self.extract_instagram_content(offset=0, limit=None))
         
         if source in ['organized', 'all']:
-            # 🆕 Usar extractor extendido para manejar plataformas adicionales
-            if platform in ['other', 'all-platforms'] or (platform and platform not in ['youtube', 'tiktok', 'instagram']):
+            # 🆕 Usar extractor extendido para manejar plataformas adicionales  
+            # Normalizar plataforma: 'all-platforms' -> None para procesamiento
+            normalized_platform = None if platform in [None, 'all-platforms'] else platform
+            
+            if normalized_platform in ['other'] or (normalized_platform and normalized_platform not in ['youtube', 'tiktok', 'instagram']):
                 # Usar extractor extendido para plataformas adicionales o específicas
-                all_videos.extend(self.extract_organized_videos_extended(platform))
+                all_videos.extend(self.extract_organized_videos_extended(normalized_platform))
             else:
                 # Usar extractor clásico para plataformas principales
-                all_videos.extend(self.extract_organized_videos(platform))
+                all_videos.extend(self.extract_organized_videos(normalized_platform))
         
         # Eliminar duplicados basados en file_path
         seen_paths = set()

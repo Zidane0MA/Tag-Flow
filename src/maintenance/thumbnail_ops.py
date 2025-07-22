@@ -231,6 +231,17 @@ class ThumbnailOperations:
         orphaned = []
         total_size = 0
         
+        # Obtener ruta de thumbnails desde configuración centralizada
+        if not config.THUMBNAILS_PATH.exists():
+            logger.warning(f"Directorio de thumbnails no encontrado: {config.THUMBNAILS_PATH}")
+            return {
+                'success': True,
+                'orphaned_count': 0,
+                'total_size_mb': 0,
+                'deleted_count': 0,
+                'message': f"Directorio de thumbnails no encontrado: {config.THUMBNAILS_PATH}"
+            }
+        
         for thumb_path in config.THUMBNAILS_PATH.glob('*.jpg'):
             if thumb_path.name not in valid_thumbnails:
                 orphaned.append(thumb_path)
@@ -342,6 +353,39 @@ class ThumbnailOperations:
         total_videos = stats['total']
         coverage_percentage = (valid_thumbnails / total_videos * 100) if total_videos > 0 else 0
         
+        # Mostrar estadísticas en consola
+        logger.info(f"✅ Estadísticas de thumbnails:")
+        logger.info(f"   📊 Total de videos: {total_videos}")
+        logger.info(f"   🎨 Con thumbnails válidos: {valid_thumbnails} ({coverage_percentage:.1f}%)")
+        logger.info(f"   ❌ Sin thumbnails: {stats['without_thumbnails']}")
+        
+        if missing_thumbnails > 0:
+            logger.info(f"   📍 Referencias en BD pero archivos faltantes: {missing_thumbnails}")
+        if corrupt_thumbnails > 0:
+            logger.info(f"   🚫 Thumbnails corruptos: {corrupt_thumbnails}")
+        
+        # Status general
+        if coverage_percentage >= 90:
+            status_icon = "✅"
+            status = "Excelente"
+        elif coverage_percentage >= 70:
+            status_icon = "🟡" 
+            status = "Bueno"
+        elif coverage_percentage >= 50:
+            status_icon = "🟠"
+            status = "Regular"
+        else:
+            status_icon = "🔴"
+            status = "Necesita atención"
+        
+        logger.info(f"   {status_icon} Estado general: {status}")
+        
+        if coverage_percentage < 90:
+            logger.info(f"\n💡 Para mejorar la cobertura:")
+            logger.info(f"   python main.py populate-thumbnails")
+            if corrupt_thumbnails > 0:
+                logger.info(f"   python main.py regenerate-thumbnails --force")
+        
         return {
             'success': True,
             'total_videos': total_videos,
@@ -351,7 +395,9 @@ class ThumbnailOperations:
             'corrupt_thumbnails': corrupt_thumbnails,
             'missing_thumbnails': missing_thumbnails,
             'coverage_percentage': coverage_percentage,
-            'video_ids_analyzed': len(video_ids) if video_ids else total_videos
+            'video_ids_analyzed': len(video_ids) if video_ids else total_videos,
+            'status': status,
+            'message': f'Cobertura de thumbnails: {coverage_percentage:.1f}% ({status})'
         }
     
     def populate_thumbnails(self, platform: Optional[str] = None, limit: Optional[int] = None, force: bool = False) -> Dict[str, Any]:
