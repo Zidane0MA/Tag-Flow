@@ -93,9 +93,9 @@ class CharacterOperations:
             
             # Mapeos de TikToker Personas
             auto_detected = self.character_intelligence.creator_mapping.get('auto_detected', {})
-            tiktoker_personas = {}
+            mapeo_creador = {}
             for creator, data in auto_detected.items():
-                tiktoker_personas[creator] = {
+                mapeo_creador[creator] = {
                     'character': data.get('character', 'N/A'),
                     'confidence': data.get('confidence', 'N/A'),
                     'platform': data.get('platform', 'N/A')
@@ -120,7 +120,7 @@ class CharacterOperations:
                 'basic_stats': basic_stats,
                 'optimized_stats': optimized_stats,
                 'characters_by_game': characters_by_game,
-                'tiktoker_personas': tiktoker_personas,
+                'mapeo_creador': mapeo_creador,
                 'performance_report': performance_report,
                 'timestamp': datetime.now().isoformat()
             }

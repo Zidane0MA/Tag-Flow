@@ -171,9 +171,9 @@ class CharacterIntelligence:
             "auto_detected": {}
         }
         
-        # Buscar tiktoker_personas en la base de datos
-        if 'tiktoker_personas' in self.character_db:
-            tiktoker_data = self.character_db['tiktoker_personas']
+        # Buscar mapeo_creador en la base de datos
+        if 'mapeo_creador' in self.character_db:
+            tiktoker_data = self.character_db['mapeo_creador']
             
             if isinstance(tiktoker_data.get('characters'), dict):
                 # Nueva estructura
@@ -560,9 +560,9 @@ class CharacterIntelligence:
             }
         
         # NUEVO: Verificar si es un TikToker con persona propia
-        if 'tiktoker_personas' in self.creator_mapping:
-            if creator_name in self.creator_mapping['tiktoker_personas']:
-                tiktoker_info = self.creator_mapping['tiktoker_personas'][creator_name]
+        if 'mapeo_creador' in self.creator_mapping:
+            if creator_name in self.creator_mapping['mapeo_creador']:
+                tiktoker_info = self.creator_mapping['mapeo_creador'][creator_name]
                 if tiktoker_info.get('auto_detect', False):
                     return {
                         'name': tiktoker_info['persona_name'],
@@ -768,7 +768,7 @@ class CharacterIntelligence:
             'blue_archive': ['blue', 'archive', 'ba', 'nexon'],
             'vocaloid': ['vocaloid', 'miku', 'virtual', 'singer', 'crypton'],
             'other_popular': ['anime', 'manga', 'character'],
-            'tiktoker_personas': ['cosplay', 'tiktok', 'dance', 'cos', 'tiktoker']
+            'mapeo_creador': ['cosplay', 'tiktok', 'dance', 'cos', 'tiktoker']
         }
         
         # Agregar hints específicos del juego
@@ -799,7 +799,7 @@ class CharacterIntelligence:
                 hints.extend(element_hints_list)
         
         # Context hints para TikTokers
-        if game == 'tiktoker_personas' or 'cos' in character_lower:
+        if game == 'mapeo_creador' or 'cos' in character_lower:
             hints.extend(['cosplay', 'cosplayer', 'costume', 'performance', 'creator'])
         
         # Hints generales para personajes de anime/gaming

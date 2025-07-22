@@ -506,8 +506,8 @@ class ConfigVerifier:
                 self._success(f"Total patrones estimados: {total_patterns}")
                 
                 # Verificar TikToker personas
-                if 'tiktoker_personas' in char_db:
-                    tiktoker_data = char_db['tiktoker_personas']
+                if 'mapeo_creador' in char_db:
+                    tiktoker_data = char_db['mapeo_creador']
                     if isinstance(tiktoker_data.get('characters'), dict):
                         tiktoker_count = len(tiktoker_data['characters'])
                         self._success(f"TikToker Personas: {tiktoker_count} configurados")
