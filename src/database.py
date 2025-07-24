@@ -726,5 +726,40 @@ class DatabaseManager:
         logger.info(f"Restauración masiva: {successful} exitosos, {failed} fallidos")
         return successful, failed
 
-# Instancia global del gestor de base de datos
-db = DatabaseManager()
+# ⚠️ DEPRECATED: Instancia global removida para eliminar dependencias circulares
+# Usar ServiceFactory.get_service('database') o get_database() desde service_factory
+# 
+# Funciones de compatibilidad temporal (serán removidas en futuras versiones)
+def get_database_manager():
+    """
+    🔄 MIGRACIÓN: Función de compatibilidad temporal
+    TODO: Reemplazar todos los usos con ServiceFactory.get_service('database')
+    """
+    from src.service_factory import get_database
+    return get_database()
+
+# Variable global para compatibilidad temporal
+db = None
+
+def _ensure_global_db():
+    """Asegurar que db global esté inicializado (solo para compatibilidad)"""
+    global db
+    if db is None:
+        db = get_database_manager()
+    return db
+
+# Monkey-patch para compatibilidad temporal
+import sys
+current_module = sys.modules[__name__]
+
+class DatabaseProxy:
+    """Proxy para mantener compatibilidad con uso de db.método()"""
+    
+    def __getattr__(self, name):
+        # Asegurar que ServiceFactory registre el servicio como cargado
+        from src.service_factory import get_database
+        db_instance = get_database()
+        return getattr(db_instance, name)
+
+# Reemplazar la variable db con el proxy
+db = DatabaseProxy()

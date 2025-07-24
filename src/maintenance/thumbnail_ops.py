@@ -20,10 +20,10 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 import config
-from src.database import DatabaseManager
-from src.thumbnail_generator import ThumbnailGenerator
+# 🚀 MIGRADO: Eliminados imports directos, ahora se usan via service factory
+# Los módulos se importan solo cuando se necesitan mediante lazy loading
 
-# Instancias globales - movidas a funciones para evitar inicialización múltiple
+# Referencias eliminadas para evitar inicialización automática
 
 
 class ThumbnailOperations:
@@ -39,8 +39,26 @@ class ThumbnailOperations:
     """
     
     def __init__(self):
-        self.db = DatabaseManager()
-        self.thumbnail_generator = ThumbnailGenerator()
+        # 🚀 MIGRADO: Usar service factory para gestión centralizada
+        # NO instanciar servicios en __init__ para máximo lazy loading
+        self._db = None
+        self._thumbnail_generator = None
+    
+    @property
+    def db(self):
+        """Lazy initialization of DatabaseManager via ServiceFactory"""
+        if self._db is None:
+            from src.service_factory import get_database
+            self._db = get_database()
+        return self._db
+    
+    @property
+    def thumbnail_generator(self):
+        """Lazy initialization of ThumbnailGenerator via ServiceFactory"""
+        if self._thumbnail_generator is None:
+            from src.service_factory import get_thumbnail_generator
+            self._thumbnail_generator = get_thumbnail_generator()
+        return self._thumbnail_generator
     
     def regenerate_thumbnails(self, force: bool = False) -> Dict[str, Any]:
         """

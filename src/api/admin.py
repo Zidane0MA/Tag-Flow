@@ -10,7 +10,7 @@ from pathlib import Path
 from flask import Blueprint, request, jsonify, render_template
 import logging
 
-from src.database import db
+# Database will be imported lazily within functions
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +20,8 @@ admin_bp = Blueprint('admin', __name__)
 def admin_page():
     """Página de administración"""
     try:
+        from src.service_factory import get_database
+        db = get_database()
         stats = db.get_stats()
         return render_template('admin.html', stats=stats)
     except Exception as e:
@@ -259,6 +261,9 @@ def api_verify():
 def api_empty_trash():
     """API para vaciar la papelera (eliminación permanente)"""
     try:
+        from src.service_factory import get_database
+        db = get_database()
+        
         # Contar videos en papelera antes de eliminar
         trash_count = db.count_videos({'is_deleted': True})
         
@@ -298,6 +303,9 @@ def api_reset_database():
                 'error': 'Confirmación requerida para esta operación'
             }), 400
         
+        from src.service_factory import get_database
+        db = get_database()
+        
         # Reinicializar base de datos
         success = db.reset_database()
         
@@ -317,6 +325,8 @@ def api_reset_database():
 def api_get_platforms():
     """API para obtener plataformas disponibles"""
     try:
+        from src.service_factory import get_database
+        db = get_database()
         platforms = db.get_unique_platforms()
         return jsonify({
             'success': True, 

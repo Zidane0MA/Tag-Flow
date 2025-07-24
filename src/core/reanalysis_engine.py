@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import List, Union, Dict
 
 from config import config
-from src.database import db
+# 🚀 MIGRADO: Eliminados imports directos, ahora se usan via service factory
 from .video_analyzer import VideoAnalyzer
 
 logger = logging.getLogger(__name__)
@@ -18,6 +18,16 @@ class ReanalysisEngine:
     
     def __init__(self):
         self.analyzer = VideoAnalyzer()
+        # 🚀 LAZY LOADING: Database se carga solo cuando se necesita
+        self._db = None
+    
+    @property
+    def db(self):
+        """Lazy initialization of DatabaseManager via ServiceFactory"""
+        if self._db is None:
+            from src.service_factory import get_database
+            self._db = get_database()
+        return self._db
         
     def reanalyze_videos(self, video_ids: Union[List[int], str], force: bool = False) -> Dict:
         """
@@ -82,7 +92,7 @@ class ReanalysisEngine:
         """
         try:
             # Obtener video de la base de datos
-            video = db.get_video_by_id(video_id)
+            video = self.db.get_video_by_id(video_id)
             if not video:
                 return {
                     'success': False,
@@ -111,7 +121,7 @@ class ReanalysisEngine:
                     }
             
             # Marcar como procesando
-            db.update_video(video_id, {
+            self.db.update_video(video_id, {
                 'processing_status': 'procesando',
                 'error_message': None
             })
@@ -145,7 +155,7 @@ class ReanalysisEngine:
                 }
             else:
                 # Marcar como error
-                db.update_video(video_id, {
+                self.db.update_video(video_id, {
                     'processing_status': 'error',
                     'error_message': result.get('error', 'Error en reanálisis')
                 })
@@ -161,7 +171,7 @@ class ReanalysisEngine:
             
             # Marcar como error en la BD
             try:
-                db.update_video(video_id, {
+                self.db.update_video(video_id, {
                     'processing_status': 'error',
                     'error_message': str(e)
                 })

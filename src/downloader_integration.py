@@ -10,7 +10,7 @@ from typing import Dict, List, Optional, Tuple
 from datetime import datetime
 
 from config import config
-from src.database import db
+# 🚀 MIGRADO: Eliminado import directo, ahora se usa via service factory
 
 logger = logging.getLogger(__name__)
 
@@ -20,11 +20,21 @@ class DownloaderIntegration:
     def __init__(self):
         self.external_youtube_db = config.EXTERNAL_YOUTUBE_DB
         self.is_available = self._check_availability()
+        # 🚀 LAZY LOADING: Database se carga solo cuando se necesita
+        self._db = None
         
         if self.is_available:
             logger.info("4K Video Downloader disponible")
         else:
             logger.warning("4K Video Downloader no disponible o no configurado")
+    
+    @property
+    def db(self):
+        """Lazy initialization of DatabaseManager via ServiceFactory"""
+        if self._db is None:
+            from src.service_factory import get_database
+            self._db = get_database()
+        return self._db
     
     def _check_availability(self) -> bool:
         """Verificar si la base de datos de 4K Downloader está disponible"""
@@ -151,7 +161,7 @@ class DownloaderIntegration:
                 return False
             
             # Verificar si ya está en nuestra BD
-            existing_videos = db.get_videos()
+            existing_videos = self.db.get_videos()
             if any(video['file_path'] == str(file_path_obj) for video in existing_videos):
                 logger.debug(f"Video ya existe en BD: {file_path_obj.name}")
                 return False
@@ -168,10 +178,10 @@ class DownloaderIntegration:
             }
             
             # Insertar en BD
-            video_id = db.add_video(video_data)
+            video_id = self.db.add_video(video_data)
             
             # Crear mapeo en tabla de integración
-            db_conn = db.get_connection()
+            db_conn = self.db.get_connection()
             with db_conn:
                 db_conn.execute("""
                     INSERT INTO downloader_mapping 
@@ -285,7 +295,7 @@ class DownloaderIntegration:
             return {'available': False}
         
         try:
-            with db.get_connection() as conn:
+            with self.db.get_connection() as conn:
                 cursor = conn.execute('SELECT COUNT(*) FROM downloader_mapping')
                 mapped_count = cursor.fetchone()[0]
                 
@@ -307,5 +317,6 @@ class DownloaderIntegration:
             logger.error(f"Error obteniendo estadísticas de integración: {e}")
             return {'available': True, 'error': str(e)}
 
-# Instancia global
-downloader_integration = DownloaderIntegration()
+# DEPRECATED: Global instance deprecated in favor of ServiceFactory
+# Use: from src.services.service_factory import ServiceFactory; service_factory = ServiceFactory(); downloader_integration = service_factory.get_downloader_integration()
+# downloader_integration = DownloaderIntegration()

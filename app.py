@@ -13,7 +13,7 @@ from flask_cors import CORS
 sys.path.append(str(Path(__file__).parent / 'src'))
 
 from config import config
-from src.database import db
+# Database will be imported lazily within functions
 from src.api import gallery_bp, videos_bp, admin_bp, maintenance_bp
 
 # Configurar logging
@@ -56,6 +56,8 @@ def create_app():
     def stream_video(video_id):
         """Servir video para streaming (para reproducción en navegador)"""
         try:
+            from src.service_factory import get_database
+            db = get_database()
             video = db.get_video(video_id)
             if not video:
                 abort(404)
@@ -104,6 +106,8 @@ def create_app():
     def inject_stats():
         """Inyectar estadísticas básicas en templates"""
         try:
+            from src.service_factory import get_database
+            db = get_database()
             stats = db.get_stats()
             return {'global_stats': stats}
         except:

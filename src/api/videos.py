@@ -12,7 +12,7 @@ from pathlib import Path
 from flask import Blueprint, request, jsonify, send_file, abort
 import logging
 
-from src.database import db
+# Database will be imported lazily within functions
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +22,9 @@ videos_bp = Blueprint('videos', __name__, url_prefix='/api')
 def api_videos():
     """API endpoint para obtener videos (AJAX)"""
     try:
+        from src.service_factory import get_database
+        db = get_database()
+        
         # Obtener parámetros
         filters = {}
         for key in ['creator_name', 'platform', 'edit_status', 'processing_status', 'difficulty_level']:
@@ -82,6 +85,8 @@ def api_videos():
 def api_get_video(video_id):
     """API para obtener un video específico"""
     try:
+        from src.service_factory import get_database
+        db = get_database()
         video = db.get_video(video_id)
         if not video:
             return jsonify({'success': False, 'error': 'Video not found'}), 404
@@ -127,6 +132,8 @@ def api_get_video(video_id):
 def api_play_video(video_id):
     """API para obtener información de reproducción del video"""
     try:
+        from src.service_factory import get_database
+        db = get_database()
         video = db.get_video(video_id)
         if not video:
             return jsonify({'success': False, 'error': 'Video not found'}), 404
@@ -191,6 +198,9 @@ def api_update_video(video_id):
         
         logger.info(f"Campos a actualizar para video {video_id}: {updates}")
         
+        from src.service_factory import get_database
+        db = get_database()
+        
         # Actualizar en base de datos
         success = db.update_video(video_id, updates)
         
@@ -229,6 +239,8 @@ def api_update_video(video_id):
 def api_open_folder(video_id):
     """API para abrir la carpeta del video en el explorador"""
     try:
+        from src.service_factory import get_database
+        db = get_database()
         video = db.get_video(video_id)
         if not video:
             return jsonify({'success': False, 'error': 'Video not found'}), 404
@@ -260,6 +272,8 @@ def api_open_folder(video_id):
 def api_delete_video(video_id):
     """API para eliminar (soft delete) un video"""
     try:
+        from src.service_factory import get_database
+        db = get_database()
         success = db.soft_delete_video(video_id)
         if success:
             return jsonify({'success': True, 'message': 'Video moved to trash'})
@@ -274,6 +288,8 @@ def api_delete_video(video_id):
 def api_restore_video(video_id):
     """API para restaurar un video desde la papelera"""
     try:
+        from src.service_factory import get_database
+        db = get_database()
         success = db.restore_video(video_id)
         if success:
             return jsonify({'success': True, 'message': 'Video restored from trash'})
@@ -288,6 +304,9 @@ def api_restore_video(video_id):
 def api_permanent_delete_video(video_id):
     """API para eliminar permanentemente un video"""
     try:
+        from src.service_factory import get_database
+        db = get_database()
+        
         # Obtener video antes de eliminarlo para mostrar información
         video = db.get_video(video_id)
         if not video:
@@ -310,6 +329,8 @@ def api_permanent_delete_video(video_id):
 def api_stats():
     """API para obtener estadísticas del sistema"""
     try:
+        from src.service_factory import get_database
+        db = get_database()
         stats = db.get_stats()
         return jsonify({'success': True, 'stats': stats})
         
@@ -323,6 +344,9 @@ def api_reanalyze_video(video_id):
     try:
         data = request.get_json() or {}
         force = data.get('force', False)
+        
+        from src.service_factory import get_database
+        db = get_database()
         
         video = db.get_video(video_id)
         if not video:
@@ -549,6 +573,9 @@ def api_bulk_update_videos():
         if not filtered_updates:
             return jsonify({'success': False, 'error': 'No valid fields to update'}), 400
         
+        from src.service_factory import get_database
+        db = get_database()
+        
         success_count = 0
         for video_id in video_ids:
             if db.update_video(video_id, filtered_updates):
@@ -575,6 +602,9 @@ def api_bulk_edit_videos():
         
         if not video_ids:
             return jsonify({'success': False, 'error': 'No video IDs provided'}), 400
+        
+        from src.service_factory import get_database
+        db = get_database()
         
         success_count = 0
         

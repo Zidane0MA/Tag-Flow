@@ -465,5 +465,6 @@ class MusicRecognizer:
         
         return results
 
-# Instancia global del reconocedor
-music_recognizer = MusicRecognizer()
+# DEPRECATED: Global instance deprecated in favor of ServiceFactory
+# Use: from src.services.service_factory import ServiceFactory; service_factory = ServiceFactory(); music_recognizer = service_factory.get_music_recognizer()
+# music_recognizer = MusicRecognizer()

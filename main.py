@@ -193,11 +193,12 @@ Ejemplos de uso:
         """Ejecutar comando de procesamiento"""
         logger.info("🎬 Iniciando procesamiento de videos...")
         
-        # Importar módulos de procesamiento
-        from src.video_processor import video_processor
-        from src.music_recognition import music_recognizer
-        from src.face_recognition import face_recognizer
-        from src.thumbnail_generator import thumbnail_generator
+        # 🚀 MIGRADO: Usar service factory para lazy loading
+        from src.service_factory import get_video_processor, get_music_recognizer, get_face_recognizer
+        
+        video_processor = get_video_processor()
+        music_recognizer = get_music_recognizer()
+        face_recognizer = get_face_recognizer()
         
         # Reanálisis vs análisis normal
         if args.reanalyze_video:
@@ -312,8 +313,9 @@ Ejemplos de uso:
             )
             
         elif command == 'db-stats':
-            from src.maintenance.database_ops import DatabaseOperations
-            ops = DatabaseOperations()
+            # 🚀 OPTIMIZADO: Usar operaciones ligeras sin dependencias pesadas
+            from src.maintenance.stats_ops import StatsOperations
+            ops = StatsOperations()
             result = ops.get_database_stats()
             
         elif command in ['regenerate-thumbnails', 'populate-thumbnails', 'clean-thumbnails', 'thumbnail-stats']:
@@ -374,7 +376,9 @@ Ejemplos de uso:
                 
         elif command in ['show-stats', 'character-stats']:
             from src.maintenance.utils import format_bytes, format_number
-            from src.database import db
+            # 🚀 MIGRADO: Usar service factory para lazy loading
+            from src.service_factory import get_database
+            db = get_database()
             
             if command == 'show-stats':
                 stats = db.get_stats()
@@ -383,9 +387,9 @@ Ejemplos de uso:
                     logger.info(f"  {key}: {value}")
                 return
             else:
-                # Character stats usando character intelligence
-                from src.character_intelligence import CharacterIntelligence
-                ci = CharacterIntelligence()
+                # 🚀 MIGRADO: Character stats usando service factory
+                from src.service_factory import get_character_intelligence
+                ci = get_character_intelligence()
                 stats = ci.get_performance_report()
                 logger.info("🎭 Estadísticas de personajes:")
                 for key, value in stats.items():

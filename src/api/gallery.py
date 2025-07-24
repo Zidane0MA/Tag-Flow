@@ -8,7 +8,7 @@ from pathlib import Path
 from flask import Blueprint, render_template, request, abort
 import logging
 
-from src.database import db
+# Database will be imported lazily within functions
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +18,9 @@ gallery_bp = Blueprint('gallery', __name__)
 def index():
     """Página principal - galería de videos"""
     try:
+        from src.service_factory import get_database
+        db = get_database()
+        
         # Obtener filtros de la query string
         filters = {}
         if request.args.get('creator'):
@@ -109,6 +112,8 @@ def index():
 def video_detail(video_id):
     """Página de detalle de un video específico"""
     try:
+        from src.service_factory import get_database
+        db = get_database()
         video = db.get_video_by_id(video_id)
         if not video:
             abort(404)
@@ -161,6 +166,9 @@ def trash():
         page = int(request.args.get('page', 1))
         per_page = int(request.args.get('per_page', 20))
         offset = (page - 1) * per_page
+        
+        from src.service_factory import get_database
+        db = get_database()
         
         # Obtener videos eliminados
         videos = db.get_videos(filters=filters, limit=per_page, offset=offset)

@@ -24,11 +24,10 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 import config
-from src.database import DatabaseManager
-from src.external_sources import ExternalSourcesManager
-from src.video_processor import VideoProcessor
+# 🚀 MIGRADO: Eliminados imports directos, ahora se usan via service factory
+# Los módulos se importan solo cuando se necesitan mediante lazy loading
 
-# Instancias globales - movidas a funciones para evitar inicialización múltiple
+# Referencias eliminadas para evitar inicialización automática
 
 
 class DatabaseOperations:
@@ -44,9 +43,35 @@ class DatabaseOperations:
     """
     
     def __init__(self):
-        self.db = DatabaseManager()
-        self.external_sources = ExternalSourcesManager()
-        self.video_processor = VideoProcessor()
+        # 🚀 MIGRADO: Usar service factory para gestión centralizada
+        # NO instanciar servicios en __init__ para máximo lazy loading
+        self._db = None
+        self._external_sources = None
+        self._video_processor = None
+    
+    @property
+    def db(self):
+        """Lazy initialization of DatabaseManager via ServiceFactory"""
+        if self._db is None:
+            from src.service_factory import get_database
+            self._db = get_database()
+        return self._db
+    
+    @property
+    def external_sources(self):
+        """Lazy initialization of ExternalSourcesManager via ServiceFactory"""
+        if self._external_sources is None:
+            from src.service_factory import get_external_sources
+            self._external_sources = get_external_sources()
+        return self._external_sources
+    
+    @property
+    def video_processor(self):
+        """Lazy initialization of VideoProcessor via ServiceFactory"""
+        if self._video_processor is None:
+            from src.service_factory import get_video_processor
+            self._video_processor = get_video_processor()
+        return self._video_processor
     
     def populate_database(self, source: str = 'all', platform: Optional[str] = None, 
                          limit: Optional[int] = None, force: bool = False, 

@@ -23,8 +23,10 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 import config
-from src.database import DatabaseManager
-from src.character_intelligence import CharacterIntelligence
+# 🚀 MIGRADO: Eliminados imports directos, ahora se usan via service factory
+# Los módulos se importan solo cuando se necesitan mediante lazy loading
+
+# Referencias eliminadas para evitar inicialización automática
 
 
 class IntegrityOperations:
@@ -41,8 +43,26 @@ class IntegrityOperations:
     """
     
     def __init__(self):
-        self.db = DatabaseManager()
-        self.character_intelligence = CharacterIntelligence()
+        # 🚀 MIGRADO: Usar service factory para gestión centralizada
+        # NO instanciar servicios en __init__ para máximo lazy loading
+        self._db = None
+        self._character_intelligence = None
+    
+    @property
+    def db(self):
+        """Lazy initialization of DatabaseManager via ServiceFactory"""
+        if self._db is None:
+            from src.service_factory import get_database
+            self._db = get_database()
+        return self._db
+    
+    @property
+    def character_intelligence(self):
+        """Lazy initialization of CharacterIntelligence via ServiceFactory"""
+        if self._character_intelligence is None:
+            from src.service_factory import get_character_intelligence
+            self._character_intelligence = get_character_intelligence()
+        return self._character_intelligence
     
     def verify_database_integrity(self, fix_issues: bool = False) -> Dict[str, Any]:
         """
@@ -465,8 +485,8 @@ class IntegrityOperations:
                 logger.info("🔄 Regenerando thumbnails faltantes...")
                 
                 try:
-                    from src.thumbnail_generator import ThumbnailGenerator
-                    thumbnail_generator = ThumbnailGenerator()
+                    from src.service_factory import get_thumbnail_generator
+                    thumbnail_generator = get_thumbnail_generator()
                     
                     for missing in verification_results['missing_thumbnails']:
                         video_id = missing['video_id']
@@ -932,10 +952,10 @@ class IntegrityOperations:
     def _extract_description_from_external_db(self, file_path: str, platform: str) -> Optional[str]:
         """Extraer descripción desde bases de datos externas de 4K Apps"""
         try:
-            from src.external_sources import ExternalSourcesManager
+            from src.service_factory import get_external_sources
             
             # Usar ExternalSourcesManager para acceder a las BDs externas
-            external_manager = ExternalSourcesManager()
+            external_manager = get_external_sources()
             
             if platform == 'tiktok':
                 # Buscar en BD de TikTok

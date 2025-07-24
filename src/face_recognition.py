@@ -14,8 +14,8 @@ from PIL import Image
 import io
 from config import config
 
-# Importar el nuevo sistema de inteligencia
-from .character_intelligence import character_intelligence
+# Importar el nuevo sistema de inteligencia a través del service factory
+from .service_factory import get_character_intelligence
 
 # Configurar logger primero
 logger = logging.getLogger(__name__)
@@ -104,7 +104,7 @@ class FaceRecognizer:
             # Obtener sugerencias de título
             if video_data.get('title'):
                 title = video_data['title']
-                title_suggestions = character_intelligence.analyze_video_title(title)
+                title_suggestions = get_character_intelligence().analyze_video_title(title)
                 results['suggestions_from_title'] = title_suggestions
                 
                 for suggestion in title_suggestions:
@@ -117,7 +117,7 @@ class FaceRecognizer:
             
             # Obtener sugerencias de creador
             if video_data.get('creator_name'):
-                creator_suggestion = character_intelligence.analyze_creator_name(video_data['creator_name'])
+                creator_suggestion = get_character_intelligence().analyze_creator_name(video_data['creator_name'])
                 if creator_suggestion:
                     results['suggestions_from_creator'] = [creator_suggestion]
                     results['detected_characters'].append(creator_suggestion['name'])
@@ -432,5 +432,6 @@ class FaceRecognizer:
         
         return results
 
-# Instancia global del reconocedor facial
-face_recognizer = FaceRecognizer()
+# DEPRECATED: Global instance deprecated in favor of ServiceFactory
+# Use: from src.services.service_factory import ServiceFactory; service_factory = ServiceFactory(); face_recognizer = service_factory.get_face_recognizer()
+# face_recognizer = FaceRecognizer()

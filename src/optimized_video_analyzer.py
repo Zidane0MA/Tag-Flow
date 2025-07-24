@@ -13,10 +13,8 @@ import time
 # Agregar el directorio src al path para imports
 sys.path.append(str(Path(__file__).parent))
 
-from database import db
-from optimized_database import OptimizedDatabaseManager
+# 🚀 MIGRADO: Eliminados imports directos, ahora se usan via service factory
 from pattern_cache import get_global_cache
-import external_sources
 
 logger = logging.getLogger(__name__)
 
@@ -24,22 +22,48 @@ class OptimizedVideoAnalyzer:
     """VideoAnalyzer con optimizaciones de BD manteniendo interfaz idéntica"""
     
     def __init__(self):
+        # 🚀 LAZY LOADING: Servicios se cargan solo cuando se necesitan
+        self._db = None
+        self._optimized_db = None
+        self._external_sources = None
+        
         # Intentar usar optimizaciones
         try:
-            self.optimized_db = OptimizedDatabaseManager()
             self.use_optimizations = True
             self.cache = get_global_cache()
             logger.info("🚀 VideoAnalyzer OPTIMIZADO inicializado")
         except Exception as e:
             logger.warning(f"⚠️ Error inicializando optimizaciones, usando estándar: {e}")
             self.use_optimizations = False
-            self.optimized_db = None
-        
-        # Mantener configuración original
-        from config import config
-        config.ensure_directories()
-        
-        self.video_extensions = {'.mp4', '.avi', '.mov', '.mkv', '.wmv', '.flv', '.webm', '.m4v'}
+    
+    # 🚀 Properties para lazy loading de servicios
+    @property
+    def db(self):
+        """Lazy initialization of DatabaseManager via ServiceFactory"""
+        if self._db is None:
+            from src.service_factory import get_database
+            self._db = get_database()
+        return self._db
+    
+    @property
+    def optimized_db(self):
+        """Lazy initialization of OptimizedDatabaseManager"""
+        if self._optimized_db is None and self.use_optimizations:
+            try:
+                from optimized_database import OptimizedDatabaseManager
+                self._optimized_db = OptimizedDatabaseManager()
+            except Exception as e:
+                logger.warning(f"⚠️ Error cargando OptimizedDatabaseManager: {e}")
+                self.use_optimizations = False
+        return self._optimized_db
+    
+    @property
+    def external_sources(self):
+        """Lazy initialization of ExternalSourcesManager via ServiceFactory"""
+        if self._external_sources is None:
+            from src.service_factory import get_external_sources
+            self._external_sources = get_external_sources()
+        return self._external_sources
         
         logger.debug(f"Optimizaciones: {'ACTIVAS' if self.use_optimizations else 'INACTIVAS'}")
     
@@ -62,7 +86,7 @@ class OptimizedVideoAnalyzer:
             logger.debug(f"📊 Paths existentes obtenidos en {paths_time:.3f}s (cache: {len(existing_paths)} paths)")
             
             # ✅ OPTIMIZACIÓN 2: Obtener videos externos (sin cambios para compatibilidad)
-            external_videos = external_sources.get_all_videos_from_source(source_filter, self._map_platform_to_internal(platform_filter))
+            external_videos = self.external_sources.get_all_videos_from_source(source_filter, self._map_platform_to_internal(platform_filter))
             external_time = time.time() - start_time - paths_time
             logger.debug(f"📊 Videos externos obtenidos en {external_time:.3f}s ({len(external_videos)} videos)")
             
@@ -202,7 +226,7 @@ class OptimizedVideoAnalyzer:
         
         # Obtener plataformas adicionales disponibles
         try:
-            available_platforms = external_sources.get_available_platforms()
+            available_platforms = self.external_sources.get_available_platforms()
             for platform_key in available_platforms['additional'].keys():
                 platform_map[platform_key] = platform_key.upper()
         except Exception as e:
@@ -435,7 +459,7 @@ class OptimizedVideoAnalyzer:
             
             # Agregar plataformas adicionales disponibles
             try:
-                available_platforms = external_sources.get_available_platforms()
+                available_platforms = self.external_sources.get_available_platforms()
                 for platform_key, platform_info in available_platforms['additional'].items():
                     platform_names[platform_key] = f"{platform_info['folder_name']} (D:\\4K All\\{platform_info['folder_name']})"
             except Exception as e:
@@ -519,8 +543,8 @@ class OptimizedVideoAnalyzer:
             batch_results = self.process_videos_batch(videos_to_process)
             
             # 3. Mostrar estadísticas finales
-            if hasattr(db, 'get_stats'):
-                stats = db.get_stats()
+            if hasattr(self.db, 'get_stats'):
+                stats = self.db.get_stats()
                 logger.info("=== ESTADÍSTICAS FINALES ===")
                 logger.info(f"Total videos en BD: {stats['total_videos']}")
                 logger.info(f"Videos con música: {stats['with_music']}")

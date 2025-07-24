@@ -24,7 +24,7 @@ except ImportError:
         MEDIUM = 'medium'
         HIGH = 'high'
 
-from src.database import db
+# Database will be imported lazily within functions
 
 maintenance_bp = Blueprint('maintenance', __name__, url_prefix='/api/maintenance')
 
@@ -336,6 +336,8 @@ def api_backup_database():
 def api_database_stats():
     """API para obtener estadísticas de base de datos"""
     try:
+        from src.service_factory import get_database
+        db = get_database()
         stats = db.get_detailed_stats()
         
         return jsonify({

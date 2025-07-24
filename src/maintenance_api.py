@@ -29,7 +29,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import config
-from src.database import Database
+# 🚀 MIGRADO: Eliminado import directo, ahora se usa via service factory
 from src.maintenance.thumbnail_ops import ThumbnailOperations
 from src.maintenance.database_ops import DatabaseOperations
 from src.maintenance.backup_ops import BackupOperations
@@ -53,7 +53,8 @@ class MaintenanceAPI:
     """
     
     def __init__(self):
-        self.db = Database()
+        # 🚀 MIGRADO: Lazy loading para todos los servicios
+        self._db = None
         self.thumbnail_ops = ThumbnailOperations()
         self.database_ops = DatabaseOperations()
         self.backup_ops = BackupOperations()
@@ -65,6 +66,14 @@ class MaintenanceAPI:
         self.websocket_manager = get_websocket_manager()
         
         logger.info("🔧 Maintenance API inicializada")
+    
+    @property
+    def db(self):
+        """Lazy initialization of Database via ServiceFactory"""
+        if self._db is None:
+            from src.service_factory import get_database
+            self._db = get_database()
+        return self._db
     
     # Operaciones de thumbnails con WebSockets
     def regenerate_thumbnails_bulk(self, video_ids: List[int], 

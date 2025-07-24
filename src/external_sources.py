@@ -899,5 +899,4 @@ class ExternalSourcesManager:
         
         return None
 
-# Instancia global
-external_sources = ExternalSourcesManager()
+# Instancia global removida - usar lazy initialization

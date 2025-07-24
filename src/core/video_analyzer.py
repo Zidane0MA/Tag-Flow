@@ -9,12 +9,8 @@ from typing import List, Dict, Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from config import config
-from src.database import db
-from src.external_sources import external_sources
-from src.video_processor import video_processor
-from src.music_recognition import music_recognizer
-from src.face_recognition import face_recognizer
-from src.thumbnail_generator import thumbnail_generator
+# 🚀 REFACTORIZADO: Lazy loading mediante service factory
+# Eliminados imports pesados al nivel de módulo para mejorar performance
 
 logger = logging.getLogger(__name__)
 
@@ -28,11 +24,69 @@ class VideoAnalyzer:
         # Extensiones de video soportadas
         self.video_extensions = {'.mp4', '.avi', '.mov', '.mkv', '.wmv', '.flv', '.webm', '.m4v'}
         
+        # 🚀 LAZY LOADING: No crear instancias pesadas en __init__
+        # Los servicios se cargarán solo cuando se necesiten mediante properties
+        self._db = None
+        self._external_sources = None
+        self._video_processor = None
+        self._music_recognizer = None
+        self._face_recognizer = None
+        self._thumbnail_generator = None
+        
         # Validar configuración (solo mostrar errores críticos)
         warnings = config.validate_config()
         critical_warnings = [w for w in warnings if "API" in w or "configurada" in w]
         if critical_warnings:
             logger.warning("⚠️ Configuración: " + "; ".join(critical_warnings))
+    
+    # 🚀 Properties para lazy loading de servicios pesados
+    @property
+    def db(self):
+        """Lazy loading de DatabaseManager"""
+        if self._db is None:
+            from src.service_factory import get_database
+            self._db = get_database()
+        return self._db
+    
+    @property
+    def external_sources(self):
+        """Lazy loading de ExternalSourcesManager"""
+        if self._external_sources is None:
+            from src.service_factory import get_external_sources
+            self._external_sources = get_external_sources()
+        return self._external_sources
+    
+    @property
+    def video_processor(self):
+        """Lazy loading de VideoProcessor"""
+        if self._video_processor is None:
+            from src.service_factory import get_video_processor
+            self._video_processor = get_video_processor()
+        return self._video_processor
+    
+    @property
+    def music_recognizer(self):
+        """Lazy loading de MusicRecognizer"""
+        if self._music_recognizer is None:
+            from src.service_factory import get_music_recognizer
+            self._music_recognizer = get_music_recognizer()
+        return self._music_recognizer
+    
+    @property
+    def face_recognizer(self):
+        """Lazy loading de FaceRecognizer"""
+        if self._face_recognizer is None:
+            from src.service_factory import get_face_recognizer
+            self._face_recognizer = get_face_recognizer()
+        return self._face_recognizer
+    
+    @property
+    def thumbnail_generator(self):
+        """Lazy loading de ThumbnailGenerator"""
+        if self._thumbnail_generator is None:
+            from src.service_factory import get_thumbnail_generator
+            self._thumbnail_generator = get_thumbnail_generator()
+        return self._thumbnail_generator
     
     def find_new_videos(self, platform_filter=None, source_filter='all') -> List[Dict]:
         """
@@ -50,7 +104,7 @@ class VideoAnalyzer:
         # Obtener videos ya procesados de la BD
         existing_videos = set()
         try:
-            videos_in_db = db.get_videos()
+            videos_in_db = self.db.get_videos()
             existing_videos = {video['file_path'] for video in videos_in_db}
             logger.info(f"📊 Videos ya en BD: {len(existing_videos)}")
         except Exception as e:
@@ -82,7 +136,7 @@ class VideoAnalyzer:
             }
             
             # Obtener plataformas adicionales disponibles
-            available_platforms = external_sources.get_available_platforms()
+            available_platforms = self.external_sources.get_available_platforms()
             
             # Agregar plataformas adicionales al mapa
             for platform_key in available_platforms['additional'].keys():
@@ -104,7 +158,7 @@ class VideoAnalyzer:
                 external_source = 'all'
             
             # Obtener videos de fuentes externas
-            external_videos = external_sources.get_all_videos_from_source(external_source, internal_platform_code)
+            external_videos = self.external_sources.get_all_videos_from_source(external_source, internal_platform_code)
             
             # Filtrar nuevos y verificar existencia
             for video_data in external_videos:
@@ -225,7 +279,7 @@ class VideoAnalyzer:
                 }
             
             # Verificar que es un video válido
-            if not video_processor.is_valid_video(Path(file_path)):
+            if not self.video_processor.is_valid_video(Path(file_path)):
                 return {
                     'success': False,
                     'error': 'Archivo de video inválido',
@@ -233,7 +287,7 @@ class VideoAnalyzer:
                 }
             
             # Extraer metadatos básicos
-            video_metadata = video_processor.extract_metadata(file_path)
+            video_metadata = self.video_processor.extract_metadata(file_path)
             
             # Análisis de música (si hay audio)
             music_result = {'song_name': None, 'artist_name': None, 'confidence': 0.0, 'source': None}
@@ -241,11 +295,11 @@ class VideoAnalyzer:
             if video_metadata.get('has_audio', False):
                 try:
                     # Extraer audio temporal
-                    audio_path = video_processor.extract_audio(Path(file_path), duration=30)
+                    audio_path = self.video_processor.extract_audio(Path(file_path), duration=30)
                     if audio_path:
                         # Usar reconocimiento de música con filename para análisis completo
                         filename = Path(file_path).name
-                        music_result = music_recognizer.recognize_music(audio_path, filename)
+                        music_result = self.music_recognizer.recognize_music(audio_path, filename)
                         # Limpiar archivo temporal
                         if audio_path.exists():
                             audio_path.unlink()
@@ -256,7 +310,7 @@ class VideoAnalyzer:
             face_result = {'characters': [], 'faces': []}
             
             try:
-                frame_data = video_processor.get_video_frame(Path(file_path), timestamp=2.0)
+                frame_data = self.video_processor.get_video_frame(Path(file_path), timestamp=2.0)
                 if frame_data:
                     # Preparar datos del video para análisis inteligente
                     video_data_for_recognition = {
@@ -266,13 +320,13 @@ class VideoAnalyzer:
                     }
                     
                     # Usar reconocimiento inteligente que combina todas las estrategias
-                    face_result = face_recognizer.recognize_faces_intelligent(frame_data, video_data_for_recognition)
+                    face_result = self.face_recognizer.recognize_faces_intelligent(frame_data, video_data_for_recognition)
                         
             except Exception as e:
                 logger.warning(f"  Error en reconocimiento de personajes: {e}")
             
             # Generar thumbnail
-            thumbnail_result = thumbnail_generator.generate_thumbnail(Path(file_path))
+            thumbnail_result = self.thumbnail_generator.generate_thumbnail(Path(file_path))
             
             # Preparar datos para actualizar el video existente
             update_data = {
@@ -296,7 +350,7 @@ class VideoAnalyzer:
             video_id = video_data.get('id')
             if video_id:
                 
-                success = db.update_video(video_id, update_data)
+                success = self.db.update_video(video_id, update_data)
                 
                 if success:
                     return {
@@ -356,7 +410,7 @@ class VideoAnalyzer:
             filters['platform'] = platform
         
         # Obtener videos pendientes de análisis o todos según filtros
-        existing_videos = db.get_videos(filters)
+        existing_videos = self.db.get_videos(filters)
         
         # Filtrar solo videos que necesitan análisis (sin personajes o música)
         videos_to_analyze = []
@@ -417,7 +471,7 @@ class VideoAnalyzer:
                 logger.info(f"✅ +{import_result['imported']} videos importados")
                 
                 # Actualizar lista de videos para analizar
-                new_existing = db.get_videos(filters)
+                new_existing = self.db.get_videos(filters)
                 for video in new_existing:
                     if video not in existing_videos:
                         needs_analysis = (
