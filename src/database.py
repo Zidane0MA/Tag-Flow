@@ -396,11 +396,14 @@ class DatabaseManager:
         
         query = f"UPDATE videos SET {', '.join(set_clauses)} WHERE id = ?"
         
+        
         with self.get_connection() as conn:
             cursor = conn.execute(query, params)
             success = cursor.rowcount > 0
             if success:
                 logger.info(f"Video {video_id} actualizado exitosamente")
+            else:
+                logger.warning(f"⚠️ Video {video_id} no encontrado o no se actualizó (rowcount: {cursor.rowcount})")
             return success
     
     def batch_update_videos(self, video_updates: List[Dict]) -> Tuple[int, int]:

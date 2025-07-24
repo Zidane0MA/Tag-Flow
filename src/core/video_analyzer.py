@@ -28,14 +28,11 @@ class VideoAnalyzer:
         # Extensiones de video soportadas
         self.video_extensions = {'.mp4', '.avi', '.mov', '.mkv', '.wmv', '.flv', '.webm', '.m4v'}
         
-        logger.info("VideoAnalyzer inicializado")
-        
-        # Validar configuración
+        # Validar configuración (solo mostrar errores críticos)
         warnings = config.validate_config()
-        if warnings:
-            logger.warning("Advertencias de configuración:")
-            for warning in warnings:
-                logger.warning(f"  - {warning}")
+        critical_warnings = [w for w in warnings if "API" in w or "configurada" in w]
+        if critical_warnings:
+            logger.warning("⚠️ Configuración: " + "; ".join(critical_warnings))
     
     def find_new_videos(self, platform_filter=None, source_filter='all') -> List[Dict]:
         """
@@ -145,7 +142,7 @@ class VideoAnalyzer:
         total_videos = len(videos)
         max_workers = max_workers or config.MAX_CONCURRENT_PROCESSING
         
-        logger.info(f"🎬 Procesando {total_videos} videos con {max_workers} workers paralelos...")
+        logger.info(f"🎬 Procesando {total_videos} videos (workers: {max_workers})...")
         
         results = {
             'processed': 0,
@@ -167,12 +164,20 @@ class VideoAnalyzer:
                 try:
                     result = future.result()
                     
+                    current_num = results['processed'] + results['errors'] + 1
+                    
                     if result['success']:
                         results['processed'] += 1
-                        logger.info(f"✅ [{results['processed']}/{total_videos}] {Path(video['file_path']).name}")
+                        # Solo mostrar detalles de procesamiento exitoso si hay pocos videos
+                        if total_videos <= 3:
+                            music = result.get('detected_music') or 'N/A'
+                            chars = len(result.get('detected_characters', []))
+                            logger.info(f"✅ [{current_num}/{total_videos}] {Path(video['file_path']).name} - Música: {music}, Personajes: {chars}")
+                        else:
+                            logger.info(f"✅ [{current_num}/{total_videos}] {Path(video['file_path']).name}")
                     else:
                         results['errors'] += 1
-                        logger.error(f"❌ [{results['processed'] + results['errors']}/{total_videos}] {Path(video['file_path']).name}: {result.get('error', 'Error desconocido')}")
+                        logger.error(f"❌ [{current_num}/{total_videos}] {Path(video['file_path']).name}: {result.get('error', 'Error desconocido')}")
                     
                     results['details'].append(result)
                     
@@ -185,12 +190,10 @@ class VideoAnalyzer:
                         'video_path': video.get('file_path', 'Unknown')
                     })
         
-        # Estadísticas finales
-        success_rate = (results['processed'] / total_videos * 100) if total_videos > 0 else 0
-        logger.info(f"📊 Procesamiento completado:")
-        logger.info(f"   ✅ Procesados: {results['processed']}")
-        logger.info(f"   ❌ Errores: {results['errors']}")
-        logger.info(f"   📈 Tasa de éxito: {success_rate:.1f}%")
+        # Solo mostrar estadísticas si hay errores o múltiples videos
+        if results['errors'] > 0 or total_videos > 1:
+            success_rate = (results['processed'] / total_videos * 100) if total_videos > 0 else 0
+            logger.info(f"📊 Resumen: {results['processed']} exitosos, {results['errors']} errores ({success_rate:.1f}%)")
         
         return {
             'success': True,
@@ -211,7 +214,7 @@ class VideoAnalyzer:
             file_path = video_data['file_path']
             file_name = video_data.get('file_name', Path(file_path).name)
             
-            logger.debug(f"🎬 Procesando: {file_name}")
+            # Removido log individual - se muestra en process_videos
             
             # Verificar que el archivo existe
             if not Path(file_path).exists():
@@ -221,74 +224,99 @@ class VideoAnalyzer:
                     'video_path': file_path
                 }
             
-            # Procesar video usando video_processor
-            processing_result = video_processor.process_video(video_data)
-            
-            if not processing_result.get('success'):
+            # Verificar que es un video válido
+            if not video_processor.is_valid_video(Path(file_path)):
                 return {
                     'success': False,
-                    'error': processing_result.get('error', 'Error en procesamiento'),
+                    'error': 'Archivo de video inválido',
                     'video_path': file_path
                 }
             
-            # Obtener metadata del resultado
-            video_metadata = processing_result.get('metadata', {})
+            # Extraer metadatos básicos
+            video_metadata = video_processor.extract_metadata(file_path)
             
-            # Análisis de música
-            music_result = music_recognizer.analyze_video_music(file_path)
+            # Análisis de música (si hay audio)
+            music_result = {'song_name': None, 'artist_name': None, 'confidence': 0.0, 'source': None}
             
-            # Análisis de personajes y reconocimiento facial
-            face_result = face_recognizer.analyze_video_faces(file_path)
+            if video_metadata.get('has_audio', False):
+                try:
+                    # Extraer audio temporal
+                    audio_path = video_processor.extract_audio(Path(file_path), duration=30)
+                    if audio_path:
+                        # Usar reconocimiento de música con filename para análisis completo
+                        filename = Path(file_path).name
+                        music_result = music_recognizer.recognize_music(audio_path, filename)
+                        # Limpiar archivo temporal
+                        if audio_path.exists():
+                            audio_path.unlink()
+                except Exception as e:
+                    logger.warning(f"  Error en reconocimiento musical: {e}")
+            
+            # Análisis de personajes y reconocimiento facial inteligente
+            face_result = {'characters': [], 'faces': []}
+            
+            try:
+                frame_data = video_processor.get_video_frame(Path(file_path), timestamp=2.0)
+                if frame_data:
+                    # Preparar datos del video para análisis inteligente
+                    video_data_for_recognition = {
+                        'creator_name': video_data.get('creator_name', ''),
+                        'platform': video_data.get('platform', 'unknown'),
+                        'title': video_data.get('title', '') or video_data.get('description', '')
+                    }
+                    
+                    # Usar reconocimiento inteligente que combina todas las estrategias
+                    face_result = face_recognizer.recognize_faces_intelligent(frame_data, video_data_for_recognition)
+                        
+            except Exception as e:
+                logger.warning(f"  Error en reconocimiento de personajes: {e}")
             
             # Generar thumbnail
-            thumbnail_result = thumbnail_generator.generate_thumbnail(file_path)
+            thumbnail_result = thumbnail_generator.generate_thumbnail(Path(file_path))
             
-            # Preparar datos para la base de datos
-            db_data = {
-                'file_path': file_path,
-                'file_name': file_name,
-                'creator_name': video_data.get('creator_name', 'Unknown'),
-                'platform': video_data.get('platform', 'unknown'),
-                'title': video_data.get('title', ''),
-                'description': video_data.get('description', ''),
-                'content_type': video_data.get('content_type', 'video'),
+            # Preparar datos para actualizar el video existente
+            update_data = {
+                # Música detectada - corregir nombres de campos
+                'detected_music': music_result.get('detected_music'),
+                'detected_music_artist': music_result.get('detected_music_artist'),
+                'detected_music_confidence': music_result.get('detected_music_confidence'),
+                'music_source': music_result.get('music_source'),
                 
-                # Metadata técnica
-                **video_metadata,
-                
-                # Música detectada
-                'detected_music': music_result.get('song_name'),
-                'detected_music_artist': music_result.get('artist_name'),
-                'music_confidence': music_result.get('confidence'),
-                'music_source': music_result.get('source'),
-                
-                # Personajes detectados
-                'detected_characters': face_result.get('characters', []),
-                'detected_faces': face_result.get('faces', []),
+                # Personajes detectados - corregir nombre de campo
+                'detected_characters': face_result.get('detected_characters', []),
                 
                 # Thumbnail
-                'thumbnail_path': thumbnail_result.get('thumbnail_path'),
+                'thumbnail_path': str(thumbnail_result) if thumbnail_result else None,
                 
                 # Estado
-                'processing_status': 'completado',
-                'created_at': 'CURRENT_TIMESTAMP'
+                'processing_status': 'completado'
             }
             
-            # Insertar en base de datos
-            video_id = db.insert_video(db_data)
-            
+            # Actualizar video existente en base de datos
+            video_id = video_data.get('id')
             if video_id:
-                return {
-                    'success': True,
-                    'video_id': video_id,
-                    'detected_music': music_result.get('song_name'),
-                    'detected_characters': face_result.get('characters', []),
-                    'video_path': file_path
-                }
+                
+                success = db.update_video(video_id, update_data)
+                
+                if success:
+                    return {
+                        'success': True,
+                        'video_id': video_id,
+                        'detected_music': music_result.get('detected_music'),
+                        'detected_characters': face_result.get('detected_characters', []),
+                        'video_path': file_path
+                    }
+                else:
+                    logger.error(f"❌ Error actualizando video {video_id} en BD")
+                    return {
+                        'success': False,
+                        'error': 'Error actualizando video en base de datos',
+                        'video_path': file_path
+                    }
             else:
                 return {
                     'success': False,
-                    'error': 'Error insertando en base de datos',
+                    'error': 'Video ID no encontrado para actualización',
                     'video_path': file_path
                 }
                 
@@ -299,3 +327,124 @@ class VideoAnalyzer:
                 'error': str(e),
                 'video_path': video_data.get('file_path', 'Unknown')
             }
+    
+    def run(self, limit=None, platform=None, source='all', force=False):
+        """
+        Ejecutar análisis completo con la lógica correcta
+        
+        Args:
+            limit (int, optional): Número máximo de videos a procesar. 
+                                 Si es None, procesa todos. Si es 0, solo analiza existentes.
+            platform (str, optional): Plataforma específica a procesar
+            source (str, optional): Fuente de datos ('db', 'organized', 'all')
+            force (bool, optional): Si True, reanaliza videos completados
+        """
+        # Mostrar configuración inicial compacta
+        filter_info = f"platform={platform or 'todas'}, source={source}"
+        if limit == 0:
+            filter_info += " (solo existentes)"
+        elif limit:
+            filter_info += f", limit={limit}"
+        if force:
+            filter_info += ", force=True"
+        
+        logger.info(f"🎯 Análisis: {filter_info}")
+        
+        # Paso 1: Obtener videos existentes en BD según filtros
+        filters = {}
+        if platform:
+            filters['platform'] = platform
+        
+        # Obtener videos pendientes de análisis o todos según filtros
+        existing_videos = db.get_videos(filters)
+        
+        # Filtrar solo videos que necesitan análisis (sin personajes o música)
+        videos_to_analyze = []
+        for video in existing_videos:
+            # Un video necesita análisis si:
+            # 1. No tiene estado completado
+            # 2. No tiene personajes detectados (None, vacío o "[]")
+            # 3. No tiene música detectada
+            processing_status = video.get('processing_status')
+            detected_chars = video.get('detected_characters')
+            detected_music = video.get('detected_music')
+            
+            # Con force=True, analizar todos los videos
+            if force:
+                needs_analysis = True
+            else:
+                needs_analysis = (
+                    processing_status != 'completado' or
+                    not detected_chars or 
+                    detected_chars == '[]' or
+                    detected_chars == 'null' or
+                    not detected_music
+                )
+            
+            if needs_analysis:
+                videos_to_analyze.append(video)
+        
+        logger.info(f"📊 BD: {len(existing_videos)} total, {len(videos_to_analyze)} pendientes")
+        
+        # Paso 2: Determinar si necesitamos importar más videos
+        if limit == 0:
+            # limit=0: Solo analizar existentes, no importar
+            need_to_import = False
+            videos_needed = len(videos_to_analyze)
+        elif limit is None:
+            # Sin limit: Importar todos los disponibles, luego analizar todos
+            need_to_import = True
+            videos_needed = None  # Ilimitado
+        else:
+            # limit>0: Importar solo si necesitamos más videos para alcanzar el límite
+            videos_needed = limit
+            need_to_import = videos_needed > len(videos_to_analyze)
+        
+        if need_to_import:
+            additional_needed = videos_needed - len(videos_to_analyze) if limit else None
+            logger.info(f"📥 Importando {additional_needed or 'todos'} videos adicionales...")
+            
+            # Importar videos adicionales usando populate-db
+            from src.maintenance.database_ops import DatabaseOperations
+            db_ops = DatabaseOperations()
+            import_result = db_ops.populate_database(
+                source=source,
+                platform=platform,
+                limit=additional_needed
+            )
+            
+            if import_result['success'] and import_result['imported'] > 0:
+                logger.info(f"✅ +{import_result['imported']} videos importados")
+                
+                # Actualizar lista de videos para analizar
+                new_existing = db.get_videos(filters)
+                for video in new_existing:
+                    if video not in existing_videos:
+                        needs_analysis = (
+                            not video.get('detected_characters') or 
+                            video.get('detected_characters') == '[]' or 
+                            video.get('processing_status') != 'completado'
+                        )
+                        if needs_analysis:
+                            videos_to_analyze.append(video)
+        
+        # Paso 3: Aplicar límite final
+        if limit and limit > 0:
+            videos_to_analyze = videos_to_analyze[:limit]
+        
+        if not videos_to_analyze:
+            logger.info("🎉 No hay videos para analizar")
+            return {'success': True, 'processed': 0, 'errors': 0}
+        
+        # Paso 4: Procesar videos con IA
+        result = self.process_videos(videos_to_analyze)
+        
+        # Log compacto del resultado final
+        if result['success']:
+            processed = result.get('processed', 0)
+            errors = result.get('errors', 0) 
+            logger.info(f"✅ Completado: {processed} procesados, {errors} errores")
+        else:
+            logger.error("❌ Análisis falló")
+        
+        return result

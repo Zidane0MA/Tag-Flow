@@ -77,7 +77,7 @@ Comandos diseñados para diagnosticar y reparar la salud de la base de datos, lo
 - **`verify-files`**
   - **Función:** Se enfoca exclusivamente en verificar la existencia y accesibilidad de los archivos de video. Es útil para un diagnóstico rápido después de mover o eliminar archivos multimedia.
   - **Opciones:**
-    - `--video-ids [ID...]`: Limita la verificación a una lista específica de IDs de video.
+    - `--video-id [ID...]`: Limita la verificación a un ID de video especifico.
   - **Ejemplo:** `python -X utf8 main.py verify-files`
 
 - **`integrity-report`**
@@ -143,7 +143,6 @@ Comandos para poblar, optimizar, limpiar y obtener estadísticas de la base de d
       - `all-platforms`: Todas las plataformas (principales + adicionales)
     - `--limit N`: Importa como máximo N videos nuevos.
     - `--force`: Vuelve a importar y sobrescribe la información de videos que ya están en la base de datos.
-    - `--file-path RUTA`: Importa únicamente el archivo de video especificado.
   - **Ejemplo:** `python -X utf8 main.py populate-db --source all --platform tiktok`
 
 - **`optimize-db`**
@@ -227,7 +226,7 @@ Los comandos de procesamiento se encargan del análisis inteligente de videos, i
 ### **`process`**
 - **Función:** Comando principal para el procesamiento y análisis de videos. Puede funcionar en modo de análisis de videos nuevos o reanálisis de videos específicos. Opcionalmente puede poblar la base de datos antes del análisis.
 - **Opciones:**
-  - `--limit N`: Límite de videos a procesar.
+  - `--limit N 0`: Límite de N videos a procesar, prioriza videos de la bd luego los importa. Si es 0 solo pendientes de la bd.
   - `--source {db,organized,all}`: Fuente de videos para procesar.
     - `db`: Solo bases de datos externas (4K Apps)
     - `organized`: Solo carpetas organizadas

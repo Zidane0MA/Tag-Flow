@@ -332,32 +332,43 @@ class ExternalSourcesManager:
             # Buscar plataforma específica por nombre (ej: 'iwara')
             platform_found = False
             
+            logger.info(f"🔍 Buscando plataforma '{platform_filter}' en plataformas adicionales...")
+            logger.info(f"📁 Plataformas adicionales disponibles: {list(available_platforms['additional'].keys())}")
+            
             # Buscar en plataformas adicionales
             for platform_key, platform_info in available_platforms['additional'].items():
+                logger.debug(f"Comparando: platform_key='{platform_key}' vs platform_filter.lower()='{platform_filter.lower()}'")
+                logger.debug(f"Comparando: folder_name.lower()='{platform_info['folder_name'].lower()}' vs platform_filter.lower()='{platform_filter.lower()}'")
+                
                 if platform_key == platform_filter.lower() or platform_info['folder_name'].lower() == platform_filter.lower():
                     folders_to_scan.append((platform_info['folder_path'], platform_key, platform_info['folder_name']))
                     platform_found = True
+                    logger.info(f"✅ Plataforma encontrada: {platform_key} -> {platform_info['folder_path']}")
                     break
             
             if not platform_found:
-                logger.warning(f"Plataforma '{platform_filter}' no encontrada")
+                logger.warning(f"❌ Plataforma '{platform_filter}' no encontrada en plataformas adicionales")
+                logger.info(f"💡 Plataformas disponibles: {list(available_platforms['additional'].keys())}")
                 return []
         
         # Escanear las carpetas seleccionadas
+        logger.info(f"📂 Carpetas a escanear: {len(folders_to_scan)}")
+        
         for folder_path, platform_key, folder_name in folders_to_scan:
             if not folder_path.exists():
-                logger.warning(f"Carpeta no existe: {folder_path}")
+                logger.warning(f"❌ Carpeta no existe: {folder_path}")
                 continue
             
-            logger.info(f"Escaneando carpeta {platform_key} ({folder_name}): {folder_path}")
+            logger.info(f"📁 Escaneando carpeta {platform_key} ({folder_name}): {folder_path}")
+            
+            # Contar carpetas de creadores
+            creator_folders = [d for d in folder_path.iterdir() if d.is_dir()]
+            logger.info(f"👤 Carpetas de creadores encontradas: {len(creator_folders)}")
             
             # Escanear carpetas de creadores
-            for creator_folder in folder_path.iterdir():
-                if not creator_folder.is_dir():
-                    continue
-                
+            for creator_folder in creator_folders:
                 creator_name = creator_folder.name
-                logger.debug(f"  Procesando creador: {creator_name}")
+                logger.debug(f"👤 Escaneando creador: {creator_name}")
                 
                 # Buscar contenido en la carpeta del creador
                 for content_file in creator_folder.rglob('*'):
@@ -384,6 +395,7 @@ class ExternalSourcesManager:
             platform_count = len([v for v in videos if v['platform'] == platform_key])
             logger.info(f"✓ Extraídos {platform_count} elementos de {platform_key} ({folder_name})")
         
+        logger.info(f"🎯 Total de videos extraídos del método extend: {len(videos)}")
         return videos
 
     def extract_organized_videos(self, platform: Optional[str] = None) -> List[Dict]:

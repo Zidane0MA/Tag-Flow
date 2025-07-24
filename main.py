@@ -49,7 +49,6 @@ Ejemplos de uso:
   python main.py process --platform youtube --limit 5      # Procesar 5 videos de YouTube
   python main.py process --platform tiktok --source db     # Procesar TikTok solo desde BD externa
   python main.py process --source organized --limit 20     # Procesar 20 videos de carpetas organizadas
-  python main.py process --populate --source all --limit 10 # Poblar + analizar en un comando
 
 🔄 REANÁLISIS:
   python main.py process --reanalyze-video 123             # Reanalizar video específico
@@ -96,20 +95,16 @@ Ejemplos de uso:
         
         # Opciones de análisis
         process_parser.add_argument('--limit', type=int, help='Límite de videos a procesar')
-        process_parser.add_argument('--platform', choices=['youtube', 'tiktok', 'instagram', 'other', 'all-platforms'], 
-                                  help='Filtrar por plataforma específica')
+        process_parser.add_argument('--platform', 
+                                  help='Filtrar por plataforma específica (youtube, tiktok, instagram, other, all-platforms) o usar autodetección')
         process_parser.add_argument('--source', choices=['db', 'organized', 'all'], default='all',
                                   help='Fuente de videos: db (bases externas), organized (carpetas), all (ambas)')
-        
-        # Opciones de población
-        process_parser.add_argument('--populate', action='store_true', 
-                                  help='Poblar BD desde fuentes externas antes de analizar')
         
         # Opciones de reanálisis
         process_parser.add_argument('--reanalyze-video', type=str,
                                   help='ID de video(s) a reanalizar (separados por coma)')
         process_parser.add_argument('--force', action='store_true',
-                                  help='Forzar reanálisis sobrescribiendo datos existentes')
+                                  help='Forzar análisis incluso de videos ya completados')
         
         # === SUBCOMANDOS: MANTENIMIENTO ===
         # Backup y restore
@@ -204,16 +199,6 @@ Ejemplos de uso:
         from src.face_recognition import face_recognizer
         from src.thumbnail_generator import thumbnail_generator
         
-        # Si se solicita población, hacerla primero
-        if args.populate:
-            logger.info("📥 Poblando base de datos desde fuentes externas...")
-            self.execute_populate_db({
-                'source': args.source,
-                'limit': args.limit,
-                'platform': args.platform
-            })
-            logger.info("✅ Población completada, continuando con análisis...")
-        
         # Reanálisis vs análisis normal
         if args.reanalyze_video:
             self._execute_reanalysis(args)
@@ -221,33 +206,19 @@ Ejemplos de uso:
             self._execute_analysis(args)
     
     def _execute_analysis(self, args):
-        """Ejecutar análisis de videos nuevos"""
-        from src.core import VideoAnalyzer
+        """Ejecutar análisis de videos usando src/core/video_analyzer.py"""
+        from src.core.video_analyzer import VideoAnalyzer
         
         analyzer = VideoAnalyzer()
-        
-        # Buscar videos nuevos
-        new_videos = analyzer.find_new_videos(
-            platform_filter=args.platform,
-            source_filter=args.source
+        result = analyzer.run(
+            limit=args.limit,
+            platform=args.platform,
+            source=args.source,
+            force=args.force
         )
         
-        if args.limit:
-            new_videos = new_videos[:args.limit]
-        
-        if not new_videos:
-            logger.info("🎉 No hay videos nuevos para procesar")
-            return
-        
-        logger.info(f"📹 Procesando {len(new_videos)} videos nuevos...")
-        
-        # Procesar videos usando la lógica refactorizada
-        result = analyzer.process_videos(new_videos)
-        
-        if result['success']:
-            logger.info("✅ Análisis completado exitosamente")
-        else:
-            logger.error("❌ Análisis completado con errores")
+        # El VideoAnalyzer ya muestra el resultado final compacto
+        pass
     
     def _execute_reanalysis(self, args):
         """Ejecutar reanálisis de videos específicos"""

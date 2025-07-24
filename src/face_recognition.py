@@ -99,22 +99,12 @@ class FaceRecognizer:
             'error': None
         }
         
-        # DEBUG: Mostrar datos de entrada
-        if video_data:
-            title = video_data.get('title', '')
-            creator = video_data.get('creator_name', '')
-            logger.info(f"DEBUG: título='{title}', creador='{creator}'")
-        else:
-            logger.info("DEBUG: No hay video_data")
-        
         # ESTRATEGIA 1: Análisis de título y creador (más rápido y confiable)
         if video_data:
             # Obtener sugerencias de título
             if video_data.get('title'):
                 title = video_data['title']
-                logger.info(f"DEBUG: Analizando título: '{title}'")
                 title_suggestions = character_intelligence.analyze_video_title(title)
-                logger.info(f"DEBUG: {len(title_suggestions)} sugerencias de título encontradas")
                 results['suggestions_from_title'] = title_suggestions
                 
                 for suggestion in title_suggestions:
@@ -235,7 +225,7 @@ class FaceRecognizer:
             except Exception as e:
                 logger.warning(f"Error con DeepFace: {e}")
         
-        logger.info("No se detectaron caras o personajes conocidos")
+        logger.info("⚠️ No se detectaron caras o personajes conocidos")
         return results
     
     def _recognize_with_google_vision(self, image_data: bytes) -> Dict:

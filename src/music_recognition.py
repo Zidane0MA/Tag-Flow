@@ -68,7 +68,6 @@ class MusicRecognizer:
     
     def recognize_music(self, audio_path: Path, filename: str = None) -> Dict:
         """Reconocer música usando estrategia híbrida mejorada"""
-        logger.info(f"Iniciando reconocimiento musical para: {audio_path}")
         
         results = {
             'detected_music': None,
@@ -92,7 +91,6 @@ class MusicRecognizer:
                         results['music_source'] = 'manual'  # Usar 'manual' en lugar de 'filename_validated'
                         results['final_music'] = validated_result['detected_music']
                         results['final_music_artist'] = validated_result['detected_music_artist']
-                        logger.info(f"Música extraída y validada del filename: {results['final_music']}")
                         return results
                     else:
                         # Si no se pudo validar, usar resultado del filename con confianza menor
@@ -100,7 +98,6 @@ class MusicRecognizer:
                         results['music_source'] = 'manual'  # Usar 'manual' en lugar de 'filename'
                         results['final_music'] = filename_result['detected_music']
                         results['detected_music_confidence'] = 0.7
-                        logger.info(f"Música extraída del filename (sin validar): {results['final_music']}")
                         return results
             except Exception as e:
                 logger.warning(f"Error extrayendo música del filename: {e}")
@@ -177,7 +174,6 @@ class MusicRecognizer:
                     
                     if music_title:
                         results['detected_music'] = music_title
-                        logger.info(f"Música extraída del filename: {music_title}")
                         break
         
         # Si no encontró con patrones, buscar palabras clave conocidas de música
