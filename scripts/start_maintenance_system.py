@@ -32,7 +32,7 @@ def main():
     try:
         # 1. Inicializar WebSocket Manager
         logger.info("🔗 Inicializando WebSocket Manager...")
-        from src.maintenance.websocket_manager import get_websocket_manager
+        from src.core.websocket_manager import get_websocket_manager
         
         def start_websocket_server():
             """Iniciar servidor WebSocket en thread separado"""
@@ -48,14 +48,14 @@ def main():
         
         # 2. Inicializar Operation Manager
         logger.info("⚙️ Inicializando Operation Manager...")
-        from src.maintenance.operation_manager import get_operation_manager
+        from src.core.operation_manager import get_operation_manager
         
         operation_manager = get_operation_manager()
         logger.info("✅ Operation Manager iniciado")
         
         # 3. Inicializar Maintenance API
         logger.info("🔧 Inicializando Maintenance API...")
-        from src.maintenance_api import get_maintenance_api
+        from src.async_operations_api import get_maintenance_api
         
         api = get_maintenance_api()
         logger.info("✅ Maintenance API iniciada")
@@ -218,7 +218,7 @@ URLs:
   • API: http://localhost:5001/maintenance/api/
 
 Ejemplos de uso programático:
-  from src.maintenance_api import get_maintenance_api
+  from src.async_operations_api import get_maintenance_api
   api = get_maintenance_api()
   
   # Regenerar thumbnails

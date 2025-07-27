@@ -101,14 +101,27 @@ class VideoAnalyzer:
         """
         logger.info(f"🔍 Buscando videos nuevos (source: {source_filter}, platform: {platform_filter or 'todas'})...")
         
-        # Obtener videos ya procesados de la BD
+        # 🚀 MÉTRICAS: Timing de operaciones para monitoreo
+        import time
+        start_time = time.time()
+        
+        # 🚀 OPTIMIZADO: Obtener paths existentes con cache inteligente
         existing_videos = set()
         try:
-            videos_in_db = self.db.get_videos()
-            existing_videos = {video['file_path'] for video in videos_in_db}
-            logger.info(f"📊 Videos ya en BD: {len(existing_videos)}")
+            # Usar cache optimizado con TTL para paths existentes
+            from src.cache_manager import get_existing_paths_cached
+            existing_videos = get_existing_paths_cached(self.db)
+            paths_time = time.time() - start_time
+            logger.info(f"📊 Videos ya en BD: {len(existing_videos)} paths en {paths_time:.3f}s (cached)")
         except Exception as e:
             logger.error(f"❌ Error consultando BD: {e}")
+            # Fallback al método original si falla
+            try:
+                videos_in_db = self.db.get_videos()
+                existing_videos = {video['file_path'] for video in videos_in_db}
+                logger.warning("⚠️ Usando método fallback para paths existentes")
+            except Exception as e2:
+                logger.error(f"❌ Error en fallback: {e2}")
         
         new_videos = []
         
@@ -158,18 +171,40 @@ class VideoAnalyzer:
                 external_source = 'all'
             
             # Obtener videos de fuentes externas
+            external_start = time.time()
             external_videos = self.external_sources.get_all_videos_from_source(external_source, internal_platform_code)
+            external_time = time.time() - external_start
+            logger.debug(f"📊 Videos externos obtenidos en {external_time:.3f}s ({len(external_videos)} videos)")
             
-            # Filtrar nuevos y verificar existencia
+            # 🚀 OPTIMIZADO: Filtrado O(1) con verificación por path y nombre  
+            # Pre-computar set de nombres para verificación O(1) de duplicados por nombre
+            filter_start = time.time()
+            existing_names = {Path(path).name for path in existing_videos}
+            
             for video_data in external_videos:
                 file_path = video_data.get('file_path')
-                if file_path and file_path not in existing_videos:
-                    # Verificar que el archivo existe físicamente
-                    if Path(file_path).exists():
-                        new_videos.append(video_data)
-                        logger.debug(f"✅ Nuevo video encontrado: {Path(file_path).name}")
+                if not file_path:
+                    continue
+                    
+                video_path = Path(file_path)
+                
+                # Verificación ultra-rápida O(1) por path completo
+                if file_path not in existing_videos:
+                    # Verificación adicional O(1) por nombre de archivo (detecta duplicados con path diferente)
+                    if video_path.name not in existing_names:
+                        # Verificar que el archivo existe físicamente y es video
+                        if video_path.exists() and video_data.get('content_type', 'video') == 'video':
+                            new_videos.append(video_data)
+                            logger.debug(f"✅ Nuevo video encontrado: {video_path.name}")
                     else:
-                        logger.warning(f"⚠️ Archivo no encontrado: {file_path}")
+                        logger.debug(f"🔄 Video duplicado por nombre: {video_path.name}")
+                else:
+                    logger.debug(f"🔄 Video ya existe: {video_path.name}")
+            
+            filter_time = time.time() - filter_start
+            total_time = time.time() - start_time
+            logger.debug(f"📊 Filtrado O(1) completado en {filter_time:.3f}s")
+            logger.debug(f"📊 Timing total: paths={paths_time:.3f}s, external={external_time:.3f}s, filter={filter_time:.3f}s, total={total_time:.3f}s")
         
         logger.info(f"🆕 Videos nuevos encontrados: {len(new_videos)}")
         return new_videos

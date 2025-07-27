@@ -74,44 +74,74 @@ def api_populate_db():
 
 @admin_bp.route('/api/admin/analyze-videos', methods=['POST'])
 def api_analyze_videos():
-    """API para analizar videos nuevos"""
+    """API para analizar videos nuevos usando AsyncOperationsAPI"""
     try:
         data = request.get_json() or {}
-        limit = data.get('limit', 10)
-        platform = data.get('platform', 'all')
+        video_ids = data.get('video_ids', [])
+        force = data.get('force', False)
+        priority = data.get('priority', 'medium')
         
-        def run_analysis():
-            try:
-                logger.info(f"Iniciando análisis de videos - Platform: {platform}, Limit: {limit}")
-                
-                # Ejecutar main.py para análisis
-                cmd = ['python', 'main.py', '--limit', str(limit)]
-                if platform != 'all':
-                    cmd.extend(['--platform', platform])
-                
-                result = subprocess.run(cmd, capture_output=True, text=True, cwd=Path.cwd())
-                
-                if result.returncode == 0:
-                    logger.info("Análisis de videos completado exitosamente")
-                else:
-                    logger.error(f"Error en análisis de videos: {result.stderr}")
-                    
-            except Exception as e:
-                logger.error(f"Error ejecutando análisis de videos: {e}")
+        if not video_ids:
+            return jsonify({
+                'success': False, 
+                'error': 'video_ids es requerido'
+            }), 400
         
-        # Ejecutar en thread separado
-        thread = threading.Thread(target=run_analysis)
-        thread.daemon = True
-        thread.start()
+        # Usar la nueva API asíncrona
+        from src.async_operations_api import get_async_operations_api
+        from src.core.operation_manager import OperationPriority
+        
+        priority_enum = getattr(OperationPriority, priority.upper(), OperationPriority.MEDIUM)
+        api = get_async_operations_api()
+        operation_id = api.analyze_videos_async(
+            video_ids=video_ids,
+            force=force,
+            priority=priority_enum
+        )
         
         return jsonify({
             'success': True, 
-            'message': f'Análisis iniciado para {limit} videos de {platform}',
+            'operation_id': operation_id,
+            'message': f'Reanálisis iniciado para {len(video_ids)} videos',
             'status': 'running'
         })
         
     except Exception as e:
         logger.error(f"Error iniciando análisis: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@admin_bp.route('/api/admin/process-videos', methods=['POST'])
+def api_process_videos():
+    """API para procesamiento de videos usando AsyncOperationsAPI"""
+    try:
+        data = request.get_json() or {}
+        limit = data.get('limit', None)
+        platform = data.get('platform', None)
+        source = data.get('source', 'all')
+        priority = data.get('priority', 'high')
+        
+        # Usar la nueva API asíncrona
+        from src.async_operations_api import get_async_operations_api
+        from src.core.operation_manager import OperationPriority
+        
+        priority_enum = getattr(OperationPriority, priority.upper(), OperationPriority.HIGH)
+        api = get_async_operations_api()
+        operation_id = api.process_videos_async(
+            limit=limit,
+            platform=platform,
+            source=source,
+            priority=priority_enum
+        )
+        
+        return jsonify({
+            'success': True, 
+            'operation_id': operation_id,
+            'message': f'Procesamiento iniciado (limit: {limit}, platform: {platform}, source: {source})',
+            'status': 'running'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error iniciando procesamiento: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @admin_bp.route('/api/admin/generate-thumbnails', methods=['POST'])

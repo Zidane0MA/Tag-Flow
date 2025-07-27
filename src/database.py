@@ -19,6 +19,13 @@ class DatabaseManager:
     
     def __init__(self, db_path: Path = None):
         self.db_path = db_path or config.DATABASE_PATH
+        
+        # 🚀 MIGRADO: Sistema de métricas de performance de optimized_database.py
+        self.query_times = {}  # {query_name: [times]}
+        self.total_queries = 0
+        self.cache_hits = 0
+        self.cache_misses = 0
+        
         self.init_database()
     
     def get_connection(self) -> sqlite3.Connection:
@@ -99,6 +106,37 @@ class DatabaseManager:
             conn.execute('CREATE INDEX IF NOT EXISTS idx_videos_platform ON videos(platform)')
             conn.execute('CREATE INDEX IF NOT EXISTS idx_videos_file_path ON videos(file_path)')
             conn.execute('CREATE INDEX IF NOT EXISTS idx_videos_deleted ON videos(deleted_at)')
+            
+            # 🚀 MIGRADOS: Índices optimizados de optimized_database.py
+            # Índice compuesto para búsqueda por path y nombre combinada (10x más rápido)
+            conn.execute('''
+                CREATE INDEX IF NOT EXISTS idx_videos_file_path_name 
+                ON videos(file_path, file_name)
+            ''')
+            
+            # Índice para filtros frecuentes en procesamiento (5x más rápido)
+            conn.execute('''
+                CREATE INDEX IF NOT EXISTS idx_videos_platform_status 
+                ON videos(platform, processing_status)
+            ''')
+            
+            # Índice para consultas de videos pendientes optimizadas
+            conn.execute('''
+                CREATE INDEX IF NOT EXISTS idx_videos_status_platform 
+                ON videos(processing_status, platform)
+            ''')
+            
+            # Índice compuesto para filtering avanzado con fecha
+            conn.execute('''
+                CREATE INDEX IF NOT EXISTS idx_videos_status_platform_created 
+                ON videos(processing_status, platform, created_at)
+            ''')
+            
+            # Índice para ordenamiento por fecha de agregado
+            conn.execute('''
+                CREATE INDEX IF NOT EXISTS idx_videos_created_at 
+                ON videos(created_at)
+            ''')
             
             conn.commit()
             logger.info("Base de datos inicializada correctamente")
@@ -725,6 +763,263 @@ class DatabaseManager:
         
         logger.info(f"Restauración masiva: {successful} exitosos, {failed} fallidos")
         return successful, failed
+    
+    # 🚀 MIGRADOS: Métodos optimizados de optimized_database.py
+    
+    def get_existing_paths_only(self) -> set:
+        """
+        🚀 OPTIMIZADO: Solo obtener file_paths para verificación de duplicados (10x más rápido)
+        
+        Returns:
+            Set de file_paths existentes para verificación O(1)
+        """
+        import time
+        start_time = time.time()
+        
+        with self.get_connection() as conn:
+            cursor = conn.execute("SELECT file_path FROM videos WHERE deleted_at IS NULL")
+            result = {row[0] for row in cursor.fetchall()}
+        
+        # Track performance
+        execution_time = time.time() - start_time
+        self._track_query('get_existing_paths_only', execution_time)
+        
+        return result
+    
+    def get_video_by_path_or_name(self, file_path: str, file_name: str) -> Optional[Dict]:
+        """
+        🚀 OPTIMIZADO: Buscar por ruta O nombre en una sola consulta SQL optimizada
+        
+        Args:
+            file_path: Ruta completa del archivo
+            file_name: Nombre del archivo
+            
+        Returns:
+            Diccionario con datos del video o None si no se encuentra
+        """
+        with self.get_connection() as conn:
+            cursor = conn.execute("""
+                SELECT * FROM videos 
+                WHERE (file_path = ? OR file_name = ?) AND deleted_at IS NULL
+                LIMIT 1
+            """, (file_path, file_name))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+    
+    def get_pending_videos_filtered(self, platform_filter: str = None, 
+                                   source_filter: str = 'all', limit: int = None) -> List[Dict]:
+        """
+        🚀 OPTIMIZADO: Obtener videos pendientes con filtros SQL nativos (5x más rápido)
+        
+        Args:
+            platform_filter: Filtro de plataforma ('youtube', 'tiktok', 'instagram', 'all', etc.)
+            source_filter: Filtro de fuente ('db', 'organized', 'all')
+            limit: Límite de resultados
+            
+        Returns:
+            Lista de videos pendientes filtrados
+        """
+        import time
+        start_time = time.time()
+        
+        query = "SELECT * FROM videos WHERE processing_status = 'pendiente' AND deleted_at IS NULL"
+        params = []
+        
+        # Aplicar filtros de plataforma en SQL
+        if platform_filter and platform_filter != 'all-platforms':
+            if platform_filter == 'other':
+                # Filtrar plataformas adicionales (no principales)
+                query += " AND platform NOT IN ('youtube', 'tiktok', 'instagram')"
+            elif isinstance(platform_filter, list):
+                # Lista de plataformas
+                placeholders = ','.join(['?' for _ in platform_filter])
+                query += f" AND platform IN ({placeholders})"
+                params.extend(platform_filter)
+            else:
+                # Plataforma específica
+                query += " AND platform = ?"
+                params.append(platform_filter)
+        
+        # Ordenar por fecha de agregado (más recientes primero)
+        query += " ORDER BY created_at DESC"
+        
+        # Aplicar límite
+        if limit:
+            query += " LIMIT ?"
+            params.append(limit)
+        
+        with self.get_connection() as conn:
+            cursor = conn.execute(query, params)
+            result = [dict(row) for row in cursor.fetchall()]
+        
+        # Track performance  
+        execution_time = time.time() - start_time
+        self._track_query('get_pending_videos_filtered', execution_time)
+        
+        return result
+    
+    def check_videos_exist_batch(self, file_paths: List[str]) -> Dict[str, bool]:
+        """
+        🚀 OPTIMIZADO: Verificar existencia de múltiples videos en una sola query (O(1))
+        
+        Args:
+            file_paths: Lista de rutas de archivos a verificar
+            
+        Returns:
+            Diccionario {file_path: bool} indicando existencia
+        """
+        if not file_paths:
+            return {}
+        
+        # Crear placeholders para la consulta IN
+        placeholders = ','.join(['?' for _ in file_paths])
+        
+        with self.get_connection() as conn:
+            cursor = conn.execute(f"""
+                SELECT file_path FROM videos 
+                WHERE file_path IN ({placeholders}) AND deleted_at IS NULL
+            """, file_paths)
+            
+            existing_paths = {row[0] for row in cursor.fetchall()}
+            
+            # Crear diccionario de resultados
+            return {path: path in existing_paths for path in file_paths}
+    
+    def get_videos_by_paths_batch(self, file_paths: List[str]) -> Dict[str, Dict]:
+        """
+        🚀 OPTIMIZADO: Obtener múltiples videos por sus rutas en una sola query
+        
+        Args:
+            file_paths: Lista de rutas de archivos
+            
+        Returns:
+            Diccionario {file_path: video_data}
+        """
+        if not file_paths:
+            return {}
+        
+        placeholders = ','.join(['?' for _ in file_paths])
+        
+        with self.get_connection() as conn:
+            cursor = conn.execute(f"""
+                SELECT * FROM videos 
+                WHERE file_path IN ({placeholders}) AND deleted_at IS NULL
+            """, file_paths)
+            
+            results = {}
+            for row in cursor.fetchall():
+                video_data = dict(row)
+                results[video_data['file_path']] = video_data
+            
+            return results
+    
+    # 🚀 MIGRADO: Sistema de métricas de performance de optimized_database.py
+    
+    def _track_query(self, query_name: str, execution_time: float):
+        """Registrar tiempo de ejecución de una consulta para métricas"""
+        if query_name not in self.query_times:
+            self.query_times[query_name] = []
+        
+        self.query_times[query_name].append(execution_time)
+        self.total_queries += 1
+        
+        # Mantener solo las últimas 100 mediciones por query
+        if len(self.query_times[query_name]) > 100:
+            self.query_times[query_name] = self.query_times[query_name][-100:]
+    
+    def get_performance_report(self) -> Dict:
+        """
+        🚀 OPTIMIZADO: Obtener reporte completo de performance de la base de datos
+        
+        Returns:
+            Diccionario con métricas detalladas de performance
+        """
+        import statistics
+        
+        report = {
+            'total_queries': self.total_queries,
+            'cache_hits': self.cache_hits,
+            'cache_misses': self.cache_misses,
+            'cache_hit_rate': 0.0,
+            'queries_by_type': {},
+            'database_size_mb': 0.0,
+            'performance_grade': 'UNKNOWN'
+        }
+        
+        # Calcular hit rate si hay datos de cache
+        total_cache_requests = self.cache_hits + self.cache_misses
+        if total_cache_requests > 0:
+            report['cache_hit_rate'] = round((self.cache_hits / total_cache_requests) * 100, 1)
+        
+        # Estadísticas por tipo de query
+        for query_name, times in self.query_times.items():
+            if times:
+                report['queries_by_type'][query_name] = {
+                    'count': len(times),
+                    'avg_time_ms': round(statistics.mean(times) * 1000, 2),
+                    'min_time_ms': round(min(times) * 1000, 2),
+                    'max_time_ms': round(max(times) * 1000, 2),
+                    'total_time_s': round(sum(times), 2)
+                }
+        
+        # Tamaño de base de datos
+        try:
+            db_size_bytes = self.db_path.stat().st_size
+            report['database_size_mb'] = round(db_size_bytes / (1024 * 1024), 2)
+        except:
+            pass
+        
+        # Calcular grade de performance
+        report['performance_grade'] = self._calculate_performance_grade(report)
+        
+        return report
+    
+    def _calculate_performance_grade(self, report: Dict) -> str:
+        """Calcular calificación de performance basada en métricas"""
+        score = 100
+        
+        # Penalizar hit rate bajo
+        if report['cache_hit_rate'] < 70:
+            score -= 20
+        elif report['cache_hit_rate'] < 85:
+            score -= 10
+        
+        # Penalizar queries lentas
+        for query_data in report['queries_by_type'].values():
+            avg_time = query_data['avg_time_ms']
+            if avg_time > 100:  # > 100ms
+                score -= 15
+            elif avg_time > 50:  # > 50ms
+                score -= 5
+        
+        # Calificación final
+        if score >= 90:
+            return 'EXCELLENT'
+        elif score >= 75:
+            return 'GOOD'
+        elif score >= 60:
+            return 'AVERAGE'
+        else:
+            return 'NEEDS_IMPROVEMENT'
+    
+    def log_performance_summary(self):
+        """Mostrar resumen de performance en logs"""
+        report = self.get_performance_report()
+        
+        logger.info("="*50)
+        logger.info("📊 DATABASE PERFORMANCE REPORT")
+        logger.info("="*50)
+        logger.info(f"Total Queries: {report['total_queries']}")
+        logger.info(f"Cache Hit Rate: {report['cache_hit_rate']}%")
+        logger.info(f"Database Size: {report['database_size_mb']} MB")
+        logger.info(f"Performance Grade: {report['performance_grade']}")
+        
+        if report['queries_by_type']:
+            logger.info("\nQuery Performance:")
+            for query_name, stats in report['queries_by_type'].items():
+                logger.info(f"  {query_name}: {stats['avg_time_ms']}ms avg ({stats['count']} calls)")
+        
+        logger.info("="*50)
 
 # ⚠️ DEPRECATED: Instancia global removida para eliminar dependencias circulares
 # Usar ServiceFactory.get_service('database') o get_database() desde service_factory

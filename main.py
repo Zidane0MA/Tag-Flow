@@ -375,7 +375,7 @@ Ejemplos de uso:
                 )
                 
         elif command in ['show-stats', 'character-stats']:
-            from src.maintenance.utils import format_bytes, format_number
+            from src.utils import format_bytes, format_number
             # 🚀 MIGRADO: Usar service factory para lazy loading
             from src.service_factory import get_database
             db = get_database()

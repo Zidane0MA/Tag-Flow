@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-🔧 Maintenance API
-API programática avanzada con WebSockets y notificaciones en tiempo real
+🔄 Async Operations API
+API unificada para operaciones asíncronas con WebSockets y notificaciones en tiempo real
 """
 
 import os
@@ -35,16 +35,17 @@ from src.maintenance.database_ops import DatabaseOperations
 from src.maintenance.backup_ops import BackupOperations
 from src.maintenance.character_ops import CharacterOperations
 from src.maintenance.integrity_ops import IntegrityOperations
-from src.maintenance.operation_manager import get_operation_manager, OperationPriority
-from src.maintenance.websocket_manager import get_websocket_manager, send_notification
+from src.core.operation_manager import get_operation_manager, OperationPriority
+from src.core.websocket_manager import get_websocket_manager, send_notification
 
 
-class MaintenanceAPI:
+class AsyncOperationsAPI:
     """
-    🔧 API programática avanzada para operaciones de mantenimiento
+    🔄 API unificada para operaciones asíncronas del sistema
     
     Características:
-    - Operaciones asíncronas con WebSockets
+    - Procesamiento de videos con tracking en tiempo real
+    - Operaciones de mantenimiento con WebSockets
     - Notificaciones en tiempo real
     - Progreso detallado con métricas
     - Cancelación y pausa de operaciones
@@ -65,7 +66,7 @@ class MaintenanceAPI:
         self.operation_manager = get_operation_manager()
         self.websocket_manager = get_websocket_manager()
         
-        logger.info("🔧 Maintenance API inicializada")
+        logger.info("🔄 Async Operations API inicializada")
     
     @property
     def db(self):
@@ -75,6 +76,196 @@ class MaintenanceAPI:
             self._db = get_database()
         return self._db
     
+    # === PROCESAMIENTO DE VIDEOS ===
+    def process_videos_async(self, limit: Optional[int] = None, 
+                           platform: Optional[str] = None,
+                           source: str = 'all',
+                           priority: OperationPriority = OperationPriority.HIGH) -> str:
+        """
+        🎬 Procesamiento de videos con tracking en tiempo real
+        
+        Args:
+            limit: Límite de videos a procesar
+            platform: Plataforma específica (youtube, tiktok, etc.)
+            source: Fuente de datos ('db', 'organized', 'all')
+            priority: Prioridad de la operación
+            
+        Returns:
+            operation_id: ID de la operación para tracking
+        """
+        operation_id = self.operation_manager.create_operation(
+            operation_type="process_videos",
+            priority=priority,
+            total_items=limit or 100,  # Estimación inicial
+            notification_interval=2.0  # Actualizar cada 2 segundos
+        )
+        
+        def process_worker():
+            try:
+                # Notificar inicio
+                self.websocket_manager.send_operation_update(
+                    operation_id=operation_id,
+                    status="running",
+                    message="🎬 Iniciando procesamiento de videos...",
+                    progress=0
+                )
+                
+                # Importar video analyzer de forma lazy
+                from src.core.video_analyzer import VideoAnalyzer
+                analyzer = VideoAnalyzer()
+                
+                # Obtener videos a procesar
+                videos_to_process = analyzer.get_videos_to_process(
+                    limit=limit,
+                    platform=platform,
+                    source=source
+                )
+                
+                # Actualizar total real
+                total_videos = len(videos_to_process)
+                self.operation_manager.update_operation(
+                    operation_id, 
+                    total_items=total_videos
+                )
+                
+                # Procesar videos uno por uno
+                for i, video_path in enumerate(videos_to_process):
+                    if self.operation_manager.is_cancelled(operation_id):
+                        break
+                        
+                    # Procesar video individual
+                    try:
+                        result = analyzer.process_single_video(video_path)
+                        progress = ((i + 1) / total_videos) * 100
+                        
+                        self.websocket_manager.send_operation_update(
+                            operation_id=operation_id,
+                            status="running",
+                            message=f"📹 Procesado: {video_path.name}",
+                            progress=progress,
+                            processed_count=i + 1
+                        )
+                        
+                    except Exception as e:
+                        logger.error(f"Error procesando {video_path}: {e}")
+                        self.websocket_manager.send_operation_update(
+                            operation_id=operation_id,
+                            status="running", 
+                            message=f"❌ Error en {video_path.name}: {str(e)}",
+                            progress=((i + 1) / total_videos) * 100
+                        )
+                
+                # Finalizar operación
+                self.operation_manager.complete_operation(
+                    operation_id,
+                    result={"processed": total_videos, "success": True}
+                )
+                
+                self.websocket_manager.send_operation_update(
+                    operation_id=operation_id,
+                    status="completed",
+                    message=f"✅ Procesamiento completado: {total_videos} videos",
+                    progress=100
+                )
+                
+            except Exception as e:
+                logger.error(f"Error en procesamiento de videos: {e}")
+                self.operation_manager.fail_operation(operation_id, str(e))
+                self.websocket_manager.send_operation_update(
+                    operation_id=operation_id,
+                    status="failed",
+                    message=f"❌ Error: {str(e)}",
+                    progress=0
+                )
+        
+        # Ejecutar en thread separado
+        import threading
+        thread = threading.Thread(target=process_worker, daemon=True)
+        thread.start()
+        
+        return operation_id
+
+    def analyze_videos_async(self, video_ids: List[int],
+                           force: bool = False,
+                           priority: OperationPriority = OperationPriority.MEDIUM) -> str:
+        """
+        🔍 Reanálisis de videos específicos con tracking en tiempo real
+        
+        Args:
+            video_ids: Lista de IDs de videos a reanalizar
+            force: Forzar reanálisis sobrescribiendo datos existentes
+            priority: Prioridad de la operación
+            
+        Returns:
+            operation_id: ID de la operación para tracking
+        """
+        operation_id = self.operation_manager.create_operation(
+            operation_type="analyze_videos",
+            priority=priority,
+            total_items=len(video_ids),
+            notification_interval=1.0
+        )
+        
+        def analyze_worker():
+            try:
+                self.websocket_manager.send_operation_update(
+                    operation_id=operation_id,
+                    status="running",
+                    message="🔍 Iniciando reanálisis de videos...",
+                    progress=0
+                )
+                
+                from src.core.reanalysis_engine import ReanalysisEngine
+                engine = ReanalysisEngine()
+                
+                for i, video_id in enumerate(video_ids):
+                    if self.operation_manager.is_cancelled(operation_id):
+                        break
+                        
+                    try:
+                        result = engine.reanalyze_video(video_id, force=force)
+                        progress = ((i + 1) / len(video_ids)) * 100
+                        
+                        self.websocket_manager.send_operation_update(
+                            operation_id=operation_id,
+                            status="running",
+                            message=f"🔍 Reanalizado video ID: {video_id}",
+                            progress=progress,
+                            processed_count=i + 1
+                        )
+                        
+                    except Exception as e:
+                        logger.error(f"Error analizando video {video_id}: {e}")
+                
+                self.operation_manager.complete_operation(
+                    operation_id,
+                    result={"analyzed": len(video_ids), "success": True}
+                )
+                
+                self.websocket_manager.send_operation_update(
+                    operation_id=operation_id,
+                    status="completed",
+                    message=f"✅ Reanálisis completado: {len(video_ids)} videos",
+                    progress=100
+                )
+                
+            except Exception as e:
+                logger.error(f"Error en reanálisis: {e}")
+                self.operation_manager.fail_operation(operation_id, str(e))
+                self.websocket_manager.send_operation_update(
+                    operation_id=operation_id,
+                    status="failed",
+                    message=f"❌ Error: {str(e)}",
+                    progress=0
+                )
+        
+        import threading
+        thread = threading.Thread(target=analyze_worker, daemon=True)
+        thread.start()
+        
+        return operation_id
+
+    # === OPERACIONES DE MANTENIMIENTO ===
     # Operaciones de thumbnails con WebSockets
     def regenerate_thumbnails_bulk(self, video_ids: List[int], 
                                   force: bool = False,
@@ -784,14 +975,19 @@ class MaintenanceAPI:
 
 
 # Instancia global (singleton)
-_maintenance_api_instance = None
+_async_operations_api_instance = None
 
-def get_maintenance_api() -> MaintenanceAPI:
-    """Obtener instancia singleton de MaintenanceAPI"""
-    global _maintenance_api_instance
-    if _maintenance_api_instance is None:
-        _maintenance_api_instance = MaintenanceAPI()
-    return _maintenance_api_instance
+def get_async_operations_api() -> AsyncOperationsAPI:
+    """Obtener instancia singleton de AsyncOperationsAPI"""
+    global _async_operations_api_instance
+    if _async_operations_api_instance is None:
+        _async_operations_api_instance = AsyncOperationsAPI()
+    return _async_operations_api_instance
+
+# Alias para compatibilidad hacia atrás
+def get_maintenance_api() -> AsyncOperationsAPI:
+    """Alias para compatibilidad - usar get_async_operations_api()"""
+    return get_async_operations_api()
 
 
 # Funciones de conveniencia

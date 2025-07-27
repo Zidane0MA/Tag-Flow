@@ -4,6 +4,7 @@ API endpoints para sistema de mantenimiento avanzado
 """
 
 import json
+import time
 from flask import Blueprint, request, jsonify, render_template
 import logging
 
@@ -11,8 +12,8 @@ logger = logging.getLogger(__name__)
 
 # Import del sistema de mantenimiento
 try:
-    from src.maintenance_api import get_maintenance_api
-    from src.maintenance.operation_manager import OperationPriority
+    from src.async_operations_api import get_maintenance_api
+    from src.core.operation_manager import OperationPriority
     MAINTENANCE_AVAILABLE = True
 except ImportError:
     # logger.warning("Sistema de mantenimiento no disponible")
@@ -347,6 +348,82 @@ def api_database_stats():
         
     except Exception as e:
         logger.error(f"Error obteniendo estadísticas de BD: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@maintenance_bp.route('/character/stats', methods=['GET'])
+def api_character_stats():
+    """API para obtener estadísticas de personajes"""
+    try:
+        from src.maintenance.character_ops import show_character_stats
+        stats = show_character_stats()
+        
+        return jsonify({
+            'success': True,
+            'stats': stats
+        })
+        
+    except Exception as e:
+        logger.error(f"Error obteniendo estadísticas de personajes: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@maintenance_bp.route('/thumbnails/stats', methods=['GET'])
+def api_thumbnail_stats():
+    """API para obtener estadísticas de thumbnails"""
+    try:
+        from src.maintenance.thumbnail_ops import ThumbnailOperations
+        ops = ThumbnailOperations()
+        stats = ops.get_thumbnail_stats()
+        
+        return jsonify({
+            'success': True,
+            'stats': stats
+        })
+        
+    except Exception as e:
+        logger.error(f"Error obteniendo estadísticas de thumbnails: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@maintenance_bp.route('/system/stats', methods=['GET'])
+def api_system_stats():
+    """API para obtener estadísticas del sistema"""
+    try:
+        from src.service_factory import get_database
+        from src.utils import SystemUtils
+        
+        db = get_database()
+        db_stats = db.get_detailed_stats()
+        system_stats = SystemUtils.get_system_info()
+        
+        combined_stats = {
+            'database': db_stats,
+            'system': system_stats,
+            'timestamp': time.time()
+        }
+        
+        return jsonify({
+            'success': True,
+            'stats': combined_stats
+        })
+        
+    except Exception as e:
+        logger.error(f"Error obteniendo estadísticas del sistema: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@maintenance_bp.route('/integrity/report', methods=['GET'])
+def api_integrity_report():
+    """API para obtener reporte de integridad"""
+    try:
+        from src.maintenance.integrity_ops import IntegrityOperations
+        ops = IntegrityOperations()
+        report = ops.generate_integrity_report()
+        
+        return jsonify({
+            'success': True,
+            'report': report
+        })
+        
+    except Exception as e:
+        logger.error(f"Error generando reporte de integridad: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 # Ruta adicional para el monitor de mantenimiento

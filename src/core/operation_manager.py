@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 import sys
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from src.maintenance.websocket_manager import get_websocket_manager, send_operation_progress, send_operation_complete, send_notification
+from src.core.websocket_manager import get_websocket_manager, send_operation_progress, send_operation_complete, send_notification
 
 
 class OperationStatus(Enum):

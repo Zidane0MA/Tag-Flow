@@ -13,8 +13,7 @@ from typing import List, Dict, Set
 sys.path.append(str(Path(__file__).parent / 'src'))
 
 from config import config
-from src.database import db
-from src.optimized_database import OptimizedDatabaseManager
+from src.service_factory import get_database
 from src.pattern_cache import get_global_cache, clear_global_cache
 import logging
 
@@ -25,8 +24,8 @@ class PerformanceBenchmark:
     """Benchmark para medir mejoras de rendimiento de las optimizaciones"""
     
     def __init__(self):
-        self.regular_db = db
-        self.optimized_db = OptimizedDatabaseManager()
+        # Ahora todas las optimizaciones están en el sistema principal
+        self.db = get_database()  # Ya incluye todas las optimizaciones migradas
         self.cache = get_global_cache()
         
     def benchmark_get_existing_paths(self, iterations=100):
