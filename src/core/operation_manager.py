@@ -43,6 +43,7 @@ class OperationPriority(Enum):
     """Prioridades de operación"""
     LOW = "low"
     NORMAL = "normal"
+    MEDIUM = "medium"
     HIGH = "high"
     CRITICAL = "critical"
 

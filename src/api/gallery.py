@@ -74,7 +74,7 @@ def index():
             if video.get('thumbnail_path'):
                 video['thumbnail_url'] = f"/thumbnail/{Path(video['thumbnail_path']).name}"
             else:
-                video['thumbnail_url'] = "/static/img/no-thumbnail.jpg"
+                video['thumbnail_url'] = "/static/img/no-thumbnail.svg"
             
             # Preparar título apropiado para el frontend
             if video.get('platform') in ['tiktok', 'instagram'] and video.get('description'):
@@ -96,6 +96,7 @@ def index():
                              creators=creators,
                              music_tracks=music_tracks,
                              stats=stats,
+                             page=page,
                              current_page=page,
                              total_pages=total_pages,
                              total_videos=total_videos,
@@ -139,7 +140,7 @@ def video_detail(video_id):
         if video.get('thumbnail_path'):
             video['thumbnail_url'] = f"/thumbnail/{Path(video['thumbnail_path']).name}"
         else:
-            video['thumbnail_url'] = "/static/img/no-thumbnail.jpg"
+            video['thumbnail_url'] = "/static/img/no-thumbnail.svg"
         
         return render_template('video_detail.html', video=video)
     
@@ -154,7 +155,7 @@ def trash():
     """Página de videos eliminados"""
     try:
         # Obtener filtros específicos para trash
-        filters = {'is_deleted': True}
+        filters = {}
         if request.args.get('creator'):
             filters['creator_name'] = request.args.get('creator')
         if request.args.get('platform'):
@@ -170,9 +171,14 @@ def trash():
         from src.service_factory import get_database
         db = get_database()
         
-        # Obtener videos eliminados
-        videos = db.get_videos(filters=filters, limit=per_page, offset=offset)
-        total_videos = db.count_videos(filters=filters)
+        # Obtener solo videos eliminados - necesitamos filtrar manualmente
+        # Por ahora obtenemos todos con include_deleted=True y luego filtramos
+        all_videos = db.get_videos(filters=filters, include_deleted=True)
+        deleted_videos = [v for v in all_videos if v.get('deleted_at') is not None]
+        
+        # Aplicar paginación manual
+        total_videos = len(deleted_videos)
+        videos = deleted_videos[offset:offset + per_page]
         total_pages = (total_videos + per_page - 1) // per_page
         
         # Procesar videos para el template (mismo procesamiento que galería)
@@ -196,13 +202,15 @@ def trash():
             if video.get('thumbnail_path'):
                 video['thumbnail_url'] = f"/thumbnail/{Path(video['thumbnail_path']).name}"
             else:
-                video['thumbnail_url'] = "/static/img/no-thumbnail.jpg"
+                video['thumbnail_url'] = "/static/img/no-thumbnail.svg"
         
         return render_template('trash.html', 
                              videos=videos,
+                             page=page,
                              current_page=page,
                              total_pages=total_pages,
                              total_videos=total_videos,
+                             total_deleted=total_videos,
                              per_page=per_page,
                              filters=request.args)
     
