@@ -225,6 +225,10 @@ Los comandos de procesamiento se encargan del análisis inteligente de videos, i
 
 ### **`process`**
 - **Función:** Comando principal para el procesamiento y análisis de videos. Puede funcionar en modo de análisis de videos nuevos o reanálisis de videos específicos. Opcionalmente puede poblar la base de datos antes del análisis.
+- **--limit de forma inteligente:**
+  - Si limit es 0, solo se procesan los videos pendientes de la BD.
+  - Si limit es N, se procesarán hasta N videos de la base de datos. Si hay menos de N videos pendientes, primero se intentará agregar a la base de datos la cantidad necesaria de videos nuevos para alcanzar el total de N, y luego se procesarán todos esos videos.
+  - Si limit no se especifica, se poblan todos los videos nuevos y luego se procesan todos los pendientes.
 - **Opciones:**
   - `--limit N 0`: Límite de N videos a procesar, prioriza videos de la bd luego los importa. Si es 0 solo pendientes de la bd.
   - `--source {db,organized,all}`: Fuente de videos para procesar.
@@ -244,9 +248,6 @@ Los comandos de procesamiento se encargan del análisis inteligente de videos, i
   python -X utf8 main.py process --limit 10
   python -X utf8 main.py process --platform youtube --limit 5
   python -X utf8 main.py process --source organized --limit 20
-  
-  # Poblar y analizar en un comando
-  python -X utf8 main.py process --populate --source all --limit 10
   
   # Reanálisis
   python -X utf8 main.py process --reanalyze-video 123

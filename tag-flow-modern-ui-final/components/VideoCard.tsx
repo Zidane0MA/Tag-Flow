@@ -1,0 +1,283 @@
+
+
+import React, { useState } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
+import { Post, EditStatus, ProcessStatus, Difficulty, PostType, SubscriptionType } from '../types';
+import { ICONS } from '../constants';
+import { useData } from '../hooks/useMockData';
+
+interface PostCardProps {
+    video: Post; // Renamed to video to avoid large-scale refactor in GalleryPage for now. It is a Post object.
+    videos: Post[]; // The full list of (filtered) posts for context
+    isSelected: boolean;
+    onSelect: (id: string, isSelected: boolean) => void;
+    onEdit: (video: Post) => void;
+}
+
+const getEditStatusIcon = (status: EditStatus) => {
+    const iconProps = { className: 'h-4 w-4' };
+    let icon;
+    let title;
+    let colorClass;
+    
+    switch (status) {
+        case EditStatus.PENDING:
+            icon = ICONS.status_pending;
+            title = 'Pendiente';
+            colorClass = 'text-gray-300';
+            break;
+        case EditStatus.IN_PROGRESS:
+            icon = ICONS.status_in_progress;
+            title = 'En Progreso';
+            colorClass = 'text-yellow-400';
+            break;
+        case EditStatus.COMPLETED:
+            icon = ICONS.status_completed;
+            title = 'Completado';
+            colorClass = 'text-green-400';
+            break;
+        default:
+            return null;
+    }
+    // By wrapping the icon in a fixed-size flex container, we can guarantee centering.
+    return (
+      <span title={title} className={`${colorClass} flex h-5 w-5 items-center justify-center`}>
+        {React.cloneElement(icon, iconProps)}
+      </span>
+    );
+};
+
+const DifficultyIndicator: React.FC<{ difficulty: Difficulty }> = ({ difficulty }) => {
+  const colorMap = {
+    [Difficulty.LOW]: 'bg-green-500',
+    [Difficulty.MEDIUM]: 'bg-yellow-400',
+    [Difficulty.HIGH]: 'bg-red-500',
+  };
+  const levelMap = {
+    [Difficulty.LOW]: 1,
+    [Difficulty.MEDIUM]: 2,
+    [Difficulty.HIGH]: 3,
+  };
+  const level = levelMap[difficulty] || 0;
+  
+  const dotClass = 'h-1.5 w-1.5 rounded-full'; // Make dots smaller
+
+  return (
+    <div title={`Dificultad: ${difficulty}`} className="flex items-center gap-0.5">
+      {[...Array(3)].map((_, i) => (
+        <span
+          key={i}
+          className={`${dotClass} ${i < level ? colorMap[difficulty] : 'bg-white/30'}`}
+        ></span>
+      ))}
+    </div>
+  );
+};
+
+const StatusIndicator: React.FC<{ status: ProcessStatus, isAnalyzing: boolean }> = ({ status, isAnalyzing }) => {
+    let indicator: { icon: React.ReactElement, className: string, title: string } | null = null;
+    
+    const currentStatus = isAnalyzing ? ProcessStatus.PROCESSING : status;
+
+    const iconClass = 'h-3 w-3 text-white'; // Made icon smaller
+
+    switch (currentStatus) {
+        case ProcessStatus.COMPLETED:
+            indicator = {
+                icon: React.cloneElement(ICONS.check_plain, { className: iconClass }),
+                className: 'bg-green-500/80', // Increased opacity slightly for visibility
+                title: 'Estado: Completado'
+            };
+            break;
+        case ProcessStatus.PROCESSING:
+            indicator = {
+                icon: React.cloneElement(ICONS.spinner, { className: `animate-spin ${iconClass}` }),
+                className: 'bg-purple-600/80',
+                title: 'Estado: Procesando'
+            };
+            break;
+        case ProcessStatus.PENDING:
+            indicator = {
+                icon: React.cloneElement(ICONS.exclamation_simple, { className: iconClass }),
+                className: 'bg-gray-400/80',
+                title: 'Estado: Pendiente'
+            };
+            break;
+        case ProcessStatus.ERROR:
+            indicator = {
+                icon: React.cloneElement(ICONS.close, { className: iconClass }),
+                className: 'bg-red-500/80',
+                title: 'Estado: Error'
+            };
+            break;
+        default:
+            return null;
+    }
+    
+    if (!indicator) return null;
+
+    return (
+        <div title={indicator.title} className={`absolute top-2 right-2 z-20 h-5 w-5 rounded-full flex items-center justify-center ${indicator.className}`}>
+            {indicator.icon}
+        </div>
+    );
+};
+
+const getSubscriptionIcon = (type: SubscriptionType) => {
+    const iconMap: Record<SubscriptionType, React.ReactElement> = {
+        'playlist': ICONS.list,
+        'music': ICONS.music,
+        'hashtag': ICONS.hashtag,
+        'saved': ICONS.bookmark,
+        'location': ICONS.location_marker,
+        'feed': ICONS.reels,
+        'liked': ICONS.reels,
+        'reels': ICONS.reels,
+        'stories': ICONS.stories,
+        'highlights': ICONS.highlights,
+        'tagged': ICONS.reels,
+        'channel': ICONS.user,
+        'account': ICONS.user,
+        'watch_later': ICONS.clock,
+        'favorites': ICONS.bookmark
+    };
+    return iconMap[type] || ICONS.folder;
+}
+
+
+const PostCard: React.FC<PostCardProps> = ({ video: post, videos: posts, isSelected, onSelect, onEdit }) => {
+    const { moveToTrash, analyzePost } = useData();
+    const [isAnalyzing, setIsAnalyzing] = useState(false);
+    const navigate = useNavigate();
+    
+    const handleAnalyze = async (e: React.MouseEvent) => {
+        e.stopPropagation();
+        setIsAnalyzing(true);
+        await analyzePost(post.id);
+        setIsAnalyzing(false);
+    }
+    
+    const handlePlay = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        // Pass the filtered list of posts to the player page
+        navigate(`/post/${post.id}/player`, { state: { posts } });
+    };
+
+    return (
+        <div className="bg-[#212121] rounded-lg overflow-hidden shadow-lg flex flex-col group text-sm transition-all duration-300 ease-in-out hover:-translate-y-1 hover:shadow-2xl will-change-[transform,box-shadow]">
+            {/* === Thumbnail Area === */}
+            <div className="relative">
+                <img src={post.thumbnailUrl} alt={post.title} className="w-full h-48 object-cover" />
+                
+                <div className="absolute inset-0 bg-black/50 pointer-events-none z-10"></div>
+                
+                {/* Selection & Type Indicator (Top Left) */}
+                <div className="absolute top-2 left-2 z-40 flex items-center gap-2">
+                    <input 
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={(e) => onSelect(post.id, e.target.checked)}
+                        className="h-5 w-5 rounded text-red-600 bg-gray-900 border-gray-500 focus:ring-red-500 cursor-pointer"
+                        onClick={(e) => e.stopPropagation()}
+                    />
+                    {post.type === PostType.IMAGE && (
+                        <div className="flex items-center gap-1.5 bg-black/70 backdrop-blur-sm rounded-full px-2 py-0.5 text-gray-300" title="Publicación de imagen">
+                            {React.cloneElement(ICONS.image, {className: "h-4 w-4"})}
+                            {post.imageUrls && post.imageUrls.length > 1 && (
+                                <span className="text-xs font-bold">{post.imageUrls.length}</span>
+                            )}
+                        </div>
+                    )}
+                </div>
+                
+                {/* Process Status Indicator (Top Right) */}
+                <StatusIndicator status={post.processStatus} isAnalyzing={isAnalyzing || post.processStatus === 'Procesando'} />
+
+                {/* Platform Badge (Bottom Right) */}
+                <div className="absolute bottom-2 right-2 z-20 flex items-center bg-black/70 backdrop-blur-sm rounded-full px-2.5 py-0.5">
+                    <span className="text-xs font-semibold text-white">{post.platform}</span>
+                </div>
+
+                {/* Edit Status & Difficulty (Bottom Left) */}
+                <div className="absolute bottom-2 left-2 z-20 flex items-center gap-1.5 bg-black/70 backdrop-blur-sm rounded-full px-[0.44rem] py-[0.1rem]">
+                    {getEditStatusIcon(post.editStatus)}
+                    <div className="h-3 w-px bg-white/20"></div>
+                    <DifficultyIndicator difficulty={post.difficulty} />
+                </div>
+                
+                {/* Hover Actions */}
+                 <div className="absolute inset-0 flex items-center justify-center gap-2 sm:gap-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none group-hover:pointer-events-auto z-30">
+                    <button onClick={handlePlay} title="Reproducir" className="p-3 bg-black/50 backdrop-blur-sm rounded-full text-white hover:bg-red-600 transition-colors">{ICONS.play}</button>
+                    <button onClick={(e) => { e.stopPropagation(); onEdit(post); }} title="Editar" className="p-3 bg-black/50 backdrop-blur-sm rounded-full text-white hover:bg-red-600 transition-colors">{ICONS.edit}</button>
+                    <button onClick={handleAnalyze} disabled={isAnalyzing || post.processStatus === 'Procesando'} title="Analizar" className="p-3 bg-black/50 backdrop-blur-sm rounded-full text-white hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                       {isAnalyzing || post.processStatus === 'Procesando' ? ICONS.spinner : ICONS.analyze}
+                    </button>
+                    <button onClick={(e) => { e.stopPropagation(); }} title="Mostrar Archivo" className="p-3 bg-black/50 backdrop-blur-sm rounded-full text-white hover:bg-red-600 transition-colors">{ICONS.folder}</button>
+                    <button onClick={(e) => { e.stopPropagation(); moveToTrash(post.id); }} title="Eliminar" className="p-3 bg-black/50 backdrop-blur-sm rounded-full text-white hover:bg-red-500 transition-colors">{ICONS.delete}</button>
+                </div>
+            </div>
+
+            {/* === Information Area === */}
+            <div className="p-3 flex-grow flex flex-col justify-between space-y-3">
+                {/* Title */}
+                <h3 className="font-bold text-base text-white leading-tight truncate" title={post.description || post.title}>
+                    {post.description || post.title}
+                </h3>
+
+                {/* Creator and Subscription */}
+                <div className="flex justify-between items-start gap-2">
+                    <Link to={`/creator/${post.creator}`} onClick={e => e.stopPropagation()} className="flex items-center gap-1.5 text-gray-400 min-w-0 group/creator">
+                        {React.cloneElement(ICONS.user, { className: 'h-4 w-4 flex-shrink-0 group-hover/creator:text-white' })}
+                        <span className="truncate group-hover/creator:text-white transition-colors" title={post.creator}>{post.creator}</span>
+                    </Link>
+                    {post.subscription && (
+                        <Link to={`/subscription/${post.subscription.type}/${post.subscription.id}`} onClick={e => e.stopPropagation()} title={post.subscription.name} className="flex items-center gap-1.5 text-gray-400 flex-shrink-0 hover:text-white transition-colors">
+                           {React.cloneElement(getSubscriptionIcon(post.subscription.type), {className: "h-4 w-4"})}
+                           <span className="text-xs font-medium hidden sm:inline truncate max-w-[100px]">{post.subscription.name}</span>
+                        </Link>
+                    )}
+                </div>
+
+                {/* Additional Info */}
+                <div className="space-y-1 text-xs text-gray-400">
+                    {post.music && (
+                        <div className="flex items-center gap-1.5 truncate" title={`${post.music} - ${post.artist}`}>
+                            {React.cloneElement(ICONS.music, { className: 'h-4 w-4 flex-shrink-0' })}
+                            <span>{post.music} - {post.artist}</span>
+                        </div>
+                    )}
+                    {post.characters && post.characters.length > 0 && (
+                        <div className="flex items-center gap-1.5 truncate" title={post.characters.join(', ')}>
+                            {React.cloneElement(ICONS.users, { className: 'h-4 w-4 flex-shrink-0' })}
+                            <span>{post.characters.join(', ')}</span>
+                        </div>
+                    )}
+                    {post.notes && (
+                        <div className="flex items-center gap-1.5 truncate" title={post.notes}>
+                            {React.cloneElement(ICONS.notes, { className: 'h-4 w-4 flex-shrink-0' })}
+                            <span>{post.notes}</span>
+                        </div>
+                    )}
+                </div>
+
+                {/* Secondary Metadata */}
+                <div className="flex justify-between items-center text-xs text-gray-500 pt-2 border-t border-gray-700/50">
+                    <div className="flex items-center gap-1" title="Duración">
+                        {React.cloneElement(ICONS.clock, { className: 'h-4 w-4' })}
+                        <span>{post.type === PostType.VIDEO ? `${(post.duration / 60).toFixed(1)} min` : '---'}</span>
+                    </div>
+                    <div className="flex items-center gap-1" title="Tamaño">
+                        {React.cloneElement(ICONS.file_alt, { className: 'h-4 w-4' })}
+                        <span>{post.size.toFixed(1)} MB</span>
+                    </div>
+                    <div className="flex items-center gap-1" title="Fecha de descarga">
+                        {React.cloneElement(ICONS.calendar, { className: 'h-4 w-4' })}
+                        <span>{new Date(post.downloadDate).toLocaleDateString()}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+export default PostCard;

@@ -1,0 +1,226 @@
+
+import React, { useState, useMemo } from 'react';
+import { useData } from '../hooks/useMockData';
+import { Post, EditStatus, Difficulty, Platform, ProcessStatus } from '../types';
+import PostCard from '../components/VideoCard';
+import Pagination from '../components/Pagination';
+import EditModal from '../components/EditModal';
+import BulkActionBar from '../components/BulkActionBar';
+
+const initialFilters = {
+  search: '',
+  creator: 'All',
+  platform: 'All',
+  editStatus: 'All',
+  difficulty: 'All',
+  processStatus: 'All',
+};
+
+const filterLabels: { [key: string]: string } = {
+  search: 'Búsqueda',
+  creator: 'Creador',
+  platform: 'Plataforma',
+  editStatus: 'Estado Edición',
+  difficulty: 'Dificultad',
+  processStatus: 'Estado Procesamiento',
+};
+
+const GalleryPage: React.FC = () => {
+    const { posts, moveMultipleToTrash, reanalyzePosts } = useData();
+    const [currentPage, setCurrentPage] = useState(1);
+    const [selectedPosts, setSelectedPosts] = useState<string[]>([]);
+    const [editingPost, setEditingPost] = useState<Post | null>(null);
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    
+    const [filters, setFilters] = useState(initialFilters);
+    const [sort, setSort] = useState({ by: 'downloadDate', order: 'desc' });
+
+    const POSTS_PER_PAGE = 12;
+
+    const filteredAndSortedPosts = useMemo(() => {
+        let filtered = posts.filter(p => {
+            const searchTerm = filters.search.toLowerCase();
+            const matchesSearch = filters.search === '' || (
+                p.title.toLowerCase().includes(searchTerm) ||
+                p.description.toLowerCase().includes(searchTerm) ||
+                p.creator.toLowerCase().includes(searchTerm) ||
+                (p.music && p.music.toLowerCase().includes(searchTerm)) ||
+                (p.characters && p.characters.join(', ').toLowerCase().includes(searchTerm)) ||
+                (p.notes && p.notes.toLowerCase().includes(searchTerm))
+            );
+
+            return (
+                matchesSearch &&
+                (filters.creator === 'All' || p.creator === filters.creator) &&
+                (filters.platform === 'All' || p.platform === filters.platform) &&
+                (filters.editStatus === 'All' || p.editStatus === filters.editStatus) &&
+                (filters.difficulty === 'All' || p.difficulty === filters.difficulty) &&
+                (filters.processStatus === 'All' || p.processStatus === filters.processStatus)
+            );
+        });
+
+        return filtered.sort((a, b) => {
+            const aVal = a[sort.by as keyof Post];
+            const bVal = b[sort.by as keyof Post];
+            if (aVal < bVal) return sort.order === 'asc' ? -1 : 1;
+            if (aVal > bVal) return sort.order === 'asc' ? 1 : -1;
+            return 0;
+        });
+    }, [posts, filters, sort]);
+
+    const paginatedPosts = useMemo(() => {
+        const startIndex = (currentPage - 1) * POSTS_PER_PAGE;
+        return filteredAndSortedPosts.slice(startIndex, startIndex + POSTS_PER_PAGE);
+    }, [filteredAndSortedPosts, currentPage]);
+
+    const handleSelectPost = (id: string, isSelected: boolean) => {
+        if (isSelected) {
+            setSelectedPosts(prev => [...prev, id]);
+        } else {
+            setSelectedPosts(prev => prev.filter(pid => pid !== id));
+        }
+    };
+
+    const creators = useMemo(() => [...new Set(posts.map(p => p.creator))], [posts]);
+
+    const handleFilterChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+        setFilters(prev => ({ ...prev, [e.target.name]: e.target.value }));
+        setCurrentPage(1);
+    };
+
+    const handleRemoveFilter = (filterKey: string) => {
+        setFilters(prev => ({ ...prev, [filterKey]: initialFilters[filterKey as keyof typeof initialFilters] }));
+        setCurrentPage(1);
+    };
+
+    const handleResetFilters = () => {
+        setFilters(initialFilters);
+        setCurrentPage(1);
+    };
+    
+    const handleSortChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        setSort(prev => ({...prev, [e.target.name]: e.target.value}));
+    }
+
+    const activeFilters = useMemo(() =>
+        Object.entries(filters).filter(([key, value]) => value !== initialFilters[key as keyof typeof initialFilters]),
+      [filters]
+    );
+
+    return (
+        <>
+            <details className="bg-[#212121] p-4 rounded-lg mb-6 shadow-lg" open>
+                <summary className="font-semibold text-white cursor-pointer select-none flex justify-between items-center list-none">
+                    <span className="text-lg">Filtros y Ordenación</span>
+                    <span className="text-xs font-normal text-gray-400 hover:text-white transition-colors">Haga clic para expandir/colapsar</span>
+                </summary>
+                <div className="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                     <input 
+                        type="text" 
+                        name="search" 
+                        placeholder="Buscar por título, creador, descripción, etc..."
+                        value={filters.search} 
+                        onChange={handleFilterChange} 
+                        className="bg-gray-700 text-white rounded p-2 focus:ring-2 focus:ring-red-500 focus:outline-none md:col-span-2 lg:col-span-4"
+                    />
+                     <select name="creator" value={filters.creator} onChange={handleFilterChange} className="bg-gray-700 text-white rounded p-2 focus:ring-2 focus:ring-red-500 focus:outline-none">
+                        <option value="All">Creadores</option>
+                        {creators.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                    <select name="platform" value={filters.platform} onChange={handleFilterChange} className="bg-gray-700 text-white rounded p-2 focus:ring-2 focus:ring-red-500 focus:outline-none">
+                        <option value="All">Plataformas</option>
+                        {Object.values(Platform).map(p => <option key={p} value={p}>{p}</option>)}
+                    </select>
+                    <select name="editStatus" value={filters.editStatus} onChange={handleFilterChange} className="bg-gray-700 text-white rounded p-2 focus:ring-2 focus:ring-red-500 focus:outline-none">
+                        <option value="All">Estados Edición</option>
+                        {Object.values(EditStatus).map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                     <select name="difficulty" value={filters.difficulty} onChange={handleFilterChange} className="bg-gray-700 text-white rounded p-2 focus:ring-2 focus:ring-red-500 focus:outline-none">
+                        <option value="All">Dificultad</option>
+                        {Object.values(Difficulty).map(d => <option key={d} value={d}>{d}</option>)}
+                    </select>
+                    <select name="processStatus" value={filters.processStatus} onChange={handleFilterChange} className="bg-gray-700 text-white rounded p-2 focus:ring-2 focus:ring-red-500 focus:outline-none">
+                        <option value="All">Estados Proceso</option>
+                        {Object.values(ProcessStatus).map(p => <option key={p} value={p}>{p}</option>)}
+                    </select>
+                    <div className="flex gap-2">
+                        <select name="by" value={sort.by} onChange={handleSortChange} className="bg-gray-700 text-white rounded p-2 w-full focus:ring-2 focus:ring-red-500 focus:outline-none">
+                            <option value="downloadDate">Fecha Descarga</option>
+                            <option value="id">ID</option>
+                            <option value="title">Nombre</option>
+                        </select>
+                         <select name="order" value={sort.order} onChange={handleSortChange} className="bg-gray-700 text-white rounded p-2 w-full focus:ring-2 focus:ring-red-500 focus:outline-none">
+                            <option value="desc">Desc</option>
+                            <option value="asc">Asc</option>
+                        </select>
+                    </div>
+                </div>
+            </details>
+
+             {activeFilters.length > 0 && (
+                <div className="mb-6 flex items-center flex-wrap gap-2">
+                    <span className="text-sm font-medium text-gray-400">Filtros Activos:</span>
+                    {activeFilters.map(([key, value]) => (
+                        <span key={key} className="flex items-center bg-gray-600 text-white text-xs font-semibold px-2.5 py-1 rounded-full">
+                            {filterLabels[key]}: {String(value)}
+                            <button onClick={() => handleRemoveFilter(key)} className="ml-2 text-gray-300 hover:text-white text-base leading-none">
+                                &times;
+                            </button>
+                        </span>
+                    ))}
+                    <button onClick={handleResetFilters} className="text-sm text-red-500 hover:text-red-400 hover:underline ml-2">
+                        Limpiar Todo
+                    </button>
+                </div>
+            )}
+            
+            <div className={selectedPosts.length > 0 ? 'pb-24' : ''}>
+                {filteredAndSortedPosts.length > 0 ? (
+                    <>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+                            {paginatedPosts.map(post => (
+                                <PostCard 
+                                  key={post.id} 
+                                  video={post}
+                                  videos={filteredAndSortedPosts}
+                                  isSelected={selectedPosts.includes(post.id)} 
+                                  onSelect={handleSelectPost}
+                                  onEdit={setEditingPost}
+                                />
+                            ))}
+                        </div>
+
+                        <Pagination 
+                            currentPage={currentPage} 
+                            totalItems={filteredAndSortedPosts.length} 
+                            itemsPerPage={POSTS_PER_PAGE} 
+                            onPageChange={setCurrentPage} 
+                        />
+                    </>
+                ) : (
+                    <div className="text-center py-16">
+                        <h3 className="text-2xl font-semibold text-white">No se encontraron videos</h3>
+                        <p className="text-gray-400 mt-2">Intenta ajustar tus filtros o búsqueda para encontrar lo que buscas.</p>
+                        <button onClick={handleResetFilters} className="mt-4 px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-md transition">
+                            Limpiar Filtros
+                        </button>
+                    </div>
+                )}
+            </div>
+
+            <BulkActionBar
+                isVisible={selectedPosts.length > 0}
+                selectedCount={selectedPosts.length}
+                onReanalyze={() => reanalyzePosts(selectedPosts)}
+                onEdit={() => setIsEditModalOpen(true)}
+                onDelete={() => {moveMultipleToTrash(selectedPosts); setSelectedPosts([])}}
+                onClear={() => setSelectedPosts([])}
+            />
+            
+            {editingPost && <EditModal video={editingPost} onClose={() => setEditingPost(null)} />}
+            {isEditModalOpen && <EditModal videoIds={selectedPosts} onClose={() => { setIsEditModalOpen(false); setSelectedPosts([]); }} />}
+        </>
+    );
+};
+
+export default GalleryPage;
