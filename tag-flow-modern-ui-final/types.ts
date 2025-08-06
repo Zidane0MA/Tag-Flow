@@ -128,3 +128,12 @@ export interface DataContextType {
   getSubscriptionInfo: (type: SubscriptionType, id: string) => SubscriptionInfo | undefined;
   getPostsBySubscription: (type: SubscriptionType, id: string, list?: string) => Post[];
 }
+
+// Interfaz específica para paginación infinita
+export interface InfiniteScrollDataContextType extends DataContextType {
+  loading: boolean;
+  loadingMore: boolean;
+  hasMore: boolean;
+  error: string | null;
+  loadMoreVideos: () => Promise<void>;
+}

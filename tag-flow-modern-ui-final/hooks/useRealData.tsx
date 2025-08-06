@@ -9,9 +9,12 @@ import { apiService, VideoFilters } from '../services/apiService';
 
 interface RealDataContextType extends DataContextType {
   loading: boolean;
+  loadingMore: boolean;
+  hasMore: boolean;
   error: string | null;
   refreshData: () => Promise<void>;
   loadVideos: (filters?: VideoFilters) => Promise<void>;
+  loadMoreVideos: () => Promise<void>;
   getSubscriptionStats: (type: SubscriptionType, id: string) => Promise<any>;
 }
 
@@ -22,7 +25,14 @@ export const RealDataProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [posts, setPosts] = useState<Post[]>([]);
   const [trash, setTrash] = useState<Post[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // Estados para paginación
+  const [currentFilters, setCurrentFilters] = useState<VideoFilters>({});
+  const [currentOffset, setCurrentOffset] = useState(0);
+  const [totalVideos, setTotalVideos] = useState(0);
 
   // Estados para creadores y suscripciones
   const [backendCreators, setBackendCreators] = useState<Creator[]>([]);
@@ -116,16 +126,28 @@ export const RealDataProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   }, [posts, backendCreators]);
 
   /**
-   * Cargar videos desde el backend
+   * Cargar videos desde el backend con paginación
    */
   const loadVideos = useCallback(async (filters: VideoFilters = {}) => {
     setLoading(true);
     setError(null);
     try {
-      // No aplicar límite por defecto - dejar que el backend decida
-      const filtersWithLimit = { ...filters };
-      const { posts: newPosts } = await apiService.getVideos(filtersWithLimit);
+      // Usar paginación: 50 videos por página
+      const PAGE_SIZE = 50;
+      const filtersWithPagination = { 
+        ...filters, 
+        limit: PAGE_SIZE, 
+        offset: 0 
+      };
+      
+      const { posts: newPosts, total } = await apiService.getVideos(filtersWithPagination);
+      
       setPosts(newPosts);
+      setCurrentFilters(filters);
+      setCurrentOffset(PAGE_SIZE);
+      setTotalVideos(total);
+      setHasMore(newPosts.length === PAGE_SIZE && newPosts.length < total);
+      
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Error loading videos';
       setError(errorMessage);
@@ -134,6 +156,69 @@ export const RealDataProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       setLoading(false);
     }
   }, []);
+
+  /**
+   * Cargar más videos (paginación infinita)
+   */
+  const loadMoreVideos = useCallback(async () => {
+    console.log('🔄 loadMoreVideos called', { loadingMore, hasMore, currentOffset, currentFiltersLength: Object.keys(currentFilters).length });
+    
+    if (loadingMore || !hasMore) {
+      console.log('❌ Early return', { loadingMore, hasMore });
+      return;
+    }
+    
+    setLoadingMore(true);
+    setError(null);
+    
+    try {
+      const PAGE_SIZE = 50;
+      const filtersWithPagination = {
+        ...currentFilters,
+        limit: PAGE_SIZE,
+        offset: currentOffset
+      };
+      
+      console.log('📡 Fetching more videos with filters:', filtersWithPagination);
+      
+      const { posts: newPosts, total } = await apiService.getVideos(filtersWithPagination);
+      
+      console.log('📥 Received new posts:', { 
+        newPostsLength: newPosts.length, 
+        total, 
+        currentOffset,
+        newOffset: currentOffset + PAGE_SIZE 
+      });
+      
+      setPosts(prevPosts => {
+        const combined = [...prevPosts, ...newPosts];
+        console.log('📊 Total posts after merge:', combined.length);
+        return combined;
+      });
+      
+      const newOffset = currentOffset + PAGE_SIZE;
+      setCurrentOffset(newOffset);
+      setTotalVideos(total);
+      
+      const hasMoreVideos = newPosts.length === PAGE_SIZE && newOffset < total;
+      setHasMore(hasMoreVideos);
+      
+      console.log('✅ loadMoreVideos completed', { 
+        hasMoreVideos, 
+        newOffset, 
+        total,
+        condition1: newPosts.length === PAGE_SIZE,
+        condition2: newOffset < total
+      });
+      
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Error loading more videos';
+      setError(errorMessage);
+      console.error('❌ Error loading more videos:', err);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [loadingMore, hasMore, currentFilters, currentOffset]);
 
   /**
    * Cargar creadores desde el backend
@@ -149,11 +234,14 @@ export const RealDataProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   }, []);
 
   /**
-   * Refrescar todos los datos
+   * Refrescar todos los datos (reinicia la paginación)
    */
   const refreshData = useCallback(async () => {
+    // Reiniciar estado de paginación
+    setCurrentOffset(0);
+    setHasMore(true);
     await Promise.all([
-      loadVideos(),
+      loadVideos(), // Esto cargará desde offset 0
       loadCreators()
     ]);
   }, [loadVideos, loadCreators]);
@@ -338,18 +426,19 @@ export const RealDataProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   }, [refreshData]);
 
   /**
-   * Obtener estadísticas
+   * Obtener estadísticas (basadas en posts cargados + información de total de la BD)
    */
   const getStats = useCallback(() => {
     return {
-      total: posts.length,
+      total: posts.length, // Videos cargados actualmente
+      totalInDB: totalVideos, // Total en la base de datos
       withMusic: posts.filter(p => p.music).length,
       withCharacters: posts.filter(p => p.characters && p.characters.length > 0).length,
       processed: posts.filter(p => p.processStatus === ProcessStatus.COMPLETED).length,
       inTrash: trash.length,
       pending: posts.filter(p => p.processStatus === ProcessStatus.PENDING).length,
     };
-  }, [posts, trash]);
+  }, [posts, trash, totalVideos]);
 
   /**
    * Obtener creador por nombre
@@ -463,9 +552,12 @@ export const RealDataProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     trash,
     creators,
     loading,
+    loadingMore,
+    hasMore,
     error,
     refreshData,
     loadVideos,
+    loadMoreVideos,
     updatePost,
     updateMultiplePosts,
     moveToTrash,

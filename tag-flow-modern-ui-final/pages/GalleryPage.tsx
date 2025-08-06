@@ -1,78 +1,145 @@
-
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useRealData } from '../hooks/useRealData';
+import useInfiniteScroll from '../hooks/useInfiniteScroll';
 import { Post, EditStatus, Difficulty, Platform, ProcessStatus } from '../types';
 import PostCard from '../components/VideoCard';
-import Pagination from '../components/Pagination';
 import EditModal from '../components/EditModal';
 import BulkActionBar from '../components/BulkActionBar';
+import { VideoFilters } from '../services/apiService';
 
 const initialFilters = {
   search: '',
-  creator: 'All',
-  platform: 'All',
-  editStatus: 'All',
-  difficulty: 'All',
-  processStatus: 'All',
+  creator_name: '',
+  platform: '',
+  edit_status: '',
+  difficulty_level: '',
+  processing_status: '',
 };
 
 const filterLabels: { [key: string]: string } = {
   search: 'Búsqueda',
-  creator: 'Creador',
+  creator_name: 'Creador',
   platform: 'Plataforma',
-  editStatus: 'Estado Edición',
-  difficulty: 'Dificultad',
-  processStatus: 'Estado Procesamiento',
+  edit_status: 'Estado Edición',
+  difficulty_level: 'Dificultad',
+  processing_status: 'Estado Procesamiento',
 };
 
 const GalleryPage: React.FC = () => {
-    const { posts, moveMultipleToTrash, reanalyzePosts, loading, error } = useRealData();
-    const [currentPage, setCurrentPage] = useState(1);
+    const { 
+        posts, 
+        moveMultipleToTrash, 
+        reanalyzePosts, 
+        loading, 
+        loadingMore,
+        hasMore,
+        error, 
+        loadVideos,
+        loadMoreVideos,
+        creators 
+    } = useRealData();
+
     const [selectedPosts, setSelectedPosts] = useState<string[]>([]);
     const [editingPost, setEditingPost] = useState<Post | null>(null);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-    const [pageTransitioning, setPageTransitioning] = useState(false);
     
     const [filters, setFilters] = useState(initialFilters);
     const [sort, setSort] = useState({ by: 'downloadDate', order: 'desc' });
+    const [appliedFilters, setAppliedFilters] = useState<VideoFilters>({});
 
-    const POSTS_PER_PAGE = 12;
+    // Convertir filtros locales a formato del API
+    const buildApiFilters = useCallback((localFilters: typeof initialFilters): VideoFilters => {
+        const apiFilters: VideoFilters = {};
+        
+        if (localFilters.search) apiFilters.search = localFilters.search;
+        if (localFilters.creator_name && localFilters.creator_name !== 'All') apiFilters.creator_name = localFilters.creator_name;
+        if (localFilters.platform && localFilters.platform !== 'All') {
+            // Mapear plataformas del frontend al backend
+            const platformMap: { [key: string]: string } = {
+                'YouTube': 'youtube',
+                'TikTok': 'tiktok',
+                'Instagram': 'instagram',
+                'Vimeo': 'vimeo',
+                'Facebook': 'facebook',
+                'Twitter': 'twitter',
+                'Twitch': 'twitch',
+                'Discord': 'discord',
+                'bilibili': 'bilibili',
+                'bilibili.tv': 'bilibili/video/tv'
+            };
+            apiFilters.platform = platformMap[localFilters.platform] || localFilters.platform.toLowerCase();
+        }
+        if (localFilters.edit_status && localFilters.edit_status !== 'All') {
+            // Mapear estados de edición del frontend al backend
+            const statusMap: { [key: string]: string } = {
+                'Pendiente': 'nulo',
+                'En Progreso': 'en_proceso',
+                'Completado': 'hecho'
+            };
+            apiFilters.edit_status = statusMap[localFilters.edit_status] || localFilters.edit_status;
+        }
+        if (localFilters.processing_status && localFilters.processing_status !== 'All') {
+            // Mapear estados de procesamiento del frontend al backend
+            const statusMap: { [key: string]: string } = {
+                'Pendiente': 'pendiente',
+                'Procesando': 'procesando',
+                'Completado': 'completado',
+                'Error': 'error'
+            };
+            apiFilters.processing_status = statusMap[localFilters.processing_status] || localFilters.processing_status;
+        }
+        if (localFilters.difficulty_level && localFilters.difficulty_level !== 'All') {
+            // Mapear dificultad del frontend al backend
+            const difficultyMap: { [key: string]: string } = {
+                'Bajo': 'bajo',
+                'Medio': 'medio',
+                'Alto': 'alto'
+            };
+            apiFilters.difficulty_level = difficultyMap[localFilters.difficulty_level] || localFilters.difficulty_level;
+        }
 
-    const filteredAndSortedPosts = useMemo(() => {
-        let filtered = posts.filter(p => {
-            const searchTerm = filters.search.toLowerCase();
-            const matchesSearch = filters.search === '' || (
-                p.title.toLowerCase().includes(searchTerm) ||
-                p.description.toLowerCase().includes(searchTerm) ||
-                p.creator.toLowerCase().includes(searchTerm) ||
-                (p.music && p.music.toLowerCase().includes(searchTerm)) ||
-                (p.characters && p.characters.join(', ').toLowerCase().includes(searchTerm)) ||
-                (p.notes && p.notes.toLowerCase().includes(searchTerm))
-            );
+        return apiFilters;
+    }, []);
 
-            return (
-                matchesSearch &&
-                (filters.creator === 'All' || p.creator === filters.creator) &&
-                (filters.platform === 'All' || p.platform === filters.platform) &&
-                (filters.editStatus === 'All' || p.editStatus === filters.editStatus) &&
-                (filters.difficulty === 'All' || p.difficulty === filters.difficulty) &&
-                (filters.processStatus === 'All' || p.processStatus === filters.processStatus)
-            );
-        });
+    // Aplicar filtros (llamar al backend)
+    const applyFilters = useCallback(async () => {
+        const apiFilters = buildApiFilters(filters);
+        setAppliedFilters(apiFilters);
+        await loadVideos(apiFilters);
+    }, [filters, buildApiFilters, loadVideos]);
 
-        return filtered.sort((a, b) => {
+    // Hook para scroll infinito
+    useInfiniteScroll(
+        () => {
+            if (!loadingMore && hasMore) {
+                loadMoreVideos();
+            }
+        },
+        {
+            threshold: 200,
+            enabled: !loading && !loadingMore && hasMore
+        }
+    );
+
+    // Aplicar filtros cuando cambien
+    useEffect(() => {
+        const timeoutId = setTimeout(() => {
+            applyFilters();
+        }, 500); // Debounce de 500ms
+
+        return () => clearTimeout(timeoutId);
+    }, [applyFilters]);
+
+    // Ordenación local (ya que los posts vienen del backend)
+    const sortedPosts = useMemo(() => {
+        return [...posts].sort((a, b) => {
             const aVal = a[sort.by as keyof Post];
             const bVal = b[sort.by as keyof Post];
             if (aVal < bVal) return sort.order === 'asc' ? -1 : 1;
             if (aVal > bVal) return sort.order === 'asc' ? 1 : -1;
             return 0;
         });
-    }, [posts, filters, sort]);
-
-    const paginatedPosts = useMemo(() => {
-        const startIndex = (currentPage - 1) * POSTS_PER_PAGE;
-        return filteredAndSortedPosts.slice(startIndex, startIndex + POSTS_PER_PAGE);
-    }, [filteredAndSortedPosts, currentPage]);
+    }, [posts, sort]);
 
     const handleSelectPost = (id: string, isSelected: boolean) => {
         if (isSelected) {
@@ -82,21 +149,16 @@ const GalleryPage: React.FC = () => {
         }
     };
 
-    const creators = useMemo(() => [...new Set(posts.map(p => p.creator))], [posts]);
-
     const handleFilterChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         setFilters(prev => ({ ...prev, [e.target.name]: e.target.value }));
-        setCurrentPage(1);
     };
 
     const handleRemoveFilter = (filterKey: string) => {
         setFilters(prev => ({ ...prev, [filterKey]: initialFilters[filterKey as keyof typeof initialFilters] }));
-        setCurrentPage(1);
     };
 
     const handleResetFilters = () => {
         setFilters(initialFilters);
-        setCurrentPage(1);
     };
     
     const handleSortChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -107,6 +169,14 @@ const GalleryPage: React.FC = () => {
         Object.entries(filters).filter(([key, value]) => value !== initialFilters[key as keyof typeof initialFilters]),
       [filters]
     );
+
+    // Lista de creadores únicos para el filtro
+    const uniqueCreators = useMemo(() => {
+        if (creators && creators.length > 0) {
+            return creators.map(c => c.name);
+        }
+        return [...new Set(posts.map(p => p.creator))];
+    }, [creators, posts]);
 
     // Componente skeleton para loading
     const SkeletonCard = () => (
@@ -128,8 +198,18 @@ const GalleryPage: React.FC = () => {
         </div>
     );
 
-    // Mostrar loading con estructura mantenida
-    if (loading) {
+    // Componente de loading para cargar más
+    const LoadingMoreIndicator = () => (
+        <div className="flex justify-center items-center py-8">
+            <div className="flex items-center space-x-2 text-gray-400">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-red-500"></div>
+                <span>Cargando más videos...</span>
+            </div>
+        </div>
+    );
+
+    // Mostrar loading inicial
+    if (loading && posts.length === 0) {
         return (
             <>
                 {/* Filtros skeleton */}
@@ -142,18 +222,9 @@ const GalleryPage: React.FC = () => {
                 
                 {/* Grid skeleton */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-                    {Array.from({ length: POSTS_PER_PAGE }).map((_, i) => (
+                    {Array.from({ length: 12 }).map((_, i) => (
                         <SkeletonCard key={i} />
                     ))}
-                </div>
-                
-                {/* Paginación skeleton */}
-                <div className="flex justify-center mt-8 space-x-2 animate-pulse">
-                    <div className="h-8 w-8 bg-gray-700 rounded"></div>
-                    <div className="h-8 w-8 bg-gray-700 rounded"></div>
-                    <div className="h-8 w-8 bg-gray-700 rounded"></div>
-                    <div className="h-8 w-8 bg-gray-700 rounded"></div>
-                    <div className="h-8 w-8 bg-gray-700 rounded"></div>
                 </div>
             </>
         );
@@ -183,7 +254,9 @@ const GalleryPage: React.FC = () => {
             <details className="bg-[#212121] p-4 rounded-lg mb-6 shadow-lg" open>
                 <summary className="font-semibold text-white cursor-pointer select-none flex justify-between items-center list-none">
                     <span className="text-lg">Filtros y Ordenación</span>
-                    <span className="text-xs font-normal text-gray-400 hover:text-white transition-colors">Haga clic para expandir/colapsar</span>
+                    <span className="text-xs font-normal text-gray-400 hover:text-white transition-colors">
+                        Haga clic para expandir/colapsar • {posts.length} videos cargados {hasMore && '(cargando más al hacer scroll)'}
+                    </span>
                 </summary>
                 <div className="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                      <input 
@@ -194,24 +267,29 @@ const GalleryPage: React.FC = () => {
                         onChange={handleFilterChange} 
                         className="bg-gray-700 text-white rounded p-2 focus:ring-2 focus:ring-red-500 focus:outline-none md:col-span-2 lg:col-span-4"
                     />
-                     <select name="creator" value={filters.creator} onChange={handleFilterChange} className="bg-gray-700 text-white rounded p-2 focus:ring-2 focus:ring-red-500 focus:outline-none">
-                        <option value="All">Creadores</option>
-                        {creators.map(c => <option key={c} value={c}>{c}</option>)}
+                     <select name="creator_name" value={filters.creator_name} onChange={handleFilterChange} className="bg-gray-700 text-white rounded p-2 focus:ring-2 focus:ring-red-500 focus:outline-none">
+                        <option value="">Todos los Creadores</option>
+                        <option value="All">Todos los Creadores</option>
+                        {uniqueCreators.map(c => <option key={c} value={c}>{c}</option>)}
                     </select>
                     <select name="platform" value={filters.platform} onChange={handleFilterChange} className="bg-gray-700 text-white rounded p-2 focus:ring-2 focus:ring-red-500 focus:outline-none">
-                        <option value="All">Plataformas</option>
+                        <option value="">Todas las Plataformas</option>
+                        <option value="All">Todas las Plataformas</option>
                         {Object.values(Platform).map(p => <option key={p} value={p}>{p}</option>)}
                     </select>
-                    <select name="editStatus" value={filters.editStatus} onChange={handleFilterChange} className="bg-gray-700 text-white rounded p-2 focus:ring-2 focus:ring-red-500 focus:outline-none">
-                        <option value="All">Estados Edición</option>
+                    <select name="edit_status" value={filters.edit_status} onChange={handleFilterChange} className="bg-gray-700 text-white rounded p-2 focus:ring-2 focus:ring-red-500 focus:outline-none">
+                        <option value="">Todos los Estados</option>
+                        <option value="All">Todos los Estados</option>
                         {Object.values(EditStatus).map(s => <option key={s} value={s}>{s}</option>)}
                     </select>
-                     <select name="difficulty" value={filters.difficulty} onChange={handleFilterChange} className="bg-gray-700 text-white rounded p-2 focus:ring-2 focus:ring-red-500 focus:outline-none">
-                        <option value="All">Dificultad</option>
+                     <select name="difficulty_level" value={filters.difficulty_level} onChange={handleFilterChange} className="bg-gray-700 text-white rounded p-2 focus:ring-2 focus:ring-red-500 focus:outline-none">
+                        <option value="">Toda la Dificultad</option>
+                        <option value="All">Toda la Dificultad</option>
                         {Object.values(Difficulty).map(d => <option key={d} value={d}>{d}</option>)}
                     </select>
-                    <select name="processStatus" value={filters.processStatus} onChange={handleFilterChange} className="bg-gray-700 text-white rounded p-2 focus:ring-2 focus:ring-red-500 focus:outline-none">
-                        <option value="All">Estados Proceso</option>
+                    <select name="processing_status" value={filters.processing_status} onChange={handleFilterChange} className="bg-gray-700 text-white rounded p-2 focus:ring-2 focus:ring-red-500 focus:outline-none">
+                        <option value="">Todos los Procesos</option>
+                        <option value="All">Todos los Procesos</option>
                         {Object.values(ProcessStatus).map(p => <option key={p} value={p}>{p}</option>)}
                     </select>
                     <div className="flex gap-2">
@@ -246,14 +324,14 @@ const GalleryPage: React.FC = () => {
             )}
             
             <div className={selectedPosts.length > 0 ? 'pb-24' : ''}>
-                {filteredAndSortedPosts.length > 0 ? (
+                {sortedPosts.length > 0 ? (
                     <>
-                        <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8 transition-opacity duration-300 ${pageTransitioning ? 'opacity-75' : 'opacity-100'}`}>
-                            {paginatedPosts.map(post => (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+                            {sortedPosts.map(post => (
                                 <PostCard 
                                   key={post.id} 
                                   video={post}
-                                  videos={filteredAndSortedPosts}
+                                  videos={sortedPosts}
                                   isSelected={selectedPosts.includes(post.id)} 
                                   onSelect={handleSelectPost}
                                   onEdit={setEditingPost}
@@ -261,16 +339,15 @@ const GalleryPage: React.FC = () => {
                             ))}
                         </div>
 
-                        <Pagination 
-                            currentPage={currentPage} 
-                            totalItems={filteredAndSortedPosts.length} 
-                            itemsPerPage={POSTS_PER_PAGE} 
-                            onPageChange={(page) => {
-                                setPageTransitioning(true);
-                                setCurrentPage(page);
-                                setTimeout(() => setPageTransitioning(false), 100);
-                            }} 
-                        />
+                        {/* Indicador de carga para más contenido */}
+                        {loadingMore && <LoadingMoreIndicator />}
+                        
+                        {/* Mensaje de final de contenido */}
+                        {!hasMore && posts.length > 0 && (
+                            <div className="text-center py-8 text-gray-400">
+                                <p>Has visto todos los videos disponibles ({posts.length} videos)</p>
+                            </div>
+                        )}
                     </>
                 ) : (
                     <div className="text-center py-16">

@@ -471,7 +471,7 @@ class DatabaseManager:
         query += " ORDER BY created_at DESC"
         
         # Aplicar límite y offset
-        if limit:
+        if limit and limit > 0:
             query += " LIMIT ?"
             params.append(limit)
             if offset:

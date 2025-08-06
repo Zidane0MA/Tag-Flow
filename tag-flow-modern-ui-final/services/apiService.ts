@@ -216,7 +216,7 @@ class ApiService {
       
       return {
         posts,
-        total: data.total_videos || posts.length
+        total: data.total || data.total_videos || posts.length
       };
     } catch (error) {
       console.error('Error fetching videos:', error);

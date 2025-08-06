@@ -86,8 +86,12 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
             <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Estadísticas</h3>
             <div className="mt-4 space-y-3 text-sm">
                 <div className="flex justify-between text-gray-300">
-                    <span>Total Posts</span>
+                    <span>Cargados</span>
                     <span className="font-medium text-white">{stats.total}</span>
+                </div>
+                <div className="flex justify-between text-gray-300">
+                    <span>Total BD</span>
+                    <span className="font-medium text-blue-400">{stats.totalInDB || '...'}</span>
                 </div>
                 <div className="flex justify-between text-gray-300">
                     <span>Procesados</span>

@@ -119,8 +119,10 @@ def api_videos():
             'success': True,
             'videos': videos,
             'total': total_videos,
+            'total_videos': total_videos,  # Para compatibilidad con frontend
             'limit': limit,
-            'offset': offset
+            'offset': offset,
+            'has_more': len(videos) == limit and (offset + len(videos)) < total_videos if limit > 0 else False
         })
         
     except Exception as e:
