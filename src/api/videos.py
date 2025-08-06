@@ -36,7 +36,7 @@ def api_videos():
         if search_query:
             filters['search'] = search_query
         
-        limit = int(request.args.get('limit', 20))
+        limit = int(request.args.get('limit', 1000))
         offset = int(request.args.get('offset', 0))
         
         videos = db.get_videos(filters=filters, limit=limit, offset=offset)

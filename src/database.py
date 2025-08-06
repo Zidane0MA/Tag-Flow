@@ -424,6 +424,10 @@ class DatabaseManager:
                 query += " AND creator_name LIKE ?"
                 params.append(f"%{filters['creator_name']}%")
             
+            if filters.get('creator_name_exact'):
+                query += " AND creator_name = ?"
+                params.append(filters['creator_name_exact'])
+            
             if filters.get('platform'):
                 query += " AND platform = ?"
                 params.append(filters['platform'])
@@ -492,6 +496,10 @@ class DatabaseManager:
             if filters.get('creator_name'):
                 query += " AND creator_name LIKE ?"
                 params.append(f"%{filters['creator_name']}%")
+            
+            if filters.get('creator_name_exact'):
+                query += " AND creator_name = ?"
+                params.append(filters['creator_name_exact'])
             
             if filters.get('platform'):
                 query += " AND platform = ?"

@@ -9,7 +9,10 @@ import PlatformTabs, { Tab } from '../components/PlatformTabs';
 import { ICONS } from '../constants';
 
 const CreatorPage: React.FC = () => {
-    const { creatorName, platform: platformParam, subscriptionId } = useParams<{ creatorName: string, platform?: Platform, subscriptionId?: string }>();
+    const { creatorName, platform: platformParam, subscriptionId } = useParams<{ creatorName: string, platform?: string, subscriptionId?: string }>();
+    
+    // Decode URL-encoded platform parameter
+    const decodedPlatform = platformParam ? decodeURIComponent(platformParam) : undefined;
     const { getCreatorByName, getPostsByCreator, loading } = useRealData();
     const navigate = useNavigate();
     
@@ -19,12 +22,17 @@ const CreatorPage: React.FC = () => {
     const creator = useMemo(() => creatorName ? getCreatorByName(creatorName) : undefined, [creatorName, getCreatorByName]);
     
     const activePlatform = useMemo(() => {
-        if (platformParam && creator && creator.platforms[platformParam]) {
-            return platformParam;
+        // If no platform param, we're showing "All"
+        if (!decodedPlatform) {
+            return undefined;
         }
-        // Default to the first platform if none is selected or the selected one is invalid
+        // If platform param exists and is valid, use it
+        if (creator && creator.platforms[decodedPlatform as Platform]) {
+            return decodedPlatform as Platform;
+        }
+        // If platform param is invalid, default to first platform
         return creator ? Object.keys(creator.platforms)[0] as Platform : undefined;
-    }, [creator, platformParam]);
+    }, [creator, decodedPlatform]);
 
     // Cargar posts del creador de forma asíncrona
     useEffect(() => {
@@ -49,8 +57,46 @@ const CreatorPage: React.FC = () => {
         loadCreatorPosts();
     }, [creatorName, activePlatform, subscriptionId, getPostsByCreator]);
     
-    const totalPostCount = useMemo(() => creator ? Object.values(creator.platforms).reduce((acc, p) => acc + (p?.postCount || 0), 0) : 0, [creator]);
+    // Calculate total post count based on current view
+    const totalPostCount = useMemo(() => {
+        if (activePlatform === undefined) {
+            // When showing "All", use sum of all platform counts or displayed posts length
+            if (creator) {
+                return Object.values(creator.platforms).reduce((acc, p) => acc + (p?.postCount || 0), 0);
+            }
+            return displayedPosts.length;
+        } else {
+            // For specific platforms, use displayed posts count to ensure accuracy
+            return displayedPosts.length;
+        }
+    }, [creator, displayedPosts, activePlatform]);
 
+    const subscriptionTabs: Tab[] | undefined = useMemo(() => {
+        if (activePlatform && creator?.platforms[activePlatform]) {
+            const platformSubscriptions = creator.platforms[activePlatform]?.subscriptions || [];
+            if (platformSubscriptions.length > 1) { // Only show sub-tabs if there's more than one list
+                return [
+                    { id: 'all', label: 'All', count: creator.platforms[activePlatform]?.postCount || 0, icon: undefined },
+                    ...platformSubscriptions.map(sub => ({
+                        id: sub.id,
+                        label: sub.name,
+                        count: 0 // Por ahora 0, se podría calcular después de forma asíncrona
+                    }))
+                ];
+            }
+        }
+        return undefined;
+    }, [creator, activePlatform]);
+
+    // Early returns after all hooks
+    if (loading || postsLoading) {
+        return (
+            <div className="text-center py-16">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mx-auto"></div>
+                <p className="text-gray-400 mt-4">Cargando...</p>
+            </div>
+        );
+    }
 
     if (!creator || !creatorName) {
         return (
@@ -77,32 +123,16 @@ const CreatorPage: React.FC = () => {
         if (platformId === 'all') {
             navigate(`/creator/${creatorName}`);
         } else {
-            navigate(`/creator/${creatorName}/${platformId}`);
+            // URL encode platform name to handle special characters like slashes
+            navigate(`/creator/${creatorName}/${encodeURIComponent(platformId)}`);
         }
     };
     
-    const subscriptionTabs: Tab[] | undefined = useMemo(() => {
-        if (activePlatform && creator?.platforms[activePlatform]) {
-            const platformSubscriptions = creator.platforms[activePlatform]?.subscriptions || [];
-            if (platformSubscriptions.length > 1) { // Only show sub-tabs if there's more than one list
-                return [
-                    { id: 'all', label: 'All', count: creator.platforms[activePlatform]?.postCount || 0, icon: undefined },
-                    ...platformSubscriptions.map(sub => ({
-                        id: sub.id,
-                        label: sub.name,
-                        count: 0 // Por ahora 0, se podría calcular después de forma asíncrona
-                    }))
-                ];
-            }
-        }
-        return undefined;
-    }, [creator, activePlatform]);
-
     const handleSubscriptionTabClick = (subId: string) => {
         if (subId === 'all') {
-             navigate(`/creator/${creatorName}/${activePlatform}`);
+             navigate(`/creator/${creatorName}/${encodeURIComponent(activePlatform || '')}`);
         } else {
-            navigate(`/creator/${creatorName}/${activePlatform}/${subId}`);
+            navigate(`/creator/${creatorName}/${encodeURIComponent(activePlatform || '')}/${encodeURIComponent(subId)}`);
         }
     }
     
@@ -111,12 +141,12 @@ const CreatorPage: React.FC = () => {
         { label: creator.displayName, href: `/creator/${creatorName}`, icon: ICONS.user },
     ];
 
-    if(activePlatform && platformParam) {
-        breadcrumbs.push({ label: activePlatform, href: `/creator/${creatorName}/${activePlatform}`});
+    if(activePlatform && decodedPlatform) {
+        breadcrumbs.push({ label: activePlatform, href: `/creator/${creatorName}/${encodeURIComponent(activePlatform)}`});
         if(subscriptionId && subscriptionTabs) {
             const sub = subscriptionTabs.find(s => s.id === subscriptionId);
             if(sub) {
-                breadcrumbs.push({ label: sub.label, href: `/creator/${creatorName}/${activePlatform}/${subscriptionId}`});
+                breadcrumbs.push({ label: sub.label, href: `/creator/${creatorName}/${encodeURIComponent(activePlatform)}/${encodeURIComponent(subscriptionId)}`});
             }
         }
     }
@@ -141,7 +171,7 @@ const CreatorPage: React.FC = () => {
             
             <PlatformTabs
                 tabs={platformTabs}
-                activeTab={platformParam || 'all'}
+                activeTab={decodedPlatform || 'all'}
                 onTabClick={handlePlatformTabClick}
             />
 

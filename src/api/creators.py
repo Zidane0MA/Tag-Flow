@@ -172,8 +172,8 @@ def api_get_creator_videos(creator_name):
         limit = int(request.args.get('limit', 50))
         offset = int(request.args.get('offset', 0))
         
-        # Construir filtros
-        filters = {'creator_name': creator_name}
+        # Construir filtros - usar exact match para creator_name
+        filters = {'creator_name_exact': creator_name}
         if platform:
             filters['platform'] = platform
         

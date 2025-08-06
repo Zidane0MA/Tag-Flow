@@ -31,6 +31,7 @@ const GalleryPage: React.FC = () => {
     const [selectedPosts, setSelectedPosts] = useState<string[]>([]);
     const [editingPost, setEditingPost] = useState<Post | null>(null);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [pageTransitioning, setPageTransitioning] = useState(false);
     
     const [filters, setFilters] = useState(initialFilters);
     const [sort, setSort] = useState({ by: 'downloadDate', order: 'desc' });
@@ -107,15 +108,54 @@ const GalleryPage: React.FC = () => {
       [filters]
     );
 
-    // Mostrar loading
-    if (loading) {
-        return (
-            <div className="flex items-center justify-center min-h-[400px]">
-                <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-500 mx-auto mb-4"></div>
-                    <p className="text-white text-lg">Cargando videos...</p>
+    // Componente skeleton para loading
+    const SkeletonCard = () => (
+        <div className="bg-[#212121] rounded-lg overflow-hidden shadow-lg flex flex-col animate-pulse">
+            <div className="h-[168px] bg-gray-700"></div>
+            <div className="p-3 space-y-3">
+                <div className="h-4 bg-gray-700 rounded w-3/4"></div>
+                <div className="h-3 bg-gray-700 rounded w-1/2"></div>
+                <div className="space-y-2">
+                    <div className="h-3 bg-gray-700 rounded w-full"></div>
+                    <div className="h-3 bg-gray-700 rounded w-2/3"></div>
+                </div>
+                <div className="flex justify-between pt-2 border-t border-gray-700">
+                    <div className="h-3 bg-gray-700 rounded w-16"></div>
+                    <div className="h-3 bg-gray-700 rounded w-16"></div>
+                    <div className="h-3 bg-gray-700 rounded w-20"></div>
                 </div>
             </div>
+        </div>
+    );
+
+    // Mostrar loading con estructura mantenida
+    if (loading) {
+        return (
+            <>
+                {/* Filtros skeleton */}
+                <details className="bg-[#212121] p-4 rounded-lg mb-6 shadow-lg animate-pulse">
+                    <summary className="font-semibold text-white cursor-pointer select-none flex justify-between items-center list-none">
+                        <div className="h-6 bg-gray-700 rounded w-48"></div>
+                        <div className="h-4 bg-gray-700 rounded w-32"></div>
+                    </summary>
+                </details>
+                
+                {/* Grid skeleton */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+                    {Array.from({ length: POSTS_PER_PAGE }).map((_, i) => (
+                        <SkeletonCard key={i} />
+                    ))}
+                </div>
+                
+                {/* Paginación skeleton */}
+                <div className="flex justify-center mt-8 space-x-2 animate-pulse">
+                    <div className="h-8 w-8 bg-gray-700 rounded"></div>
+                    <div className="h-8 w-8 bg-gray-700 rounded"></div>
+                    <div className="h-8 w-8 bg-gray-700 rounded"></div>
+                    <div className="h-8 w-8 bg-gray-700 rounded"></div>
+                    <div className="h-8 w-8 bg-gray-700 rounded"></div>
+                </div>
+            </>
         );
     }
 
@@ -208,7 +248,7 @@ const GalleryPage: React.FC = () => {
             <div className={selectedPosts.length > 0 ? 'pb-24' : ''}>
                 {filteredAndSortedPosts.length > 0 ? (
                     <>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+                        <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8 transition-opacity duration-300 ${pageTransitioning ? 'opacity-75' : 'opacity-100'}`}>
                             {paginatedPosts.map(post => (
                                 <PostCard 
                                   key={post.id} 
@@ -225,7 +265,11 @@ const GalleryPage: React.FC = () => {
                             currentPage={currentPage} 
                             totalItems={filteredAndSortedPosts.length} 
                             itemsPerPage={POSTS_PER_PAGE} 
-                            onPageChange={setCurrentPage} 
+                            onPageChange={(page) => {
+                                setPageTransitioning(true);
+                                setCurrentPage(page);
+                                setTimeout(() => setPageTransitioning(false), 100);
+                            }} 
                         />
                     </>
                 ) : (

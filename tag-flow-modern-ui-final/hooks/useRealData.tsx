@@ -33,12 +33,27 @@ export const RealDataProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       return backendCreators;
     }
     
-    // Fallback: extraer de posts
-    const uniqueCreators = [...new Set(posts.map(p => p.creator))];
-    return uniqueCreators.map(creatorName => ({
+    // Fallback: extraer de posts y construir plataformas
+    const creatorsMap = new Map<string, { [key: string]: { postCount: number } }>();
+    
+    posts.forEach(post => {
+      if (!creatorsMap.has(post.creator)) {
+        creatorsMap.set(post.creator, {});
+      }
+      
+      const creatorPlatforms = creatorsMap.get(post.creator)!;
+      const platformKey = post.platform;
+      
+      if (!creatorPlatforms[platformKey]) {
+        creatorPlatforms[platformKey] = { postCount: 0 };
+      }
+      creatorPlatforms[platformKey].postCount++;
+    });
+
+    return Array.from(creatorsMap.entries()).map(([creatorName, platforms]) => ({
       name: creatorName,
       displayName: creatorName,
-      platforms: {} // Por ahora vacío, se puede expandir después
+      platforms
     }));
   }, [posts, backendCreators]);
 
@@ -49,7 +64,9 @@ export const RealDataProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setLoading(true);
     setError(null);
     try {
-      const { posts: newPosts } = await apiService.getVideos(filters);
+      // Solicitar un límite alto para mostrar todos los videos disponibles
+      const filtersWithLimit = { ...filters, limit: filters.limit || 1500 };
+      const { posts: newPosts } = await apiService.getVideos(filtersWithLimit);
       setPosts(newPosts);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Error loading videos';

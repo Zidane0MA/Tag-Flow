@@ -73,7 +73,9 @@ class ApiService {
         }
         // Si es objeto, intentar convertir a array
         else if (typeof charactersData === 'object') {
-          characters = Array.isArray(charactersData) ? charactersData : Object.values(charactersData).filter(Boolean);
+          characters = Array.isArray(charactersData)
+            ? charactersData
+            : Object.values(charactersData).filter((v): v is string => typeof v === 'string' && Boolean(v));
         }
       }
       
@@ -113,7 +115,9 @@ class ApiService {
       'facebook': Platform.FACEBOOK,
       'twitter': Platform.TWITTER,
       'twitch': Platform.TWITCH,
-      'discord': Platform.DISCORD
+      'discord': Platform.DISCORD,
+      'bilibili/video': Platform.BILIBILI,
+      'bilibili/video/tv': Platform.BILIBILI_TV
     };
 
     return {
@@ -433,7 +437,7 @@ class ApiService {
   ): Promise<{ posts: Post[], total: number }> {
     try {
       const params = new URLSearchParams();
-      if (platform) params.append('platform', platform);
+      if (platform && platform !== 'all') params.append('platform', platform);
       if (subscriptionId) params.append('subscription_id', subscriptionId);
       params.append('limit', limit.toString());
       params.append('offset', offset.toString());

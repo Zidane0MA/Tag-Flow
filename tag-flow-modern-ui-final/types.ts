@@ -13,6 +13,8 @@ export enum Platform {
   TWITTER = 'Twitter',
   TWITCH = 'Twitch',
   DISCORD = 'Discord',
+  BILIBILI = 'bilibili',
+  BILIBILI_TV = 'bilibili.tv',
   CUSTOM = 'Custom'
 }
 

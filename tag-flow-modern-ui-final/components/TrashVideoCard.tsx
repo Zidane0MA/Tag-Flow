@@ -14,6 +14,8 @@ interface TrashPostCardProps {
 
 const TrashPostCard: React.FC<TrashPostCardProps> = ({ video: post, timeAgo, isSelected, onSelect, onRestore, onDelete }) => {
     const [isLoading, setIsLoading] = useState(false);
+    const [imageLoaded, setImageLoaded] = useState(false);
+    const [imageError, setImageError] = useState(false);
     
     const handleAction = async (action: (id: string) => void) => {
         setIsLoading(true);
@@ -33,18 +35,58 @@ const TrashPostCard: React.FC<TrashPostCardProps> = ({ video: post, timeAgo, isS
             
             {/* === Thumbnail Area === */}
             <div className="relative">
-                <img src={post.thumbnailUrl} alt={post.title} className="w-full h-40 object-cover rounded-t-lg" />
+                {/* Skeleton placeholder que se mantiene hasta que la imagen carga */}
+                {!imageLoaded && !imageError && (
+                    <div className="w-full h-[168px] bg-gray-700 animate-pulse flex items-center justify-center rounded-t-lg">
+                        <div className="text-gray-500 text-sm">Cargando...</div>
+                    </div>
+                )}
+                
+                {/* Imagen real */}
+                <img 
+                    src={post.thumbnailUrl} 
+                    alt={post.title} 
+                    className={`w-full h-[168px] object-cover rounded-t-lg transition-opacity duration-300 ${
+                        imageLoaded ? 'opacity-100' : 'opacity-0 absolute inset-0'
+                    }`}
+                    onLoad={() => setImageLoaded(true)}
+                    onError={() => {
+                        setImageError(true);
+                        setImageLoaded(true); // Para que se oculte el skeleton
+                    }}
+                />
+                
+                {/* Fallback si la imagen falla */}
+                {imageError && (
+                    <div className="w-full h-[168px] bg-gray-800 flex items-center justify-center border-2 border-dashed border-gray-600 rounded-t-lg">
+                        <div className="text-center text-gray-500">
+                            <div className="text-2xl mb-2">📷</div>
+                            <div className="text-xs">Sin thumbnail</div>
+                        </div>
+                    </div>
+                )}
+                
                 <div className="absolute inset-0 bg-black/30 group-hover:bg-black/50 transition-colors duration-300 pointer-events-none z-10 rounded-t-lg"></div>
                 
                 {/* Selection Checkbox (Top Left) */}
                 <div className="absolute top-2 left-2 z-40">
-                    <input 
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={(e) => onSelect(post.id, e.target.checked)}
-                        className="h-5 w-5 rounded text-red-600 bg-gray-900 border-gray-500 focus:ring-red-500 cursor-pointer"
-                        onClick={(e) => e.stopPropagation()}
-                    />
+                    <div 
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onSelect(post.id, !isSelected);
+                        }}
+                        className={`h-4 w-4 rounded-[3px] border-[1.5px] cursor-pointer transition-all duration-200 flex items-center justify-center ${
+                            isSelected 
+                                ? 'bg-red-600 border-red-600' 
+                                : 'bg-gray-800 border-gray-500 hover:border-gray-400'
+                        }`}
+                    >
+                        {isSelected && (
+                            <svg className="h-3 w-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                        )}
+                    </div>
                 </div>
                 
                 {/* Platform Badge (Bottom Right) */}
