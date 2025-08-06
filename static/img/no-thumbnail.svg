@@ -1,0 +1,6 @@
+<svg width="400" height="225" viewBox="0 0 400 225" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="400" height="225" fill="#1f2937"/>
+  <rect x="50" y="62.5" width="300" height="100" rx="8" fill="#374151"/>
+  <path d="M150 100L200 125L150 150V100Z" fill="#6b7280"/>
+  <text x="200" y="190" text-anchor="middle" fill="#9ca3af" font-family="Arial, sans-serif" font-size="14">Sin miniatura</text>
+</svg>

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { useData } from '../hooks/useMockData';
+import { useRealData } from '../hooks/useRealData';
 import { Post, Difficulty, PostType } from '../types';
 import { ICONS } from '../constants';
 
@@ -164,7 +164,7 @@ const PostPlayerPage: React.FC = () => {
     const { postId } = useParams<{ postId: string }>();
     const navigate = useNavigate();
     const location = useLocation();
-    const { posts: allPosts, updatePost, moveToTrash } = useData();
+    const { posts: allPosts, updatePost, moveToTrash } = useRealData();
 
     const [postsToDisplay, setPostsToDisplay] = useState<Post[]>(location.state?.posts || allPosts);
     const [activePostId, setActivePostId] = useState(postId);

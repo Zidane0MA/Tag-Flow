@@ -9,6 +9,10 @@ export enum Platform {
   TIKTOK = 'TikTok',
   INSTAGRAM = 'Instagram',
   VIMEO = 'Vimeo',
+  FACEBOOK = 'Facebook',
+  TWITTER = 'Twitter',
+  TWITCH = 'Twitch',
+  DISCORD = 'Discord',
   CUSTOM = 'Custom'
 }
 
@@ -110,7 +114,7 @@ export interface DataContextType {
     pending: number;
   };
   getCreatorByName: (name: string) => Creator | undefined;
-  getPostsByCreator: (creatorName: string, platform?: Platform, listId?: string) => Post[];
+  getPostsByCreator: (creatorName: string, platform?: Platform, listId?: string) => Promise<Post[]>;
   getSubscriptionInfo: (type: SubscriptionType, id: string) => SubscriptionInfo | undefined;
   getPostsBySubscription: (type: SubscriptionType, id: string, list?: string) => Post[];
 }

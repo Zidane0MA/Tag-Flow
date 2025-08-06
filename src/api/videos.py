@@ -68,6 +68,11 @@ def api_videos():
                     video['display_title'] = video['file_name']
             else:
                 video['display_title'] = video['file_name']
+            
+            # Procesar thumbnail_path para usar solo el nombre del archivo
+            if video.get('thumbnail_path'):
+                from pathlib import Path
+                video['thumbnail_path'] = Path(video['thumbnail_path']).name
         
         return jsonify({
             'success': True,

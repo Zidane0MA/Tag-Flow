@@ -1,7 +1,7 @@
 
 import React, { useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { useData } from '../hooks/useMockData';
+import { useRealData } from '../hooks/useRealData';
 import { SubscriptionType, SubscriptionInfo } from '../types';
 import Breadcrumbs, { Crumb } from '../components/Breadcrumbs';
 import { ICONS } from '../constants';
@@ -31,7 +31,7 @@ const getSubscriptionIcon = (type: SubscriptionType) => {
 
 const SubscriptionPage: React.FC = () => {
     const { type, id, list } = useParams<{ type: SubscriptionType, id: string, list?: string }>();
-    const { getSubscriptionInfo, getPostsBySubscription, getCreatorByName } = useData();
+    const { getSubscriptionInfo, getPostsBySubscription, getCreatorByName } = useRealData();
 
     const subscriptionInfo = useMemo<SubscriptionInfo | undefined>(() => {
         if (!type || !id) return undefined;

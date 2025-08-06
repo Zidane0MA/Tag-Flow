@@ -5,7 +5,7 @@ import Layout from './components/Layout';
 import GalleryPage from './pages/GalleryPage';
 import AdminPage from './pages/AdminPage';
 import TrashPage from './pages/TrashPage';
-import { DataProvider } from './hooks/useMockData';
+import { RealDataProvider } from './hooks/useRealData';
 import { AdminProvider } from './hooks/useAdminData';
 import VideoPlayerPage from './pages/VideoPlayerPage';
 import CreatorPage from './pages/CreatorPage';
@@ -14,7 +14,7 @@ import SubscriptionPage from './pages/SubscriptionPage';
 
 const App: React.FC = () => {
   return (
-    <DataProvider>
+    <RealDataProvider>
       <AdminProvider>
         <HashRouter>
           <Routes>
@@ -46,7 +46,7 @@ const App: React.FC = () => {
           </Routes>
         </HashRouter>
       </AdminProvider>
-    </DataProvider>
+    </RealDataProvider>
   );
 };
 

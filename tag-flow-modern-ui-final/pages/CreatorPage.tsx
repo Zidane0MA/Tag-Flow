@@ -1,7 +1,7 @@
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { useData } from '../hooks/useMockData';
+import { useRealData } from '../hooks/useRealData';
 import { Platform } from '../types';
 import PostCard from '../components/VideoCard';
 import Breadcrumbs, { Crumb } from '../components/Breadcrumbs';
@@ -10,8 +10,11 @@ import { ICONS } from '../constants';
 
 const CreatorPage: React.FC = () => {
     const { creatorName, platform: platformParam, subscriptionId } = useParams<{ creatorName: string, platform?: Platform, subscriptionId?: string }>();
-    const { getCreatorByName, getPostsByCreator } = useData();
+    const { getCreatorByName, getPostsByCreator, loading } = useRealData();
     const navigate = useNavigate();
+    
+    const [displayedPosts, setDisplayedPosts] = useState<any[]>([]);
+    const [postsLoading, setPostsLoading] = useState(false);
 
     const creator = useMemo(() => creatorName ? getCreatorByName(creatorName) : undefined, [creatorName, getCreatorByName]);
     
@@ -23,9 +26,27 @@ const CreatorPage: React.FC = () => {
         return creator ? Object.keys(creator.platforms)[0] as Platform : undefined;
     }, [creator, platformParam]);
 
-    const displayedPosts = useMemo(() => {
-        if (!creatorName) return [];
-        return getPostsByCreator(creatorName, activePlatform, subscriptionId);
+    // Cargar posts del creador de forma asíncrona
+    useEffect(() => {
+        if (!creatorName) {
+            setDisplayedPosts([]);
+            return;
+        }
+
+        const loadCreatorPosts = async () => {
+            setPostsLoading(true);
+            try {
+                const posts = await getPostsByCreator(creatorName, activePlatform, subscriptionId);
+                setDisplayedPosts(posts);
+            } catch (error) {
+                console.error('Error loading creator posts:', error);
+                setDisplayedPosts([]);
+            } finally {
+                setPostsLoading(false);
+            }
+        };
+
+        loadCreatorPosts();
     }, [creatorName, activePlatform, subscriptionId, getPostsByCreator]);
     
     const totalPostCount = useMemo(() => creator ? Object.values(creator.platforms).reduce((acc, p) => acc + (p?.postCount || 0), 0) : 0, [creator]);
@@ -61,7 +82,7 @@ const CreatorPage: React.FC = () => {
     };
     
     const subscriptionTabs: Tab[] | undefined = useMemo(() => {
-        if (activePlatform && creator.platforms[activePlatform]) {
+        if (activePlatform && creator?.platforms[activePlatform]) {
             const platformSubscriptions = creator.platforms[activePlatform]?.subscriptions || [];
             if (platformSubscriptions.length > 1) { // Only show sub-tabs if there's more than one list
                 return [
@@ -69,13 +90,13 @@ const CreatorPage: React.FC = () => {
                     ...platformSubscriptions.map(sub => ({
                         id: sub.id,
                         label: sub.name,
-                        count: getPostsByCreator(creatorName, activePlatform, sub.id).length
+                        count: 0 // Por ahora 0, se podría calcular después de forma asíncrona
                     }))
                 ];
             }
         }
         return undefined;
-    }, [creator, activePlatform, getPostsByCreator, creatorName]);
+    }, [creator, activePlatform]);
 
     const handleSubscriptionTabClick = (subId: string) => {
         if (subId === 'all') {
@@ -133,24 +154,35 @@ const CreatorPage: React.FC = () => {
                 />
             )}
             
-             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-                {displayedPosts.map(post => (
-                    <PostCard 
-                        key={post.id} 
-                        video={post}
-                        videos={displayedPosts}
-                        isSelected={false} 
-                        onSelect={() => {}}
-                        onEdit={() => {}}
-                    />
-                ))}
-            </div>
-             {displayedPosts.length === 0 && (
-                 <div className="text-center py-16">
-                    <h3 className="text-2xl font-semibold text-white">No se encontraron posts</h3>
-                    <p className="text-gray-400 mt-2">No hay contenido que coincida con los filtros seleccionados.</p>
+            {postsLoading ? (
+                <div className="flex items-center justify-center min-h-[400px]">
+                    <div className="text-center">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-500 mx-auto mb-4"></div>
+                        <p className="text-white text-lg">Cargando videos del creador...</p>
+                    </div>
                 </div>
-             )}
+            ) : (
+                <>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+                        {displayedPosts.map(post => (
+                            <PostCard 
+                                key={post.id} 
+                                video={post}
+                                videos={displayedPosts}
+                                isSelected={false} 
+                                onSelect={() => {}}
+                                onEdit={() => {}}
+                            />
+                        ))}
+                    </div>
+                    {displayedPosts.length === 0 && (
+                        <div className="text-center py-16">
+                            <h3 className="text-2xl font-semibold text-white">No se encontraron posts</h3>
+                            <p className="text-gray-400 mt-2">No hay contenido que coincida con los filtros seleccionados.</p>
+                        </div>
+                    )}
+                </>
+            )}
         </div>
     );
 };

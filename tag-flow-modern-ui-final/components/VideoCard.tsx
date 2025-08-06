@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Post, EditStatus, ProcessStatus, Difficulty, PostType, SubscriptionType } from '../types';
 import { ICONS } from '../constants';
-import { useData } from '../hooks/useMockData';
+import { useRealData } from '../hooks/useRealData';
 
 interface PostCardProps {
     video: Post; // Renamed to video to avoid large-scale refactor in GalleryPage for now. It is a Post object.
@@ -146,7 +146,7 @@ const getSubscriptionIcon = (type: SubscriptionType) => {
 
 
 const PostCard: React.FC<PostCardProps> = ({ video: post, videos: posts, isSelected, onSelect, onEdit }) => {
-    const { moveToTrash, analyzePost } = useData();
+    const { moveToTrash, analyzePost } = useRealData();
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const navigate = useNavigate();
     

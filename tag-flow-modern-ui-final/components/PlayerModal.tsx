@@ -2,7 +2,7 @@
 import React from 'react';
 import Modal from './Modal';
 import { Post, Difficulty } from '../types';
-import { useData } from '../hooks/useMockData';
+import { useRealData } from '../hooks/useRealData';
 import { ICONS } from '../constants';
 
 interface PlayerModalProps {
@@ -11,7 +11,7 @@ interface PlayerModalProps {
 }
 
 const PlayerModal: React.FC<PlayerModalProps> = ({ video: post, onClose }) => {
-  const { updatePost, moveToTrash } = useData();
+  const { updatePost, moveToTrash } = useRealData();
 
   const handleDifficultyChange = (newDifficulty: Difficulty) => {
     updatePost(post.id, { difficulty: newDifficulty });

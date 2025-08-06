@@ -6,7 +6,7 @@ Interfaz web moderna con arquitectura de blueprints
 import sys
 from pathlib import Path
 import logging
-from flask import Flask, send_file, abort, render_template
+from flask import Flask, send_file, abort, render_template, jsonify
 from flask_cors import CORS
 
 # Agregar src al path
@@ -14,7 +14,7 @@ sys.path.append(str(Path(__file__).parent / 'src'))
 
 from config import config
 # Database will be imported lazily within functions
-from src.api import gallery_bp, videos_bp, admin_bp, maintenance_bp
+from src.api import gallery_bp, videos_bp, admin_bp, maintenance_bp, creators_bp
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
@@ -36,21 +36,34 @@ def create_app():
     app.register_blueprint(videos_bp)
     app.register_blueprint(admin_bp)
     app.register_blueprint(maintenance_bp)
+    app.register_blueprint(creators_bp)
     
     # Rutas estáticas y archivos
     @app.route('/thumbnail/<path:filename>')
     def serve_thumbnail(filename):
         """Servir thumbnails generados"""
         try:
-            thumbnail_path = config.DATA_DIR / 'thumbnails' / filename
-            if thumbnail_path.exists():
+            # Limpiar filename para evitar path traversal y problemas de encoding
+            import os
+            clean_filename = os.path.basename(filename)
+            
+            # Si el filename está vacío o es solo una carpeta, usar thumbnail por defecto
+            if not clean_filename or clean_filename.endswith('/') or clean_filename.endswith('\\') or clean_filename.strip() == '':
+                logger.warning(f"Filename inválido o vacío: '{filename}' -> '{clean_filename}'")
+                return send_file(config.STATIC_DIR / 'img' / 'no-thumbnail.svg')
+            
+            thumbnail_path = config.DATA_DIR / 'thumbnails' / clean_filename
+            
+            if thumbnail_path.exists() and thumbnail_path.is_file():
                 return send_file(thumbnail_path)
             else:
+                logger.warning(f"Thumbnail no encontrado: {thumbnail_path}")
                 # Thumbnail por defecto
                 return send_file(config.STATIC_DIR / 'img' / 'no-thumbnail.svg')
         except Exception as e:
             logger.error(f"Error sirviendo thumbnail {filename}: {e}")
-            abort(404)
+            # En caso de error, devolver thumbnail por defecto en lugar de 404
+            return send_file(config.STATIC_DIR / 'img' / 'no-thumbnail.svg')
     
     @app.route('/video-stream/<int:video_id>')
     def stream_video(video_id):
@@ -77,20 +90,24 @@ def create_app():
             logger.error(f"Error streaming video {video_id}: {e}")
             abort(500)
     
-    # Manejadores de errores
+    # Manejadores de errores - JSON responses para API
     @app.errorhandler(404)
     def not_found_error(error):
-        """Página 404 personalizada"""
-        return render_template('error.html', 
-                             error="Página no encontrada",
-                             details="La página que buscas no existe."), 404
+        """Respuesta 404 personalizada"""
+        return jsonify({
+            'success': False,
+            'error': 'Página no encontrada',
+            'details': 'La página que buscas no existe.'
+        }), 404
     
     @app.errorhandler(500)
     def internal_error(error):
-        """Página 500 personalizada"""
-        return render_template('error.html', 
-                             error="Error interno del servidor",
-                             details="Ha ocurrido un error inesperado."), 500
+        """Respuesta 500 personalizada"""
+        return jsonify({
+            'success': False,
+            'error': 'Error interno del servidor',
+            'details': 'Ha ocurrido un error inesperado.'
+        }), 500
     
     # Context processors para templates
     @app.context_processor

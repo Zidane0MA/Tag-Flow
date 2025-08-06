@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { useData } from '../hooks/useMockData';
+import { useRealData } from '../hooks/useRealData';
 import { Post } from '../types';
 import { ICONS } from '../constants';
 import TrashVideoCard from '../components/TrashVideoCard';
@@ -23,7 +23,7 @@ const timeAgo = (date: string | Date): string => {
 };
 
 const TrashPage: React.FC = () => {
-    const { trash, restoreFromTrash, deletePermanently, emptyTrash } = useData();
+    const { trash, restoreFromTrash, deletePermanently, emptyTrash } = useRealData();
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [sort, setSort] = useState({ by: 'deletedAt', order: 'desc' });

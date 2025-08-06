@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 
@@ -7,8 +7,25 @@ interface LayoutProps {
 }
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Mobile-first: closed by default
+  // Desktop-first: open by default on large screens, closed on mobile
+  const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth >= 1024);
   const location = useLocation();
+
+  // Handle window resize to manage sidebar state
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 1024) {
+        // Desktop: ensure sidebar is open by default
+        setIsSidebarOpen(true);
+      } else {
+        // Mobile: close sidebar when switching to mobile view
+        setIsSidebarOpen(false);
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Apply transform-gpu for rendering performance, but disable it on the gallery
   // and trash pages to prevent issues with `position: fixed` elements like the BulkActionBar.
@@ -27,7 +44,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
       <Sidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
       
-      <div className={`flex-1 overflow-y-auto lg:overflow-hidden lg:flex lg:flex-col transition-all duration-300 ease-in-out lg:${isSidebarOpen ? 'ml-64' : 'ml-20'} ${applyTransform ? 'transform-gpu' : ''}`}>
+      <div className={`flex-1 overflow-y-auto lg:overflow-hidden lg:flex lg:flex-col transition-all duration-300 ease-in-out ${applyTransform ? 'transform-gpu' : ''}`}>
         {/* Mobile Header - Sticky will now work within this scrolling container */}
         <header className="lg:hidden flex items-center justify-between h-16 px-4 bg-[#212121]/80 backdrop-blur-sm flex-shrink-0 sticky top-0 z-20">
           <span className="font-bold text-xl text-white">Tag-Flow</span>

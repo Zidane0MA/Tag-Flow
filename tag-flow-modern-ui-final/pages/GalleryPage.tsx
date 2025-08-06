@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { useData } from '../hooks/useMockData';
+import { useRealData } from '../hooks/useRealData';
 import { Post, EditStatus, Difficulty, Platform, ProcessStatus } from '../types';
 import PostCard from '../components/VideoCard';
 import Pagination from '../components/Pagination';
@@ -26,7 +26,7 @@ const filterLabels: { [key: string]: string } = {
 };
 
 const GalleryPage: React.FC = () => {
-    const { posts, moveMultipleToTrash, reanalyzePosts } = useData();
+    const { posts, moveMultipleToTrash, reanalyzePosts, loading, error } = useRealData();
     const [currentPage, setCurrentPage] = useState(1);
     const [selectedPosts, setSelectedPosts] = useState<string[]>([]);
     const [editingPost, setEditingPost] = useState<Post | null>(null);
@@ -106,6 +106,37 @@ const GalleryPage: React.FC = () => {
         Object.entries(filters).filter(([key, value]) => value !== initialFilters[key as keyof typeof initialFilters]),
       [filters]
     );
+
+    // Mostrar loading
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center min-h-[400px]">
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-500 mx-auto mb-4"></div>
+                    <p className="text-white text-lg">Cargando videos...</p>
+                </div>
+            </div>
+        );
+    }
+
+    // Mostrar error
+    if (error) {
+        return (
+            <div className="flex items-center justify-center min-h-[400px]">
+                <div className="text-center bg-red-900/20 border border-red-500 rounded-lg p-8 max-w-md">
+                    <div className="text-red-500 text-4xl mb-4">⚠️</div>
+                    <h3 className="text-xl font-semibold text-white mb-2">Error al cargar videos</h3>
+                    <p className="text-gray-300 mb-4">{error}</p>
+                    <button 
+                        onClick={() => window.location.reload()} 
+                        className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-md transition"
+                    >
+                        Reintentar
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <>

@@ -2,7 +2,7 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { NAV_LINKS, ICONS } from '../constants';
-import { useData } from '../hooks/useMockData';
+import { useRealData } from '../hooks/useRealData';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -10,7 +10,7 @@ interface SidebarProps {
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
-  const { getStats } = useData();
+  const { getStats } = useRealData();
   const stats = getStats();
 
   const handleNavClick = () => {
@@ -20,15 +20,21 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
     }
   };
 
+  const sidebarClasses = `
+    lg:relative lg:h-full fixed top-0 left-0 h-full 
+    bg-[#212121]/80 backdrop-blur-sm lg:bg-[#212121] lg:backdrop-blur-none 
+    text-gray-200 transition-all duration-300 ease-in-out z-40 transform
+    ${isOpen ? 'translate-x-0' : '-translate-x-full'} 
+    w-64 lg:translate-x-0 
+    ${isOpen ? 'lg:w-64' : 'lg:w-20'}
+  `.trim().replace(/\s+/g, ' ');
+
   return (
     <div
-      className={`fixed top-0 left-0 h-full bg-[#212121]/80 backdrop-blur-sm lg:bg-[#212121] lg:backdrop-blur-none text-gray-200 transition-all duration-300 ease-in-out z-40 transform 
-                 w-64 lg:translate-x-0 
-                 ${isOpen ? 'translate-x-0' : '-translate-x-full'}
-                 lg:${isOpen ? 'w-64' : 'w-20'}`}
+      className={sidebarClasses}
       role="navigation"
     >
-      <div className={`flex items-center h-16 lg:h-20 border-b border-white/10 lg:border-gray-700 transition-all duration-300 ${isOpen ? 'justify-between px-4 lg:px-6' : 'justify-center px-2'}`}>
+      <div className={`flex items-center h-16 lg:h-20 border-b border-white/10 lg:border-gray-700 transition-all duration-300 ${isOpen ? 'justify-between px-4 lg:px-6' : 'justify-center px-2 lg:px-3'}`}>
         {isOpen && (
           <span className="font-bold text-xl lg:text-2xl text-white whitespace-nowrap">
             Tag-Flow
@@ -55,7 +61,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
           {ICONS.close}
         </button>
       </div>
-      <nav className="mt-2 mx-2">
+      <nav className={`mt-2 transition-all duration-300 ${isOpen ? 'mx-2' : 'mx-1 lg:mx-2'}`}>
         {NAV_LINKS.map((link) => (
           <NavLink
             key={link.name}
@@ -63,7 +69,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
             title={!isOpen ? link.name : ''}
             onClick={handleNavClick}
             className={({ isActive }) =>
-              `flex items-center py-3 my-1 rounded-lg transition-colors duration-200 ${isOpen ? 'px-4' : 'justify-center'} ${
+              `flex items-center py-3 my-1 rounded-lg transition-colors duration-200 ${isOpen ? 'px-4' : 'px-2 lg:px-3 justify-center'} ${
                 isActive
                   ? 'bg-gray-600 font-semibold text-white'
                   : 'text-gray-300 hover:bg-gray-700 hover:text-white'

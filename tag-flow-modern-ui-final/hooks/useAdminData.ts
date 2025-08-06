@@ -1,7 +1,7 @@
 
 import React, { createContext, useState, useContext, useCallback, useMemo, useEffect } from 'react';
 import { AdminContextType, Operation, OperationStatus, OperationType, Character, AdminStats, AdminConfig } from '../types/admin';
-import { useData } from './useMockData';
+import { useRealData } from './useRealData';
 
 const AdminContext = createContext<AdminContextType | null>(null);
 
@@ -52,7 +52,7 @@ const buildCommandString = (type: OperationType, params: Record<string, any>): s
 };
 
 export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const { getStats: getMainStats } = useData();
+    const { getStats: getMainStats } = useRealData();
     const [operations, setOperations] = useState<Operation[]>([]);
     const [characters, setCharacters] = useState<Character[]>(MOCK_CHARACTERS);
     const [games, setGames] = useState<string[]>(MOCK_GAMES);
