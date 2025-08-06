@@ -6,7 +6,7 @@ import { Platform } from '../types';
 import PostCard from '../components/VideoCard';
 import Breadcrumbs, { Crumb } from '../components/Breadcrumbs';
 import PlatformTabs, { Tab } from '../components/PlatformTabs';
-import { ICONS } from '../constants';
+import { ICONS, getSubscriptionIcon, getListIcon } from '../constants';
 
 const CreatorPage: React.FC = () => {
     const { creatorName, platform: platformParam, subscriptionId } = useParams<{ creatorName: string, platform?: string, subscriptionId?: string }>();
@@ -76,11 +76,12 @@ const CreatorPage: React.FC = () => {
             const platformSubscriptions = creator.platforms[activePlatform]?.subscriptions || [];
             if (platformSubscriptions.length > 1) { // Only show sub-tabs if there's more than one list
                 return [
-                    { id: 'all', label: 'All', count: creator.platforms[activePlatform]?.postCount || 0, icon: undefined },
-                    ...platformSubscriptions.map(sub => ({
-                        id: sub.id,
+                    { id: 'sub-all', label: 'All', count: creator.platforms[activePlatform]?.postCount || 0, icon: undefined },
+                    ...platformSubscriptions.map((sub, index) => ({
+                        id: `sub-${index}-${sub.type}-${sub.name.replace(/[^a-zA-Z0-9]/g, '-')}`, // ID único
                         label: sub.name,
-                        count: 0 // Por ahora 0, se podría calcular después de forma asíncrona
+                        count: 0, // Por ahora 0, se podría calcular después de forma asíncrona
+                        subscriptionId: sub.id || sub.name // Mantener ID original para navegación
                     }))
                 ];
             }
@@ -112,10 +113,11 @@ const CreatorPage: React.FC = () => {
     
     const platformTabs: Tab[] = [
         { id: 'all', label: 'All', count: totalPostCount },
-        ...Object.entries(creator.platforms).map(([p, data]) => ({
-            id: p,
+        ...Object.entries(creator.platforms).map(([p, data], index) => ({
+            id: `platform-${index}-${p.replace(/[^a-zA-Z0-9]/g, '-')}`, // Generar ID único y seguro
             label: p,
-            count: data?.postCount || 0
+            count: data?.postCount || 0,
+            platformName: p // Mantener el nombre original de plataforma para navegación
         }))
     ];
 
@@ -123,16 +125,22 @@ const CreatorPage: React.FC = () => {
         if (platformId === 'all') {
             navigate(`/creator/${creatorName}`);
         } else {
+            // Encontrar el nombre real de la plataforma usando el ID
+            const platformTab = platformTabs.find(tab => tab.id === platformId);
+            const platformName = (platformTab as any)?.platformName || platformId;
             // URL encode platform name to handle special characters like slashes
-            navigate(`/creator/${creatorName}/${encodeURIComponent(platformId)}`);
+            navigate(`/creator/${creatorName}/${encodeURIComponent(platformName)}`);
         }
     };
     
     const handleSubscriptionTabClick = (subId: string) => {
-        if (subId === 'all') {
+        if (subId === 'sub-all') {
              navigate(`/creator/${creatorName}/${encodeURIComponent(activePlatform || '')}`);
         } else {
-            navigate(`/creator/${creatorName}/${encodeURIComponent(activePlatform || '')}/${encodeURIComponent(subId)}`);
+            // Encontrar el ID real de la suscripción usando el ID del tab
+            const subTab = subscriptionTabs?.find(tab => tab.id === subId);
+            const realSubId = (subTab as any)?.subscriptionId || subId;
+            navigate(`/creator/${creatorName}/${encodeURIComponent(activePlatform || '')}/${encodeURIComponent(realSubId)}`);
         }
     }
     
@@ -156,29 +164,89 @@ const CreatorPage: React.FC = () => {
         <div className="space-y-6">
             <header>
                 <Breadcrumbs crumbs={breadcrumbs} />
-                <div className="flex flex-wrap justify-between items-center gap-4">
-                    <h1 className="text-3xl font-bold text-white">{creator.displayName}</h1>
-                    <div className="flex items-center gap-3">
-                        {Object.entries(creator.platforms).map(([p, data]) => data?.url && (
-                             <a key={p} href={data.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 p-2 rounded-lg bg-[#212121]/50 border border-gray-700/50 hover:bg-red-500/20 text-gray-300 hover:text-white transition-colors">
-                                <span className="font-semibold text-sm">{p}</span>
-                                {React.cloneElement(ICONS.external_link, { className: 'h-4 w-4' })}
-                             </a>
-                        ))}
+                <div className="flex flex-wrap justify-between items-start gap-4">
+                    <div>
+                        <h1 className="text-3xl font-bold text-white">{creator.displayName}</h1>
+                        <p className="text-gray-400 mt-1">{totalPostCount} videos • {Object.keys(creator.platforms).length} plataformas</p>
+                    </div>
+                    
+                    {/* Creator and Subscription Icons Section */}
+                    <div className="flex flex-col items-end gap-4">
+                        {/* Platform Links */}
+                        <div className="flex items-center gap-2">
+                            <span className="text-gray-400 text-sm">Plataformas:</span>
+                            {Object.entries(creator.platforms).map(([p, data]) => data?.url && (
+                                 <a key={p} href={data.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 p-1.5 rounded-md bg-[#212121]/50 border border-gray-700/50 hover:bg-red-500/20 text-gray-300 hover:text-white transition-colors" title={`Ver en ${p}`}>
+                                    <span className="text-xs font-medium">{p}</span>
+                                    {React.cloneElement(ICONS.external_link, { className: 'h-3 w-3' })}
+                                 </a>
+                            ))}
+                        </div>
+                        
+                        {/* Subscriptions and Lists */}
+                        <div className="flex flex-col gap-2">
+                            {Object.entries(creator.platforms).map(([platform, data]) => {
+                                if (!data?.subscriptions || data.subscriptions.length === 0) return null;
+                                
+                                return (
+                                    <div key={platform} className="flex items-center gap-2">
+                                        <span className="text-gray-400 text-xs">{platform}:</span>
+                                        <div className="flex items-center gap-1">
+                                            {data.subscriptions.map((subscription, idx) => {
+                                                const subscriptionIcon = getSubscriptionIcon(subscription.type || 'account');
+                                                return (
+                                                    <div key={idx} className="flex items-center gap-1 p-1 rounded bg-gray-800/50 border border-gray-600/50" title={`${subscription.name} (${subscription.type})`}>
+                                                        {React.cloneElement(subscriptionIcon, { className: 'h-3 w-3 text-blue-400' })}
+                                                        <span className="text-xs text-gray-300 max-w-16 truncate">{subscription.name}</span>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                        
+                        {/* Available Lists */}
+                        {activePlatform && creator.platforms[activePlatform]?.lists && (
+                            <div className="flex items-center gap-2">
+                                <span className="text-gray-400 text-xs">Listas:</span>
+                                <div className="flex items-center gap-1">
+                                    {creator.platforms[activePlatform]?.lists?.map((listType, idx) => {
+                                        const listIcon = getListIcon(listType);
+                                        return (
+                                            <div key={idx} className="p-1 rounded bg-green-800/30 border border-green-600/50" title={`Lista: ${listType}`}>
+                                                {React.cloneElement(listIcon, { className: 'h-3 w-3 text-green-400' })}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             </header>
             
             <PlatformTabs
                 tabs={platformTabs}
-                activeTab={decodedPlatform || 'all'}
+                activeTab={(() => {
+                    if (!decodedPlatform) return 'all';
+                    // Encontrar el tab ID que corresponde a la plataforma actual
+                    const platformTab = platformTabs.find(tab => (tab as any).platformName === decodedPlatform);
+                    return platformTab?.id || 'all';
+                })()}
                 onTabClick={handlePlatformTabClick}
             />
 
             {subscriptionTabs && (
                  <PlatformTabs
                     tabs={subscriptionTabs}
-                    activeTab={subscriptionId || 'all'}
+                    activeTab={(() => {
+                        if (!subscriptionId) return 'sub-all';
+                        // Encontrar el tab ID que corresponde a la suscripción actual
+                        const subTab = subscriptionTabs.find(tab => (tab as any).subscriptionId === subscriptionId);
+                        return subTab?.id || 'sub-all';
+                    })()}
                     onTabClick={handleSubscriptionTabClick}
                     isSubTabs
                 />

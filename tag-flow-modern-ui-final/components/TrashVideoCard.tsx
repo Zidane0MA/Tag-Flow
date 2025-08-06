@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Post } from '../types';
-import { ICONS } from '../constants';
+import { ICONS, getSubscriptionIcon, getListIcon } from '../constants';
 
 interface TrashPostCardProps {
     video: Post; // Renamed to video for less refactoring, but it's a Post
@@ -113,6 +113,40 @@ const TrashPostCard: React.FC<TrashPostCardProps> = ({ video: post, timeAgo, isS
                         {React.cloneElement(ICONS.user, { className: 'h-4 w-4 flex-shrink-0' })}
                         <span>{post.creator}</span>
                     </div>
+                    
+                    {/* Subscription and Lists Info */}
+                    <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1">
+                            {post.subscription && (
+                                <div className="flex items-center gap-1" title={`${post.subscription.name} (${post.subscription.type})`}>
+                                    {React.cloneElement(getSubscriptionIcon(post.subscription.type), {className: "h-3 w-3 text-blue-400"})}
+                                    <span className="text-xs truncate max-w-[60px]">{post.subscription.name}</span>
+                                </div>
+                            )}
+                        </div>
+                        
+                        <div className="flex items-center gap-0.5">
+                            {post.lists && post.lists.length > 0 ? (
+                                <>
+                                    {post.lists.slice(0, 2).map((list, idx) => (
+                                        <div key={idx} className="p-0.5 rounded bg-green-800/20 border border-green-600/30" title={list.name}>
+                                            {React.cloneElement(getListIcon(list.type), {className: "h-2.5 w-2.5 text-green-400"})}
+                                        </div>
+                                    ))}
+                                    {post.lists.length > 2 && (
+                                        <div className="p-0.5 rounded bg-green-800/20 border border-green-600/30">
+                                            <span className="text-xs text-green-400 font-bold">+{post.lists.length - 2}</span>
+                                        </div>
+                                    )}
+                                </>
+                            ) : !post.subscription && (
+                                <div className="p-0.5 rounded bg-gray-800/20 border border-gray-600/30" title="Video individual">
+                                    {React.cloneElement(ICONS.folder, {className: "h-2.5 w-2.5 text-gray-500"})}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                    
                     <div className="flex items-center gap-1.5" title={`Eliminado ${new Date(post.deletedAt!).toLocaleString()}`}>
                         {React.cloneElement(ICONS.trash, { className: 'h-4 w-4 flex-shrink-0' })}
                         <span>Eliminado {timeAgo}</span>

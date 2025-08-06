@@ -42,6 +42,11 @@ export const ICONS = {
     external_link: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z" /><path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z" /></svg>,
     stories: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5 2a3 3 0 00-3 3v10a3 3 0 003 3h10a3 3 0 003-3V5a3 3 0 00-3-3H5zm0 2h10a1 1 0 011 1v10a1 1 0 01-1 1H5a1 1 0 01-1-1V5a1 1 0 011-1zm4 1a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" /></svg>,
     highlights: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm-1.06-5.06a.75.75 0 01-1.062-1.062l3.5-3.5a.75.75 0 111.062 1.062l-3.5 3.5zm3.122-4.438a.75.75 0 10-1.06-1.06l-3.5 3.5a.75.75 0 101.06 1.06l3.5-3.5z" clipRule="evenodd" /></svg>,
+    heart: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clipRule="evenodd" /></svg>,
+    tag: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M17.707 9.293l-5-5a1 1 0 00-.707-.293H4a1 1 0 00-1 1v8a1 1 0 001 1h8c.265 0 .52-.105.707-.293l5-5a1 1 0 000-1.414zM7 9a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" /></svg>,
+    star: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>,
+    mobile: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M7 2a2 2 0 00-2 2v12a2 2 0 002 2h6a2 2 0 002-2V4a2 2 0 00-2-2H7zM8 16a1 1 0 100 2h4a1 1 0 100-2H8z" clipRule="evenodd" /></svg>,
+    film: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm3 2.5a.5.5 0 01.5-.5h1a.5.5 0 01.5.5v1a.5.5 0 01-.5.5h-1a.5.5 0 01-.5-.5v-1zM7.5 9a.5.5 0 00-.5.5v1a.5.5 0 00.5.5h1a.5.5 0 00.5-.5v-1a.5.5 0 00-.5-.5h-1zm-.5 3.5a.5.5 0 01.5-.5h1a.5.5 0 01.5.5v1a.5.5 0 01-.5.5h-1a.5.5 0 01-.5-.5v-1zM11.5 5a.5.5 0 00-.5.5v1a.5.5 0 00.5.5h1a.5.5 0 00.5-.5v-1a.5.5 0 00-.5-.5h-1zm-.5 3.5a.5.5 0 01.5-.5h1a.5.5 0 01.5.5v1a.5.5 0 01-.5.5h-1a.5.5 0 01-.5-.5v-1zM11.5 13a.5.5 0 00-.5.5v1a.5.5 0 00.5.5h1a.5.5 0 00.5-.5v-1a.5.5 0 00-.5-.5h-1z" clipRule="evenodd" /></svg>,
 };
 
 export const NAV_LINKS = [
@@ -49,3 +54,42 @@ export const NAV_LINKS = [
     { name: 'Administración', href: '/admin', icon: ICONS.admin },
     { name: 'Papelera', href: '/trash', icon: ICONS.trash },
 ];
+
+// Mapeo de tipos de suscripción a iconos (basado en DATABASE_CONTEXT.md)
+export const SUBSCRIPTION_ICONS = {
+    'account': ICONS.user,      // 👤
+    'playlist': ICONS.list,     // 📋 
+    'music': ICONS.music,       // 🎵
+    'hashtag': ICONS.hashtag,   // #️⃣
+    'location': ICONS.location_marker, // 📍
+    'saved': ICONS.bookmark,    // 💾
+    'channel': ICONS.user,      // 👤
+    'watch_later': ICONS.clock, // ⏰
+    'favorites': ICONS.star,    // 💝
+    'single': ICONS.film,       // 🎬 Para publicaciones sueltas
+};
+
+// Mapeo de tipos de lista a iconos (basado en DATABASE_CONTEXT.md)
+export const LIST_ICONS = {
+    'feed': ICONS.film,         // 🎬 Icono de videos para TikTok feed
+    'liked': ICONS.heart,       // ❤️
+    'reels': ICONS.film,        // 🎬
+    'stories': ICONS.stories,   // 📖
+    'highlights': ICONS.highlights, // ⭐
+    'tagged': ICONS.tag,        // 🏷️
+    'favorites': ICONS.bookmark, // 🔖 Icono marcapáginas para TikTok favorites
+    'playlist': ICONS.list,     // 📋
+    'single': ICONS.film,       // 🎬 Para videos sueltos
+    'hashtag': ICONS.hashtag,   // #️⃣ Para suscripciones hashtag
+    'music': ICONS.music,       // 🎵 Para suscripciones música
+};
+
+// Función auxiliar para obtener icono de suscripción
+export const getSubscriptionIcon = (type: string) => {
+    return SUBSCRIPTION_ICONS[type as keyof typeof SUBSCRIPTION_ICONS] || ICONS.folder;
+};
+
+// Función auxiliar para obtener icono de lista
+export const getListIcon = (type: string) => {
+    return LIST_ICONS[type as keyof typeof LIST_ICONS] || ICONS.folder;
+};

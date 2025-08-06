@@ -36,13 +36,13 @@ def api_videos():
         if search_query:
             filters['search'] = search_query
         
-        limit = int(request.args.get('limit', 1000))
+        limit = int(request.args.get('limit', 0))  # 0 = sin límite
         offset = int(request.args.get('offset', 0))
         
         videos = db.get_videos(filters=filters, limit=limit, offset=offset)
         total_videos = db.count_videos(filters=filters)
         
-        # Procesar para JSON
+        # Procesar para JSON y agregar información de suscripciones/listas reales
         for video in videos:
             if video.get('detected_characters'):
                 try:
@@ -55,6 +55,47 @@ def api_videos():
                     video['final_characters'] = json.loads(video['final_characters'])
                 except:
                     video['final_characters'] = []
+            
+            # ✅ NUEVO: Agregar información real de suscripción desde la BD
+            if video.get('subscription_id'):
+                try:
+                    with db.get_connection() as conn:
+                        cursor = conn.execute('''
+                            SELECT s.name, s.type, s.platform, s.subscription_url 
+                            FROM subscriptions s 
+                            WHERE s.id = ?
+                        ''', (video['subscription_id'],))
+                        sub_row = cursor.fetchone()
+                        if sub_row:
+                            video['subscription_info'] = {
+                                'id': video['subscription_id'],
+                                'name': sub_row[0],
+                                'type': sub_row[1], 
+                                'platform': sub_row[2],
+                                'url': sub_row[3]
+                            }
+                except Exception as e:
+                    logger.warning(f"Error obteniendo subscription para video {video['id']}: {e}")
+            
+            # ✅ NUEVO: Agregar información real de listas desde la BD
+            try:
+                with db.get_connection() as conn:
+                    cursor = conn.execute('''
+                        SELECT vl.list_type, vl.source_path 
+                        FROM video_lists vl 
+                        WHERE vl.video_id = ?
+                    ''', (video['id'],))
+                    list_rows = cursor.fetchall()
+                    if list_rows:
+                        video['video_lists'] = [
+                            {
+                                'type': row[0],
+                                'name': row[0].replace('_', ' ').title(),
+                                'source_path': row[1]
+                            } for row in list_rows
+                        ]
+            except Exception as e:
+                logger.warning(f"Error obteniendo listas para video {video['id']}: {e}")
             
             # Preparar título apropiado para el frontend
             if video.get('platform') in ['tiktok', 'instagram'] and video.get('title'):
@@ -110,6 +151,47 @@ def api_get_video(video_id):
                 video['final_characters'] = []
         else:
             video['final_characters'] = []
+        
+        # ✅ NUEVO: Agregar información real de suscripción desde la BD
+        if video.get('subscription_id'):
+            try:
+                with db.get_connection() as conn:
+                    cursor = conn.execute('''
+                        SELECT s.name, s.type, s.platform, s.subscription_url 
+                        FROM subscriptions s 
+                        WHERE s.id = ?
+                    ''', (video['subscription_id'],))
+                    sub_row = cursor.fetchone()
+                    if sub_row:
+                        video['subscription_info'] = {
+                            'id': video['subscription_id'],
+                            'name': sub_row[0],
+                            'type': sub_row[1], 
+                            'platform': sub_row[2],
+                            'url': sub_row[3]
+                        }
+            except Exception as e:
+                logger.warning(f"Error obteniendo subscription para video {video_id}: {e}")
+        
+        # ✅ NUEVO: Agregar información real de listas desde la BD
+        try:
+            with db.get_connection() as conn:
+                cursor = conn.execute('''
+                    SELECT vl.list_type, vl.source_path 
+                    FROM video_lists vl 
+                    WHERE vl.video_id = ?
+                ''', (video_id,))
+                list_rows = cursor.fetchall()
+                if list_rows:
+                    video['video_lists'] = [
+                        {
+                            'type': row[0],
+                            'name': row[0].replace('_', ' ').title(),
+                            'source_path': row[1]
+                        } for row in list_rows
+                    ]
+        except Exception as e:
+            logger.warning(f"Error obteniendo listas para video {video_id}: {e}")
         
         # Preparar título apropiado para el frontend
         if video.get('platform') in ['tiktok', 'instagram'] and video.get('title'):

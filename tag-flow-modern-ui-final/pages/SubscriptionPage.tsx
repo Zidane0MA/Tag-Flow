@@ -1,67 +1,146 @@
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useRealData } from '../hooks/useRealData';
 import { SubscriptionType, SubscriptionInfo } from '../types';
 import Breadcrumbs, { Crumb } from '../components/Breadcrumbs';
-import { ICONS } from '../constants';
+import { ICONS, getSubscriptionIcon, getListIcon } from '../constants';
 import PostCard from '../components/VideoCard';
 import PlatformTabs, { Tab } from '../components/PlatformTabs';
 
-const getSubscriptionIcon = (type: SubscriptionType) => {
-    const iconMap: Record<SubscriptionType, React.ReactElement> = {
-        'playlist': ICONS.list,
-        'music': ICONS.music,
-        'hashtag': ICONS.hashtag,
-        'saved': ICONS.bookmark,
-        'location': ICONS.location_marker,
-        'feed': ICONS.reels,
-        'liked': ICONS.reels,
-        'reels': ICONS.reels,
-        'stories': ICONS.stories,
-        'highlights': ICONS.highlights,
-        'tagged': ICONS.reels,
-        'channel': ICONS.user,
-        'account': ICONS.user,
-        'watch_later': ICONS.clock,
-        'favorites': ICONS.bookmark
-    };
-    return iconMap[type] || ICONS.folder;
-};
 
 const SubscriptionPage: React.FC = () => {
     const { type, id, list } = useParams<{ type: SubscriptionType, id: string, list?: string }>();
-    const { getSubscriptionInfo, getPostsBySubscription, getCreatorByName } = useRealData();
+    const { getSubscriptionInfo, getSubscriptionStats, getPostsBySubscription, getCreatorByName } = useRealData();
 
-    const subscriptionInfo = useMemo<SubscriptionInfo | undefined>(() => {
-        if (!type || !id) return undefined;
-        // The "account" type is special; its ID is the creator's name.
-        if (type === 'account') {
-            const creator = getCreatorByName(id);
-            if (!creator) return undefined;
+    // ⚠️ IMPORTANTE: Mantener todos los hooks en el mismo orden siempre
+    const [subscriptionInfo, setSubscriptionInfo] = useState<SubscriptionInfo | undefined>(undefined);
+    const [subscriptionStats, setSubscriptionStats] = useState<{total: number, listCounts: {[key: string]: number}} | null>(null);
+    const [displayedPosts, setDisplayedPosts] = useState<any[]>([]);
+    const [postsLoading, setPostsLoading] = useState(false);
+    const [loading, setLoading] = useState(true);
 
-            // Find which platform this account subscription is for by looking for a 'feed' or similar.
-            // This is a mock data simplification.
-            const platformKey = Object.keys(creator.platforms)[0] as any;
-
-            return {
-                id: creator.name,
-                type: 'account' as SubscriptionType,
-                name: creator.displayName,
-                platform: platformKey,
-                postCount: Object.values(creator.platforms).reduce((acc, p) => acc + (p?.postCount || 0), 0),
-                creator: creator.name,
-                url: creator.platforms[platformKey]?.url,
+    // Generar subtabs dinámicos por plataforma para suscripciones tipo account
+    const accountSubscriptionTabs: Tab[] | undefined = useMemo(() => {
+        if (type === 'account' && subscriptionInfo && subscriptionStats) {
+            // Definir subtabs por plataforma
+            const platformSubtabs: { [key: string]: Array<{id: string, label: string, icon?: React.ReactElement}> } = {
+                'tiktok': [
+                    { id: 'feed', label: 'Videos', icon: getListIcon('feed') },
+                    { id: 'liked', label: 'Liked', icon: getListIcon('liked') },
+                    { id: 'favorites', label: 'Favorites', icon: getListIcon('favorites') }
+                ],
+                'youtube': [
+                    { id: 'feed', label: 'Videos', icon: getListIcon('feed') },
+                    { id: 'shorts', label: 'Shorts', icon: getListIcon('reels') },
+                    { id: 'playlist', label: 'Playlists', icon: getListIcon('playlist') }
+                ],
+                'instagram': [
+                    { id: 'feed', label: 'Posts', icon: getListIcon('feed') },
+                    { id: 'reels', label: 'Reels', icon: getListIcon('reels') },
+                    { id: 'stories', label: 'Stories', icon: getListIcon('stories') },
+                    { id: 'highlights', label: 'Highlights', icon: getListIcon('highlights') },
+                    { id: 'tagged', label: 'Tagged', icon: getListIcon('tagged') }
+                ]
             };
+            
+            const subtabs = platformSubtabs[subscriptionInfo.platform] || [
+                { id: 'feed', label: 'Feed', icon: getListIcon('feed') }
+            ];
+            
+            return [
+                { id: 'all', label: 'Todos', count: subscriptionStats.total, icon: ICONS.gallery },
+                ...subtabs.map(subtab => ({
+                    id: subtab.id,
+                    label: subtab.label,
+                    count: subscriptionStats.listCounts[subtab.id] || 0, // Usar conteos reales
+                    icon: subtab.icon
+                }))
+            ];
         }
-        return getSubscriptionInfo(type, id);
-    }, [type, id, getSubscriptionInfo, getCreatorByName]);
+        return undefined;
+    }, [type, subscriptionInfo, subscriptionStats]);
 
-    const displayedPosts = useMemo(() => {
-        if (!type || !id) return [];
-        return getPostsBySubscription(type, id, list);
+    // Cargar información de la suscripción
+    useEffect(() => {
+        if (!type || !id) {
+            setLoading(false);
+            return;
+        }
+
+        const loadSubscriptionInfo = async () => {
+            setLoading(true);
+            try {
+                // The "account" type is special; its ID is the creator's name.
+                if (type === 'account') {
+                    const creator = getCreatorByName(id);
+                    if (creator) {
+                        const platformKey = Object.keys(creator.platforms)[0] as any;
+                        setSubscriptionInfo({
+                            id: creator.name,
+                            type: 'account' as SubscriptionType,
+                            name: creator.displayName,
+                            platform: platformKey,
+                            postCount: Object.values(creator.platforms).reduce((acc, p) => acc + (p?.postCount || 0), 0),
+                            creator: creator.name,
+                            url: creator.platforms[platformKey]?.url,
+                        });
+                        setLoading(false);
+                        return;
+                    }
+                }
+                
+                // Para otros tipos, usar el backend
+                const [info, stats] = await Promise.all([
+                    getSubscriptionInfo(type, id),
+                    getSubscriptionStats(type, id)
+                ]);
+                setSubscriptionInfo(info);
+                setSubscriptionStats(stats);
+            } catch (error) {
+                console.error('Error loading subscription info:', error);
+                setSubscriptionInfo(undefined);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        loadSubscriptionInfo();
+    }, [type, id, getSubscriptionInfo, getSubscriptionStats, getCreatorByName]);
+
+    // Cargar posts de la suscripción
+    useEffect(() => {
+        if (!type || !id) {
+            setDisplayedPosts([]);
+            return;
+        }
+
+        const loadSubscriptionPosts = async () => {
+            setPostsLoading(true);
+            try {
+                // Obtener todos los posts sin límite
+                const posts = await getPostsBySubscription(type, id, list);
+                setDisplayedPosts(posts);
+            } catch (error) {
+                console.error('Error loading subscription posts:', error);
+                setDisplayedPosts([]);
+            } finally {
+                setPostsLoading(false);
+            }
+        };
+
+        loadSubscriptionPosts();
     }, [type, id, list, getPostsBySubscription]);
 
+    // Early returns después de todos los hooks
+    if (loading) {
+        return (
+            <div className="text-center py-16">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mx-auto"></div>
+                <p className="text-gray-400 mt-4">Cargando suscripción...</p>
+            </div>
+        );
+    }
 
     if (!subscriptionInfo || !type) {
         return <div className="text-center py-16 text-white">Suscripción no encontrada.</div>;
@@ -71,6 +150,7 @@ const SubscriptionPage: React.FC = () => {
         { label: 'Galería', href: '/gallery', icon: ICONS.gallery },
         { label: subscriptionInfo.name, href: `/subscription/${type}/${id}`, icon: getSubscriptionIcon(type) }
     ];
+    
     if(list) {
         // Find list name
         const creator = subscriptionInfo.creator ? getCreatorByName(subscriptionInfo.creator) : undefined;
@@ -79,25 +159,6 @@ const SubscriptionPage: React.FC = () => {
             breadcrumbs.push({ label: subList.name, href: `/subscription/${type}/${id}/${list}` });
         }
     }
-    
-    const accountSubscriptionTabs: Tab[] | undefined = useMemo(() => {
-        if (type === 'account') {
-            const creator = getCreatorByName(id);
-            if (!creator || !subscriptionInfo) return undefined;
-            const subs = creator.platforms[subscriptionInfo.platform]?.subscriptions || [];
-            if (subs.length > 0) {
-                 return [
-                    { id: 'all', label: 'All', count: subscriptionInfo.postCount, icon: undefined },
-                    ...subs.map(sub => ({
-                        id: sub.id,
-                        label: sub.name,
-                        count: getPostsBySubscription(type, id, sub.id).length
-                    }))
-                ];
-            }
-        }
-        return undefined;
-    }, [type, id, getCreatorByName, subscriptionInfo, getPostsBySubscription]);
 
     const handleSubTabClick = (subId: string) => {
         if (subId === 'all') {

@@ -50,11 +50,68 @@ export const RealDataProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       creatorPlatforms[platformKey].postCount++;
     });
 
-    return Array.from(creatorsMap.entries()).map(([creatorName, platforms]) => ({
-      name: creatorName,
-      displayName: creatorName,
-      platforms
-    }));
+    return Array.from(creatorsMap.entries()).map(([creatorName, platforms]) => {
+      // Agregar datos de ejemplo para suscripciones y listas basados en la plataforma
+      const enhancedPlatforms = Object.fromEntries(
+        Object.entries(platforms).map(([platform, data]) => {
+          let subscriptions: any[] = [];
+          let lists: string[] = [];
+          
+          // Usar la misma lógica que el backend (creators.py líneas 47-70)
+          const creatorId = creatorName.toLowerCase().replace(/\s+/g, '_');
+          
+          // Mapear tipos de suscripción por plataforma (igual que en el backend)
+          const subscriptionMapping: { [key: string]: { type: string, name: string } } = {
+            'youtube': { type: 'channel', name: 'Canal Principal' },
+            'tiktok': { type: 'feed', name: 'Feed Principal' },
+            'instagram': { type: 'feed', name: 'Feed Principal' },
+            'facebook': { type: 'account', name: 'Página Principal' },
+            'twitter': { type: 'account', name: 'Cuenta Principal' },
+            'twitch': { type: 'channel', name: 'Canal Principal' },
+            'discord': { type: 'account', name: 'Servidor Principal' },
+            'vimeo': { type: 'channel', name: 'Canal Principal' },
+            'bilibili': { type: 'feed', name: 'Feed Principal' },
+            'bilibili/video': { type: 'feed', name: 'Feed Principal' },
+            'bilibili/video/tv': { type: 'feed', name: 'Feed Principal' }
+          };
+          
+          const platformMapping = subscriptionMapping[platform.toLowerCase()] || { type: 'feed', name: 'Feed Principal' };
+          
+          subscriptions = [
+            {
+              type: platformMapping.type,
+              id: `${creatorId}_${platform}_main`,
+              name: platformMapping.name
+            }
+          ];
+          
+          // Listas básicas por plataforma
+          const listMapping: { [key: string]: string[] } = {
+            'youtube': ['feed'],
+            'tiktok': ['feed'],
+            'instagram': ['feed', 'reels'],
+            'bilibili': ['feed'],
+            'bilibili/video': ['feed'],
+            'bilibili/video/tv': ['feed']
+          };
+          
+          lists = listMapping[platform.toLowerCase()] || ['feed'];
+          
+          return [platform, {
+            ...data,
+            subscriptions,
+            lists,
+            url: `https://${platform.toLowerCase()}.com/@${creatorName.toLowerCase().replace(/\s+/g, '')}`
+          }];
+        })
+      );
+
+      return {
+        name: creatorName,
+        displayName: creatorName,
+        platforms: enhancedPlatforms
+      };
+    });
   }, [posts, backendCreators]);
 
   /**
@@ -64,8 +121,8 @@ export const RealDataProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setLoading(true);
     setError(null);
     try {
-      // Solicitar un límite alto para mostrar todos los videos disponibles
-      const filtersWithLimit = { ...filters, limit: filters.limit || 1500 };
+      // No aplicar límite por defecto - dejar que el backend decida
+      const filtersWithLimit = { ...filters };
       const { posts: newPosts } = await apiService.getVideos(filtersWithLimit);
       setPosts(newPosts);
     } catch (err) {
@@ -305,11 +362,13 @@ export const RealDataProvider: React.FC<{ children: React.ReactNode }> = ({ chil
    */
   const getPostsByCreator = useCallback(async (creatorName: string, platform?: Platform, listId?: string) => {
     try {
-      // Usar API del backend para obtener videos del creador
+      // Usar API del backend para obtener todos los videos del creador sin límite
       const { posts: creatorPosts } = await apiService.getCreatorVideos(
         creatorName, 
         platform, 
-        listId
+        listId,
+        0, // Sin límite
+        0  // Sin offset
       );
       return creatorPosts;
     } catch (error) {
@@ -324,20 +383,74 @@ export const RealDataProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   }, [posts]);
 
   /**
-   * Obtener información de suscripción (placeholder)
+   * Obtener información de suscripción desde el backend
    */
-  const getSubscriptionInfo = useCallback((type: SubscriptionType, id: string): SubscriptionInfo | undefined => {
-    // TODO: Implementar cuando tengamos sistema de suscripciones en backend
-    return undefined;
+  const getSubscriptionInfo = useCallback(async (type: SubscriptionType, id: string): Promise<SubscriptionInfo | undefined> => {
+    try {
+      const subscriptionInfo = await apiService.getSubscriptionInfo(type, id);
+      return subscriptionInfo || undefined;
+    } catch (error) {
+      console.error('Error getting subscription info:', error);
+      
+      // Fallback: crear información básica desde posts locales
+      return {
+        id: id,
+        type: type,
+        name: type === 'playlist' ? 'Lista de Reproducción' : type.replace('_', ' ').replace(/^\w/, c => c.toUpperCase()),
+        platform: 'youtube' as any,
+        postCount: posts.filter(p => p.subscription?.id === id).length,
+        creator: undefined,
+        url: undefined
+      };
+    }
+  }, [posts]);
+
+  /**
+   * Obtener estadísticas de suscripción desde el backend
+   */
+  const getSubscriptionStats = useCallback(async (type: SubscriptionType, id: string) => {
+    try {
+      const stats = await apiService.getSubscriptionStats(type, id);
+      return stats;
+    } catch (error) {
+      console.error('Error getting subscription stats:', error);
+      return null;
+    }
   }, []);
 
   /**
-   * Obtener posts por suscripción (placeholder)
+   * Obtener posts por suscripción desde el backend
    */
-  const getPostsBySubscription = useCallback((type: SubscriptionType, id: string, list?: string) => {
-    // TODO: Implementar cuando tengamos sistema de suscripciones en backend
-    return [];
-  }, []);
+  const getPostsBySubscription = useCallback(async (type: SubscriptionType, id: string, list?: string): Promise<Post[]> => {
+    try {
+      // Obtener todos los posts sin límite para páginas de suscripción
+      const { posts: subscriptionPosts } = await apiService.getSubscriptionVideos(type, id, list, 0); // 0 = sin límite
+      return subscriptionPosts;
+    } catch (error) {
+      console.error('Error getting subscription posts:', error);
+      
+      // Fallback: filtrar desde posts locales
+      let filteredPosts = posts;
+      
+      // Filtrar por suscripción
+      if (type && id) {
+        filteredPosts = posts.filter(post => {
+          if (!post.subscription) return false;
+          return post.subscription.type === type && (post.subscription.id === id || post.subscription.name === id);
+        });
+      }
+      
+      // Filtrar por lista específica si se proporciona
+      if (list && list !== 'all') {
+        filteredPosts = filteredPosts.filter(post => {
+          if (!post.lists || post.lists.length === 0) return false;
+          return post.lists.some(l => l.type === list || l.name === list);
+        });
+      }
+      
+      return filteredPosts;
+    }
+  }, [posts]);
 
   // Cargar datos iniciales
   useEffect(() => {
@@ -365,6 +478,7 @@ export const RealDataProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     getCreatorByName,
     getPostsByCreator,
     getSubscriptionInfo,
+    getSubscriptionStats,
     getPostsBySubscription,
   };
 

@@ -45,6 +45,13 @@ export interface Subscription {
   name: string;
 }
 
+export type ListType = 'feed' | 'liked' | 'reels' | 'stories' | 'highlights' | 'tagged' | 'favorites' | 'playlist' | 'saved' | 'watch_later';
+
+export interface List {
+  type: ListType;
+  name: string;
+}
+
 export interface Post {
   id: string;
   title: string;
@@ -68,6 +75,7 @@ export interface Post {
   uploadDate?: string;
   deletedAt?: string;
   subscription?: Subscription;
+  lists?: List[]; // Array de listas a las que pertenece el video
 }
 
 export interface CreatorPlatformInfo {

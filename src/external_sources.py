@@ -461,11 +461,13 @@ class ExternalSourcesManager:
         return None
     
     def extract_tiktok_videos(self, offset: int = 0, limit: int = None) -> List[Dict]:
-        """Extraer videos de TikTok desde BD de 4K Tokkit con nueva estructura completa"""
+        """Extraer videos de TikTok desde BD de 4K Tokkit con nueva estructura completa
+        Solo incluye videos que han sido descargados (downloaded=1)
+        """
         if limit is not None:
-            logger.info(f"Extrayendo videos de TikTok (offset: {offset}, limit: {limit})...")
+            logger.info(f"Extrayendo videos de TikTok descargados (offset: {offset}, limit: {limit})...")
         else:
-            logger.info("Extrayendo videos de TikTok...")
+            logger.info("Extrayendo videos de TikTok descargados...")
         videos = []
 
         conn = self._get_connection(self.tiktok_db_path)
@@ -535,7 +537,7 @@ class ExternalSourcesManager:
                     logger.error(f"Error procesando fila TikTok {row['media_id']}: {e}")
                     continue
             
-            logger.info(f"✓ Extraídos {len(videos)} videos de TikTok desde BD")
+            logger.info(f"✓ Extraídos {len(videos)} videos de TikTok desde BD (solo descargados)")
             
         except Exception as e:
             logger.error(f"Error extrayendo videos de TikTok: {e}")
@@ -545,7 +547,7 @@ class ExternalSourcesManager:
         return videos
     
     def _process_tokkit_row_with_structure(self, row, tiktok_base: Path) -> Optional[Dict]:
-        """Procesar una fila de 4K Tokkit con nueva estructura completa"""
+        """Procesar una fila de 4K Tokkit con nueva estructura completa según especificación"""
         # Construir ruta completa del archivo
         relative_path = row['relativePath']
         if relative_path.startswith('/'):
@@ -555,18 +557,38 @@ class ExternalSourcesManager:
             
         file_path = tiktok_base / relative_path
         
-        # Verificar que sea video y exista
-        if not file_path.exists() or file_path.suffix.lower() not in self.video_extensions:
+        # Verificar que sea video y exista - también incluir imágenes para carruseles
+        if not file_path.exists():
             return None
+            
+        # Aceptar tanto videos como imágenes (para carruseles de TikTok)
+        is_video = file_path.suffix.lower() in self.video_extensions
+        is_image = file_path.suffix.lower() in self.image_extensions
+        
+        if not (is_video or is_image):
+            return None
+        
+        # Construir URL del post según especificación
+        tiktok_id_clean = row['tiktok_id']
+        if '_index_' in str(tiktok_id_clean):
+            # Para imágenes: remover _index_n1_n2 del ID
+            tiktok_id_clean = tiktok_id_clean.split('_index_')[0]
+        
+        # URLs según especificación
+        if is_video:
+            post_url = f"https://www.tiktok.com/@{row['authorName']}/video/{tiktok_id_clean}"
+        else:
+            post_url = f"https://www.tiktok.com/@{row['authorName']}/photo/{tiktok_id_clean}"
         
         # Datos básicos del video
         video_data = {
             'file_path': str(file_path),
             'file_name': file_path.name,
             'title': row['video_title'] or file_path.stem,  # Usar description como título
-            'post_url': f"https://www.tiktok.com/@{row['authorName']}/video/{row['tiktok_id']}",  # URL del post
+            'post_url': post_url,  # URL del post según especificación
             'platform': 'tiktok',
             'external_video_id': row['tiktok_id'],
+            'content_type': 'video' if is_video else 'image',
             
             # Datos del downloader
             'downloader_data': {
@@ -575,7 +597,9 @@ class ExternalSourcesManager:
                 'external_metadata': json.dumps({
                     'subscription_id': str(row['subscriptionDatabaseId']) if row['subscriptionDatabaseId'] else None,
                     'author_name': row['authorName'],
-                    'relative_path': row['relativePath']
+                    'relative_path': row['relativePath'],
+                    'is_carousel_item': '_index_' in str(row['tiktok_id']),
+                    'carousel_order': self._extract_carousel_order(str(row['tiktok_id']))
                 })
             }
         }
@@ -591,48 +615,86 @@ class ExternalSourcesManager:
         result = {
             'creator_name': row['authorName'],
             'creator_url': f"https://www.tiktok.com/@{row['authorName']}",
-            'subscription_name': row['subscription_name'] or row['authorName'],
-            'subscription_type': 'account',  # Por defecto
+            'subscription_name': None,
+            'subscription_type': None,
             'subscription_url': None,
-            'list_types': ['feed']
+            'list_types': ['single']  # Por defecto para publicaciones sueltas
         }
         
-        # Determinar tipo de suscripción basado en subscription_type según especificación
+        # CASO 1: Publicaciones sueltas (subscriptionDatabaseId = NULL)
+        if not row['subscriptionDatabaseId']:
+            # Publicaciones sueltas se convierten en listas tipo "single"
+            result['subscription_name'] = 'Videos sueltos'
+            result['subscription_type'] = 'single'
+            result['subscription_url'] = None  # No tienen URL específica
+            result['list_types'] = ['single']
+            return result
+        
+        # CASO 2: Suscripciones con subscription_type
         subscription_types = {
-            1: 'account',    # cuenta
-            2: 'hashtag',    # hashtag  
-            3: 'music'       # música
+            1: 'account',    # cuenta - tipo 1
+            2: 'hashtag',    # hashtag - tipo 2 
+            3: 'music'       # música - tipo 3
         }
         
         if row['subscription_type'] in subscription_types:
             sub_type = subscription_types[row['subscription_type']]
             result['subscription_type'] = sub_type
             subscription_name = row['subscription_name']
+            result['subscription_name'] = subscription_name
             
             # Construir URL de suscripción según especificación
             if sub_type == 'account':
                 result['subscription_url'] = f"https://www.tiktok.com/@{subscription_name}"
+                # Para cuentas, detectar sub-listas desde relativePath
+                result['list_types'] = self._detect_account_sublists_tiktok(row['relativePath'])
             elif sub_type == 'hashtag':
                 result['subscription_url'] = f"https://www.tiktok.com/tag/{subscription_name}"
+                result['list_types'] = ['hashtag']  # Los hashtags son listas simples
             elif sub_type == 'music':
                 # Música: "cancion nueva cinco" -> "cancion-nueva-cinco"
                 clean_name = subscription_name.replace(' ', '-')
                 result['subscription_url'] = f"https://www.tiktok.com/music/{clean_name}-{row['subscription_external_id']}"
-        
-        # Determinar list_types desde relativePath según especificación
-        relative_path = row['relativePath'] or ''
-        list_types = []
-        
-        if '\\Liked\\' in relative_path or '/Liked/' in relative_path:
-            list_types.append('liked')
-        elif '\\Favorites\\' in relative_path or '/Favorites/' in relative_path:
-            list_types.append('favorites')
+                result['list_types'] = ['music']  # Las músicas son listas simples
         else:
-            list_types.append('feed')
-        
-        result['list_types'] = list_types
+            # Tipo desconocido - tratar como cuenta
+            result['subscription_type'] = 'account'
+            result['subscription_name'] = row['subscription_name'] or row['authorName']
+            result['subscription_url'] = f"https://www.tiktok.com/@{result['subscription_name']}"
+            result['list_types'] = self._detect_account_sublists_tiktok(row['relativePath'])
         
         return result
+        
+    def _detect_account_sublists_tiktok(self, relative_path: str) -> List[str]:
+        """Detectar sublistas para cuentas TikTok según estructura de carpetas"""
+        if not relative_path:
+            return ['feed']
+            
+        # Normalizar separadores
+        path_normalized = relative_path.replace('\\', '/').lower()
+        
+        if '/liked/' in path_normalized or '/liked' in path_normalized:
+            return ['liked']
+        elif '/favorites/' in path_normalized or '/favorites' in path_normalized:
+            return ['favorites']
+        else:
+            return ['feed']  # Por defecto: feed principal
+            
+    def _extract_carousel_order(self, tiktok_id: str) -> Optional[int]:
+        """Extraer orden de carrusel desde ID de TikTok con _index_n1_n2"""
+        if '_index_' not in tiktok_id:
+            return None
+            
+        try:
+            # Formato: 7534089319917735182_index_0_3
+            # Extraer el primer número después de _index_ (n1 = orden)
+            parts = tiktok_id.split('_index_')[1].split('_')
+            if len(parts) >= 1:
+                return int(parts[0])
+        except (ValueError, IndexError):
+            pass
+            
+        return None
     
     def extract_instagram_content(self, offset: int = 0, limit: int = None) -> List[Dict]:
         """🆕 NUEVA ESTRUCTURA: Extraer contenido de Instagram desde 4K Stogram con soporte completo"""

@@ -120,6 +120,28 @@ class ApiService {
       'bilibili/video/tv': Platform.BILIBILI_TV
     };
 
+    // ✅ USAR INFORMACIÓN REAL DE SUSCRIPCIONES Y LISTAS DESDE EL BACKEND
+    let subscription: any = null;
+    let lists: any[] = [];
+    
+    // Usar información real de suscripción si está disponible
+    if ((video as any).subscription_info) {
+      const subInfo = (video as any).subscription_info;
+      subscription = {
+        type: subInfo.type,
+        id: subInfo.id.toString(),
+        name: subInfo.name
+      };
+    }
+    
+    // Usar información real de listas si está disponible
+    if ((video as any).video_lists && Array.isArray((video as any).video_lists)) {
+      lists = (video as any).video_lists.map((list: any) => ({
+        type: list.type,
+        name: list.name
+      }));
+    }
+
     return {
       id: video.id.toString(),
       title: video.title || video.file_name || 'Sin título',
@@ -160,6 +182,8 @@ class ApiService {
       size: video.file_size ? Math.round(video.file_size / (1024 * 1024)) : 0, // Convert to MB
       downloadDate: video.created_at,
       uploadDate: video.created_at,
+      subscription,
+      lists: lists.length > 0 ? lists : undefined,
     };
   }
 
@@ -346,7 +370,7 @@ class ApiService {
    */
   async getStats() {
     try {
-      const { posts, total } = await this.getVideos({ limit: 1000 });
+      const { posts, total } = await this.getVideos();
       
       return {
         total,
@@ -432,15 +456,15 @@ class ApiService {
     creatorName: string, 
     platform?: string, 
     subscriptionId?: string,
-    limit: number = 50,
+    limit: number = 0, // 0 = sin límite por defecto
     offset: number = 0
   ): Promise<{ posts: Post[], total: number }> {
     try {
       const params = new URLSearchParams();
       if (platform && platform !== 'all') params.append('platform', platform);
       if (subscriptionId) params.append('subscription_id', subscriptionId);
-      params.append('limit', limit.toString());
-      params.append('offset', offset.toString());
+      if (limit > 0) params.append('limit', limit.toString());
+      if (offset > 0) params.append('offset', offset.toString());
 
       const response = await fetch(`${API_BASE_URL}/creator/${encodeURIComponent(creatorName)}/videos?${params}`);
       
@@ -486,6 +510,103 @@ class ApiService {
       return data.subscriptions;
     } catch (error) {
       console.error('Error fetching subscriptions:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtener información específica de una suscripción
+   */
+  async getSubscriptionInfo(type: string, id: string): Promise<SubscriptionInfo | null> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/subscription/${type}/${id}`);
+      
+      if (!response.ok) {
+        if (response.status === 404) {
+          return null;
+        }
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      if (!data.success) {
+        throw new Error(data.error || 'Error fetching subscription info');
+      }
+
+      return data.subscription;
+    } catch (error) {
+      console.error('Error fetching subscription info:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtener estadísticas de una suscripción (conteos por tipo de lista)
+   */
+  async getSubscriptionStats(type: string, id: string): Promise<{total: number, listCounts: {[key: string]: number}} | null> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/subscription/${type}/${id}/stats`);
+      
+      if (!response.ok) {
+        if (response.status === 404) {
+          return null;
+        }
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      if (!data.success) {
+        throw new Error(data.error || 'Error fetching subscription stats');
+      }
+
+      return {
+        total: data.total,
+        listCounts: data.list_counts
+      };
+    } catch (error) {
+      console.error('Error fetching subscription stats:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtener videos de una suscripción específica
+   */
+  async getSubscriptionVideos(
+    type: string,
+    id: string,
+    listFilter?: string,
+    limit: number = 0, // 0 = sin límite por defecto
+    offset: number = 0
+  ): Promise<{ posts: Post[], total: number }> {
+    try {
+      const params = new URLSearchParams();
+      if (listFilter && listFilter !== 'all') params.append('list', listFilter);
+      if (limit > 0) params.append('limit', limit.toString());
+      if (offset > 0) params.append('offset', offset.toString());
+
+      const response = await fetch(`${API_BASE_URL}/subscription/${type}/${id}/videos?${params}`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      if (!data.success) {
+        throw new Error(data.error || 'Error fetching subscription videos');
+      }
+
+      const posts = data.videos.map((video: BackendVideo) => this.convertBackendVideoToPost(video));
+      
+      return {
+        posts,
+        total: data.total || posts.length
+      };
+    } catch (error) {
+      console.error('Error fetching subscription videos:', error);
       throw error;
     }
   }
