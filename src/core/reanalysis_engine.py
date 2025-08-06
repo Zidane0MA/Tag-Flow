@@ -134,8 +134,8 @@ class ReanalysisEngine:
                 'file_name': video['file_name'],
                 'creator_name': video['creator_name'],
                 'platform': video['platform'],
-                'title': video.get('description', ''),
-                'description': video.get('description', ''),
+                'title': video.get('title', ''),
+                'description': video.get('title', ''),
                 'content_type': 'video',
                 'existing_video_id': video_id,  # Marcador para identificar reanálisis
                 'source_type': 'reanalysis'

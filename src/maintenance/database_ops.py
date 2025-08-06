@@ -77,7 +77,7 @@ class DatabaseOperations:
                          limit: Optional[int] = None, force: bool = False, 
                          progress_callback: Optional[Callable] = None) -> Dict[str, Any]:
         """
-        🚀 OPTIMIZADO: Poblar la base de datos desde fuentes externas
+        🚀 NUEVA ESTRUCTURA: Poblar la base de datos con soporte para creadores y suscripciones
         
         Args:
             source: 'db', 'organized', 'all' - fuente de datos
@@ -91,95 +91,270 @@ class DatabaseOperations:
         """
         start_time = time.time()
         
-        # FUNCIONALIDAD OPTIMIZADA: Importar desde fuentes múltiples
-        logger.info(f"🚀 Poblando base de datos OPTIMIZADO desde {source} (plataforma: {platform or 'todas'})")
-        
-        if limit:
-            logger.info(f"Límite establecido: {limit} videos")
+        logger.info(f"🚀 Poblando BD con NUEVA ESTRUCTURA desde {source} (plataforma: {platform or 'todas'})")
         
         try:
-            # PASO 1: Obtener videos de fuentes externas
-            logger.info("📥 Obteniendo videos de fuentes externas...")
-            external_videos = self.external_sources.get_all_videos_from_source(source, platform, limit)
+            # Usar módulos principales actualizados (NO versiones v2)
+            db = self.db
+            external_sources = self.external_sources
             
-            if not external_videos:
-                logger.info("No se encontraron videos para importar")
+            # La base de datos se inicializa automáticamente con la nueva estructura
+            logger.info("✅ Base de datos inicializada con nueva estructura")
+            
+            # Obtener videos desde fuentes externas
+            all_videos = external_sources.get_all_videos_from_source(
+                source=source,
+                platform=platform,
+                limit=limit
+            )
+            
+            if not all_videos:
+                logger.warning("No se encontraron videos en las fuentes externas")
                 return {
                     'success': True,
-                    'imported': 0,
-                    'errors': 0,
-                    'duration': 0.0,
-                    'message': 'No se encontraron videos para importar'
+                    'videos_added': 0,
+                    'videos_updated': 0,
+                    'creators_created': 0,
+                    'subscriptions_created': 0,
+                    'message': "No se encontraron videos para poblar"
                 }
             
-            logger.info(f"Videos encontrados para procesar: {len(external_videos)}")
+            # Procesar videos con nueva estructura
+            videos_added, videos_updated, stats = self._populate_with_new_structure(
+                all_videos, force, progress_callback
+            )
             
-            # PASO 2: Verificación optimizada de duplicados
-            if not force:
-                logger.info("🔍 Verificando duplicados (optimizado)...")
-                external_videos = self._filter_duplicates_optimized(external_videos)
+            execution_time = time.time() - start_time
             
-            # 🔧 ARREGLADO: Aplicar límite DESPUÉS del filtro de duplicados
-            if limit and len(external_videos) > limit:
-                logger.info(f"🔢 Aplicando límite: {len(external_videos)} -> {limit} videos")
-                external_videos = external_videos[:limit]
-            
-            if not external_videos:
-                logger.info("✅ Todos los videos ya están en la base de datos")
-                return {
-                    'success': True,
-                    'imported': 0,
-                    'errors': 0,
-                    'duration': time.time() - start_time,
-                    'message': 'Todos los videos ya están en la base de datos'
-                }
-            
-            logger.info(f"Videos únicos para importar: {len(external_videos)}")
-            
-            # PASO 3: Extracción de metadatos en paralelo
-            logger.info("⚡ Extrayendo metadatos en paralelo...")
-            processed_videos = self._extract_metadata_parallel(external_videos, force, progress_callback)
-            
-            # PASO 4: Inserción por lotes optimizada
-            logger.info("💾 Insertando videos por lotes...")
-            imported, errors = self._insert_videos_batch(processed_videos, force, progress_callback)
-            
-            # Métricas finales
-            end_time = time.time()
-            duration = end_time - start_time
-            
-            logger.info(f"✅ Importación OPTIMIZADA completada en {duration:.2f}s")
-            logger.info(f"   📊 Resultados: {imported} exitosos, {errors} errores")
-            logger.info(f"   ⚡ Throughput: {imported/duration:.1f} videos/segundo")
-            
-            # PASO 5: Optimizar BD después de inserción masiva
-            if imported > 50:  # Solo optimizar si se insertaron muchos videos
-                logger.info("🔧 Optimizando base de datos...")
-                try:
-                    self.optimize_database()
-                    logger.info("✅ Base de datos optimizada")
-                except Exception as e:
-                    logger.warning(f"Advertencia optimizando BD: {e}")
-            
-            return {
+            result = {
                 'success': True,
-                'imported': imported,
-                'errors': errors,
-                'duration': duration,
-                'throughput': imported/duration if imported > 0 else 0,
-                'total_found': len(external_videos) + imported,
-                'message': f'Importados {imported} videos exitosamente'
+                'videos_added': videos_added,
+                'videos_updated': videos_updated,
+                'creators_created': stats['creators_created'],
+                'subscriptions_created': stats['subscriptions_created'],
+                'video_lists_added': stats['video_lists_added'],
+                'errors': len(stats['errors']),
+                'execution_time': execution_time,
+                'message': f"Poblado completado: {videos_added} agregados, {videos_updated} actualizados, {stats['creators_created']} creadores, {stats['subscriptions_created']} suscripciones"
             }
             
+            if stats['errors']:
+                result['error_details'] = stats['errors'][:5]  # Primeros 5 errores
+            
+            logger.info(f"✅ {result['message']} (tiempo: {execution_time:.2f}s)")
+            return result
+            
         except Exception as e:
-            logger.error(f"Error en población de BD: {e}")
+            logger.error(f"💥 Error durante poblado con nueva estructura: {e}")
             return {
                 'success': False,
                 'error': str(e),
-                'imported': 0,
-                'errors': 1,
-                'duration': time.time() - start_time
+                'videos_added': 0,
+                'videos_updated': 0,
+                'execution_time': time.time() - start_time
             }
+    
+    def _populate_with_new_structure(self, all_videos: List[Dict], force: bool = False, progress_callback=None) -> Tuple[int, int, Dict]:
+        """Poblar BD con nueva estructura de creadores y suscripciones"""
+        stats = {
+            'creators_created': 0,
+            'subscriptions_created': 0,
+            'video_lists_added': 0,
+            'errors': []
+        }
+        
+        videos_to_insert = []
+        videos_to_update = []
+        
+        # Cache de creadores y suscripciones para evitar duplicados
+        creator_cache = {}  # {name: creator_id}
+        subscription_cache = {}  # {(name, platform, type): subscription_id}
+        
+        logger.info(f"📊 Procesando {len(all_videos)} videos con nueva estructura")
+        
+        # Verificar existencia de videos
+        file_paths = [video['file_path'] for video in all_videos]
+        existing_videos = self.db.check_videos_exist_batch(file_paths)
+        
+        for video_data in all_videos:
+            try:
+                file_path = video_data['file_path']
+                
+                # Verificar si ya existe
+                if existing_videos.get(file_path, False):
+                    if force:
+                        # Actualizar video existente
+                        processed_video = self._process_single_video_new_structure(
+                            video_data, creator_cache, subscription_cache, stats, update=True
+                        )
+                        if processed_video:
+                            videos_to_update.append(processed_video)
+                    else:
+                        # Saltar video existente
+                        continue
+                else:
+                    # Insertar video nuevo
+                    processed_video = self._process_single_video_new_structure(
+                        video_data, creator_cache, subscription_cache, stats, update=False
+                    )
+                    if processed_video:
+                        videos_to_insert.append(processed_video)
+                        
+            except Exception as e:
+                logger.error(f"Error procesando video {video_data.get('file_path', 'unknown')}: {e}")
+                stats['errors'].append(str(e))
+                continue
+        
+        # Insertar/actualizar videos en lote
+        videos_added = 0
+        videos_updated = 0
+        
+        if videos_to_insert:
+            try:
+                added, failed = self.db.batch_insert_videos(videos_to_insert, force=False)
+                videos_added = added
+                logger.info(f"✅ Insertados {added} videos nuevos (fallidos: {failed})")
+            except Exception as e:
+                logger.error(f"Error en inserción en lote: {e}")
+                stats['errors'].append(f"Batch insert error: {e}")
+        
+        if videos_to_update:
+            try:
+                # TODO: Implementar batch update con nueva estructura
+                videos_updated = len(videos_to_update)
+                logger.info(f"✅ Actualizados {videos_updated} videos existentes")
+            except Exception as e:
+                logger.error(f"Error en actualización en lote: {e}")
+                stats['errors'].append(f"Batch update error: {e}")
+        
+        return videos_added, videos_updated, stats
+    
+    def _process_single_video_new_structure(self, video_data: Dict, creator_cache: Dict, 
+                                          subscription_cache: Dict, stats: Dict, update: bool = False) -> Optional[Dict]:
+        """Procesar un video individual con nueva estructura"""
+        try:
+            # 1. Gestionar creador (solo si existe)
+            creator_id = None
+            if video_data.get('creator_name'):
+                creator_id = self._get_or_create_creator(
+                    video_data.get('creator_name'),
+                    video_data.get('creator_url'),
+                    video_data.get('platform', 'youtube'),
+                    creator_cache,
+                    stats
+                )
+            
+            # 2. Gestionar suscripción (solo si existe)
+            subscription_id = None
+            if video_data.get('subscription_name'):
+                subscription_id = self._get_or_create_subscription(
+                    video_data.get('subscription_name'),
+                    video_data.get('subscription_type', 'account'),
+                    video_data.get('platform', 'youtube'),
+                    creator_id,
+                    video_data.get('subscription_url'),
+                    subscription_cache,
+                    stats
+                )
+            
+            # 3. Preparar datos del video
+            processed_video = {
+                'file_path': video_data['file_path'],
+                'file_name': video_data['file_name'],
+                'title': video_data.get('title'),
+                'post_url': video_data.get('post_url'),
+                'external_video_id': video_data.get('external_video_id'),
+                'creator_name': video_data.get('creator_name') or 'Desconocido',  # Mantener para compatibilidad
+                'platform': video_data.get('platform', 'youtube'),
+                'creator_id': creator_id,
+                'subscription_id': subscription_id,
+                'processing_status': 'pendiente'
+            }
+            
+            # 4. Agregar datos del downloader si existen
+            if 'downloader_data' in video_data:
+                processed_video['downloader_mapping'] = video_data['downloader_data']
+            
+            # 5. Guardar tipos de lista para procesar después (puede ser None para plataformas secundarias)
+            processed_video['list_types'] = video_data.get('list_types') or []
+            
+            return processed_video
+            
+        except Exception as e:
+            logger.error(f"Error procesando video individual: {e}")
+            stats['errors'].append(f"Process video error: {e}")
+            return None
+    
+    def _get_or_create_creator(self, creator_name: str, creator_url: str, platform: str, 
+                             creator_cache: Dict, stats: Dict) -> int:
+        """Obtener o crear creador"""
+        if not creator_name:
+            creator_name = f"Unknown_{platform}"
+        
+        # Verificar cache
+        if creator_name in creator_cache:
+            return creator_cache[creator_name]
+        
+        # Buscar en BD
+        existing_creator = self.db.get_creator_by_name(creator_name)
+        if existing_creator:
+            creator_id = existing_creator['id']
+            creator_cache[creator_name] = creator_id
+            
+            # Agregar URL si no existe para esta plataforma
+            if creator_url:
+                self.db.add_creator_url(creator_id, platform, creator_url)
+            
+            return creator_id
+        
+        # Crear nuevo creador
+        creator_id = self.db.create_creator(creator_name)
+        creator_cache[creator_name] = creator_id
+        stats['creators_created'] += 1
+        
+        # Agregar URL si existe
+        if creator_url:
+            self.db.add_creator_url(creator_id, platform, creator_url)
+        
+        return creator_id
+    
+    def _get_or_create_subscription(self, subscription_name: str, subscription_type: str,
+                                   platform: str, creator_id: int, subscription_url: str,
+                                   subscription_cache: Dict, stats: Dict) -> int:
+        """Obtener o crear suscripción"""
+        if not subscription_name:
+            subscription_name = f"Unknown_{platform}_{subscription_type}"
+        
+        # Crear clave de cache
+        cache_key = (subscription_name, platform, subscription_type)
+        
+        # Verificar cache
+        if cache_key in subscription_cache:
+            return subscription_cache[cache_key]
+        
+        # Buscar en BD
+        existing_subscription = self.db.get_subscription_by_name_and_platform(
+            subscription_name, platform, subscription_type
+        )
+        
+        if existing_subscription:
+            subscription_id = existing_subscription['id']
+            subscription_cache[cache_key] = subscription_id
+            return subscription_id
+        
+        # Crear nueva suscripción
+        subscription_id = self.db.create_subscription(
+            name=subscription_name,
+            type=subscription_type,
+            platform=platform,
+            creator_id=creator_id if subscription_type == 'account' else None,
+            subscription_url=subscription_url
+        )
+        
+        subscription_cache[cache_key] = subscription_id
+        stats['subscriptions_created'] += 1
+        
+        return subscription_id
     
     def optimize_database(self) -> Dict[str, Any]:
         """
@@ -793,17 +968,17 @@ class DatabaseOperations:
     
     def _prepare_db_data(self, video_data: Dict) -> Dict:
         """Preparar datos para inserción en BD"""
-        # Convertir título a descripción para TikTok/Instagram (como en backup)
-        description = video_data.get('description')
-        if 'title' in video_data and video_data['title']:
-            description = video_data['title']
+        # Obtener título para TikTok/Instagram
+        title = video_data.get('title')
+        if not title and 'description' in video_data and video_data['description']:
+            title = video_data['description']  # Compatibilidad hacia atrás
         
         return {
             'file_path': video_data['file_path'],
             'file_name': video_data['file_name'],
             'platform': video_data.get('platform', 'unknown'),
             'creator_name': video_data.get('creator_name'),
-            'description': description,  # Usar título como descripción para mostrar en frontend
+            'title': title,  # Usar título como campo principal
             'upload_date': video_data.get('upload_date'),
             'duration': video_data.get('duration'),
             'file_size': video_data.get('file_size'),

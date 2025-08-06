@@ -57,13 +57,13 @@ def api_videos():
                     video['final_characters'] = []
             
             # Preparar título apropiado para el frontend
-            if video.get('platform') in ['tiktok', 'instagram'] and video.get('description'):
+            if video.get('platform') in ['tiktok', 'instagram'] and video.get('title'):
                 if (video.get('platform') == 'instagram' and 
-                    video.get('description') and 
-                    video.get('description') != video.get('file_name', '').replace('.mp4', '')):
-                    video['display_title'] = video['description']
+                    video.get('title') and 
+                    video.get('title') != video.get('file_name', '').replace('.mp4', '')):
+                    video['display_title'] = video['title']
                 elif video.get('platform') == 'tiktok':
-                    video['display_title'] = video['description']
+                    video['display_title'] = video['title']
                 else:
                     video['display_title'] = video['file_name']
             else:
@@ -107,13 +107,13 @@ def api_get_video(video_id):
             video['final_characters'] = []
         
         # Preparar título apropiado para el frontend
-        if video.get('platform') in ['tiktok', 'instagram'] and video.get('description'):
+        if video.get('platform') in ['tiktok', 'instagram'] and video.get('title'):
             if (video.get('platform') == 'instagram' and 
-                video.get('description') and 
-                video.get('description') != video.get('file_name', '').replace('.mp4', '')):
-                video['display_title'] = video['description']
+                video.get('title') and 
+                video.get('title') != video.get('file_name', '').replace('.mp4', '')):
+                video['display_title'] = video['title']
             elif video.get('platform') == 'tiktok':
-                video['display_title'] = video['description']
+                video['display_title'] = video['title']
             else:
                 video['display_title'] = video['file_name']
         else:

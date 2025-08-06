@@ -77,15 +77,15 @@ def index():
                 video['thumbnail_url'] = "/static/img/no-thumbnail.svg"
             
             # Preparar título apropiado para el frontend
-            if video.get('platform') in ['tiktok', 'instagram'] and video.get('description'):
-                # Para TikTok e Instagram: usar descripción como título si está disponible
+            if video.get('platform') in ['tiktok', 'instagram'] and video.get('title'):
+                # Para TikTok e Instagram: usar título si está disponible
                 # Para Instagram: verificar que no sea solo el nombre del archivo
                 if (video.get('platform') == 'instagram' and 
-                    video.get('description') and 
-                    video.get('description') != video.get('file_name', '').replace('.mp4', '')):
-                    video['display_title'] = video['description']
+                    video.get('title') and 
+                    video.get('title') != video.get('file_name', '').replace('.mp4', '')):
+                    video['display_title'] = video['title']
                 elif video.get('platform') == 'tiktok':
-                    video['display_title'] = video['description']
+                    video['display_title'] = video['title']
                 else:
                     video['display_title'] = video.get('title', video.get('file_name', 'Sin título'))
             else:

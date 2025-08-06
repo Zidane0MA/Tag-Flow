@@ -351,7 +351,7 @@ class VideoAnalyzer:
                     video_data_for_recognition = {
                         'creator_name': video_data.get('creator_name', ''),
                         'platform': video_data.get('platform', 'unknown'),
-                        'title': video_data.get('title', '') or video_data.get('description', '')
+                        'title': video_data.get('title', '')
                     }
                     
                     # Usar reconocimiento inteligente que combina todas las estrategias

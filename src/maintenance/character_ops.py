@@ -233,7 +233,8 @@ class CharacterOperations:
                 json.dump(character_db, f, indent=2, ensure_ascii=False)
             
             # Recargar intelligence system
-            self.character_intelligence = CharacterIntelligence()
+            from src.service_factory import get_character_intelligence
+            self._character_intelligence = get_character_intelligence()
             
             logger.info(f"✅ Personaje agregado: {character_name}")
             

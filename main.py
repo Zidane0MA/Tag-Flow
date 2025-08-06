@@ -318,6 +318,91 @@ Ejemplos de uso:
             ops = StatsOperations()
             result = ops.get_database_stats()
             
+            # Mostrar estadísticas formateadas
+            if result['success']:
+                stats = result['stats']
+                print("\n" + "="*60)
+                print("📊 ESTADÍSTICAS DE BASE DE DATOS")
+                print("="*60)
+                print(f"Base de datos: {stats['database_file']}")
+                print(f"Tamaño: {stats['database_size_mb']} MB")
+                print(f"Total videos: {stats['total_records'].get('videos', 0)}")
+                
+                if 'platform_breakdown' in stats:
+                    print(f"\n🌐 POR PLATAFORMA:")
+                    for platform, count in stats['platform_breakdown'].items():
+                        print(f"  {platform}: {count} videos")
+                
+                if 'new_structure' in stats:
+                    ns = stats['new_structure']
+                    print(f"\n🆕 NUEVA ESTRUCTURA:")
+                    print(f"  Creadores: {ns.get('total_creators', 0)}")
+                    print(f"  Suscripciones: {ns.get('total_subscriptions', 0)}")
+                    print(f"  Videos con creator_id: {ns.get('videos_with_creator_id', 0)}")
+                    print(f"  Videos con subscription_id: {ns.get('videos_with_subscription_id', 0)}")
+                
+                if 'external_sources' in stats:
+                    ext = stats['external_sources']
+                    print(f"\n🔗 FUENTES EXTERNAS:")
+                    print(f"  Total videos disponibles: {ext.get('total_external_videos', 0)}")
+                    print(f"  Fuentes encontradas: {ext.get('sources_found', 0)}")
+                    
+                    # Mostrar desglose detallado por plataforma de 4K Video Downloader
+                    if ext.get('platform_breakdown') and '4k_video_downloader' in ext['platform_breakdown']:
+                        print(f"\n  📺 4K Video Downloader - Por plataforma:")
+                        platform_stats = ext['platform_breakdown']['4k_video_downloader']
+                        total_4k = sum(platform_stats.values())
+                        
+                        for platform, count in sorted(platform_stats.items(), key=lambda x: x[1], reverse=True):
+                            percentage = (count / total_4k * 100) if total_4k > 0 else 0
+                            print(f"    {platform.capitalize()}: {count} videos ({percentage:.1f}%)")
+                        print(f"    Total: {total_4k} videos")
+                    
+                    # Mostrar otros sources
+                    if ext.get('available_sources'):
+                        print(f"\n  🎬 Otras fuentes:")
+                        for source, count in ext['available_sources'].items():
+                            if 'tokkit' in source or 'stogram' in source:
+                                source_name = source.replace('4k_', '').replace('_', ' ').title()
+                                print(f"    {source_name}: {count} videos")
+                    
+                    # Mostrar información de carpetas organizadas
+                    if ext.get('organized_folders'):
+                        org = ext['organized_folders']
+                        print(f"\n📁 CARPETAS ORGANIZADAS:")
+                        print(f"  Carpeta base: {org.get('base_path', 'No configurada')}")
+                        
+                        if org.get('base_path_exists'):
+                            print(f"  Estado: ✅ Carpeta base existe")
+                            
+                            if org.get('platforms'):
+                                print(f"\n  📊 Por plataforma:")
+                                for platform, info in org['platforms'].items():
+                                    if isinstance(info, dict) and info.get('exists', True):
+                                        creators = info.get('creators', 0)
+                                        videos = info.get('videos', 0)
+                                        print(f"    {platform.capitalize()}: {creators} creadores, {videos} videos")
+                                    else:
+                                        print(f"    {platform.capitalize()}: ❌ No existe")
+                            
+                            total_creators = org.get('total_creators', 0)
+                            total_videos = org.get('total_videos', 0)
+                            print(f"\n  📈 Totales: {total_creators} creadores, {total_videos} videos")
+                            
+                            if org.get('other_platforms'):
+                                other_count = org.get('other_platforms_count', 0)
+                                print(f"  🌐 Otras plataformas: {other_count} adicionales")
+                        else:
+                            print(f"  Estado: ❌ Carpeta base no existe")
+                        
+                        if org.get('error'):
+                            print(f"  ⚠️  Error: {org['error']}")
+                
+                print("="*60)
+            else:
+                print(f"❌ Error: {result.get('error', 'Error desconocido')}")
+            return
+            
         elif command in ['regenerate-thumbnails', 'populate-thumbnails', 'clean-thumbnails', 'thumbnail-stats']:
             from src.maintenance.thumbnail_ops import ThumbnailOperations
             ops = ThumbnailOperations()

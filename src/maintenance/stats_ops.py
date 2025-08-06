@@ -85,6 +85,14 @@ class StatsOperations:
                 # Health check de la base de datos
                 health_stats = self._get_health_stats(conn)
                 stats['health'] = health_stats
+                
+                # 🆕 NUEVA ESTRUCTURA: Estadísticas de creadores y suscripciones
+                new_structure_stats = self._get_new_structure_stats(conn)
+                stats['new_structure'] = new_structure_stats
+                
+                # 🆕 Estadísticas de fuentes externas
+                external_stats = self._get_external_sources_stats()
+                stats['external_sources'] = external_stats
             
             return {
                 'success': True,
@@ -261,6 +269,278 @@ class StatsOperations:
             return {
                 'error': str(e),
                 'database_path': str(self.db_path) if self._db_path else 'unknown'
+            }
+    
+    def _get_new_structure_stats(self, conn: sqlite3.Connection) -> Dict[str, Any]:
+        """Estadísticas de la nueva estructura (creadores, suscripciones, listas)"""
+        try:
+            stats = {}
+            
+            # Verificar si las nuevas tablas existen
+            tables_check = conn.execute("""
+                SELECT name FROM sqlite_master 
+                WHERE type='table' AND name IN ('creators', 'subscriptions', 'creator_urls', 'video_lists')
+            """).fetchall()
+            
+            existing_tables = [row[0] for row in tables_check]
+            stats['tables_exist'] = existing_tables
+            
+            if 'creators' in existing_tables:
+                # Estadísticas de creadores
+                creator_count = conn.execute("SELECT COUNT(*) FROM creators").fetchone()[0]
+                stats['total_creators'] = creator_count
+                
+                # Creadores con URLs por plataforma
+                if 'creator_urls' in existing_tables:
+                    platform_creators = conn.execute("""
+                        SELECT platform, COUNT(DISTINCT creator_id) as count
+                        FROM creator_urls
+                        GROUP BY platform
+                    """).fetchall()
+                    stats['creators_by_platform'] = {row[0]: row[1] for row in platform_creators}
+            
+            if 'subscriptions' in existing_tables:
+                # Estadísticas de suscripciones
+                subscription_count = conn.execute("SELECT COUNT(*) FROM subscriptions").fetchone()[0]
+                stats['total_subscriptions'] = subscription_count
+                
+                # Suscripciones por tipo y plataforma
+                sub_breakdown = conn.execute("""
+                    SELECT platform, type, COUNT(*) as count
+                    FROM subscriptions
+                    GROUP BY platform, type
+                """).fetchall()
+                
+                platform_subs = {}
+                for row in sub_breakdown:
+                    platform = row[0]
+                    sub_type = row[1]
+                    count = row[2]
+                    
+                    if platform not in platform_subs:
+                        platform_subs[platform] = {}
+                    platform_subs[platform][sub_type] = count
+                
+                stats['subscriptions_breakdown'] = platform_subs
+            
+            if 'video_lists' in existing_tables:
+                # Estadísticas de listas de videos
+                list_stats = conn.execute("""
+                    SELECT list_type, COUNT(*) as count
+                    FROM video_lists
+                    GROUP BY list_type
+                """).fetchall()
+                stats['video_lists'] = {row[0]: row[1] for row in list_stats}
+            
+            # Videos con nueva estructura
+            videos_with_creator = conn.execute("""
+                SELECT COUNT(*) FROM videos WHERE creator_id IS NOT NULL
+            """).fetchone()[0]
+            
+            videos_with_subscription = conn.execute("""
+                SELECT COUNT(*) FROM videos WHERE subscription_id IS NOT NULL
+            """).fetchone()[0]
+            
+            stats['videos_with_creator_id'] = videos_with_creator
+            stats['videos_with_subscription_id'] = videos_with_subscription
+            
+            return stats
+            
+        except Exception as e:
+            logger.error(f"Error en estadísticas de nueva estructura: {e}")
+            return {'error': str(e)}
+    
+    def _get_external_sources_stats(self) -> Dict[str, Any]:
+        """Estadísticas de fuentes externas disponibles con desglose por plataforma"""
+        try:
+            # Usar external_sources integrado (no v2)
+            from src.service_factory import get_external_sources
+            
+            external_sources = get_external_sources()
+            
+            # Contar videos disponibles por plataforma
+            available_sources = {}
+            platform_breakdown = {}
+            
+            # 4K Video Downloader - Desglose por todas las plataformas
+            if external_sources.external_youtube_db and external_sources.external_youtube_db.exists():
+                # Obtener desglose por plataforma de 4K Video Downloader
+                platform_stats = self._get_4k_video_platform_breakdown(external_sources)
+                platform_breakdown['4k_video_downloader'] = platform_stats
+                
+                # Total de 4K Video Downloader
+                total_4k_video = sum(platform_stats.values())
+                available_sources['4k_video_downloader_total'] = total_4k_video
+                
+                # YouTube específico
+                available_sources['4k_video_youtube'] = platform_stats.get('youtube', 0)
+            
+            # TikTok (4K Tokkit)
+            if external_sources.tiktok_db_path and external_sources.tiktok_db_path.exists():
+                tiktok_videos = external_sources.extract_tiktok_videos()
+                available_sources['4k_tokkit_tiktok'] = len(tiktok_videos)
+            
+            # Instagram (4K Stogram)
+            if external_sources.instagram_db_path and external_sources.instagram_db_path.exists():
+                instagram_content = external_sources.extract_instagram_content()
+                available_sources['4k_stogram_instagram'] = len(instagram_content)
+            
+            # Carpetas organizadas
+            organized_stats = self._get_organized_folders_stats(external_sources)
+            
+            return {
+                'available_sources': available_sources,
+                'platform_breakdown': platform_breakdown,
+                'organized_folders': organized_stats,
+                'total_external_videos': sum(available_sources.values()),
+                'total_organized_videos': organized_stats.get('total_videos', 0),
+                'sources_found': len(available_sources)
+            }
+            
+        except Exception as e:
+            logger.error(f"Error obteniendo estadísticas de fuentes externas: {e}")
+            return {
+                'error': str(e),
+                'available_sources': {},
+                'platform_breakdown': {},
+                'total_external_videos': 0,
+                'sources_found': 0
+            }
+    
+    def _get_4k_video_platform_breakdown(self, external_sources) -> Dict[str, int]:
+        """Obtener desglose por plataforma de 4K Video Downloader"""
+        try:
+            import sqlite3
+            platform_stats = {}
+            
+            # Conectar directamente a la BD de 4K Video Downloader
+            conn = sqlite3.connect(str(external_sources.external_youtube_db))
+            conn.row_factory = sqlite3.Row
+            
+            # Query para obtener estadísticas por plataforma
+            query = """
+            SELECT 
+                LOWER(ud.service_name) as platform,
+                COUNT(*) as count
+            FROM download_item di
+            LEFT JOIN media_item_description mid ON di.id = mid.download_item_id
+            LEFT JOIN url_description ud ON mid.id = ud.media_item_description_id
+            WHERE di.filename IS NOT NULL AND ud.service_name IS NOT NULL
+            GROUP BY LOWER(ud.service_name)
+            ORDER BY count DESC
+            """
+            
+            cursor = conn.execute(query)
+            rows = cursor.fetchall()
+            
+            # Normalizar nombres de plataforma
+            platform_mapping = {
+                'youtube': 'youtube',
+                'facebook': 'facebook',
+                'twitter': 'twitter',
+                'x': 'twitter',  # X (antes Twitter)
+                'vimeo': 'vimeo',
+                'dailymotion': 'dailymotion',
+                'twitch': 'twitch',
+                'soundcloud': 'soundcloud'
+            }
+            
+            for row in rows:
+                platform_raw = row['platform']
+                count = row['count']
+                
+                # Normalizar nombre de plataforma
+                platform_normalized = platform_mapping.get(platform_raw, platform_raw)
+                
+                if platform_normalized in platform_stats:
+                    platform_stats[platform_normalized] += count
+                else:
+                    platform_stats[platform_normalized] = count
+            
+            conn.close()
+            
+            return platform_stats
+            
+        except Exception as e:
+            logger.error(f"Error obteniendo desglose de plataformas 4K Video Downloader: {e}")
+            return {}
+    
+    def _get_organized_folders_stats(self, external_sources) -> Dict[str, Any]:
+        """Obtener estadísticas de carpetas organizadas"""
+        try:
+            import sys
+            sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+            from config import config
+            
+            organized_stats = {
+                'base_path': str(config.ORGANIZED_BASE_PATH),
+                'base_path_exists': config.ORGANIZED_BASE_PATH.exists(),
+                'platforms': {},
+                'total_videos': 0,
+                'total_creators': 0
+            }
+            
+            if not config.ORGANIZED_BASE_PATH.exists():
+                organized_stats['error'] = f"Carpeta base no existe: {config.ORGANIZED_BASE_PATH}"
+                return organized_stats
+            
+            # Escanear plataformas principales
+            main_platforms = ['Youtube', 'Tiktok', 'Instagram']
+            
+            for platform in main_platforms:
+                platform_path = config.ORGANIZED_BASE_PATH / platform
+                platform_lower = platform.lower()
+                
+                if platform_path.exists():
+                    # Contar carpetas de creadores
+                    creator_folders = [d for d in platform_path.iterdir() if d.is_dir()]
+                    
+                    # Contar videos en cada carpeta de creador
+                    total_videos = 0
+                    video_extensions = {'.mp4', '.avi', '.mov', '.mkv', '.wmv', '.flv', '.webm', '.m4v'}
+                    
+                    for creator_folder in creator_folders:
+                        if creator_folder.is_dir():
+                            # Contar videos recursivamente
+                            for file_path in creator_folder.rglob('*'):
+                                if file_path.is_file() and file_path.suffix.lower() in video_extensions:
+                                    total_videos += 1
+                    
+                    organized_stats['platforms'][platform_lower] = {
+                        'path': str(platform_path),
+                        'creators': len(creator_folders),
+                        'videos': total_videos
+                    }
+                    
+                    organized_stats['total_videos'] += total_videos
+                    organized_stats['total_creators'] += len(creator_folders)
+                else:
+                    organized_stats['platforms'][platform_lower] = {
+                        'path': str(platform_path),
+                        'exists': False,
+                        'creators': 0,
+                        'videos': 0
+                    }
+            
+            # Escanear otras plataformas (carpetas adicionales)
+            other_platforms = []
+            for item in config.ORGANIZED_BASE_PATH.iterdir():
+                if item.is_dir() and item.name not in main_platforms:
+                    other_platforms.append(item.name)
+            
+            if other_platforms:
+                organized_stats['other_platforms'] = other_platforms
+                organized_stats['other_platforms_count'] = len(other_platforms)
+            
+            return organized_stats
+            
+        except Exception as e:
+            logger.error(f"Error obteniendo estadísticas de carpetas organizadas: {e}")
+            return {
+                'error': str(e),
+                'platforms': {},
+                'total_videos': 0,
+                'total_creators': 0
             }
     
     def __del__(self):

@@ -1,10 +1,12 @@
 """
-Tag-Flow V2 - Manejo de Fuentes Externas
+Tag-Flow V2 - Manejo de Fuentes Externas con Nueva Estructura
 Extracción de datos desde múltiples bases de datos y carpetas organizadas
+CON SOPORTE COMPLETO PARA CREADORES, SUSCRIPCIONES Y LISTAS
 """
 
 import sqlite3
 import json
+import re
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 import logging
@@ -20,7 +22,7 @@ logger = logging.getLogger(__name__)
 _external_sources_instance = None
 
 class ExternalSourcesManager:
-    """Gestor para extraer datos de fuentes externas (4K Downloader apps + carpetas organizadas)"""
+    """Gestor para extraer datos de fuentes externas con nueva estructura BD completa"""
     
     def __new__(cls):
         global _external_sources_instance
@@ -75,9 +77,75 @@ class ExternalSourcesManager:
             logger.error(f"Error conectando a {db_path}: {e}")
             return None
     
-    def extract_youtube_videos(self) -> List[Dict]:
-        """Extraer videos de la base de datos de 4K Video Downloader+"""
-        logger.info("Extrayendo videos de YouTube...")
+    def get_available_4k_platforms(self) -> Dict[str, int]:
+        """
+        🔍 AUTODETECCIÓN: Descubrir automáticamente todas las plataformas disponibles en 4K Video Downloader
+        
+        Returns:
+            Dict con plataforma normalizada y cantidad de videos disponibles
+        """
+        platforms = {}
+        
+        conn = self._get_connection(self.external_youtube_db)
+        if not conn:
+            return platforms
+        
+        try:
+            # Query para obtener todas las plataformas disponibles con conteo
+            query = """
+            SELECT 
+                LOWER(ud.service_name) as platform_raw,
+                COUNT(*) as count
+            FROM download_item di
+            LEFT JOIN media_item_description mid ON di.id = mid.download_item_id
+            LEFT JOIN url_description ud ON mid.id = ud.media_item_description_id
+            WHERE di.filename IS NOT NULL AND ud.service_name IS NOT NULL
+            GROUP BY LOWER(ud.service_name)
+            ORDER BY count DESC
+            """
+            
+            cursor = conn.execute(query)
+            rows = cursor.fetchall()
+            
+            # Mapeo para normalizar nombres de plataforma
+            platform_mapping = {
+                'youtube': 'youtube',
+                'facebook': 'facebook',
+                'twitter': 'twitter',
+                'x': 'twitter',  # X (antes Twitter)
+                'vimeo': 'vimeo',
+                'dailymotion': 'dailymotion',
+                'twitch': 'twitch',
+                'soundcloud': 'soundcloud',
+                'bilibili': 'bilibili',
+                'bilibili/video': 'bilibili',
+                'bilibili/video/tv': 'bilibili',
+            }
+            
+            for row in rows:
+                platform_raw = row['platform_raw']
+                count = row['count']
+                
+                # Normalizar nombre de plataforma
+                platform_normalized = platform_mapping.get(platform_raw, platform_raw)
+                
+                if platform_normalized in platforms:
+                    platforms[platform_normalized] += count
+                else:
+                    platforms[platform_normalized] = count
+            
+            conn.close()
+            
+            return platforms
+            
+        except Exception as e:
+            logger.error(f"Error autodescubriendo plataformas 4K Video Downloader: {e}")
+            conn.close()
+            return platforms
+    
+    def extract_youtube_videos(self, offset: int = 0, limit: Optional[int] = None) -> List[Dict]:
+        """🆕 NUEVA ESTRUCTURA: Extraer videos de 4K Video Downloader con soporte completo"""
+        logger.info("Extrayendo videos de 4K Video Downloader con nueva estructura...")
         videos = []
         
         conn = self._get_connection(self.external_youtube_db)
@@ -85,40 +153,60 @@ class ExternalSourcesManager:
             return videos
         
         try:
-            # Query para obtener videos con metadatos y creadores
+            # Query completa para obtener todos los metadatos necesarios
             query = """
             SELECT 
                 di.id as download_id,
                 di.filename as file_path,
                 mid.title as video_title,
-                mim.value as creator_name
+                ud.service_name as platform,
+                ud.url as video_url,
+                
+                -- Metadatos del creador y playlist
+                GROUP_CONCAT(
+                    CASE 
+                        WHEN mim.type = 0 THEN 'creator_name:' || mim.value
+                        WHEN mim.type = 1 THEN 'creator_url:' || mim.value  
+                        WHEN mim.type = 3 THEN 'playlist_name:' || mim.value
+                        WHEN mim.type = 4 THEN 'playlist_url:' || mim.value
+                        WHEN mim.type = 5 THEN 'channel_name:' || mim.value
+                        WHEN mim.type = 6 THEN 'channel_url:' || mim.value
+                        WHEN mim.type = 7 THEN 'subscription_info:' || mim.value
+                    END, '|||'
+                ) as metadata_concat
+                
             FROM download_item di
             LEFT JOIN media_item_description mid ON di.id = mid.download_item_id
-            LEFT JOIN media_item_metadata mim ON di.id = mim.download_item_id AND mim.type = 0
+            LEFT JOIN url_description ud ON mid.id = ud.media_item_description_id
+            LEFT JOIN media_item_metadata mim ON di.id = mim.download_item_id
             WHERE di.filename IS NOT NULL
+            GROUP BY di.id 
             ORDER BY di.id DESC
             """
             
-            cursor = conn.execute(query)
+            # Aplicar límite y offset (SQLite requiere LIMIT con OFFSET)
+            params = []
+            if limit or offset > 0:
+                # Si hay offset pero no limit, usar un límite muy alto
+                actual_limit = limit if limit else 10000
+                query += " LIMIT ? OFFSET ?"
+                params.extend([actual_limit, offset])
+            
+            cursor = conn.execute(query, params)
             rows = cursor.fetchall()
             
-            for row in rows:
-                file_path = Path(row['file_path'])
-                
-                # Verificar que el archivo exista y sea un video
-                if file_path.exists() and file_path.suffix.lower() in self.video_extensions:
-                    video_data = {
-                        'file_path': str(file_path),
-                        'file_name': file_path.name,
-                        'creator_name': row['creator_name'] or 'Desconocido',
-                        'platform': 'youtube',
-                        'title': row['video_title'] or file_path.stem,
-                        'source': 'youtube_db',
-                        'external_id': row['download_id']
-                    }
-                    videos.append(video_data)
+            logger.info(f"Obtenidos {len(rows)} registros de 4K Video Downloader")
             
-            logger.info(f"✓ Extraídos {len(videos)} videos de YouTube desde BD")
+            for row in rows:
+                try:
+                    video_data = self._process_4k_video_row(row)
+                    if video_data:
+                        videos.append(video_data)
+                except Exception as e:
+                    logger.error(f"Error procesando fila {row['download_id']}: {e}")
+                    continue
+            
+            logger.info(f"✓ Procesados {len(videos)} videos de 4K Video Downloader")
             
         except Exception as e:
             logger.error(f"Error extrayendo videos de YouTube: {e}")
@@ -127,49 +215,311 @@ class ExternalSourcesManager:
         
         return videos
     
+    def extract_4k_video_downloader_by_platform(self, platform_filter: str, offset: int = 0, limit: Optional[int] = None) -> List[Dict]:
+        """Extraer videos de 4K Video Downloader filtrados por plataforma específica"""
+        logger.info(f"Extrayendo videos de 4K Video Downloader para {platform_filter}...")
+        videos = []
+        
+        conn = self._get_connection(self.external_youtube_db)
+        if not conn:
+            return videos
+        
+        try:
+            # Query con filtro de plataforma
+            query = """
+            SELECT 
+                di.id as download_id,
+                di.filename as file_path,
+                mid.title as video_title,
+                ud.service_name as platform,
+                ud.url as video_url,
+                
+                -- Metadatos del creador y playlist
+                GROUP_CONCAT(
+                    CASE 
+                        WHEN mim.type = 0 THEN 'creator_name:' || mim.value
+                        WHEN mim.type = 1 THEN 'creator_url:' || mim.value  
+                        WHEN mim.type = 3 THEN 'playlist_name:' || mim.value
+                        WHEN mim.type = 4 THEN 'playlist_url:' || mim.value
+                        WHEN mim.type = 5 THEN 'channel_name:' || mim.value
+                        WHEN mim.type = 6 THEN 'channel_url:' || mim.value
+                        WHEN mim.type = 7 THEN 'subscription_info:' || mim.value
+                    END, '|||'
+                ) as metadata_concat
+                
+            FROM download_item di
+            LEFT JOIN media_item_description mid ON di.id = mid.download_item_id
+            LEFT JOIN url_description ud ON mid.id = ud.media_item_description_id
+            LEFT JOIN media_item_metadata mim ON di.id = mim.download_item_id
+            WHERE di.filename IS NOT NULL
+            """
+            
+            # 🔍 AUTODETECCIÓN: Aplicar filtro de plataforma inteligente
+            params = []
+            
+            if platform_filter == 'other':
+                # Filtrar todas las plataformas que NO son principales (YouTube, TikTok, Instagram)
+                query += " AND ud.service_name IS NOT NULL AND LOWER(ud.service_name) NOT LIKE '%youtube%'"
+            else:
+                # 🚀 SIMPLIFICADO: Usar pattern matching para cualquier plataforma
+                # Mapeo de nombres de plataforma a patrones de búsqueda
+                platform_patterns = {
+                    'youtube': ['youtube'],
+                    'facebook': ['facebook'],
+                    'twitter': ['twitter', 'x'],
+                    'vimeo': ['vimeo'],
+                    'dailymotion': ['dailymotion'],
+                    'twitch': ['twitch'],
+                    'soundcloud': ['soundcloud'],
+                    'bilibili': ['bilibili']
+                }
+                
+                patterns = platform_patterns.get(platform_filter, [platform_filter])
+                
+                # Construir condición OR para todos los patrones
+                conditions = []
+                for pattern in patterns:
+                    conditions.append("LOWER(ud.service_name) LIKE LOWER(?)")
+                    params.append(f"%{pattern}%")
+                
+                if conditions:
+                    query += f" AND ({' OR '.join(conditions)})"
+            
+            query += " GROUP BY di.id ORDER BY di.id DESC"
+            
+            # Aplicar límite y offset
+            if limit or offset > 0:
+                actual_limit = limit if limit else 10000
+                query += " LIMIT ? OFFSET ?"
+                params.extend([actual_limit, offset])
+            
+            cursor = conn.execute(query, params)
+            rows = cursor.fetchall()
+            
+            logger.info(f"Obtenidos {len(rows)} registros de 4K Video Downloader para {platform_filter}")
+            
+            for row in rows:
+                try:
+                    video_data = self._process_4k_video_row(row)
+                    if video_data:
+                        videos.append(video_data)
+                except Exception as e:
+                    logger.error(f"Error procesando fila {row['download_id']}: {e}")
+                    continue
+                    
+        except Exception as e:
+            logger.error(f"Error extrayendo de 4K Video Downloader para {platform_filter}: {e}")
+        finally:
+            conn.close()
+        
+        logger.info(f"✓ Procesados {len(videos)} videos de {platform_filter}")
+        return videos
+    
+    def _process_4k_video_row(self, row) -> Optional[Dict]:
+        """Procesar una fila de 4K Video Downloader con nueva estructura"""
+        # Verificar que el archivo sea un video
+        file_path = Path(row['file_path']) if row['file_path'] else None
+        if not file_path or file_path.suffix.lower() not in self.video_extensions:
+            return None
+        
+        # Procesar metadata
+        metadata = self._parse_4k_metadata(row['metadata_concat'])
+        
+        # Datos básicos del video
+        video_data = {
+            'file_path': str(file_path),
+            'file_name': file_path.name,
+            'title': row['video_title'] or file_path.stem,
+            'post_url': row['video_url'],
+            'platform': self._normalize_platform_name(row['platform']) or 'youtube',
+            'external_video_id': self._extract_video_id_from_url(row['video_url']),
+            
+            # Datos del downloader
+            'downloader_data': {
+                'download_item_id': row['download_id'],
+                'external_db_source': '4k_video',
+                'external_metadata': json.dumps(metadata)
+            }
+        }
+        
+        # Determinar creador y suscripción solo para plataformas principales
+        platform_name = self._normalize_platform_name(row['platform']) or 'youtube'
+        
+        if platform_name == 'youtube':
+            # YouTube: crear estructura completa
+            creator_info = self._determine_4k_creator_and_subscription(metadata, file_path)
+            video_data.update(creator_info)
+        else:
+            # Otras plataformas (Facebook, Twitter, etc.): solo URL del video
+            video_data.update({
+                'creator_name': None,
+                'creator_url': None,
+                'subscription_name': None,
+                'subscription_type': None,
+                'subscription_url': None,
+                'list_types': None  # No listas para plataformas secundarias
+            })
+        
+        return video_data
+    
+    def _parse_4k_metadata(self, metadata_concat: str) -> Dict:
+        """Parsear metadata concatenada de 4K Video Downloader"""
+        metadata = {}
+        
+        if not metadata_concat:
+            return metadata
+        
+        # Dividir por separador y procesar cada entrada
+        entries = metadata_concat.split('|||')
+        for entry in entries:
+            if ':' in entry:
+                key, value = entry.split(':', 1)
+                if value:  # Solo agregar si hay valor
+                    metadata[key] = value
+        
+        return metadata
+    
+    def _determine_4k_creator_and_subscription(self, metadata: Dict, file_path: Path) -> Dict:
+        """Determinar creador y suscripción para 4K Video Downloader"""
+        result = {
+            'creator_name': None,
+            'creator_url': None,
+            'subscription_name': None,
+            'subscription_type': None,
+            'subscription_url': None,
+            'list_types': ['feed']  # Por defecto
+        }
+        
+        # Obtener nombre del creador
+        creator_name = metadata.get('creator_name')
+        if not creator_name:
+            # Fallback: usar el nombre de la carpeta padre
+            creator_name = file_path.parent.name
+            if creator_name in ['4K Video Downloader+', '4K Video Downloader']:
+                creator_name = file_path.stem  # Usar nombre del archivo
+        
+        result['creator_name'] = creator_name
+        
+        # Construir URL del creador (por ahora solo YouTube)
+        if metadata.get('creator_url'):
+            result['creator_url'] = metadata['creator_url']
+        elif creator_name:
+            result['creator_url'] = f"https://www.youtube.com/@{creator_name}"
+        
+        # Determinar tipo de suscripción
+        if metadata.get('playlist_name'):
+            # Es una playlist
+            result['subscription_name'] = metadata['playlist_name']
+            result['subscription_type'] = 'playlist'
+            result['subscription_url'] = metadata.get('playlist_url')
+            result['list_types'] = ['playlist']
+        else:
+            # Es canal/cuenta principal
+            result['subscription_name'] = creator_name
+            result['subscription_type'] = 'account'
+            result['subscription_url'] = result['creator_url']
+            result['list_types'] = ['feed']
+        
+        return result
+    
+    def _normalize_platform_name(self, platform: str) -> str:
+        """Normalizar nombre de plataforma"""
+        if not platform:
+            return 'youtube'  # Por defecto
+        
+        platform_map = {
+            'YouTube': 'youtube',
+            'TikTok': 'tiktok', 
+            'Instagram': 'instagram',
+            'Facebook': 'facebook'
+        }
+        
+        return platform_map.get(platform, platform.lower())
+    
+    def _extract_video_id_from_url(self, url: str) -> Optional[str]:
+        """Extraer ID del video desde URL"""
+        if not url:
+            return None
+        
+        # YouTube
+        if 'youtube.com' in url or 'youtu.be' in url:
+            patterns = [
+                r'(?:v=|/)([0-9A-Za-z_-]{11}).*',
+                r'youtu.be/([0-9A-Za-z_-]{11})'
+            ]
+            for pattern in patterns:
+                match = re.search(pattern, url)
+                if match:
+                    return match.group(1)
+        
+        # TikTok
+        if 'tiktok.com' in url:
+            match = re.search(r'/video/(\d+)', url)
+            if match:
+                return match.group(1)
+        
+        return None
+    
     def extract_tiktok_videos(self, offset: int = 0, limit: int = None) -> List[Dict]:
-        """Extraer videos de la base de datos de 4K Tokkit"""
+        """Extraer videos de TikTok desde BD de 4K Tokkit con nueva estructura completa"""
         if limit is not None:
             logger.info(f"Extrayendo videos de TikTok (offset: {offset}, limit: {limit})...")
         else:
             logger.info("Extrayendo videos de TikTok...")
         videos = []
-        
+
         conn = self._get_connection(self.tiktok_db_path)
         if not conn:
             return videos
-        
+
         try:
+            # Query completa con datos de suscripción según especificación
             if limit is not None:
                 query = """
                 SELECT 
-                    id,
-                    authorName as creator_name,
-                    description as video_title,
-                    relativePath as relative_path
-                FROM MediaItems
-                WHERE relativePath IS NOT NULL
-                ORDER BY id DESC
+                    mi.databaseId as media_id,
+                    mi.subscriptionDatabaseId,
+                    mi.id as tiktok_id,
+                    mi.authorName,
+                    mi.description as video_title,
+                    mi.relativePath,
+                    
+                    s.type as subscription_type,
+                    s.name as subscription_name,
+                    s.id as subscription_external_id
+                    
+                FROM MediaItems mi
+                LEFT JOIN Subscriptions s ON mi.subscriptionDatabaseId = s.databaseId
+                WHERE mi.relativePath IS NOT NULL
+                ORDER BY mi.databaseId DESC
                 LIMIT ? OFFSET ?
                 """
                 cursor = conn.execute(query, (limit, offset))
             else:
                 query = """
                 SELECT 
-                    id,
-                    authorName as creator_name,
-                    description as video_title,
-                    relativePath as relative_path
-                FROM MediaItems
-                WHERE relativePath IS NOT NULL
-                ORDER BY id DESC
+                    mi.databaseId as media_id,
+                    mi.subscriptionDatabaseId,
+                    mi.id as tiktok_id,
+                    mi.authorName,
+                    mi.description as video_title,
+                    mi.relativePath,
+                    
+                    s.type as subscription_type,
+                    s.name as subscription_name,
+                    s.id as subscription_external_id
+                    
+                FROM MediaItems mi
+                LEFT JOIN Subscriptions s ON mi.subscriptionDatabaseId = s.databaseId
+                WHERE mi.relativePath IS NOT NULL
+                ORDER BY mi.databaseId DESC
                 LIMIT -1 OFFSET ?
                 """
                 cursor = conn.execute(query, (offset,))
             
             rows = cursor.fetchall()
             
-            # 🆕 MEJORADO: Extraer ruta base dinámicamente de EXTERNAL_TIKTOK_DB
+            # Obtener ruta base de TikTok
             if not self.tiktok_db_path:
                 logger.warning("EXTERNAL_TIKTOK_DB no configurado en .env")
                 return []
@@ -177,26 +527,13 @@ class ExternalSourcesManager:
             tiktok_base = Path(self.tiktok_db_path).parent  # D:/4K Tokkit/data.sqlite -> D:/4K Tokkit
             
             for row in rows:
-                relative_path = row['relative_path']
-                
-                # Manejar paths que empiezan con "/" (eliminar para hacer verdaderamente relativo)
-                if relative_path.startswith('/'):
-                    relative_path = relative_path[1:]  # Remover el "/" inicial
-                
-                file_path = tiktok_base / relative_path
-                
-                # Verificar que el archivo exista y sea un video
-                if file_path.exists() and file_path.suffix.lower() in self.video_extensions:
-                    video_data = {
-                        'file_path': str(file_path),
-                        'file_name': file_path.name,
-                        'creator_name': row['creator_name'] or 'Desconocido',
-                        'platform': 'tiktok',
-                        'title': row['video_title'] or file_path.stem,
-                        'source': 'tiktok_db',
-                        'external_id': row['id']
-                    }
-                    videos.append(video_data)
+                try:
+                    video_data = self._process_tokkit_row_with_structure(row, tiktok_base)
+                    if video_data:
+                        videos.append(video_data)
+                except Exception as e:
+                    logger.error(f"Error procesando fila TikTok {row['media_id']}: {e}")
+                    continue
             
             logger.info(f"✓ Extraídos {len(videos)} videos de TikTok desde BD")
             
@@ -207,8 +544,98 @@ class ExternalSourcesManager:
         
         return videos
     
+    def _process_tokkit_row_with_structure(self, row, tiktok_base: Path) -> Optional[Dict]:
+        """Procesar una fila de 4K Tokkit con nueva estructura completa"""
+        # Construir ruta completa del archivo
+        relative_path = row['relativePath']
+        if relative_path.startswith('/'):
+            relative_path = relative_path[1:]
+        if relative_path.startswith('\\'):
+            relative_path = relative_path[1:]
+            
+        file_path = tiktok_base / relative_path
+        
+        # Verificar que sea video y exista
+        if not file_path.exists() or file_path.suffix.lower() not in self.video_extensions:
+            return None
+        
+        # Datos básicos del video
+        video_data = {
+            'file_path': str(file_path),
+            'file_name': file_path.name,
+            'title': row['video_title'] or file_path.stem,  # Usar description como título
+            'post_url': f"https://www.tiktok.com/@{row['authorName']}/video/{row['tiktok_id']}",  # URL del post
+            'platform': 'tiktok',
+            'external_video_id': row['tiktok_id'],
+            
+            # Datos del downloader
+            'downloader_data': {
+                'download_item_id': row['media_id'],
+                'external_db_source': '4k_tokkit',
+                'external_metadata': json.dumps({
+                    'subscription_id': str(row['subscriptionDatabaseId']) if row['subscriptionDatabaseId'] else None,
+                    'author_name': row['authorName'],
+                    'relative_path': row['relativePath']
+                })
+            }
+        }
+        
+        # Determinar creador y suscripción según especificación
+        creator_info = self._determine_tokkit_creator_and_subscription_v2(row)
+        video_data.update(creator_info)
+        
+        return video_data
+    
+    def _determine_tokkit_creator_and_subscription_v2(self, row) -> Dict:
+        """Determinar creador y suscripción para TikTok según especificación exacta"""
+        result = {
+            'creator_name': row['authorName'],
+            'creator_url': f"https://www.tiktok.com/@{row['authorName']}",
+            'subscription_name': row['subscription_name'] or row['authorName'],
+            'subscription_type': 'account',  # Por defecto
+            'subscription_url': None,
+            'list_types': ['feed']
+        }
+        
+        # Determinar tipo de suscripción basado en subscription_type según especificación
+        subscription_types = {
+            1: 'account',    # cuenta
+            2: 'hashtag',    # hashtag  
+            3: 'music'       # música
+        }
+        
+        if row['subscription_type'] in subscription_types:
+            sub_type = subscription_types[row['subscription_type']]
+            result['subscription_type'] = sub_type
+            subscription_name = row['subscription_name']
+            
+            # Construir URL de suscripción según especificación
+            if sub_type == 'account':
+                result['subscription_url'] = f"https://www.tiktok.com/@{subscription_name}"
+            elif sub_type == 'hashtag':
+                result['subscription_url'] = f"https://www.tiktok.com/tag/{subscription_name}"
+            elif sub_type == 'music':
+                # Música: "cancion nueva cinco" -> "cancion-nueva-cinco"
+                clean_name = subscription_name.replace(' ', '-')
+                result['subscription_url'] = f"https://www.tiktok.com/music/{clean_name}-{row['subscription_external_id']}"
+        
+        # Determinar list_types desde relativePath según especificación
+        relative_path = row['relativePath'] or ''
+        list_types = []
+        
+        if '\\Liked\\' in relative_path or '/Liked/' in relative_path:
+            list_types.append('liked')
+        elif '\\Favorites\\' in relative_path or '/Favorites/' in relative_path:
+            list_types.append('favorites')
+        else:
+            list_types.append('feed')
+        
+        result['list_types'] = list_types
+        
+        return result
+    
     def extract_instagram_content(self, offset: int = 0, limit: int = None) -> List[Dict]:
-        """Extraer contenido de la base de datos de 4K Stogram"""
+        """🆕 NUEVA ESTRUCTURA: Extraer contenido de Instagram desde 4K Stogram con soporte completo"""
         if limit is not None:
             logger.info(f"Extrayendo contenido de Instagram (offset: {offset}, limit: {limit})...")
         else:
@@ -220,66 +647,78 @@ class ExternalSourcesManager:
             return content
         
         try:
+            # Query completa con JOIN para obtener datos de suscripción
             if limit is not None:
                 query = """
                 SELECT 
-                    id,
-                    title,
-                    file as relative_path,
-                    ownerName as creator_name
-                FROM photos
-                WHERE file IS NOT NULL
-                ORDER BY id DESC
+                    p.id as photo_id,
+                    p.subscriptionId,
+                    p.web_url,
+                    p.title,
+                    p.file as relative_path,
+                    p.is_video,
+                    p.ownerName,
+                    
+                    s.type as subscription_type,
+                    s.display_name as subscription_display_name
+                    
+                FROM photos p
+                LEFT JOIN subscriptions s ON p.subscriptionId = s.id
+                WHERE p.file IS NOT NULL AND p.state = 4
+                ORDER BY p.web_url, p.id DESC
                 LIMIT ? OFFSET ?
                 """
                 cursor = conn.execute(query, (limit, offset))
             else:
                 query = """
                 SELECT 
-                    id,
-                    title,
-                    file as relative_path,
-                    ownerName as creator_name
-                FROM photos
-                WHERE file IS NOT NULL
-                ORDER BY id DESC
+                    p.id as photo_id,
+                    p.subscriptionId,
+                    p.web_url,
+                    p.title,
+                    p.file as relative_path,
+                    p.is_video,
+                    p.ownerName,
+                    
+                    s.type as subscription_type,
+                    s.display_name as subscription_display_name
+                    
+                FROM photos p
+                LEFT JOIN subscriptions s ON p.subscriptionId = s.id
+                WHERE p.file IS NOT NULL AND p.state = 4
+                ORDER BY p.web_url, p.id DESC
                 LIMIT -1 OFFSET ?
                 """
                 cursor = conn.execute(query, (offset,))
             
             rows = cursor.fetchall()
             
-            # 🆕 MEJORADO: Extraer ruta base dinámicamente de EXTERNAL_INSTAGRAM_DB
+            # Obtener ruta base de Instagram
             if not self.instagram_db_path:
                 logger.warning("EXTERNAL_INSTAGRAM_DB no configurado en .env")
                 return []
             
-            instagram_base = Path(self.instagram_db_path).parent  # D:/4K Stogram/.stogram.sqlite -> D:/4K Stogram
+            instagram_base = Path(self.instagram_db_path).parent
             
+            # Agrupar por web_url para manejar carruseles
+            posts_by_url = {}
             for row in rows:
-                relative_path = row['relative_path']
-                file_path = instagram_base / relative_path
-                
-                # Verificar que el archivo exista
-                if file_path.exists():
-                    # Determinar si es video o imagen
-                    is_video = file_path.suffix.lower() in self.video_extensions
-                    is_image = file_path.suffix.lower() in self.image_extensions
-                    
-                    if is_video or is_image:
-                        content_data = {
-                            'file_path': str(file_path),
-                            'file_name': file_path.name,
-                            'creator_name': row['creator_name'] or 'Desconocido',
-                            'platform': 'instagram',
-                            'title': row['title'] or file_path.stem,
-                            'source': 'instagram_db',
-                            'external_id': row['id'],
-                            'content_type': 'video' if is_video else 'image'
-                        }
-                        content.append(content_data)
+                web_url = row['web_url']
+                if web_url not in posts_by_url:
+                    posts_by_url[web_url] = []
+                posts_by_url[web_url].append(row)
             
-            logger.info(f"✓ Extraídos {len(content)} elementos de Instagram desde BD")
+            # Procesar cada publicación (puede tener múltiples archivos)
+            for web_url, post_rows in posts_by_url.items():
+                try:
+                    post_data = self._process_stogram_post_with_carousel(post_rows, instagram_base)
+                    if post_data:
+                        content.append(post_data)
+                except Exception as e:
+                    logger.error(f"Error procesando post Instagram {web_url}: {e}")
+                    continue
+            
+            logger.info(f"✓ Extraídos {len(content)} posts de Instagram desde BD")
             
         except Exception as e:
             logger.error(f"Error extrayendo contenido de Instagram: {e}")
@@ -287,6 +726,145 @@ class ExternalSourcesManager:
             conn.close()
         
         return content
+    
+    def _process_stogram_post_with_carousel(self, post_rows, instagram_base: Path) -> Optional[Dict]:
+        """Procesar una publicación de Instagram que puede tener múltiples archivos (carrusel)"""
+        if not post_rows:
+            return None
+        
+        # Usar la primera fila como base para metadatos
+        main_row = post_rows[0]
+        
+        # Procesar todos los archivos de la publicación
+        media_files = []
+        valid_files_count = 0
+        
+        for row in post_rows:
+            # Construir ruta completa del archivo
+            relative_path = row['relative_path']
+            if relative_path.startswith('/'):
+                relative_path = relative_path[1:]
+            if relative_path.startswith('\\'):
+                relative_path = relative_path[1:]
+            
+            file_path = instagram_base / relative_path
+            
+            # Verificar que el archivo exista
+            if not file_path.exists():
+                continue
+            
+            # Determinar tipo de archivo
+            is_video = row['is_video'] == 65
+            is_image = not is_video and file_path.suffix.lower() in {'.jpg', '.jpeg', '.png', '.webp', '.gif'}
+            
+            # Solo incluir videos e imágenes válidas
+            if not (is_video or is_image):
+                continue
+            
+            media_files.append({
+                'file_path': str(file_path),
+                'file_name': file_path.name,
+                'is_video': is_video,
+                'photo_id': row['photo_id']
+            })
+            valid_files_count += 1
+        
+        # Si no hay archivos válidos, descartar publicación
+        if valid_files_count == 0:
+            return None
+        
+        # Usar el primer archivo válido como archivo principal
+        main_file = media_files[0]
+        
+        # Datos básicos de la publicación
+        post_data = {
+            'file_path': main_file['file_path'],
+            'file_name': main_file['file_name'],
+            'title': main_row['title'] or Path(main_file['file_path']).stem,
+            'post_url': main_row['web_url'],  # URL del post de Instagram
+            'platform': 'instagram',
+            'external_video_id': str(main_row['photo_id']),
+            
+            # Datos del downloader con información de carrusel
+            'downloader_data': {
+                'download_item_id': main_row['photo_id'],
+                'external_db_source': '4k_stogram',
+                'external_metadata': json.dumps({
+                    'subscription_id': str(main_row['subscriptionId']) if main_row['subscriptionId'] else None,
+                    'owner_name': main_row['ownerName'],
+                    'relative_path': main_row['relative_path'],
+                    'is_video': main_row['is_video'],
+                    'is_carousel': len(media_files) > 1,
+                    'carousel_files': media_files,
+                    'total_files': len(media_files)
+                })
+            }
+        }
+        
+        # Determinar creador y suscripción según especificación
+        creator_info = self._determine_stogram_creator_and_subscription(main_row, Path(main_file['file_path']))
+        post_data.update(creator_info)
+        
+        return post_data
+    
+    def _determine_stogram_creator_and_subscription(self, row, file_path: Path) -> Dict:
+        """Determinar creador y suscripción para Instagram según especificación exacta"""
+        result = {
+            'creator_name': row['ownerName'],
+            'creator_url': f"https://www.instagram.com/{row['ownerName']}/",
+            'subscription_name': None,
+            'subscription_type': None,
+            'subscription_url': None,
+            'list_types': ['feed']  # Por defecto
+        }
+        
+        # Si hay suscripción asociada
+        if row['subscriptionId'] and row['subscription_display_name']:
+            subscription_types = {
+                1: 'account',    # cuenta
+                2: 'hashtag',    # hashtag
+                3: 'location',   # location
+                4: 'saved'       # guardados
+            }
+            
+            sub_type = subscription_types.get(row['subscription_type'], 'account')
+            result['subscription_type'] = sub_type
+            result['subscription_name'] = row['subscription_display_name']
+            
+            # Construir URL de suscripción según especificación
+            if sub_type == 'account':
+                result['subscription_url'] = f"https://www.instagram.com/{row['subscription_display_name']}/"
+            elif sub_type == 'saved':
+                result['subscription_url'] = f"https://www.instagram.com/{row['subscription_display_name']}/saved/"
+            # Para hashtag y location, Instagram no tiene URLs directas simples
+            
+        else:
+            # Publicación individual (Single media) - subscriptionId NULL
+            # Debe tener una suscripción especial tipo 'folder'
+            result['subscription_name'] = 'Single media'
+            result['subscription_type'] = 'folder'
+            result['subscription_url'] = None  # No tiene URL específica
+        
+        # Determinar list_types desde file path según especificación
+        file_path_str = str(file_path).replace('\\', '/')
+        list_types = []
+        
+        if '/highlights/' in file_path_str:
+            list_types.append('highlights')
+        elif '/reels/' in file_path_str:
+            list_types.append('reels')
+        elif '/story/' in file_path_str:
+            list_types.append('stories')
+        elif '/tagged/' in file_path_str:
+            list_types.append('tagged')
+        elif 'Single media' in file_path_str:
+            list_types.append('feed')  # Publicaciones individuales van al feed
+        else:
+            list_types.append('feed')  # Por defecto
+        
+        result['list_types'] = list_types
+        
+        return result
     
     def extract_organized_videos_extended(self, platform_filter: Optional[str] = None) -> List[Dict]:
         """
@@ -458,8 +1036,7 @@ class ExternalSourcesManager:
     
     def get_all_videos_from_source(self, source: str, platform: Optional[str] = None, limit: Optional[int] = None) -> List[Dict]:
         """
-        🚀 NUEVA ESTRATEGIA: Obtener videos de una fuente específica
-        Busca videos nuevos en todo el rango, no solo después del offset
+        🚀 ESTRATEGIA POPULATE: Siempre encontrar videos nuevos usando offset dinámico
         
         Args:
             source: 'db' para bases de datos, 'organized' para carpetas organizadas, 'all' para ambas
@@ -467,6 +1044,21 @@ class ExternalSourcesManager:
             limit: número máximo de videos a retornar
         """
         all_videos = []
+        
+        # 🚀 NUEVA LÓGICA: Calcular offset dinámico basado en videos existentes
+        def get_dynamic_offset(platform_name: str) -> int:
+            try:
+                from src.database import DatabaseManager
+                db = DatabaseManager()
+                with db.get_connection() as conn:
+                    cursor = conn.execute(
+                        "SELECT COUNT(*) FROM videos WHERE platform = ? AND deleted_at IS NULL",
+                        (platform_name,)
+                    )
+                    return cursor.fetchone()[0]
+            except Exception as e:
+                logger.debug(f"Error calculando offset para {platform_name}: {e}")
+                return 0
         
         # 🚀 NUEVA ESTRATEGIA: Obtener rutas ya importadas para filtrado inteligente
         def get_imported_paths(platform_name: str) -> set:
@@ -488,20 +1080,81 @@ class ExternalSourcesManager:
             # Normalizar plataforma: 'all-platforms' -> None para procesamiento
             normalized_platform = None if platform in [None, 'all-platforms'] else platform
             
-            if normalized_platform is None or normalized_platform == 'youtube':
-                all_videos.extend(self.extract_youtube_videos())
+            # Distribuir límite entre plataformas si es necesario
+            platforms_to_extract = []
+            if normalized_platform is None:
+                # Extraer de todas las plataformas disponibles
+                if self.external_youtube_db and self.external_youtube_db.exists():
+                    platforms_to_extract.append('youtube')
+                if self.tiktok_db_path and self.tiktok_db_path.exists():
+                    platforms_to_extract.append('tiktok')
+                if self.instagram_db_path and self.instagram_db_path.exists():
+                    platforms_to_extract.append('instagram')
+                
+                # Agregar todas las plataformas 'other' disponibles en 4K Video Downloader
+                if self.external_youtube_db and self.external_youtube_db.exists():
+                    available_4k_platforms = self.get_available_4k_platforms()
+                    for platform_name in available_4k_platforms.keys():
+                        if platform_name not in ['youtube', 'tiktok', 'instagram'] and platform_name not in platforms_to_extract:
+                            platforms_to_extract.append(platform_name)
+            else:
+                # 🔍 AUTODETECCIÓN: Usar autodescubrimiento de plataformas
+                available_4k_platforms = self.get_available_4k_platforms()
+                
+                # Verificar si la plataforma solicitada tiene fuente disponible
+                platform_sources = {
+                    # Plataformas principales con fuentes específicas
+                    'tiktok': self.tiktok_db_path and self.tiktok_db_path.exists(),
+                    'instagram': self.instagram_db_path and self.instagram_db_path.exists(),
+                    # Filtro especial para plataformas no principales
+                    'other': self.external_youtube_db and self.external_youtube_db.exists()
+                }
+                
+                # Agregar automáticamente todas las plataformas descubiertas en 4K Video Downloader
+                if self.external_youtube_db and self.external_youtube_db.exists():
+                    for platform_name in available_4k_platforms.keys():
+                        platform_sources[platform_name] = True
+                    # Agregar 'other' como plataforma disponible si hay BD de 4K Video Downloader
+                    platform_sources['other'] = True
+                
+                if platform_sources.get(normalized_platform, False):
+                    platforms_to_extract.append(normalized_platform)
+                else:
+                    logger.warning(f"Plataforma '{normalized_platform}' no disponible o sin fuente de datos")
+                    logger.info(f"💡 Plataformas disponibles: {list(platform_sources.keys())}")
             
-            if normalized_platform is None or normalized_platform == 'tiktok':
-                # 🚀 NUEVA ESTRATEGIA: Extraer TODOS los videos de TikTok (sin offset)
-                # Luego filtraremos por duplicados de manera inteligente
-                logger.info("🔍 Extrayendo TODOS los videos de TikTok para búsqueda inteligente...")
-                all_videos.extend(self.extract_tiktok_videos(offset=0, limit=None))
+            # Estrategia inteligente de distribución de límites
+            platform_limit = None
+            if limit and len(platforms_to_extract) > 1:
+                # Para límites pequeños: dar más margen para asegurar que se cumpla
+                # Para límites grandes: distribuir eficientemente
+                if limit <= 20:
+                    # Límites pequeños: cada plataforma puede contribuir hasta el límite completo
+                    platform_limit = limit
+                else:
+                    # Límites grandes: distribuir con margen del 50% para compensar desbalances
+                    base_limit = limit // len(platforms_to_extract)
+                    margin = max(5, limit // 4)  # Margen mínimo de 5 o 25% del límite
+                    platform_limit = base_limit + margin
+            elif limit:
+                platform_limit = limit
             
-            if normalized_platform is None or normalized_platform == 'instagram':
-                # 🚀 NUEVA ESTRATEGIA: Extraer TODOS los videos de Instagram (sin offset)
-                # Luego filtraremos por duplicados de manera inteligente
-                logger.info("🔍 Extrayendo TODOS los videos de Instagram para búsqueda inteligente...")
-                all_videos.extend(self.extract_instagram_content(offset=0, limit=None))
+            # Extraer de cada plataforma según disponibilidad
+            for platform_name in platforms_to_extract:
+                platform_offset = get_dynamic_offset(platform_name)
+                logger.info(f"🔍 Extrayendo videos de {platform_name.title()} (offset: {platform_offset})...")
+                
+                if platform_name == 'tiktok':
+                    # TikTok usa 4K Tokkit
+                    all_videos.extend(self.extract_tiktok_videos(offset=platform_offset, limit=platform_limit))
+                elif platform_name == 'instagram':
+                    # Instagram usa 4K Stogram
+                    all_videos.extend(self.extract_instagram_content(offset=platform_offset, limit=platform_limit))
+                else:
+                    # YouTube, Facebook, Twitter, etc. usan 4K Video Downloader
+                    all_videos.extend(self.extract_4k_video_downloader_by_platform(
+                        platform_name, offset=platform_offset, limit=platform_limit
+                    ))
         
         if source in ['organized', 'all']:
             # 🆕 Usar extractor extendido para manejar plataformas adicionales  
@@ -523,8 +1176,10 @@ class ExternalSourcesManager:
                 seen_paths.add(video['file_path'])
                 unique_videos.append(video)
         
-        # 🔧 ARREGLADO: NO aplicar límite aquí, dejarlo para después del filtro de duplicados
-        # El límite se aplicará en database_ops.py después de filtrar duplicados
+        # Aplicar límite final si se especifica
+        if limit and len(unique_videos) > limit:
+            logger.info(f"🔢 Aplicando límite final: {len(unique_videos)} -> {limit} videos")
+            unique_videos = unique_videos[:limit]
         
         logger.info(f"Total de videos únicos extraídos: {len(unique_videos)}")
         return unique_videos
@@ -853,7 +1508,7 @@ class ExternalSourcesManager:
                         if row:
                             return {
                                 'creator_name': row['creator_name'],
-                                'title': row['video_title'] or file_path.stem,  # 🔧 ARREGLADO: Mapear description como title
+                                'title': row['video_title'] or file_path.stem,  # 🔧 ARREGLADO: Mapear title como title
                                 'external_id': row['id']
                             }
                     except ValueError:

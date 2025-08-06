@@ -101,7 +101,7 @@ CREATE TABLE subscriptions (
 CREATE TABLE video_lists (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     video_id INTEGER NOT NULL REFERENCES videos(id),
-    list_type TEXT NOT NULL,       -- 'feed', 'liked', 'reels', 'stories', 'highlights', 'saved', 'favorites'
+    list_type TEXT NOT NULL,       -- 'feed', 'liked', 'reels', 'stories', 'highlights', 'tagged', 'saved', 'favorites'
     source_path TEXT,              -- Ruta que indica la lista (ej: "\\name\\Liked\\")
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(video_id, list_type)

@@ -67,19 +67,6 @@ MediaItems
   Notas:
   - Links de los posts se arman como `https://www.tiktok.com/@authorName/video/id`
 
-SubscriptionsDownloadSettings
-  - subscriptionDatabaseId
-  - downloadFeed (0,1)
-  - downloadLiked (0,1)
-  - downloadFavorites (0,1)
-
-Nota:
-- `downloadFavorites` Son los favoritos de tu cuenta
-- Sabiendo lo anterior entonces las combinaciones posibles son:
-  - downloadFeed y downloadLiked ambos pueden ser 0 o 1 por lo que se tendra que manejar el nombre de la lista.
-  - downloadFavorites es incompatible con los anteriores por lo que no hay problemas.
-- Se puede usar esto o la informacion del relativePath.
-
 ## CASO: 4k Strogram (Solo Instagram)
 ### Contexto
 La app agrupa los videos de diferentes maneras:
@@ -91,62 +78,13 @@ La app agrupa los videos de diferentes maneras:
   - `\\display_name\\story`
   - `\\display_name\\tagged`
 
-### Tabla de tipos de suscripciones y flags
-
-| display_name | type | downloadPhotos | downloadVideos | downloadFeed | downloadStories | downloadHighlights | downloadTaggedPosts | downloadReels |
-|--------------|------|----------------|----------------|--------------|-----------------|--------------------|---------------------|---------------|
-| cuenta       | 1    | 1              | 1              | 1            | 1               | 1                  | 0                   | 0             |
-| hashtag      | 2    | 1              | 1              | 1            | 1               | 1                  | 0                   | 0             |
-| location     | 3    | 1              | 1              | 1            | 1               | 1                  | 0                   | 0             |
-| saved        | 4    | 1              | 1              | 1            | 0               | 0                  | 0                   | 0             |
-
-### Objetivo futuro
-1. Para el caso de instagram en el frontend la card de una publicacion tendra un apartado de listas que al presionar me muestre los videos de esas listas. Se tendran:
-    - Publicaciones guardadas (saved) de un display_name
-    - Publicaciones etiquetadas (tagged) de un display_name
-    - Publicaciones de historias (story) de un display_name
-    - Publicaciones de reels (reels) de un display_name
-    - Publicaciones de highlights (Highlights) de un display_name
-    - Publicaciones por hashtag de un display_name
-    - Publicaciones por location de un display_name
-    - Publicaciones por cuenta de un display_name
-2. Para el caso de las imagenes que pertenecen a una misma publicacion se necesitara crear una interfaz de carrusel/múltiple [tipo tiktok], se tendra info como [n/m].
-
 ### BD Strogram
 1. subscriptions
     - id (formato: BLOB)
     - type (n=display_name)
     - display_name  (1=cuenta, 2=hashtag, 3=location, 4=guardados de la cuenta)
-    - downloadPhotos (0,1)
-    - downloadVideos (0,1)
-    - downloadFeed (0,1)
-    - downloadStories (0,1)
-    - downloadHighlights (0,1)
-    - downloadTaggedPosts (0,1)
-    - downloadReels (0,1)
 
-    Nota: Las listas seran usando las siguientes combinaciones:
-      - `display_name` sera usado para estos casos:
-        - Cuenta
-        - Mis publicaciones guardadas (saved)
-        - hashtags
-        - location
-      - `downloadFeed` para:
-        - reels (video)
-        - fuente (imagen)
-      - `downloadStories` para:
-        - historias
-      - `downloadHighlights` para:
-        - destacados (Highlights)
-      - `downloadTaggedPosts` para:
-        - etiquetado
-      - `downloadReels` para:
-        - reels
-      - Links de la lista se arman como:
-        - `https://www.instagram.com/display_name/`
-        - `https://www.instagram.com/display_name/saved/` 
-        - `https://www.instagram.com/display_name/reels/`
-        - `https://www.instagram.com/display_name/tagged/`
+    Nota: Independientemente del type, las s
 
 2. photos
     - subscriptionId

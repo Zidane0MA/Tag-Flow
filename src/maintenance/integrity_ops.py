@@ -186,14 +186,14 @@ class IntegrityOperations:
                             'video_id': video['id']
                         })
                 
-                # Verificar descripciones específicas para TikTok/Instagram
+                # Verificar títulos específicos para TikTok/Instagram
                 platform = video.get('platform', '').lower()
                 if platform in ['tiktok', 'instagram']:
-                    if not video.get('description'):
+                    if not video.get('title'):
                         integrity_report['video_records']['invalid_metadata'] += 1
                         integrity_report['issues_found'].append({
-                            'type': 'missing_description_tiktok_instagram',
-                            'description': f'Missing description for {platform} video {video["id"]} - can extract from external DB',
+                            'type': 'missing_title_tiktok_instagram',
+                            'description': f'Missing title for {platform} video {video["id"]} - can extract from external DB',
                             'severity': 'medium',
                             'video_id': video['id'],
                             'platform': platform,
@@ -907,20 +907,20 @@ class IntegrityOperations:
                                 fixed_count += 1
                                 logger.info(f"✅ Corregido metadatos para video {video_id}")
                 
-                elif issue_type == 'missing_description_tiktok_instagram':
-                    # Extraer descripción de bases de datos externas
+                elif issue_type == 'missing_title_tiktok_instagram':
+                    # Extraer título de bases de datos externas
                     video_id = issue.get('video_id')
                     platform = issue.get('platform')
                     file_path = issue.get('file_path')
                     
                     if video_id and platform and file_path:
-                        description = self._extract_description_from_external_db(file_path, platform)
-                        if description:
-                            self.db.update_video(video_id, {'description': description})
+                        title = self._extract_title_from_external_db(file_path, platform)
+                        if title:
+                            self.db.update_video(video_id, {'title': title})
                             fixed_count += 1
-                            logger.info(f"✅ Corregida descripción para video {platform} {video_id}: {description[:50]}...")
+                            logger.info(f"✅ Corregido título para video {platform} {video_id}: {title[:50]}...")
                         else:
-                            logger.warning(f"⚠️ No se pudo extraer descripción para video {video_id}")
+                            logger.warning(f"⚠️ No se pudo extraer título para video {video_id}")
                 
                 elif issue_type == 'orphaned_thumbnail':
                     # Eliminar thumbnails huérfanos
@@ -949,8 +949,8 @@ class IntegrityOperations:
         
         return fixed_count
     
-    def _extract_description_from_external_db(self, file_path: str, platform: str) -> Optional[str]:
-        """Extraer descripción desde bases de datos externas de 4K Apps"""
+    def _extract_title_from_external_db(self, file_path: str, platform: str) -> Optional[str]:
+        """Extraer título desde bases de datos externas de 4K Apps"""
         try:
             from src.service_factory import get_external_sources
             

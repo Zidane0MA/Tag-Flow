@@ -51,7 +51,9 @@ class DatabaseManager:
                     duration_seconds INTEGER,
                     
                     -- Información del contenido
-                    description TEXT,  -- Título/descripción del video
+                    title TEXT,  -- Título/descripción del video
+                    post_url TEXT,              -- URL del post original
+                    external_video_id TEXT,     -- ID del video en plataforma externa
                     
                     -- Creador (desde 4K Downloader + manual)
                     creator_name TEXT NOT NULL,
@@ -83,29 +85,95 @@ class DatabaseManager:
                     -- Sistema de eliminación (soft delete)
                     deleted_at TIMESTAMP NULL,
                     deleted_by TEXT,
-                    deletion_reason TEXT
+                    deletion_reason TEXT,
+                    
+                    -- Relaciones con nuevas tablas
+                    creator_id INTEGER REFERENCES creators(id),
+                    subscription_id INTEGER REFERENCES subscriptions(id)
                 )
             ''')
             
-            # Tabla de mapeo con 4K Downloader
+            # Nuevas tablas del sistema
+            
+            # Tabla de creadores
+            conn.execute('''
+                CREATE TABLE IF NOT EXISTS creators (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL,              -- Nombre unificado del creador
+                    display_name TEXT,               -- Nombre para mostrar en UI
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            # Tabla de URLs de creadores por plataforma
+            conn.execute('''
+                CREATE TABLE IF NOT EXISTS creator_urls (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    creator_id INTEGER NOT NULL REFERENCES creators(id),
+                    platform TEXT NOT NULL,         -- 'youtube', 'tiktok', 'instagram', 'facebook'
+                    url TEXT NOT NULL,              -- URL completa del perfil
+                    username TEXT,                  -- @username sin la URL base
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(creator_id, platform)
+                )
+            ''')
+            
+            # Tabla de suscripciones
+            conn.execute('''
+                CREATE TABLE IF NOT EXISTS subscriptions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL,             -- "Canal X", "Mi Playlist", "#hashtag"
+                    type TEXT NOT NULL,             -- 'account', 'playlist', 'music', 'hashtag', 'location', 'saved', 'personal'
+                    platform TEXT NOT NULL,        -- 'youtube', 'tiktok', 'instagram', 'facebook'
+                    creator_id INTEGER REFERENCES creators(id), -- NULL para listas sin creador específico
+                    
+                    -- URLs y metadata
+                    subscription_url TEXT,          -- URL de la lista/subscription
+                    external_id TEXT,              -- ID en la plataforma externa
+                    metadata TEXT,                 -- JSON con datos específicos por tipo
+                    
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            # Tabla de listas por video
+            conn.execute('''
+                CREATE TABLE IF NOT EXISTS video_lists (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    video_id INTEGER NOT NULL REFERENCES videos(id),
+                    list_type TEXT NOT NULL,       -- 'feed', 'liked', 'reels', 'stories', 'highlights', 'saved', 'favorites'
+                    source_path TEXT,              -- Ruta que indica la lista (ej: "\\\\name\\\\Liked\\\\")
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(video_id, list_type)
+                )
+            ''')
+            
+            # Tabla de mapeo con 4K Downloader (actualizada)
             conn.execute('''
                 CREATE TABLE IF NOT EXISTS downloader_mapping (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    video_id INTEGER,
-                    download_item_id INTEGER,
+                    video_id INTEGER NOT NULL REFERENCES videos(id),
+                    download_item_id INTEGER,       -- ID en BD externa
+                    external_db_source TEXT,        -- '4k_video', '4k_tokkit', '4k_stogram'
                     original_filename TEXT,
                     creator_from_downloader TEXT,
+                    external_metadata TEXT,         -- JSON con metadata específica del downloader
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (video_id) REFERENCES videos(id) ON DELETE CASCADE
                 )
             ''')
             
-            # Índices para rendimiento
+            # Índices para rendimiento - Tabla videos
             conn.execute('CREATE INDEX IF NOT EXISTS idx_videos_creator ON videos(creator_name)')
             conn.execute('CREATE INDEX IF NOT EXISTS idx_videos_status ON videos(edit_status)')
             conn.execute('CREATE INDEX IF NOT EXISTS idx_videos_platform ON videos(platform)')
             conn.execute('CREATE INDEX IF NOT EXISTS idx_videos_file_path ON videos(file_path)')
             conn.execute('CREATE INDEX IF NOT EXISTS idx_videos_deleted ON videos(deleted_at)')
+            
+            # Índices para nuevos campos en videos
+            conn.execute('CREATE INDEX IF NOT EXISTS idx_videos_creator_id ON videos(creator_id)')
+            conn.execute('CREATE INDEX IF NOT EXISTS idx_videos_subscription_id ON videos(subscription_id)')
+            conn.execute('CREATE INDEX IF NOT EXISTS idx_videos_external_video_id ON videos(external_video_id)')
             
             # 🚀 MIGRADOS: Índices optimizados de optimized_database.py
             # Índice compuesto para búsqueda por path y nombre combinada (10x más rápido)
@@ -138,6 +206,36 @@ class DatabaseManager:
                 ON videos(created_at)
             ''')
             
+            # Índices compuestos para queries del frontend
+            conn.execute('''
+                CREATE INDEX IF NOT EXISTS idx_videos_creator_platform 
+                ON videos(creator_id, platform)
+            ''')
+            conn.execute('''
+                CREATE INDEX IF NOT EXISTS idx_videos_subscription_platform 
+                ON videos(subscription_id, platform)
+            ''')
+            
+            # Índices para creators
+            conn.execute('CREATE INDEX IF NOT EXISTS idx_creators_name ON creators(name)')
+            
+            # Índices para creator_urls
+            conn.execute('CREATE INDEX IF NOT EXISTS idx_creator_urls_creator_id ON creator_urls(creator_id)')
+            conn.execute('CREATE INDEX IF NOT EXISTS idx_creator_urls_platform ON creator_urls(platform)')
+            
+            # Índices para subscriptions
+            conn.execute('CREATE INDEX IF NOT EXISTS idx_subscriptions_creator_id ON subscriptions(creator_id)')
+            conn.execute('CREATE INDEX IF NOT EXISTS idx_subscriptions_platform ON subscriptions(platform)')
+            conn.execute('CREATE INDEX IF NOT EXISTS idx_subscriptions_type ON subscriptions(type)')
+            conn.execute('CREATE INDEX IF NOT EXISTS idx_subscriptions_platform_type ON subscriptions(platform, type)')
+            
+            # Índices para video_lists
+            conn.execute('CREATE INDEX IF NOT EXISTS idx_video_lists_video_id ON video_lists(video_id)')
+            conn.execute('CREATE INDEX IF NOT EXISTS idx_video_lists_list_type ON video_lists(list_type)')
+            
+            # Índices para downloader_mapping
+            conn.execute('CREATE INDEX IF NOT EXISTS idx_downloader_mapping_external_db ON downloader_mapping(external_db_source)')
+            
             conn.commit()
             logger.info("Base de datos inicializada correctamente")
     
@@ -148,7 +246,7 @@ class DatabaseManager:
                 INSERT INTO videos (
                     file_path, file_name, creator_name, platform, file_size, duration_seconds,
                     detected_music, detected_music_artist, detected_music_confidence,
-                    detected_characters, music_source, processing_status, description
+                    detected_characters, music_source, processing_status, title
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 video_data['file_path'],
@@ -163,7 +261,7 @@ class DatabaseManager:
                 json.dumps(video_data.get('detected_characters', [])),
                 video_data.get('music_source'),
                 video_data.get('processing_status', 'pendiente'),
-                video_data.get('description')  # Nueva línea para descripción
+                video_data.get('title')  # Nueva línea para título
             ))
             video_id = cursor.lastrowid
             logger.info(f"Video agregado con ID {video_id}: {video_data['file_name']}")
@@ -196,7 +294,11 @@ class DatabaseManager:
                             json.dumps(video_data.get('detected_characters', [])),
                             video_data.get('music_source'),
                             video_data.get('processing_status', 'pendiente'),
-                            video_data.get('description')
+                            video_data.get('title'),
+                            video_data.get('post_url'),
+                            video_data.get('external_video_id'),
+                            video_data.get('creator_id'),          # Nueva estructura
+                            video_data.get('subscription_id')      # Nueva estructura
                         )
                         insert_data.append(insert_row)
                     
@@ -206,15 +308,17 @@ class DatabaseManager:
                             file_path, file_name, creator_name, platform,
                             file_size, duration_seconds, detected_music, detected_music_artist,
                             detected_music_confidence, detected_characters, music_source,
-                            processing_status, description
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            processing_status, title, post_url, external_video_id,
+                            creator_id, subscription_id
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ''', insert_data)
                     
                     successful = len(insert_data)
                     logger.info(f"Inserción por lotes con FORCE exitosa: {successful} videos")
                 else:
                     # Modo normal: insertar solo videos nuevos
-                    insert_data = []
+                    # Inserción uno por uno para obtener IDs correctos
+                    video_ids = []
                     for video_data in videos_data:
                         insert_row = (
                             video_data['file_path'],
@@ -229,21 +333,52 @@ class DatabaseManager:
                             json.dumps(video_data.get('detected_characters', [])),
                             video_data.get('music_source'),
                             video_data.get('processing_status', 'pendiente'),
-                            video_data.get('description')
+                            video_data.get('title'),
+                            video_data.get('post_url'),
+                            video_data.get('external_video_id'),
+                            video_data.get('creator_id'),          # Nueva estructura
+                            video_data.get('subscription_id')      # Nueva estructura
                         )
-                        insert_data.append(insert_row)
+                        
+                        cursor = conn.execute('''
+                            INSERT INTO videos (
+                                file_path, file_name, creator_name, platform,
+                                file_size, duration_seconds, detected_music, detected_music_artist,
+                                detected_music_confidence, detected_characters, music_source,
+                                processing_status, title, post_url, external_video_id,
+                                creator_id, subscription_id
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        ''', insert_row)
+                        
+                        video_id = cursor.lastrowid
+                        video_ids.append(video_id)
+                        
+                        # Insertar en downloader_mapping si hay datos
+                        if 'downloader_mapping' in video_data and video_data['downloader_mapping']:
+                            dm_data = video_data['downloader_mapping']
+                            conn.execute('''
+                                INSERT INTO downloader_mapping (
+                                    video_id, download_item_id, external_db_source, 
+                                    original_filename, creator_from_downloader, external_metadata
+                                ) VALUES (?, ?, ?, ?, ?, ?)
+                            ''', (
+                                video_id,
+                                dm_data.get('download_item_id'),
+                                dm_data.get('external_db_source'),
+                                video_data.get('file_name'),
+                                video_data.get('creator_name'),
+                                dm_data.get('external_metadata', '{}')
+                            ))
+                        
+                        # Insertar en video_lists si hay tipos de lista
+                        if 'list_types' in video_data and video_data['list_types']:
+                            for list_type in video_data['list_types']:
+                                conn.execute('''
+                                    INSERT OR IGNORE INTO video_lists (video_id, list_type)
+                                    VALUES (?, ?)
+                                ''', (video_id, list_type))
                     
-                    # Inserción normal
-                    conn.executemany('''
-                        INSERT INTO videos (
-                            file_path, file_name, creator_name, platform,
-                            file_size, duration_seconds, detected_music, detected_music_artist,
-                            detected_music_confidence, detected_characters, music_source,
-                            processing_status, description
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    ''', insert_data)
-                    
-                    successful = len(insert_data)
+                    successful = len(video_ids)
                     logger.info(f"Inserción por lotes exitosa: {successful} videos")
                 
                 conn.commit()
@@ -413,7 +548,8 @@ class DatabaseManager:
         allowed_fields = [
             'final_music', 'final_music_artist', 'final_characters', 'difficulty_level',
             'edit_status', 'edited_video_path', 'notes', 'processing_status', 'error_message',
-            'thumbnail_path', 'description',  # Agregar description
+            'thumbnail_path', 'title', 'post_url', 'external_video_id',  # Campos de contenido
+            'creator_id', 'subscription_id',  # Relaciones
             'detected_music', 'detected_music_artist', 'detected_music_confidence', 'music_source', 'detected_characters'
         ]
         
@@ -464,7 +600,8 @@ class DatabaseManager:
         allowed_fields = [
             'final_music', 'final_music_artist', 'final_characters', 'difficulty_level',
             'edit_status', 'edited_video_path', 'notes', 'processing_status', 'error_message',
-            'thumbnail_path', 'description',
+            'thumbnail_path', 'title', 'post_url', 'external_video_id',  # Campos de contenido
+            'creator_id', 'subscription_id',  # Relaciones
             'detected_music', 'detected_music_artist', 'detected_music_confidence', 'music_source', 'detected_characters'
         ]
         
@@ -912,6 +1049,291 @@ class DatabaseManager:
                 results[video_data['file_path']] = video_data
             
             return results
+    
+    # ========================================
+    # 🆕 NUEVAS FUNCIONES PARA SISTEMA REESTRUCTURADO
+    # ========================================
+    
+    # --- GESTIÓN DE CREADORES ---
+    
+    def create_creator(self, name: str, display_name: str = None) -> int:
+        """Crear un nuevo creador"""
+        with self.get_connection() as conn:
+            cursor = conn.execute('''
+                INSERT INTO creators (name, display_name)
+                VALUES (?, ?)
+            ''', (name, display_name or name))
+            creator_id = cursor.lastrowid
+            logger.info(f"Creador creado con ID {creator_id}: {name}")
+            return creator_id
+    
+    def get_creator_by_name(self, name: str) -> Optional[Dict]:
+        """Obtener creador por nombre"""
+        with self.get_connection() as conn:
+            cursor = conn.execute('SELECT * FROM creators WHERE name = ?', (name,))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+    
+    def get_creator_with_urls(self, creator_id: int) -> Optional[Dict]:
+        """Obtener creador con sus URLs por plataforma"""
+        with self.get_connection() as conn:
+            # Obtener datos del creador
+            cursor = conn.execute('SELECT * FROM creators WHERE id = ?', (creator_id,))
+            creator_row = cursor.fetchone()
+            if not creator_row:
+                return None
+                
+            creator = dict(creator_row)
+            
+            # Obtener URLs por plataforma
+            cursor = conn.execute('''
+                SELECT platform, url, username 
+                FROM creator_urls 
+                WHERE creator_id = ?
+            ''', (creator_id,))
+            
+            creator['urls'] = {}
+            for row in cursor.fetchall():
+                creator['urls'][row[0]] = {
+                    'url': row[1],
+                    'username': row[2]
+                }
+            
+            return creator
+    
+    def add_creator_url(self, creator_id: int, platform: str, url: str, username: str = None) -> bool:
+        """Agregar URL de creador para una plataforma"""
+        try:
+            with self.get_connection() as conn:
+                conn.execute('''
+                    INSERT OR REPLACE INTO creator_urls (creator_id, platform, url, username)
+                    VALUES (?, ?, ?, ?)
+                ''', (creator_id, platform, url, username))
+                logger.info(f"URL agregada para creador {creator_id} en {platform}: {url}")
+                return True
+        except Exception as e:
+            logger.error(f"Error agregando URL de creador: {e}")
+            return False
+    
+    # --- GESTIÓN DE SUSCRIPCIONES ---
+    
+    def create_subscription(self, name: str, type: str, platform: str, 
+                          creator_id: int = None, subscription_url: str = None,
+                          external_id: str = None, metadata: str = None) -> int:
+        """Crear una nueva suscripción"""
+        with self.get_connection() as conn:
+            cursor = conn.execute('''
+                INSERT INTO subscriptions (name, type, platform, creator_id, subscription_url, external_id, metadata)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            ''', (name, type, platform, creator_id, subscription_url, external_id, metadata))
+            subscription_id = cursor.lastrowid
+            logger.info(f"Suscripción creada con ID {subscription_id}: {name} ({type})")
+            return subscription_id
+    
+    def get_subscription_by_name_and_platform(self, name: str, platform: str, type: str = None) -> Optional[Dict]:
+        """Obtener suscripción por nombre y plataforma"""
+        with self.get_connection() as conn:
+            if type:
+                cursor = conn.execute('''
+                    SELECT * FROM subscriptions 
+                    WHERE name = ? AND platform = ? AND type = ?
+                ''', (name, platform, type))
+            else:
+                cursor = conn.execute('''
+                    SELECT * FROM subscriptions 
+                    WHERE name = ? AND platform = ?
+                ''', (name, platform))
+            
+            row = cursor.fetchone()
+            return dict(row) if row else None
+    
+    def get_subscriptions_by_creator(self, creator_id: int) -> List[Dict]:
+        """Obtener todas las suscripciones de un creador"""
+        with self.get_connection() as conn:
+            cursor = conn.execute('''
+                SELECT * FROM subscriptions 
+                WHERE creator_id = ?
+                ORDER BY platform, type, name
+            ''', (creator_id,))
+            return [dict(row) for row in cursor.fetchall()]
+    
+    def get_subscriptions_by_platform_and_type(self, platform: str, type: str) -> List[Dict]:
+        """Obtener suscripciones por plataforma y tipo"""
+        with self.get_connection() as conn:
+            cursor = conn.execute('''
+                SELECT * FROM subscriptions 
+                WHERE platform = ? AND type = ?
+                ORDER BY name
+            ''', (platform, type))
+            return [dict(row) for row in cursor.fetchall()]
+    
+    # --- GESTIÓN DE LISTAS DE VIDEOS ---
+    
+    def add_video_to_list(self, video_id: int, list_type: str, source_path: str = None) -> bool:
+        """Agregar video a una lista específica"""
+        try:
+            with self.get_connection() as conn:
+                conn.execute('''
+                    INSERT OR REPLACE INTO video_lists (video_id, list_type, source_path)
+                    VALUES (?, ?, ?)
+                ''', (video_id, list_type, source_path))
+                return True
+        except Exception as e:
+            logger.error(f"Error agregando video {video_id} a lista {list_type}: {e}")
+            return False
+    
+    def get_video_lists(self, video_id: int) -> List[str]:
+        """Obtener todas las listas a las que pertenece un video"""
+        with self.get_connection() as conn:
+            cursor = conn.execute('''
+                SELECT list_type FROM video_lists 
+                WHERE video_id = ?
+            ''', (video_id,))
+            return [row[0] for row in cursor.fetchall()]
+    
+    def get_videos_by_list_type(self, list_type: str, platform: str = None, limit: int = None) -> List[Dict]:
+        """Obtener videos por tipo de lista"""
+        query = '''
+            SELECT v.*, vl.list_type, vl.source_path
+            FROM videos v
+            JOIN video_lists vl ON v.id = vl.video_id
+            WHERE vl.list_type = ? AND v.deleted_at IS NULL
+        '''
+        params = [list_type]
+        
+        if platform:
+            query += ' AND v.platform = ?'
+            params.append(platform)
+            
+        query += ' ORDER BY v.created_at DESC'
+        
+        if limit:
+            query += ' LIMIT ?'
+            params.append(limit)
+        
+        with self.get_connection() as conn:
+            cursor = conn.execute(query, params)
+            return [dict(row) for row in cursor.fetchall()]
+    
+    # --- QUERIES COMPLEJAS PARA FRONTEND ---
+    
+    def get_videos_by_creator_with_metadata(self, creator_id: int, platform: str = None, limit: int = None) -> List[Dict]:
+        """Obtener videos de un creador con metadata completa"""
+        query = '''
+            SELECT 
+                v.*,
+                c.name as creator_name,
+                c.display_name as creator_display_name,
+                s.name as subscription_name,
+                s.type as subscription_type,
+                s.subscription_url,
+                GROUP_CONCAT(vl.list_type) as list_types
+            FROM videos v
+            LEFT JOIN creators c ON v.creator_id = c.id
+            LEFT JOIN subscriptions s ON v.subscription_id = s.id
+            LEFT JOIN video_lists vl ON v.id = vl.video_id
+            WHERE v.creator_id = ? AND v.deleted_at IS NULL
+        '''
+        params = [creator_id]
+        
+        if platform:
+            query += ' AND v.platform = ?'
+            params.append(platform)
+            
+        query += ' GROUP BY v.id ORDER BY v.created_at DESC'
+        
+        if limit:
+            query += ' LIMIT ?'
+            params.append(limit)
+        
+        with self.get_connection() as conn:
+            cursor = conn.execute(query, params)
+            return [dict(row) for row in cursor.fetchall()]
+    
+    def get_videos_by_subscription_with_metadata(self, subscription_id: int, limit: int = None) -> List[Dict]:
+        """Obtener videos de una suscripción con metadata completa"""
+        query = '''
+            SELECT 
+                v.*,
+                c.name as creator_name,
+                c.display_name as creator_display_name,
+                s.name as subscription_name,
+                s.type as subscription_type,
+                s.subscription_url,
+                GROUP_CONCAT(vl.list_type) as list_types
+            FROM videos v
+            LEFT JOIN creators c ON v.creator_id = c.id
+            LEFT JOIN subscriptions s ON v.subscription_id = s.id
+            LEFT JOIN video_lists vl ON v.id = vl.video_id
+            WHERE v.subscription_id = ? AND v.deleted_at IS NULL
+            GROUP BY v.id
+            ORDER BY v.created_at DESC
+        '''
+        params = [subscription_id]
+        
+        if limit:
+            query += ' LIMIT ?'
+            params.append(limit)
+        
+        with self.get_connection() as conn:
+            cursor = conn.execute(query, params)
+            return [dict(row) for row in cursor.fetchall()]
+    
+    def get_creator_stats(self, creator_id: int) -> Dict:
+        """Obtener estadísticas de un creador"""
+        with self.get_connection() as conn:
+            stats = {}
+            
+            # Total de videos
+            cursor = conn.execute('''
+                SELECT COUNT(*) FROM videos 
+                WHERE creator_id = ? AND deleted_at IS NULL
+            ''', (creator_id,))
+            stats['total_videos'] = cursor.fetchone()[0]
+            
+            # Videos por plataforma
+            cursor = conn.execute('''
+                SELECT platform, COUNT(*) FROM videos 
+                WHERE creator_id = ? AND deleted_at IS NULL
+                GROUP BY platform
+            ''', (creator_id,))
+            stats['by_platform'] = dict(cursor.fetchall())
+            
+            # Videos por suscripción
+            cursor = conn.execute('''
+                SELECT s.name, s.type, COUNT(v.id) FROM videos v
+                JOIN subscriptions s ON v.subscription_id = s.id
+                WHERE v.creator_id = ? AND v.deleted_at IS NULL
+                GROUP BY s.id, s.name, s.type
+            ''', (creator_id,))
+            stats['by_subscription'] = [{'name': row[0], 'type': row[1], 'count': row[2]} for row in cursor.fetchall()]
+            
+            return stats
+    
+    def get_platform_stats_external_sources(self) -> Dict:
+        """Obtener estadísticas de plataformas desde fuentes externas"""
+        with self.get_connection() as conn:
+            stats = {}
+            
+            # Estadísticas por fuente externa
+            cursor = conn.execute('''
+                SELECT dm.external_db_source, v.platform, COUNT(v.id) as video_count
+                FROM videos v
+                JOIN downloader_mapping dm ON v.id = dm.video_id
+                WHERE v.deleted_at IS NULL
+                GROUP BY dm.external_db_source, v.platform
+            ''')
+            
+            for row in cursor.fetchall():
+                source = row[0] or 'unknown'
+                platform = row[1]
+                count = row[2]
+                
+                if source not in stats:
+                    stats[source] = {}
+                stats[source][platform] = count
+            
+            return stats
     
     # 🚀 MIGRADO: Sistema de métricas de performance de optimized_database.py
     
