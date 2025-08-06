@@ -12,6 +12,7 @@ interface RealDataContextType extends DataContextType {
   error: string | null;
   refreshData: () => Promise<void>;
   loadVideos: (filters?: VideoFilters) => Promise<void>;
+  getSubscriptionStats: (type: SubscriptionType, id: string) => Promise<any>;
 }
 
 const RealDataContext = createContext<RealDataContextType | undefined>(undefined);
