@@ -416,11 +416,30 @@ def api_permanent_delete_video(video_id):
 
 @videos_bp.route('/stats')
 def api_stats():
-    """API para obtener estadísticas del sistema"""
+    """API para obtener estadísticas globales del sistema"""
     try:
         from src.service_factory import get_database
         db = get_database()
-        stats = db.get_stats()
+        
+        # Estadísticas globales de toda la base de datos
+        total_videos = db.count_videos()
+        total_processed = db.count_videos({'processing_status': 'completado'})
+        total_pending = db.count_videos({'processing_status': 'pendiente'})
+        total_in_trash = db.count_videos(include_deleted=True) - total_videos
+        
+        # Estadísticas adicionales
+        videos_with_music = len([v for v in db.get_videos() if v.get('final_music') or v.get('detected_music')])
+        videos_with_characters = len([v for v in db.get_videos() if v.get('final_characters') or v.get('detected_characters')])
+        
+        stats = {
+            'total': total_videos,
+            'processed': total_processed,
+            'pending': total_pending,
+            'in_trash': total_in_trash,
+            'with_music': videos_with_music,
+            'with_characters': videos_with_characters
+        }
+        
         return jsonify({'success': True, 'stats': stats})
         
     except Exception as e:

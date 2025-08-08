@@ -1,24 +1,31 @@
 
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useRealData } from '../hooks/useRealData';
-import { Platform } from '../types';
+import { Platform, CreatorPlatformInfo } from '../types';
 import PostCard from '../components/VideoCard';
 import Breadcrumbs, { Crumb } from '../components/Breadcrumbs';
 import PlatformTabs, { Tab } from '../components/PlatformTabs';
 import { ICONS, getSubscriptionIcon, getListIcon } from '../constants';
+import useInfiniteScroll from '../hooks/useInfiniteScroll';
 
 const CreatorPage: React.FC = () => {
     const { creatorName, platform: platformParam, subscriptionId } = useParams<{ creatorName: string, platform?: string, subscriptionId?: string }>();
     
+    
     // Decode URL-encoded platform parameter
     const decodedPlatform = platformParam ? decodeURIComponent(platformParam) : undefined;
-    const { getCreatorByName, getPostsByCreator, loading } = useRealData();
+    const { 
+        getCreatorByName, 
+        getPostsByCreator, 
+        loading,
+        loadCreatorPosts,
+        loadMoreCreatorPosts,
+        getCreatorScrollData,
+        clearCreatorScrollData
+    } = useRealData();
     const navigate = useNavigate();
     
-    const [displayedPosts, setDisplayedPosts] = useState<any[]>([]);
-    const [postsLoading, setPostsLoading] = useState(false);
-
     const creator = useMemo(() => creatorName ? getCreatorByName(creatorName) : undefined, [creatorName, getCreatorByName]);
     
     const activePlatform = useMemo(() => {
@@ -34,35 +41,56 @@ const CreatorPage: React.FC = () => {
         return creator ? Object.keys(creator.platforms)[0] as Platform : undefined;
     }, [creator, decodedPlatform]);
 
-    // Cargar posts del creador de forma asíncrona
+    // Usar infinite scroll data en lugar de estado local (después de definir activePlatform)
+    const scrollData = getCreatorScrollData(creatorName || '', activePlatform, subscriptionId);
+    const displayedPosts = scrollData.posts;
+    const postsLoading = scrollData.loading;
+    
+
+    // Limpiar datos cuando cambie la configuración y cargar nuevos posts
     useEffect(() => {
         if (!creatorName) {
-            setDisplayedPosts([]);
             return;
         }
 
-        const loadCreatorPosts = async () => {
-            setPostsLoading(true);
+        // Limpiar datos existentes para forzar nueva carga
+        clearCreatorScrollData(creatorName, activePlatform, subscriptionId);
+
+        const loadPosts = async () => {
             try {
-                const posts = await getPostsByCreator(creatorName, activePlatform, subscriptionId);
-                setDisplayedPosts(posts);
+                await loadCreatorPosts(creatorName, activePlatform, subscriptionId);
             } catch (error) {
                 console.error('Error loading creator posts:', error);
-                setDisplayedPosts([]);
-            } finally {
-                setPostsLoading(false);
             }
         };
 
-        loadCreatorPosts();
-    }, [creatorName, activePlatform, subscriptionId, getPostsByCreator]);
+        loadPosts();
+    }, [creatorName, activePlatform, subscriptionId, loadCreatorPosts, clearCreatorScrollData]);
+
+    // Infinite scroll callback
+    const infiniteScrollCallback = useCallback(() => {
+        if (creatorName && !postsLoading && scrollData.hasMore) {
+            loadMoreCreatorPosts(creatorName, activePlatform, subscriptionId);
+        }
+    }, [creatorName, activePlatform, subscriptionId, postsLoading, scrollData.hasMore, loadMoreCreatorPosts]);
+
+    // Hook para scroll infinito
+    const infiniteScrollEnabled = !loading && !postsLoading && scrollData.hasMore && scrollData.initialLoaded && displayedPosts.length > 0;
+    
+    useInfiniteScroll(infiniteScrollCallback, {
+        threshold: 100,
+        enabled: infiniteScrollEnabled
+    });
     
     // Calculate total post count based on current view
     const totalPostCount = useMemo(() => {
         if (activePlatform === undefined) {
             // When showing "All", use sum of all platform counts or displayed posts length
             if (creator) {
-                return Object.values(creator.platforms).reduce((acc, p) => acc + (p?.postCount || 0), 0);
+                return Object.values(creator.platforms).reduce((acc: number, p) => {
+                    const postCount = (p as CreatorPlatformInfo | undefined)?.postCount || 0;
+                    return acc + postCount;
+                }, 0);
             }
             return displayedPosts.length;
         } else {
@@ -76,7 +104,7 @@ const CreatorPage: React.FC = () => {
             const platformSubscriptions = creator.platforms[activePlatform]?.subscriptions || [];
             if (platformSubscriptions.length > 1) { // Only show sub-tabs if there's more than one list
                 return [
-                    { id: 'sub-all', label: 'All', count: creator.platforms[activePlatform]?.postCount || 0, icon: undefined },
+                    { id: 'sub-all', label: 'All', count: (creator.platforms[activePlatform] as CreatorPlatformInfo)?.postCount || 0, icon: undefined },
                     ...platformSubscriptions.map((sub, index) => ({
                         id: `sub-${index}-${sub.type}-${sub.name.replace(/[^a-zA-Z0-9]/g, '-')}`, // ID único
                         label: sub.name,
@@ -116,7 +144,7 @@ const CreatorPage: React.FC = () => {
         ...Object.entries(creator.platforms).map(([p, data], index) => ({
             id: `platform-${index}-${p.replace(/[^a-zA-Z0-9]/g, '-')}`, // Generar ID único y seguro
             label: p,
-            count: data?.postCount || 0,
+            count: (data as CreatorPlatformInfo)?.postCount || 0,
             platformName: p // Mantener el nombre original de plataforma para navegación
         }))
     ];
@@ -175,8 +203,8 @@ const CreatorPage: React.FC = () => {
                         {/* Platform Links */}
                         <div className="flex items-center gap-2">
                             <span className="text-gray-400 text-sm">Plataformas:</span>
-                            {Object.entries(creator.platforms).map(([p, data]) => data?.url && (
-                                 <a key={p} href={data.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 p-1.5 rounded-md bg-[#212121]/50 border border-gray-700/50 hover:bg-red-500/20 text-gray-300 hover:text-white transition-colors" title={`Ver en ${p}`}>
+                            {Object.entries(creator.platforms).map(([p, data]) => (data as CreatorPlatformInfo)?.url && (
+                                 <a key={p} href={(data as CreatorPlatformInfo).url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 p-1.5 rounded-md bg-[#212121]/50 border border-gray-700/50 hover:bg-red-500/20 text-gray-300 hover:text-white transition-colors" title={`Ver en ${p}`}>
                                     <span className="text-xs font-medium">{p}</span>
                                     {React.cloneElement(ICONS.external_link, { className: 'h-3 w-3' })}
                                  </a>
@@ -186,13 +214,13 @@ const CreatorPage: React.FC = () => {
                         {/* Subscriptions and Lists */}
                         <div className="flex flex-col gap-2">
                             {Object.entries(creator.platforms).map(([platform, data]) => {
-                                if (!data?.subscriptions || data.subscriptions.length === 0) return null;
+                                if (!(data as CreatorPlatformInfo)?.subscriptions || (data as CreatorPlatformInfo).subscriptions.length === 0) return null;
                                 
                                 return (
                                     <div key={platform} className="flex items-center gap-2">
                                         <span className="text-gray-400 text-xs">{platform}:</span>
                                         <div className="flex items-center gap-1">
-                                            {data.subscriptions.map((subscription, idx) => {
+                                            {(data as CreatorPlatformInfo).subscriptions.map((subscription, idx) => {
                                                 const subscriptionIcon = getSubscriptionIcon(subscription.type || 'account');
                                                 return (
                                                     <div key={idx} className="flex items-center gap-1 p-1 rounded bg-gray-800/50 border border-gray-600/50" title={`${subscription.name} (${subscription.type})`}>
@@ -273,7 +301,24 @@ const CreatorPage: React.FC = () => {
                             />
                         ))}
                     </div>
-                    {displayedPosts.length === 0 && (
+                    {/* Indicador de carga para más contenido */}
+                    {postsLoading && (
+                        <div className="flex items-center justify-center py-8">
+                            <div className="flex items-center space-x-2 text-gray-400">
+                                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-red-500"></div>
+                                <span>Cargando más videos...</span>
+                            </div>
+                        </div>
+                    )}
+                    
+                    {/* Mensaje de final de contenido */}
+                    {!scrollData.hasMore && displayedPosts.length > 0 && (
+                        <div className="text-center py-8 text-gray-400">
+                            <p>Has visto todos los videos disponibles del creador ({displayedPosts.length} videos)</p>
+                        </div>
+                    )}
+                    
+                    {displayedPosts.length === 0 && !postsLoading && (
                         <div className="text-center py-16">
                             <h3 className="text-2xl font-semibold text-white">No se encontraron posts</h3>
                             <p className="text-gray-400 mt-2">No hay contenido que coincida con los filtros seleccionados.</p>

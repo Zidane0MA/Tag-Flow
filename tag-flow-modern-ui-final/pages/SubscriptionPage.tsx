@@ -1,5 +1,5 @@
 
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useRealData } from '../hooks/useRealData';
 import { SubscriptionType, SubscriptionInfo } from '../types';
@@ -7,18 +7,33 @@ import Breadcrumbs, { Crumb } from '../components/Breadcrumbs';
 import { ICONS, getSubscriptionIcon, getListIcon } from '../constants';
 import PostCard from '../components/VideoCard';
 import PlatformTabs, { Tab } from '../components/PlatformTabs';
+import useInfiniteScroll from '../hooks/useInfiniteScroll';
 
 
 const SubscriptionPage: React.FC = () => {
     const { type, id, list } = useParams<{ type: SubscriptionType, id: string, list?: string }>();
-    const { getSubscriptionInfo, getSubscriptionStats, getPostsBySubscription, getCreatorByName } = useRealData();
+    
+    const { 
+        getSubscriptionInfo, 
+        getSubscriptionStats, 
+        getPostsBySubscription, 
+        getCreatorByName,
+        loadSubscriptionPosts,
+        loadMoreSubscriptionPosts,
+        getSubscriptionScrollData,
+        clearSubscriptionScrollData
+    } = useRealData();
 
     // ⚠️ IMPORTANTE: Mantener todos los hooks en el mismo orden siempre
     const [subscriptionInfo, setSubscriptionInfo] = useState<SubscriptionInfo | undefined>(undefined);
     const [subscriptionStats, setSubscriptionStats] = useState<{total: number, listCounts: {[key: string]: number}} | null>(null);
-    const [displayedPosts, setDisplayedPosts] = useState<any[]>([]);
-    const [postsLoading, setPostsLoading] = useState(false);
     const [loading, setLoading] = useState(true);
+    
+    // Usar infinite scroll data en lugar de estado local
+    const scrollData = getSubscriptionScrollData(type || 'account', id || '', list);
+    const displayedPosts = scrollData.posts;
+    const postsLoading = scrollData.loading;
+    
 
     // Generar subtabs dinámicos por plataforma para suscripciones tipo account
     const accountSubscriptionTabs: Tab[] | undefined = useMemo(() => {
@@ -108,29 +123,40 @@ const SubscriptionPage: React.FC = () => {
         loadSubscriptionInfo();
     }, [type, id, getSubscriptionInfo, getSubscriptionStats, getCreatorByName]);
 
-    // Cargar posts de la suscripción
+    // Limpiar datos cuando cambie la configuración y cargar nuevos posts
     useEffect(() => {
         if (!type || !id) {
-            setDisplayedPosts([]);
             return;
         }
 
-        const loadSubscriptionPosts = async () => {
-            setPostsLoading(true);
+        // Limpiar datos existentes para forzar nueva carga
+        clearSubscriptionScrollData(type, id, list);
+
+        const loadPosts = async () => {
             try {
-                // Obtener todos los posts sin límite
-                const posts = await getPostsBySubscription(type, id, list);
-                setDisplayedPosts(posts);
+                await loadSubscriptionPosts(type, id, list);
             } catch (error) {
                 console.error('Error loading subscription posts:', error);
-                setDisplayedPosts([]);
-            } finally {
-                setPostsLoading(false);
             }
         };
 
-        loadSubscriptionPosts();
-    }, [type, id, list, getPostsBySubscription]);
+        loadPosts();
+    }, [type, id, list, loadSubscriptionPosts, clearSubscriptionScrollData]);
+
+    // Infinite scroll callback
+    const infiniteScrollCallback = useCallback(() => {
+        if (type && id && !postsLoading && scrollData.hasMore) {
+            loadMoreSubscriptionPosts(type, id, list);
+        }
+    }, [type, id, list, postsLoading, scrollData.hasMore, loadMoreSubscriptionPosts]);
+
+    // Hook para scroll infinito
+    const infiniteScrollEnabled = !loading && !postsLoading && scrollData.hasMore && scrollData.initialLoaded && displayedPosts.length > 0;
+    
+    useInfiniteScroll(infiniteScrollCallback, {
+        threshold: 100,
+        enabled: infiniteScrollEnabled
+    });
 
     // Early returns después de todos los hooks
     if (loading) {
@@ -208,24 +234,53 @@ const SubscriptionPage: React.FC = () => {
                 />
             )}
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-                {displayedPosts.map(post => (
-                    <PostCard 
-                        key={post.id} 
-                        video={post}
-                        videos={displayedPosts}
-                        isSelected={false} 
-                        onSelect={() => {}}
-                        onEdit={() => {}}
-                    />
-                ))}
-            </div>
-             {displayedPosts.length === 0 && (
-                 <div className="text-center py-16">
-                    <h3 className="text-2xl font-semibold text-white">No se encontraron posts</h3>
-                    <p className="text-gray-400 mt-2">No hay contenido que coincida con esta suscripción.</p>
+            {postsLoading ? (
+                <div className="flex items-center justify-center min-h-[400px]">
+                    <div className="text-center">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-500 mx-auto mb-4"></div>
+                        <p className="text-white text-lg">Cargando videos de la suscripción...</p>
+                    </div>
                 </div>
-             )}
+            ) : (
+                <>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+                        {displayedPosts.map(post => (
+                            <PostCard 
+                                key={post.id} 
+                                video={post}
+                                videos={displayedPosts}
+                                isSelected={false} 
+                                onSelect={() => {}}
+                                onEdit={() => {}}
+                            />
+                        ))}
+                    </div>
+                    
+                    {/* Indicador de carga para más contenido */}
+                    {postsLoading && (
+                        <div className="flex items-center justify-center py-8">
+                            <div className="flex items-center space-x-2 text-gray-400">
+                                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-red-500"></div>
+                                <span>Cargando más videos...</span>
+                            </div>
+                        </div>
+                    )}
+                    
+                    {/* Mensaje de final de contenido */}
+                    {!scrollData.hasMore && displayedPosts.length > 0 && (
+                        <div className="text-center py-8 text-gray-400">
+                            <p>Has visto todos los videos disponibles de la suscripción ({displayedPosts.length} videos)</p>
+                        </div>
+                    )}
+                    
+                    {displayedPosts.length === 0 && !postsLoading && (
+                        <div className="text-center py-16">
+                            <h3 className="text-2xl font-semibold text-white">No se encontraron posts</h3>
+                            <p className="text-gray-400 mt-2">No hay contenido que coincida con esta suscripción.</p>
+                        </div>
+                    )}
+                </>
+            )}
 
         </div>
     );

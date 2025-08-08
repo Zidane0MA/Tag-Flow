@@ -1,8 +1,8 @@
-
-import React from 'react';
-import { NavLink } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { NavLink, useLocation } from 'react-router-dom';
 import { NAV_LINKS, ICONS } from '../constants';
 import { useRealData } from '../hooks/useRealData';
+import { apiService } from '../services/apiService';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -10,14 +10,45 @@ interface SidebarProps {
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
-  const { getStats } = useRealData();
-  const stats = getStats();
+  const { posts } = useRealData();
+  const location = useLocation();
+  const [globalStats, setGlobalStats] = useState({
+    total: 0,
+    withMusic: 0,
+    withCharacters: 0,
+    processed: 0,
+    inTrash: 0,
+    pending: 0,
+  });
+
+  // Cargar estadísticas globales
+  useEffect(() => {
+    const loadGlobalStats = async () => {
+      try {
+        const stats = await apiService.getGlobalStats();
+        setGlobalStats(stats);
+      } catch (error) {
+        console.error('Error loading global stats:', error);
+      }
+    };
+
+    loadGlobalStats();
+    // Actualizar cada 30 segundos
+    const interval = setInterval(loadGlobalStats, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleNavClick = () => {
     // Close sidebar on navigation in mobile view
     if (window.innerWidth < 1024) {
       setIsOpen(false);
     }
+  };
+
+  // Determinar si mostrar estadísticas locales (solo en GalleryPage)
+  const showLocalStats = location.pathname === '/';
+  const localStats = {
+    loaded: posts.length
   };
 
   const sidebarClasses = `
@@ -83,29 +114,44 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
       </nav>
       {isOpen && (
         <div className="px-6 mt-8 overflow-hidden">
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Estadísticas</h3>
-            <div className="mt-4 space-y-3 text-sm">
+          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Estadísticas</h3>
+          <div className="mt-4 space-y-3 text-sm">
+            {/* Estadísticas locales (solo en gallery) */}
+            {showLocalStats && (
+              <div className="mb-4 pb-3 border-b border-gray-700">
                 <div className="flex justify-between text-gray-300">
-                    <span>Cargados</span>
-                    <span className="font-medium text-white">{stats.total}</span>
+                  <span>Cargados</span>
+                  <span className="font-medium text-green-400">{localStats.loaded}</span>
                 </div>
-                <div className="flex justify-between text-gray-300">
-                    <span>Total BD</span>
-                    <span className="font-medium text-blue-400">{stats.totalInDB || '...'}</span>
-                </div>
-                <div className="flex justify-between text-gray-300">
-                    <span>Procesados</span>
-                    <span className="font-medium text-white">{stats.processed}</span>
-                </div>
-                <div className="flex justify-between text-gray-300">
-                    <span>Pendientes</span>
-                    <span className="font-medium text-white">{stats.pending}</span>
-                </div>
-                <div className="flex justify-between text-gray-300">
-                    <span>En Papelera</span>
-                    <span className="font-medium text-white">{stats.inTrash}</span>
-                </div>
+              </div>
+            )}
+            
+            {/* Estadísticas globales */}
+            <div className="flex justify-between text-gray-300">
+              <span>Total Sistema</span>
+              <span className="font-medium text-white">{globalStats.total}</span>
             </div>
+            <div className="flex justify-between text-gray-300">
+              <span>Procesados</span>
+              <span className="font-medium text-white">{globalStats.processed}</span>
+            </div>
+            <div className="flex justify-between text-gray-300">
+              <span>Pendientes</span>
+              <span className="font-medium text-white">{globalStats.pending}</span>
+            </div>
+            <div className="flex justify-between text-gray-300">
+              <span>Con Música</span>
+              <span className="font-medium text-white">{globalStats.withMusic}</span>
+            </div>
+            <div className="flex justify-between text-gray-300">
+              <span>Con Personajes</span>
+              <span className="font-medium text-white">{globalStats.withCharacters}</span>
+            </div>
+            <div className="flex justify-between text-gray-300">
+              <span>En Papelera</span>
+              <span className="font-medium text-white">{globalStats.inTrash}</span>
+            </div>
+          </div>
         </div>
       )}
     </div>

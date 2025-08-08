@@ -5,7 +5,7 @@
 
 import { Post, Platform, EditStatus, ProcessStatus, Difficulty, Creator, SubscriptionInfo, SubscriptionType } from '../types';
 
-const API_BASE_URL = 'http://localhost:5000/api';
+const API_BASE_URL = 'http://192.168.1.135:5000/api';
 
 export interface VideoFilters {
   search?: string;
@@ -148,12 +148,12 @@ class ApiService {
       description: video.title || video.file_name || '',
       thumbnailUrl: (() => {
         if (!video.thumbnail_path || !video.thumbnail_path.trim()) {
-          return 'http://localhost:5000/static/img/no-thumbnail.svg';
+          return 'http://192.168.1.135:5000/static/img/no-thumbnail.svg';
         }
         
         let filename = video.thumbnail_path.split(/[/\\]/).pop();
         if (!filename || !filename.trim()) {
-          return 'http://localhost:5000/static/img/no-thumbnail.svg';
+          return 'http://192.168.1.135:5000/static/img/no-thumbnail.svg';
         }
         
         // Si el filename no termina con _thumb.jpg, intentar construirlo desde file_name
@@ -165,7 +165,7 @@ class ApiService {
           }
         }
         
-        return `http://localhost:5000/thumbnail/${encodeURIComponent(filename)}`;
+        return `http://192.168.1.135:5000/thumbnail/${encodeURIComponent(filename)}`;
       })(),
       postUrl: video.file_path, // Para streaming local
       type: 'Video' as any, // Todos los posts del backend son videos por ahora
@@ -366,22 +366,32 @@ class ApiService {
 
 
   /**
-   * Obtener estadísticas
+   * Obtener estadísticas globales del sistema
    */
-  async getStats() {
+  async getGlobalStats() {
     try {
-      const { posts, total } = await this.getVideos();
+      const response = await fetch(`${API_BASE_URL}/stats`);
       
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      if (!data.success) {
+        throw new Error(data.error || 'Error fetching global stats');
+      }
+
       return {
-        total,
-        withMusic: posts.filter(p => p.music).length,
-        withCharacters: posts.filter(p => p.characters && p.characters.length > 0).length,
-        processed: posts.filter(p => p.processStatus === ProcessStatus.COMPLETED).length,
-        inTrash: 0, // Por implementar cuando tengamos endpoint de papelera
-        pending: posts.filter(p => p.processStatus === ProcessStatus.PENDING).length,
+        total: data.stats.total,
+        withMusic: data.stats.with_music,
+        withCharacters: data.stats.with_characters,
+        processed: data.stats.processed,
+        inTrash: data.stats.in_trash,
+        pending: data.stats.pending,
       };
     } catch (error) {
-      console.error('Error fetching stats:', error);
+      console.error('Error fetching global stats:', error);
       return {
         total: 0,
         withMusic: 0,
@@ -391,6 +401,13 @@ class ApiService {
         pending: 0,
       };
     }
+  }
+
+  /**
+   * Obtener estadísticas (solo para compatibilidad)
+   */
+  async getStats() {
+    return this.getGlobalStats();
   }
 
   /**

@@ -36,8 +36,13 @@ const GalleryPage: React.FC = () => {
         error, 
         loadVideos,
         loadMoreVideos,
-        creators 
+        creators,
+        getStats
     } = useRealData();
+    
+    // Obtener estadísticas para mostrar total de videos
+    const stats = getStats();
+    const totalVideos = stats.total;
 
     const [selectedPosts, setSelectedPosts] = useState<string[]>([]);
     const [editingPost, setEditingPost] = useState<Post | null>(null);
@@ -108,18 +113,24 @@ const GalleryPage: React.FC = () => {
         await loadVideos(apiFilters);
     }, [filters, buildApiFilters, loadVideos]);
 
-    // Hook para scroll infinito
-    useInfiniteScroll(
-        () => {
-            if (!loadingMore && hasMore) {
-                loadMoreVideos();
-            }
-        },
-        {
-            threshold: 200,
-            enabled: !loading && !loadingMore && hasMore
+    // Memoizar el callback para evitar recreaciones constantes
+    const infiniteScrollCallback = useCallback(() => {
+        if (!loadingMore && hasMore) {
+            loadMoreVideos();
         }
-    );
+    }, [loadingMore, hasMore, loadMoreVideos]);
+
+    // Simplificar enabled - solo usar hasMore ya que es el más estable
+    const infiniteScrollEnabled = hasMore && posts.length > 0;
+    
+    // Memoizar las opciones para evitar recreaciones constantes
+    const infiniteScrollOptions = useMemo(() => ({
+        threshold: 400,
+        enabled: infiniteScrollEnabled
+    }), [infiniteScrollEnabled]);
+
+    // Hook para scroll infinito
+    useInfiniteScroll(infiniteScrollCallback, infiniteScrollOptions);
 
     // Aplicar filtros cuando cambien
     useEffect(() => {
@@ -255,7 +266,7 @@ const GalleryPage: React.FC = () => {
                 <summary className="font-semibold text-white cursor-pointer select-none flex justify-between items-center list-none">
                     <span className="text-lg">Filtros y Ordenación</span>
                     <span className="text-xs font-normal text-gray-400 hover:text-white transition-colors">
-                        Haga clic para expandir/colapsar • {posts.length} videos cargados {hasMore && '(cargando más al hacer scroll)'}
+                        Haga clic para expandir/colapsar
                     </span>
                 </summary>
                 <div className="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
