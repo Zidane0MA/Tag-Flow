@@ -129,20 +129,24 @@ const SubscriptionPage: React.FC = () => {
         }
     }, [type, id, list]);
 
-    // Infinite scroll callback
+    // Infinite scroll callback - SIMPLIFICADO COMO GALLERY
     const infiniteScrollCallback = useCallback(() => {
         if (type && id && !postsLoading && scrollData.hasMore) {
             loadMoreSubscriptionPosts(type, id, list);
         }
-    }, [type, id, list, postsLoading, scrollData.hasMore, loadMoreSubscriptionPosts]);
+    }, [postsLoading, scrollData.hasMore, loadMoreSubscriptionPosts]); // Dependencias mínimas
+
+    // Simplificar enabled - solo usar condiciones estables como Gallery
+    const infiniteScrollEnabled = scrollData.hasMore && displayedPosts.length > 0;
+    
+    // Memoizar las opciones para evitar recreaciones constantes
+    const infiniteScrollOptions = useMemo(() => ({
+        threshold: 400, // Mismo threshold que Gallery
+        enabled: infiniteScrollEnabled
+    }), [infiniteScrollEnabled]);
 
     // Hook para scroll infinito
-    const infiniteScrollEnabled = !postsLoading && scrollData.hasMore && scrollData.initialLoaded && displayedPosts.length > 0;
-    
-    useInfiniteScroll(infiniteScrollCallback, {
-        threshold: 100,
-        enabled: infiniteScrollEnabled
-    });
+    useInfiniteScroll(infiniteScrollCallback, infiniteScrollOptions);
 
     // Early returns después de todos los hooks
     if (postsLoading && !scrollData.initialLoaded) {
@@ -232,7 +236,7 @@ const SubscriptionPage: React.FC = () => {
                             <PostCard 
                                 key={post.id} 
                                 video={post}
-                                videos={displayedPosts}
+                                videos={[]} // Empty array to avoid re-renders - player navigation handled differently
                                 isSelected={false} 
                                 onSelect={() => {}}
                                 onEdit={() => {}}

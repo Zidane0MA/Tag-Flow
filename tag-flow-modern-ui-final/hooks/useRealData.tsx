@@ -543,12 +543,25 @@ export const RealDataProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       const { posts: newPosts } = await apiService.getCreatorVideos(creatorName, platform, listId, PAGE_SIZE, currentData.offset);
       
       setCreatorScrollData(prev => {
-        const existingPosts = prev[key]?.posts || [];
-        const existingIds = new Set(existingPosts.map(p => p.id));
+        const currentScrollData = prev[key];
+        if (!currentScrollData) return prev;
+        
+        // Concatenación simple como en galería - MANTENER REFERENCIA DEL OBJETO
+        const existingIds = new Set(currentScrollData.posts.map(p => p.id));
         const uniqueNewPosts = newPosts.filter(p => !existingIds.has(p.id));
 
-        return { ...prev, [key]: { ...currentData, posts: [...existingPosts, ...uniqueNewPosts], offset: currentData.offset + PAGE_SIZE, hasMore: newPosts.length === PAGE_SIZE, loading: false } };
+        return { 
+          ...prev, 
+          [key]: { 
+            ...currentScrollData,  // Mantener referencia del objeto existente
+            posts: [...currentScrollData.posts, ...uniqueNewPosts], // Concatenación simple
+            offset: currentScrollData.offset + PAGE_SIZE,
+            hasMore: newPosts.length === PAGE_SIZE,
+            loading: false
+          } 
+        };
       });
+
     } catch (error) {
       console.error('Error loading more creator posts:', error);
       setCreatorScrollData(prev => ({ ...prev, [key]: { ...currentData, loading: false } }));
@@ -641,12 +654,25 @@ export const RealDataProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       const { posts: newPosts } = await apiService.getSubscriptionVideos(type, id, list, PAGE_SIZE, currentData.offset);
 
       setSubscriptionScrollData(prev => {
-        const existingPosts = prev[key]?.posts || [];
-        const existingIds = new Set(existingPosts.map(p => p.id));
+        const currentScrollData = prev[key];
+        if (!currentScrollData) return prev;
+        
+        // Concatenación simple como en galería - MANTENER REFERENCIA DEL OBJETO
+        const existingIds = new Set(currentScrollData.posts.map(p => p.id));
         const uniqueNewPosts = newPosts.filter(p => !existingIds.has(p.id));
 
-        return { ...prev, [key]: { ...currentData, posts: [...existingPosts, ...uniqueNewPosts], offset: currentData.offset + PAGE_SIZE, hasMore: newPosts.length === PAGE_SIZE, loading: false } };
+        return { 
+          ...prev, 
+          [key]: { 
+            ...currentScrollData,  // Mantener referencia del objeto existente
+            posts: [...currentScrollData.posts, ...uniqueNewPosts], // Concatenación simple
+            offset: currentScrollData.offset + PAGE_SIZE,
+            hasMore: newPosts.length === PAGE_SIZE,
+            loading: false
+          } 
+        };
       });
+
     } catch (error) {
       console.error('Error loading more subscription posts:', error);
       setSubscriptionScrollData(prev => ({ ...prev, [key]: { ...currentData, loading: false } }));
