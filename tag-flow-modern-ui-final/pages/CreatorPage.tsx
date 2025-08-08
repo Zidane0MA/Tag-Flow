@@ -21,25 +21,15 @@ const CreatorPage: React.FC = () => {
         loading,
         loadCreatorPosts,
         loadMoreCreatorPosts,
-        getCreatorScrollData,
-        clearCreatorScrollData
+        getCreatorScrollData
     } = useRealData();
     const navigate = useNavigate();
     
     const creator = useMemo(() => creatorName ? getCreatorByName(creatorName) : undefined, [creatorName, getCreatorByName]);
     
     const activePlatform = useMemo(() => {
-        // If no platform param, we're showing "All"
-        if (!decodedPlatform) {
-            return undefined;
-        }
-        // If platform param exists and is valid, use it
-        if (creator && creator.platforms[decodedPlatform as Platform]) {
-            return decodedPlatform as Platform;
-        }
-        // If platform param is invalid, default to first platform
-        return creator ? Object.keys(creator.platforms)[0] as Platform : undefined;
-    }, [creator, decodedPlatform]);
+        return decodedPlatform as Platform | undefined;
+    }, [decodedPlatform]);
 
     // Usar infinite scroll data en lugar de estado local (después de definir activePlatform)
     const scrollData = getCreatorScrollData(creatorName || '', activePlatform, subscriptionId);
@@ -47,25 +37,11 @@ const CreatorPage: React.FC = () => {
     const postsLoading = scrollData.loading;
     
 
-    // Limpiar datos cuando cambie la configuración y cargar nuevos posts
     useEffect(() => {
-        if (!creatorName) {
-            return;
+        if (creatorName) {
+            loadCreatorPosts(creatorName, activePlatform, subscriptionId);
         }
-
-        // Limpiar datos existentes para forzar nueva carga
-        clearCreatorScrollData(creatorName, activePlatform, subscriptionId);
-
-        const loadPosts = async () => {
-            try {
-                await loadCreatorPosts(creatorName, activePlatform, subscriptionId);
-            } catch (error) {
-                console.error('Error loading creator posts:', error);
-            }
-        };
-
-        loadPosts();
-    }, [creatorName, activePlatform, subscriptionId, loadCreatorPosts, clearCreatorScrollData]);
+    }, [creatorName, activePlatform, subscriptionId]);
 
     // Infinite scroll callback
     const infiniteScrollCallback = useCallback(() => {
@@ -75,7 +51,7 @@ const CreatorPage: React.FC = () => {
     }, [creatorName, activePlatform, subscriptionId, postsLoading, scrollData.hasMore, loadMoreCreatorPosts]);
 
     // Hook para scroll infinito
-    const infiniteScrollEnabled = !loading && !postsLoading && scrollData.hasMore && scrollData.initialLoaded && displayedPosts.length > 0;
+    const infiniteScrollEnabled = !postsLoading && scrollData.hasMore && scrollData.initialLoaded && displayedPosts.length > 0;
     
     useInfiniteScroll(infiniteScrollCallback, {
         threshold: 100,
@@ -87,7 +63,7 @@ const CreatorPage: React.FC = () => {
         if (activePlatform === undefined) {
             // When showing "All", use sum of all platform counts or displayed posts length
             if (creator) {
-                return Object.values(creator.platforms).reduce((acc: number, p) => {
+                return Object.values(creator?.platforms || {}).reduce((acc: number, p) => {
                     const postCount = (p as CreatorPlatformInfo | undefined)?.postCount || 0;
                     return acc + postCount;
                 }, 0);
@@ -101,10 +77,10 @@ const CreatorPage: React.FC = () => {
 
     const subscriptionTabs: Tab[] | undefined = useMemo(() => {
         if (activePlatform && creator?.platforms[activePlatform]) {
-            const platformSubscriptions = creator.platforms[activePlatform]?.subscriptions || [];
+            const platformSubscriptions = creator?.platforms[activePlatform]?.subscriptions || [];
             if (platformSubscriptions.length > 1) { // Only show sub-tabs if there's more than one list
                 return [
-                    { id: 'sub-all', label: 'All', count: (creator.platforms[activePlatform] as CreatorPlatformInfo)?.postCount || 0, icon: undefined },
+                    { id: 'sub-all', label: 'All', count: (creator?.platforms[activePlatform] as CreatorPlatformInfo)?.postCount || 0, icon: undefined },
                     ...platformSubscriptions.map((sub, index) => ({
                         id: `sub-${index}-${sub.type}-${sub.name.replace(/[^a-zA-Z0-9]/g, '-')}`, // ID único
                         label: sub.name,
@@ -118,7 +94,7 @@ const CreatorPage: React.FC = () => {
     }, [creator, activePlatform]);
 
     // Early returns after all hooks
-    if (loading || postsLoading) {
+    if (postsLoading && !scrollData.initialLoaded) {
         return (
             <div className="text-center py-16">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mx-auto"></div>
@@ -127,11 +103,25 @@ const CreatorPage: React.FC = () => {
         );
     }
 
-    if (!creator || !creatorName) {
+    // Show "creator not found" only in specific cases
+    if (!creatorName) {
         return (
             <div className="text-center py-16">
                 <h3 className="text-2xl font-semibold text-white">Creador no encontrado</h3>
-                <p className="text-gray-400 mt-2">No se pudo encontrar al creador solicitado.</p>
+                <p className="text-gray-400 mt-2">No se especificó un creador válido.</p>
+                <Link to="/gallery" className="mt-4 inline-block px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-md transition">
+                    Volver a la Galería
+                </Link>
+            </div>
+        );
+    }
+    
+    // Only show error if we have no creator AND have finished loading with no results
+    if (!creator && scrollData.initialLoaded && displayedPosts.length === 0) {
+        return (
+            <div className="text-center py-16">
+                <h3 className="text-2xl font-semibold text-white">Creador no encontrado</h3>
+                <p className="text-gray-400 mt-2">No se pudo encontrar al creador "{creatorName}".</p>
                 <Link to="/gallery" className="mt-4 inline-block px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-md transition">
                     Volver a la Galería
                 </Link>
@@ -141,12 +131,12 @@ const CreatorPage: React.FC = () => {
     
     const platformTabs: Tab[] = [
         { id: 'all', label: 'All', count: totalPostCount },
-        ...Object.entries(creator.platforms).map(([p, data], index) => ({
+        ...(creator ? Object.entries(creator.platforms).map(([p, data], index) => ({
             id: `platform-${index}-${p.replace(/[^a-zA-Z0-9]/g, '-')}`, // Generar ID único y seguro
             label: p,
             count: (data as CreatorPlatformInfo)?.postCount || 0,
             platformName: p // Mantener el nombre original de plataforma para navegación
-        }))
+        })) : [])
     ];
 
     const handlePlatformTabClick = (platformId: string) => {
@@ -174,7 +164,7 @@ const CreatorPage: React.FC = () => {
     
     const breadcrumbs: Crumb[] = [
         { label: 'Galería', href: '/gallery', icon: ICONS.gallery },
-        { label: creator.displayName, href: `/creator/${creatorName}`, icon: ICONS.user },
+        { label: creator?.displayName || creatorName, href: `/creator/${creatorName}`, icon: ICONS.user },
     ];
 
     if(activePlatform && decodedPlatform) {
@@ -194,8 +184,8 @@ const CreatorPage: React.FC = () => {
                 <Breadcrumbs crumbs={breadcrumbs} />
                 <div className="flex flex-wrap justify-between items-start gap-4">
                     <div>
-                        <h1 className="text-3xl font-bold text-white">{creator.displayName}</h1>
-                        <p className="text-gray-400 mt-1">{totalPostCount} videos • {Object.keys(creator.platforms).length} plataformas</p>
+                        <h1 className="text-3xl font-bold text-white">{creator?.displayName || creatorName}</h1>
+                        <p className="text-gray-400 mt-1">{totalPostCount} videos{creator ? ` • ${Object.keys(creator.platforms).length} plataformas` : ''}</p>
                     </div>
                     
                     {/* Creator and Subscription Icons Section */}
@@ -203,7 +193,7 @@ const CreatorPage: React.FC = () => {
                         {/* Platform Links */}
                         <div className="flex items-center gap-2">
                             <span className="text-gray-400 text-sm">Plataformas:</span>
-                            {Object.entries(creator.platforms).map(([p, data]) => (data as CreatorPlatformInfo)?.url && (
+                            {creator && Object.entries(creator.platforms).map(([p, data]) => (data as CreatorPlatformInfo)?.url && (
                                  <a key={p} href={(data as CreatorPlatformInfo).url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 p-1.5 rounded-md bg-[#212121]/50 border border-gray-700/50 hover:bg-red-500/20 text-gray-300 hover:text-white transition-colors" title={`Ver en ${p}`}>
                                     <span className="text-xs font-medium">{p}</span>
                                     {React.cloneElement(ICONS.external_link, { className: 'h-3 w-3' })}
@@ -213,7 +203,7 @@ const CreatorPage: React.FC = () => {
                         
                         {/* Subscriptions and Lists */}
                         <div className="flex flex-col gap-2">
-                            {Object.entries(creator.platforms).map(([platform, data]) => {
+                            {creator && Object.entries(creator.platforms).map(([platform, data]) => {
                                 if (!(data as CreatorPlatformInfo)?.subscriptions || (data as CreatorPlatformInfo).subscriptions.length === 0) return null;
                                 
                                 return (
@@ -236,11 +226,11 @@ const CreatorPage: React.FC = () => {
                         </div>
                         
                         {/* Available Lists */}
-                        {activePlatform && creator.platforms[activePlatform]?.lists && (
+                        {activePlatform && creator?.platforms[activePlatform]?.lists && (
                             <div className="flex items-center gap-2">
                                 <span className="text-gray-400 text-xs">Listas:</span>
                                 <div className="flex items-center gap-1">
-                                    {creator.platforms[activePlatform]?.lists?.map((listType, idx) => {
+                                    {creator?.platforms[activePlatform]?.lists?.map((listType, idx) => {
                                         const listIcon = getListIcon(listType);
                                         return (
                                             <div key={idx} className="p-1 rounded bg-green-800/30 border border-green-600/50" title={`Lista: ${listType}`}>
@@ -318,7 +308,7 @@ const CreatorPage: React.FC = () => {
                         </div>
                     )}
                     
-                    {displayedPosts.length === 0 && !postsLoading && (
+                    {displayedPosts.length === 0 && !postsLoading && scrollData.initialLoaded && (
                         <div className="text-center py-16">
                             <h3 className="text-2xl font-semibold text-white">No se encontraron posts</h3>
                             <p className="text-gray-400 mt-2">No hay contenido que coincida con los filtros seleccionados.</p>

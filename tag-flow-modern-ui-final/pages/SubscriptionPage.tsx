@@ -1,6 +1,6 @@
 
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useRealData } from '../hooks/useRealData';
 import { SubscriptionType, SubscriptionInfo } from '../types';
 import Breadcrumbs, { Crumb } from '../components/Breadcrumbs';
@@ -12,6 +12,7 @@ import useInfiniteScroll from '../hooks/useInfiniteScroll';
 
 const SubscriptionPage: React.FC = () => {
     const { type, id, list } = useParams<{ type: SubscriptionType, id: string, list?: string }>();
+    const navigate = useNavigate();
     
     const { 
         getSubscriptionInfo, 
@@ -20,14 +21,13 @@ const SubscriptionPage: React.FC = () => {
         getCreatorByName,
         loadSubscriptionPosts,
         loadMoreSubscriptionPosts,
-        getSubscriptionScrollData,
-        clearSubscriptionScrollData
+        getSubscriptionScrollData
     } = useRealData();
 
     // ⚠️ IMPORTANTE: Mantener todos los hooks en el mismo orden siempre
     const [subscriptionInfo, setSubscriptionInfo] = useState<SubscriptionInfo | undefined>(undefined);
     const [subscriptionStats, setSubscriptionStats] = useState<{total: number, listCounts: {[key: string]: number}} | null>(null);
-    const [loading, setLoading] = useState(true);
+    const [subscriptionInfoLoading, setSubscriptionInfoLoading] = useState(true);
     
     // Usar infinite scroll data en lugar de estado local
     const scrollData = getSubscriptionScrollData(type || 'account', id || '', list);
@@ -79,12 +79,12 @@ const SubscriptionPage: React.FC = () => {
     // Cargar información de la suscripción
     useEffect(() => {
         if (!type || !id) {
-            setLoading(false);
+            setSubscriptionInfoLoading(false);
             return;
         }
 
         const loadSubscriptionInfo = async () => {
-            setLoading(true);
+            setSubscriptionInfoLoading(true);
             try {
                 // The "account" type is special; its ID is the creator's name.
                 if (type === 'account') {
@@ -100,7 +100,7 @@ const SubscriptionPage: React.FC = () => {
                             creator: creator.name,
                             url: creator.platforms[platformKey]?.url,
                         });
-                        setLoading(false);
+                        setSubscriptionInfoLoading(false);
                         return;
                     }
                 }
@@ -116,32 +116,18 @@ const SubscriptionPage: React.FC = () => {
                 console.error('Error loading subscription info:', error);
                 setSubscriptionInfo(undefined);
             } finally {
-                setLoading(false);
+                setSubscriptionInfoLoading(false);
             }
         };
 
         loadSubscriptionInfo();
     }, [type, id, getSubscriptionInfo, getSubscriptionStats, getCreatorByName]);
 
-    // Limpiar datos cuando cambie la configuración y cargar nuevos posts
     useEffect(() => {
-        if (!type || !id) {
-            return;
+        if (type && id) {
+            loadSubscriptionPosts(type, id, list);
         }
-
-        // Limpiar datos existentes para forzar nueva carga
-        clearSubscriptionScrollData(type, id, list);
-
-        const loadPosts = async () => {
-            try {
-                await loadSubscriptionPosts(type, id, list);
-            } catch (error) {
-                console.error('Error loading subscription posts:', error);
-            }
-        };
-
-        loadPosts();
-    }, [type, id, list, loadSubscriptionPosts, clearSubscriptionScrollData]);
+    }, [type, id, list]);
 
     // Infinite scroll callback
     const infiniteScrollCallback = useCallback(() => {
@@ -151,7 +137,7 @@ const SubscriptionPage: React.FC = () => {
     }, [type, id, list, postsLoading, scrollData.hasMore, loadMoreSubscriptionPosts]);
 
     // Hook para scroll infinito
-    const infiniteScrollEnabled = !loading && !postsLoading && scrollData.hasMore && scrollData.initialLoaded && displayedPosts.length > 0;
+    const infiniteScrollEnabled = !postsLoading && scrollData.hasMore && scrollData.initialLoaded && displayedPosts.length > 0;
     
     useInfiniteScroll(infiniteScrollCallback, {
         threshold: 100,
@@ -159,7 +145,7 @@ const SubscriptionPage: React.FC = () => {
     });
 
     // Early returns después de todos los hooks
-    if (loading) {
+    if (postsLoading && !scrollData.initialLoaded) {
         return (
             <div className="text-center py-16">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mx-auto"></div>
@@ -188,11 +174,9 @@ const SubscriptionPage: React.FC = () => {
 
     const handleSubTabClick = (subId: string) => {
         if (subId === 'all') {
-             history.pushState(null, '', `#/subscription/${type}/${id}`);
-             window.dispatchEvent(new Event('popstate'));
+            navigate(`/subscription/${type}/${id}`);
         } else {
-             history.pushState(null, '', `#/subscription/${type}/${id}/${subId}`);
-             window.dispatchEvent(new Event('popstate'));
+            navigate(`/subscription/${type}/${id}/${subId}`);
         }
     };
 
@@ -273,7 +257,7 @@ const SubscriptionPage: React.FC = () => {
                         </div>
                     )}
                     
-                    {displayedPosts.length === 0 && !postsLoading && (
+                    {displayedPosts.length === 0 && !postsLoading && scrollData.initialLoaded && (
                         <div className="text-center py-16">
                             <h3 className="text-2xl font-semibold text-white">No se encontraron posts</h3>
                             <p className="text-gray-400 mt-2">No hay contenido que coincida con esta suscripción.</p>

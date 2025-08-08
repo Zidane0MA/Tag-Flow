@@ -23,9 +23,6 @@ interface RealDataContextType extends DataContextType {
   loadSubscriptionPosts: (type: SubscriptionType, id: string, list?: string) => Promise<Post[]>;
   loadMoreSubscriptionPosts: (type: SubscriptionType, id: string, list?: string) => Promise<void>;
   getSubscriptionScrollData: (type: SubscriptionType, id: string, list?: string) => {posts: Post[], offset: number, hasMore: boolean, loading: boolean, initialLoaded: boolean};
-  clearScrollData: () => void;
-  clearCreatorScrollData: (creatorName: string, platform?: Platform, listId?: string) => void;
-  clearSubscriptionScrollData: (type: SubscriptionType, id: string, list?: string) => void;
 }
 
 const RealDataContext = createContext<RealDataContextType | undefined>(undefined);
@@ -482,18 +479,6 @@ export const RealDataProvider: React.FC<{ children: React.ReactNode }> = ({ chil
    */
   const [creatorScrollData, setCreatorScrollData] = useState<{[key: string]: {posts: Post[], offset: number, hasMore: boolean, loading: boolean, initialLoaded: boolean}}>({});
   const [subscriptionScrollData, setSubscriptionScrollData] = useState<{[key: string]: {posts: Post[], offset: number, hasMore: boolean, loading: boolean, initialLoaded: boolean}}>({});
-  
-  // Referencias para controlar si los datos ya fueron cargados para una key específica
-  const creatorDataLoadedRef = useRef<Set<string>>(new Set());
-  const subscriptionDataLoadedRef = useRef<Set<string>>(new Set());
-  
-  // Referencias para mantener siempre los datos más actuales sin causar re-renders
-  const creatorScrollDataRef = useRef(creatorScrollData);
-  const subscriptionScrollDataRef = useRef(subscriptionScrollData);
-  
-  // Mantener refs actualizadas
-  creatorScrollDataRef.current = creatorScrollData;
-  subscriptionScrollDataRef.current = subscriptionScrollData;
 
   /**
    * Obtener posts por creador (con infinite scroll)
@@ -525,153 +510,62 @@ export const RealDataProvider: React.FC<{ children: React.ReactNode }> = ({ chil
    */
   const loadCreatorPosts = useCallback(async (creatorName: string, platform?: Platform, listId?: string) => {
     const key = `${creatorName}-${platform || 'all'}-${listId || 'all'}`;
-    
-    // Solo cargar si no se han cargado datos para esta key antes
-    if (creatorDataLoadedRef.current.has(key)) {
-      // Asegurar que el estado tenga initialLoaded = true si ya se cargó antes
-      setCreatorScrollData(prev => {
-        const existing = prev[key];
-        if (existing && !existing.initialLoaded) {
-          return {
-            ...prev,
-            [key]: { ...existing, initialLoaded: true }
-          };
-        }
-        return prev;
-      });
-      
-      return creatorScrollDataRef.current[key]?.posts || [];
-    }
-    
-    // Marcar como cargado ANTES de hacer la petición para prevenir dobles llamadas
-    creatorDataLoadedRef.current.add(key);
-    
+
+    if (creatorScrollData[key]?.loading) return creatorScrollData[key].posts;
+
+    setCreatorScrollData(prev => ({ ...prev, [key]: { posts: [], offset: 0, hasMore: true, loading: true, initialLoaded: false } }));
+
     try {
       const PAGE_SIZE = 50;
-      const { posts: creatorPosts } = await apiService.getCreatorVideos(
-        creatorName, 
-        platform, 
-        listId,
-        PAGE_SIZE,
-        0
-      );
-      
-      setCreatorScrollData(prev => ({
-        ...prev,
-        [key]: {
-          posts: creatorPosts,
-          offset: PAGE_SIZE,
-          hasMore: creatorPosts.length === PAGE_SIZE,
-          loading: false,
-          initialLoaded: true
-        }
-      }));
-      
+      const { posts: creatorPosts } = await apiService.getCreatorVideos(creatorName, platform, listId, PAGE_SIZE, 0);
+      setCreatorScrollData(prev => ({ ...prev, [key]: { posts: creatorPosts, offset: PAGE_SIZE, hasMore: creatorPosts.length === PAGE_SIZE, loading: false, initialLoaded: true } }));
       return creatorPosts;
     } catch (error) {
       console.error('Error loading creator posts:', error);
-      setCreatorScrollData(prev => ({
-        ...prev,
-        [key]: {
-          posts: [],
-          offset: 0,
-          hasMore: false,
-          loading: false,
-          initialLoaded: true
-        }
-      }));
+      setCreatorScrollData(prev => ({ ...prev, [key]: { posts: [], offset: 0, hasMore: false, loading: false, initialLoaded: true } }));
       return [];
     }
-  }, []);
+  }, [creatorScrollData]);
 
   /**
    * Cargar más posts de creador (infinite scroll)
    */
   const loadMoreCreatorPosts = useCallback(async (creatorName: string, platform?: Platform, listId?: string) => {
     const key = `${creatorName}-${platform || 'all'}-${listId || 'all'}`;
-    
-    // Get current scroll data from ref
-    const currentScrollData = creatorScrollDataRef.current[key];
-    
-    if (!currentScrollData || currentScrollData.loading || !currentScrollData.hasMore) {
-      return;
-    }
+    const currentData = creatorScrollData[key];
 
-    // Set loading state
-    setCreatorScrollData(prev => ({
-      ...prev,
-      [key]: { ...currentScrollData, loading: true }
-    }));
+    if (!currentData || currentData.loading || !currentData.hasMore) return;
+
+    setCreatorScrollData(prev => ({ ...prev, [key]: { ...currentData, loading: true } }));
 
     try {
       const PAGE_SIZE = 50;
-      const { posts: newPosts } = await apiService.getCreatorVideos(
-        creatorName, 
-        platform, 
-        listId,
-        PAGE_SIZE,
-        currentScrollData.offset
-      );
-      
-      // Preservar posición de scroll antes de la actualización
-      const scrollContainer = document.querySelector('.flex-1.overflow-y-auto') || document.querySelector('main') || window;
-      const currentScrollTop = scrollContainer === window ? window.scrollY : (scrollContainer as Element).scrollTop;
+      const { posts: newPosts } = await apiService.getCreatorVideos(creatorName, platform, listId, PAGE_SIZE, currentData.offset);
       
       setCreatorScrollData(prev => {
-        const scrollData = prev[key];
-        if (!scrollData) return prev;
-        
-        // Evitar duplicados al combinar posts
-        const existingIds = new Set(scrollData.posts.map(p => p.id));
+        const existingPosts = prev[key]?.posts || [];
+        const existingIds = new Set(existingPosts.map(p => p.id));
         const uniqueNewPosts = newPosts.filter(p => !existingIds.has(p.id));
-        
-        return {
-          ...prev,
-          [key]: {
-            posts: [...scrollData.posts, ...uniqueNewPosts],
-            offset: scrollData.offset + PAGE_SIZE,
-            hasMore: newPosts.length === PAGE_SIZE,
-            loading: false,
-            initialLoaded: true
-          }
-        };
+
+        return { ...prev, [key]: { ...currentData, posts: [...existingPosts, ...uniqueNewPosts], offset: currentData.offset + PAGE_SIZE, hasMore: newPosts.length === PAGE_SIZE, loading: false } };
       });
-      
-      // Restaurar posición de scroll después de la actualización
-      requestAnimationFrame(() => {
-        if (scrollContainer === window) {
-          window.scrollTo(0, currentScrollTop);
-        } else {
-          (scrollContainer as Element).scrollTop = currentScrollTop;
-        }
-      });
-      
     } catch (error) {
       console.error('Error loading more creator posts:', error);
-      setCreatorScrollData(prev => ({
-        ...prev,
-        [key]: prev[key] ? { ...prev[key], loading: false } : prev[key]
-      }));
+      setCreatorScrollData(prev => ({ ...prev, [key]: { ...currentData, loading: false } }));
     }
-  }, []);
+  }, [creatorScrollData]);
 
   /**
    * Obtener datos de scroll de creador
    */
   const getCreatorScrollData = useCallback((creatorName: string, platform?: Platform, listId?: string) => {
     const key = `${creatorName}-${platform || 'all'}-${listId || 'all'}`;
-    
-    // Obtener datos actuales desde la ref para evitar re-renders
-    const currentData = creatorScrollDataRef.current[key];
-    
-    
-    // Si no hay datos y no se han cargado antes, mostrar como cargando inicialmente
-    if (!currentData && !creatorDataLoadedRef.current.has(key)) {
+    const currentData = creatorScrollData[key];
+    if (!currentData) {
       return { posts: [], offset: 0, hasMore: true, loading: true, initialLoaded: false };
     }
-    
-    return currentData || { posts: [], offset: 0, hasMore: true, loading: false, initialLoaded: false };
-  }, []); // SIN DEPENDENCIAS - usar ref para datos actuales
+    return currentData;
+  }, [creatorScrollData]);
 
   /**
    * Obtener información de suscripción desde el backend
@@ -714,174 +608,74 @@ export const RealDataProvider: React.FC<{ children: React.ReactNode }> = ({ chil
    */
   const loadSubscriptionPosts = useCallback(async (type: SubscriptionType, id: string, list?: string) => {
     const key = `${type}-${id}-${list || 'all'}`;
-    
-    // Solo cargar si no se han cargado datos para esta key antes
-    if (subscriptionDataLoadedRef.current.has(key)) {
-      // Asegurar que el estado tenga initialLoaded = true si ya se cargó antes
-      setSubscriptionScrollData(prev => {
-        const existing = prev[key];
-        if (existing && !existing.initialLoaded) {
-          return {
-            ...prev,
-            [key]: { ...existing, initialLoaded: true }
-          };
-        }
-        return prev;
-      });
-      
-      return subscriptionScrollDataRef.current[key]?.posts || [];
-    }
-    
-    // Marcar como cargado ANTES de hacer la petición para prevenir dobles llamadas
-    subscriptionDataLoadedRef.current.add(key);
-    
+
+    if (subscriptionScrollData[key]?.loading) return subscriptionScrollData[key].posts;
+
+    setSubscriptionScrollData(prev => ({ ...prev, [key]: { posts: [], offset: 0, hasMore: true, loading: true, initialLoaded: false } }));
+
     try {
       const PAGE_SIZE = 50;
       const { posts: subscriptionPosts } = await apiService.getSubscriptionVideos(type, id, list, PAGE_SIZE, 0);
-      
-      setSubscriptionScrollData(prev => ({
-        ...prev,
-        [key]: {
-          posts: subscriptionPosts,
-          offset: PAGE_SIZE,
-          hasMore: subscriptionPosts.length === PAGE_SIZE,
-          loading: false,
-          initialLoaded: true
-        }
-      }));
-      
+      setSubscriptionScrollData(prev => ({ ...prev, [key]: { posts: subscriptionPosts, offset: PAGE_SIZE, hasMore: subscriptionPosts.length === PAGE_SIZE, loading: false, initialLoaded: true } }));
       return subscriptionPosts;
     } catch (error) {
       console.error('Error loading subscription posts:', error);
-      setSubscriptionScrollData(prev => ({
-        ...prev,
-        [key]: {
-          posts: [],
-          offset: 0,
-          hasMore: false,
-          loading: false,
-          initialLoaded: true
-        }
-      }));
+      setSubscriptionScrollData(prev => ({ ...prev, [key]: { posts: [], offset: 0, hasMore: false, loading: false, initialLoaded: true } }));
       return [];
     }
-  }, []);
+  }, [subscriptionScrollData]);
 
   /**
    * Cargar más posts de suscripción (infinite scroll)
    */
   const loadMoreSubscriptionPosts = useCallback(async (type: SubscriptionType, id: string, list?: string) => {
     const key = `${type}-${id}-${list || 'all'}`;
-    
-    // Get current scroll data from ref
-    const currentScrollData = subscriptionScrollDataRef.current[key];
-    
-    if (!currentScrollData || currentScrollData.loading || !currentScrollData.hasMore) {
-      return;
-    }
+    const currentData = subscriptionScrollData[key];
 
-    // Set loading state
-    setSubscriptionScrollData(prev => ({
-      ...prev,
-      [key]: { ...currentScrollData, loading: true }
-    }));
+    if (!currentData || currentData.loading || !currentData.hasMore) return;
+
+    setSubscriptionScrollData(prev => ({ ...prev, [key]: { ...currentData, loading: true } }));
 
     try {
       const PAGE_SIZE = 50;
-      const { posts: newPosts } = await apiService.getSubscriptionVideos(type, id, list, PAGE_SIZE, currentScrollData.offset);
-      
-      // Preservar posición de scroll antes de la actualización
-      const scrollContainer = document.querySelector('.flex-1.overflow-y-auto') || document.querySelector('main') || window;
-      const currentScrollTop = scrollContainer === window ? window.scrollY : (scrollContainer as Element).scrollTop;
-      
+      const { posts: newPosts } = await apiService.getSubscriptionVideos(type, id, list, PAGE_SIZE, currentData.offset);
+
       setSubscriptionScrollData(prev => {
-        const scrollData = prev[key];
-        if (!scrollData) return prev;
-        
-        // Evitar duplicados al combinar posts
-        const existingIds = new Set(scrollData.posts.map(p => p.id));
+        const existingPosts = prev[key]?.posts || [];
+        const existingIds = new Set(existingPosts.map(p => p.id));
         const uniqueNewPosts = newPosts.filter(p => !existingIds.has(p.id));
-        
-        return {
-          ...prev,
-          [key]: {
-            posts: [...scrollData.posts, ...uniqueNewPosts],
-            offset: scrollData.offset + PAGE_SIZE,
-            hasMore: newPosts.length === PAGE_SIZE,
-            loading: false,
-            initialLoaded: true
-          }
-        };
+
+        return { ...prev, [key]: { ...currentData, posts: [...existingPosts, ...uniqueNewPosts], offset: currentData.offset + PAGE_SIZE, hasMore: newPosts.length === PAGE_SIZE, loading: false } };
       });
-      
-      // Restaurar posición de scroll después de la actualización
-      requestAnimationFrame(() => {
-        if (scrollContainer === window) {
-          window.scrollTo(0, currentScrollTop);
-        } else {
-          (scrollContainer as Element).scrollTop = currentScrollTop;
-        }
-      });
-      
     } catch (error) {
       console.error('Error loading more subscription posts:', error);
-      setSubscriptionScrollData(prev => ({
-        ...prev,
-        [key]: prev[key] ? { ...prev[key], loading: false } : prev[key]
-      }));
+      setSubscriptionScrollData(prev => ({ ...prev, [key]: { ...currentData, loading: false } }));
     }
-  }, []);
+  }, [subscriptionScrollData]);
 
   /**
    * Obtener datos de scroll de suscripción
    */
   const getSubscriptionScrollData = useCallback((type: SubscriptionType, id: string, list?: string) => {
     const key = `${type}-${id}-${list || 'all'}`;
-    
-    // Obtener datos actuales desde la ref para evitar re-renders
-    const currentData = subscriptionScrollDataRef.current[key];
-    
-    
-    // Si no hay datos y no se han cargado antes, mostrar como cargando inicialmente
-    if (!currentData && !subscriptionDataLoadedRef.current.has(key)) {
+    const currentData = subscriptionScrollData[key];
+
+    if (!currentData) {
       return { posts: [], offset: 0, hasMore: true, loading: true, initialLoaded: false };
     }
-    
-    return currentData || { posts: [], offset: 0, hasMore: true, loading: false, initialLoaded: false };
-  }, []); // SIN DEPENDENCIAS - usar ref para datos actuales
+
+    return currentData;
+  }, [subscriptionScrollData]);
 
   /**
    * Limpiar datos de scroll específicos
    */
-  const clearCreatorScrollData = useCallback((creatorName: string, platform?: Platform, listId?: string) => {
-    const key = `${creatorName}-${platform || 'all'}-${listId || 'all'}`;
-    creatorDataLoadedRef.current.delete(key);
-    setCreatorScrollData(prev => {
-      const newData = { ...prev };
-      delete newData[key];
-      return newData;
-    });
-  }, []);
-
-  const clearSubscriptionScrollData = useCallback((type: SubscriptionType, id: string, list?: string) => {
-    const key = `${type}-${id}-${list || 'all'}`;
-    subscriptionDataLoadedRef.current.delete(key);
-    setSubscriptionScrollData(prev => {
-      const newData = { ...prev };
-      delete newData[key];
-      return newData;
-    });
-  }, []);
+  
 
   /**
    * Limpiar todos los datos de scroll para permitir recarga
    */
-  const clearScrollData = useCallback(() => {
-    creatorDataLoadedRef.current.clear();
-    subscriptionDataLoadedRef.current.clear();
-    setCreatorScrollData({});
-    setSubscriptionScrollData({});
-  }, []);
+  
 
   /**
    * Obtener posts por suscripción desde el backend (legacy, mantener para compatibilidad)
@@ -959,9 +753,8 @@ export const RealDataProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     loadSubscriptionPosts,
     loadMoreSubscriptionPosts,
     getSubscriptionScrollData,
-    clearScrollData,
-    clearCreatorScrollData,
-    clearSubscriptionScrollData,
+    
+
   }), [
     posts,
     trash,
@@ -994,9 +787,6 @@ export const RealDataProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     loadSubscriptionPosts,
     loadMoreSubscriptionPosts,
     getSubscriptionScrollData,
-    clearScrollData,
-    clearCreatorScrollData,
-    clearSubscriptionScrollData,
   ]);
 
   return (
