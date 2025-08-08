@@ -1,6 +1,6 @@
 
-import React, { useMemo, useState, useEffect, useCallback } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
+import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useRealData } from '../hooks/useRealData';
 import { SubscriptionType, SubscriptionInfo } from '../types';
 import Breadcrumbs, { Crumb } from '../components/Breadcrumbs';
@@ -13,6 +13,7 @@ import useInfiniteScroll from '../hooks/useInfiniteScroll';
 const SubscriptionPage: React.FC = () => {
     const { type, id, list } = useParams<{ type: SubscriptionType, id: string, list?: string }>();
     const navigate = useNavigate();
+    const location = useLocation();
     
     const { 
         getSubscriptionInfo, 
@@ -23,6 +24,12 @@ const SubscriptionPage: React.FC = () => {
         loadMoreSubscriptionPosts,
         getSubscriptionScrollData
     } = useRealData();
+
+    // Navigation state for video highlighting and scrolling
+    const highlightVideoId = location.state?.highlightVideoId;
+    const scrollToVideoId = location.state?.scrollToVideoId;
+    const [highlightedVideoId, setHighlightedVideoId] = useState<string | null>(highlightVideoId || null);
+    const scrolledToVideoRef = useRef(false);
 
     // ⚠️ IMPORTANTE: Mantener todos los hooks en el mismo orden siempre
     const [subscriptionInfo, setSubscriptionInfo] = useState<SubscriptionInfo | undefined>(undefined);
@@ -128,6 +135,33 @@ const SubscriptionPage: React.FC = () => {
             loadSubscriptionPosts(type, id, list);
         }
     }, [type, id, list]);
+
+    // Handle navigation from video player - scroll to video and highlight
+    useEffect(() => {
+        if (scrollToVideoId && displayedPosts.length > 0 && !scrolledToVideoRef.current) {
+            scrolledToVideoRef.current = true;
+            // Wait a bit for posts to render
+            setTimeout(() => {
+                const videoElement = document.getElementById(`video-card-${scrollToVideoId}`);
+                if (videoElement) {
+                    videoElement.scrollIntoView({ 
+                        behavior: 'smooth', 
+                        block: 'center' 
+                    });
+                }
+                // Clear navigation state after using it
+                navigate(location.pathname + location.search, { replace: true, state: null });
+            }, 100);
+        }
+        
+        // Clear highlight after 3 seconds
+        if (highlightedVideoId) {
+            const timer = setTimeout(() => {
+                setHighlightedVideoId(null);
+            }, 3000);
+            return () => clearTimeout(timer);
+        }
+    }, [scrollToVideoId, highlightedVideoId, displayedPosts, navigate, location.pathname, location.search]);
 
     // Infinite scroll callback - SIMPLIFICADO COMO GALLERY
     const infiniteScrollCallback = useCallback(() => {
@@ -235,6 +269,7 @@ const SubscriptionPage: React.FC = () => {
                                     isSelected={false} 
                                     onSelect={() => {}}
                                     onEdit={() => {}}
+                                    isHighlighted={highlightedVideoId === post.id}
                                 />
                             ))}
                         </div>

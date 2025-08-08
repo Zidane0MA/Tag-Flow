@@ -1,6 +1,6 @@
 
-import React, { useMemo, useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
+import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import { useRealData } from '../hooks/useRealData';
 import { Platform, CreatorPlatformInfo } from '../types';
 import PostCard from '../components/VideoCard';
@@ -11,7 +11,7 @@ import useInfiniteScroll from '../hooks/useInfiniteScroll';
 
 const CreatorPage: React.FC = () => {
     const { creatorName, platform: platformParam, subscriptionId } = useParams<{ creatorName: string, platform?: string, subscriptionId?: string }>();
-    
+    const location = useLocation();
     
     // Decode URL-encoded platform parameter
     const decodedPlatform = platformParam ? decodeURIComponent(platformParam) : undefined;
@@ -24,6 +24,12 @@ const CreatorPage: React.FC = () => {
         getCreatorScrollData
     } = useRealData();
     const navigate = useNavigate();
+    
+    // Navigation state for video highlighting and scrolling
+    const highlightVideoId = location.state?.highlightVideoId;
+    const scrollToVideoId = location.state?.scrollToVideoId;
+    const [highlightedVideoId, setHighlightedVideoId] = useState<string | null>(highlightVideoId || null);
+    const scrolledToVideoRef = useRef(false);
     
     const creator = useMemo(() => creatorName ? getCreatorByName(creatorName) : undefined, [creatorName, getCreatorByName]);
     
@@ -42,6 +48,33 @@ const CreatorPage: React.FC = () => {
             loadCreatorPosts(creatorName, activePlatform, subscriptionId);
         }
     }, [creatorName, activePlatform, subscriptionId]);
+
+    // Handle navigation from video player - scroll to video and highlight
+    useEffect(() => {
+        if (scrollToVideoId && displayedPosts.length > 0 && !scrolledToVideoRef.current) {
+            scrolledToVideoRef.current = true;
+            // Wait a bit for posts to render
+            setTimeout(() => {
+                const videoElement = document.getElementById(`video-card-${scrollToVideoId}`);
+                if (videoElement) {
+                    videoElement.scrollIntoView({ 
+                        behavior: 'smooth', 
+                        block: 'center' 
+                    });
+                }
+                // Clear navigation state after using it
+                navigate(location.pathname + location.search, { replace: true, state: null });
+            }, 100);
+        }
+        
+        // Clear highlight after 3 seconds
+        if (highlightedVideoId) {
+            const timer = setTimeout(() => {
+                setHighlightedVideoId(null);
+            }, 3000);
+            return () => clearTimeout(timer);
+        }
+    }, [scrollToVideoId, highlightedVideoId, displayedPosts, navigate, location.pathname, location.search]);
 
     // Infinite scroll callback - EXACTAMENTE IGUAL QUE GALLERY
     const infiniteScrollCallback = useCallback(() => {
@@ -290,6 +323,7 @@ const CreatorPage: React.FC = () => {
                                     isSelected={false} 
                                     onSelect={() => {}}
                                     onEdit={() => {}}
+                                    isHighlighted={highlightedVideoId === post.id}
                                 />
                             ))}
                         </div>

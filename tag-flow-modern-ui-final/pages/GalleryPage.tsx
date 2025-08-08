@@ -1,4 +1,5 @@
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useRealData } from '../hooks/useRealData';
 import useInfiniteScroll from '../hooks/useInfiniteScroll';
 import { Post, EditStatus, Difficulty, Platform, ProcessStatus } from '../types';
@@ -26,6 +27,8 @@ const filterLabels: { [key: string]: string } = {
 };
 
 const GalleryPage: React.FC = () => {
+    const location = useLocation();
+    const navigate = useNavigate();
     const { 
         posts, 
         moveMultipleToTrash, 
@@ -39,6 +42,12 @@ const GalleryPage: React.FC = () => {
         creators,
         getStats
     } = useRealData();
+    
+    // Navigation state for video highlighting and scrolling
+    const highlightVideoId = location.state?.highlightVideoId;
+    const scrollToVideoId = location.state?.scrollToVideoId;
+    const [highlightedVideoId, setHighlightedVideoId] = useState<string | null>(highlightVideoId || null);
+    const scrolledToVideoRef = useRef(false);
     
     // Obtener estadísticas para mostrar total de videos
     const stats = getStats();
@@ -105,6 +114,33 @@ const GalleryPage: React.FC = () => {
 
         return apiFilters;
     }, []);
+
+    // Handle navigation from video player - scroll to video and highlight
+    useEffect(() => {
+        if (scrollToVideoId && posts.length > 0 && !scrolledToVideoRef.current) {
+            scrolledToVideoRef.current = true;
+            // Wait a bit for posts to render
+            setTimeout(() => {
+                const videoElement = document.getElementById(`video-card-${scrollToVideoId}`);
+                if (videoElement) {
+                    videoElement.scrollIntoView({ 
+                        behavior: 'smooth', 
+                        block: 'center' 
+                    });
+                }
+                // Clear navigation state after using it
+                navigate(location.pathname + location.search, { replace: true, state: null });
+            }, 100);
+        }
+        
+        // Clear highlight after 3 seconds
+        if (highlightedVideoId) {
+            const timer = setTimeout(() => {
+                setHighlightedVideoId(null);
+            }, 3000);
+            return () => clearTimeout(timer);
+        }
+    }, [scrollToVideoId, highlightedVideoId, posts, navigate, location.pathname, location.search]);
 
     // Aplicar filtros (llamar al backend)
     const applyFilters = useCallback(async () => {
@@ -339,13 +375,14 @@ const GalleryPage: React.FC = () => {
                     <>
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
                             {sortedPosts.map(post => (
-                                <PostCard 
-                                  key={post.id} 
-                                  video={post}
-                                  videos={sortedPosts}
-                                  isSelected={selectedPosts.includes(post.id)} 
-                                  onSelect={handleSelectPost}
-                                  onEdit={setEditingPost}
+                                <PostCard
+                                    key={post.id}
+                                    video={post}
+                                    videos={sortedPosts}
+                                    isSelected={selectedPosts.includes(post.id)} 
+                                    onSelect={handleSelectPost}
+                                    onEdit={setEditingPost}
+                                    isHighlighted={highlightedVideoId === post.id}
                                 />
                             ))}
                         </div>

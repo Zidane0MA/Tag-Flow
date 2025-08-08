@@ -1,7 +1,7 @@
 
 
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { Post, EditStatus, ProcessStatus, Difficulty, PostType, SubscriptionType } from '../types';
 import { ICONS, getSubscriptionIcon, getListIcon } from '../constants';
 import { useRealData } from '../hooks/useRealData';
@@ -12,6 +12,7 @@ interface PostCardProps {
     isSelected: boolean;
     onSelect: (id: string, isSelected: boolean) => void;
     onEdit: (video: Post) => void;
+    isHighlighted?: boolean;
 }
 
 const getEditStatusIcon = (status: EditStatus) => {
@@ -125,12 +126,13 @@ const StatusIndicator: React.FC<{ status: ProcessStatus, isAnalyzing: boolean }>
 
 
 
-const PostCard: React.FC<PostCardProps> = ({ video: post, videos: posts, isSelected, onSelect, onEdit }) => {
+const PostCard: React.FC<PostCardProps> = ({ video: post, videos: posts, isSelected, onSelect, onEdit, isHighlighted = false }) => {
     const { moveToTrash, analyzePost } = useRealData();
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [imageLoaded, setImageLoaded] = useState(false);
     const [imageError, setImageError] = useState(false);
     const navigate = useNavigate();
+    const location = useLocation();
     
     const handleAnalyze = async (e: React.MouseEvent) => {
         e.stopPropagation();
@@ -141,12 +143,31 @@ const PostCard: React.FC<PostCardProps> = ({ video: post, videos: posts, isSelec
     
     const handlePlay = (e: React.MouseEvent) => {
         e.stopPropagation();
-        // Pass the filtered list of posts to the player page
-        navigate(`/post/${post.id}/player`, { state: { posts } });
+        const returnPath = location.pathname + location.search;
+        // Pass the filtered list of posts and current location info to the player page
+        navigate(`/post/${post.id}/player`, { 
+            state: { 
+                posts,
+                returnTo: returnPath,
+                currentVideoId: post.id
+            } 
+        });
     };
 
+    const baseClasses = "bg-[#212121] rounded-lg overflow-hidden shadow-lg flex flex-col group text-sm";
+    const animationClasses = "transition-all ease-in-out hover:-translate-y-1 hover:shadow-2xl will-change-[transform,box-shadow]";
+    
+    // Usar una duración más larga para el efecto de resaltado, y una más corta para el hover normal.
+    const durationClass = isHighlighted ? 'duration-1000' : 'duration-300';
+
+    const highlightClasses = isHighlighted 
+        ? 'ring-4 ring-gray-500 ring-opacity-5 shadow-2xl shadow-gray-500/50 scale-105'
+        : '';
+
     return (
-        <div className="bg-[#212121] rounded-lg overflow-hidden shadow-lg flex flex-col group text-sm transition-all duration-300 ease-in-out hover:-translate-y-1 hover:shadow-2xl will-change-[transform,box-shadow]">
+        <div 
+            id={`video-card-${post.id}`}
+            className={`${baseClasses} ${animationClasses} ${durationClass} ${highlightClasses}`}>
             {/* === Thumbnail Area === */}
             <div className="relative">
                 {/* Skeleton placeholder que se mantiene hasta que la imagen carga */}

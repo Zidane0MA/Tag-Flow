@@ -183,6 +183,11 @@ const PostPlayerPage: React.FC = () => {
     const [postsToDisplay, setPostsToDisplay] = useState<Post[]>(location.state?.posts || allPosts);
     const [activePostId, setActivePostId] = useState(postId);
     
+    // Get return path and original video from navigation state
+    const returnPath = location.state?.returnTo || '/gallery';
+    const originalVideoId = location.state?.currentVideoId || postId;
+    
+    
     const containerRef = useRef<HTMLDivElement>(null);
     const observerRef = useRef<IntersectionObserver | null>(null);
     const initialScrollDone = useRef(false);
@@ -215,7 +220,14 @@ const PostPlayerPage: React.FC = () => {
             const newPostId = entry.target.id.replace('post-item-', '');
             if(newPostId && newPostId !== activePostIdRef.current) {
                 setActivePostId(newPostId);
-                navigate(`/post/${newPostId}/player`, { replace: true, state: { posts: postsToDisplay } });
+                navigate(`/post/${newPostId}/player`, { 
+                    replace: true, 
+                    state: { 
+                        posts: postsToDisplay,
+                        returnTo: returnPath, // Preserve the original return path
+                        currentVideoId: originalVideoId // Preserve the original video ID
+                    } 
+                });
             }
           }
         });
@@ -302,9 +314,16 @@ const PostPlayerPage: React.FC = () => {
             const nextIndex = Math.min(currentIndex, nextPosts.length - 1);
             const nextPostId = nextPosts[nextIndex].id;
             setActivePostId(nextPostId);
-            navigate(`/post/${nextPostId}/player`, { replace: true, state: { posts: nextPosts } });
+            navigate(`/post/${nextPostId}/player`, { 
+                replace: true, 
+                state: { 
+                    posts: nextPosts,
+                    returnTo: returnPath, // Preserve the original return path
+                    currentVideoId: originalVideoId // Preserve the original video ID
+                } 
+            });
         } else {
-            navigate('/gallery', { replace: true });
+            navigate(returnPath, { replace: true });
         }
     };
     
@@ -324,9 +343,21 @@ const PostPlayerPage: React.FC = () => {
             style={{ scrollSnapStop: 'always', overscrollBehavior: 'contain' }}
         >
             <div className="absolute top-4 left-4 z-20">
-                <button onClick={() => navigate('/gallery')} className="flex items-center gap-2 px-4 py-2 bg-black/50 backdrop-blur-sm rounded-lg hover:bg-white/20 transition-colors text-white">
+                <button 
+                    onClick={() => {
+                        // Use replace instead of push to avoid double navigation
+                        navigate(returnPath, { 
+                            replace: true,
+                            state: { 
+                                highlightVideoId: activePostId, // Highlight the video we're currently viewing
+                                scrollToVideoId: originalVideoId // Scroll to the original video that was clicked
+                            } 
+                        });
+                    }} 
+                    className="flex items-center gap-2 px-4 py-2 bg-black/50 backdrop-blur-sm rounded-lg hover:bg-white/20 transition-colors text-white"
+                >
                     {React.cloneElement(ICONS.chevronRight, {className: "h-5 w-5 transform rotate-180"})}
-                    <span className="font-semibold">Galería</span>
+                    <span className="font-semibold">Atrás</span>
                 </button>
             </div>
             
