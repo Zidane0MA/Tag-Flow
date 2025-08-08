@@ -67,7 +67,7 @@ def create_app():
     
     @app.route('/video-stream/<int:video_id>')
     def stream_video(video_id):
-        """Servir video para streaming (para reproducción en navegador)"""
+        """Servir video/imagen para streaming (para reproducción en navegador)"""
         try:
             from src.service_factory import get_database
             db = get_database()
@@ -79,15 +79,38 @@ def create_app():
             if not video_path.exists():
                 abort(404)
             
-            # Servir archivo de video con soporte para streaming
+            # Detectar MIME type basándose en la extensión del archivo
+            file_extension = video_path.suffix.lower()
+            
+            # Mapear extensiones a MIME types
+            mime_types = {
+                # Videos
+                '.mp4': 'video/mp4',
+                '.avi': 'video/avi',
+                '.mov': 'video/quicktime',
+                '.mkv': 'video/x-matroska',
+                '.webm': 'video/webm',
+                '.flv': 'video/x-flv',
+                # Imágenes
+                '.jpg': 'image/jpeg',
+                '.jpeg': 'image/jpeg',
+                '.png': 'image/png',
+                '.gif': 'image/gif',
+                '.bmp': 'image/bmp',
+                '.webp': 'image/webp'
+            }
+            
+            mimetype = mime_types.get(file_extension, 'application/octet-stream')
+            
+            # Servir archivo con el MIME type correcto
             return send_file(
                 video_path,
                 as_attachment=False,
-                mimetype='video/mp4'  # Ajustar según el tipo de archivo
+                mimetype=mimetype
             )
             
         except Exception as e:
-            logger.error(f"Error streaming video {video_id}: {e}")
+            logger.error(f"Error streaming media {video_id}: {e}")
             abort(500)
     
     # Manejadores de errores - JSON responses para API

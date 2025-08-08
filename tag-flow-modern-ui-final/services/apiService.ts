@@ -3,7 +3,7 @@
  * Maneja todas las comunicaciones con los endpoints del backend
  */
 
-import { Post, Platform, EditStatus, ProcessStatus, Difficulty, Creator, SubscriptionInfo, SubscriptionType } from '../types';
+import { Post, Platform, EditStatus, ProcessStatus, Difficulty, Creator, SubscriptionInfo, SubscriptionType, PostType } from '../types';
 
 const API_BASE_URL = 'http://192.168.1.135:5000/api';
 
@@ -167,8 +167,17 @@ class ApiService {
         
         return `http://192.168.1.135:5000/thumbnail/${encodeURIComponent(filename)}`;
       })(),
-      postUrl: `http://192.168.1.135:5000/video-stream/${video.id}`, // Usar endpoint de streaming
-      type: 'Video' as any, // Todos los posts del backend son videos por ahora
+      postUrl: `http://192.168.1.135:5000/video-stream/${video.id}`,
+      type: (() => {
+        // Detectar tipo basándose en la extensión del archivo
+        const isImage = /\.(jpg|jpeg|png|gif|bmp|webp)$/i.test(video.file_path || '');
+        return isImage ? PostType.IMAGE : PostType.VIDEO;
+      })(),
+      imageUrls: (() => {
+        // Para imágenes, agregar la URL al array de imageUrls
+        const isImage = /\.(jpg|jpeg|png|gif|bmp|webp)$/i.test(video.file_path || '');
+        return isImage ? [`http://192.168.1.135:5000/video-stream/${video.id}`] : undefined;
+      })(),
       creator: video.creator_name,
       platform: platformMap[video.platform.toLowerCase()] || Platform.CUSTOM,
       editStatus: editStatusMap[video.edit_status] || EditStatus.PENDING,
