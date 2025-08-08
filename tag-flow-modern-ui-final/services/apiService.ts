@@ -169,12 +169,22 @@ class ApiService {
       })(),
       postUrl: `http://192.168.1.135:5000/video-stream/${video.id}`,
       type: (() => {
+        // Si es un carrusel de imágenes, marcarlo como IMAGE
+        if ((video as any).is_carousel && (video as any).carousel_items) {
+          return PostType.IMAGE;
+        }
         // Detectar tipo basándose en la extensión del archivo
         const isImage = /\.(jpg|jpeg|png|gif|bmp|webp)$/i.test(video.file_path || '');
         return isImage ? PostType.IMAGE : PostType.VIDEO;
       })(),
       imageUrls: (() => {
-        // Para imágenes, agregar la URL al array de imageUrls
+        // Si es un carrusel de imágenes, usar carousel_items
+        if ((video as any).is_carousel && (video as any).carousel_items) {
+          return (video as any).carousel_items
+            .sort((a: any, b: any) => a.order - b.order)
+            .map((item: any) => `http://192.168.1.135:5000/video-stream/${item.id}`);
+        }
+        // Para imagen individual
         const isImage = /\.(jpg|jpeg|png|gif|bmp|webp)$/i.test(video.file_path || '');
         return isImage ? [`http://192.168.1.135:5000/video-stream/${video.id}`] : undefined;
       })(),

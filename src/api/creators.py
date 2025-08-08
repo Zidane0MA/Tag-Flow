@@ -7,6 +7,9 @@ import json
 from flask import Blueprint, request, jsonify
 import logging
 
+# Import carousel processing function
+from .videos import process_image_carousels, process_video_data_for_api
+
 logger = logging.getLogger(__name__)
 
 creators_bp = Blueprint('creators', __name__, url_prefix='/api')
@@ -18,15 +21,20 @@ def api_get_creators():
         from src.service_factory import get_database
         db = get_database()
         
-        # Obtener todos los creadores únicos desde videos
-        unique_creators = db.get_unique_creators()
+        # Optimización: Obtener todos los videos de una vez y agrupar por creador
+        all_videos = db.get_videos({}, limit=10000)  # Obtener más videos para analysis completo
         
         creators_data = []
+        creators_videos = {}
         
-        for creator_name in unique_creators:
-            # Obtener videos del creador para extraer plataformas
-            videos = db.get_videos({'creator_name': creator_name}, limit=4000)
-            
+        # Agrupar videos por creador
+        for video in all_videos:
+            creator_name = video['creator_name']
+            if creator_name not in creators_videos:
+                creators_videos[creator_name] = []
+            creators_videos[creator_name].append(video)
+        
+        for creator_name, videos in creators_videos.items():
             # Agrupar por plataforma
             platforms = {}
             for video in videos:
@@ -184,19 +192,9 @@ def api_get_creator_videos(creator_name):
             videos = db.get_videos(filters=filters, offset=offset)
         total_videos = db.count_videos(filters=filters)
         
-        # Procesar videos para JSON (similar al endpoint principal de videos)
+        # Procesar cada video para la API usando función helper
         for video in videos:
-            if video.get('detected_characters'):
-                try:
-                    video['detected_characters'] = json.loads(video['detected_characters'])
-                except:
-                    video['detected_characters'] = []
-            
-            if video.get('final_characters'):
-                try:
-                    video['final_characters'] = json.loads(video['final_characters'])
-                except:
-                    video['final_characters'] = []
+            process_video_data_for_api(video)
             
             # ✅ NUEVO: Agregar información real de suscripción desde la BD
             if video.get('subscription_id'):
@@ -238,32 +236,24 @@ def api_get_creator_videos(creator_name):
                         ]
             except Exception as e:
                 logger.warning(f"Error obteniendo listas para video {video['id']}: {e}")
-            
-            # Preparar título apropiado para el frontend
-            if video.get('platform') in ['tiktok', 'instagram'] and video.get('title'):
-                if (video.get('platform') == 'instagram' and 
-                    video.get('title') and 
-                    video.get('title') != video.get('file_name', '').replace('.mp4', '')):
-                    video['display_title'] = video['title']
-                elif video.get('platform') == 'tiktok':
-                    video['display_title'] = video['title']
-                else:
-                    video['display_title'] = video['file_name']
-            else:
-                video['display_title'] = video['file_name']
-            
-            # Procesar thumbnail_path para usar solo el nombre del archivo
-            if video.get('thumbnail_path'):
-                from pathlib import Path
-                video['thumbnail_path'] = Path(video['thumbnail_path']).name
+        
+        # ✅ NUEVO: Procesar carruseles de imágenes
+        processed_videos = process_image_carousels(db, videos, filters)
+        
+        # Calcular has_more basándose en los videos originales, no procesados
+        original_count = len(videos)
+        has_more = limit > 0 and original_count == limit and (offset + original_count) < total_videos
         
         return jsonify({
             'success': True,
-            'videos': videos,
+            'videos': processed_videos,
             'total': total_videos,
             'creator': creator_name,
             'platform': platform,
-            'subscription_id': subscription_id
+            'subscription_id': subscription_id,
+            'has_more': has_more,
+            'returned_count': len(processed_videos),
+            'original_count': original_count
         })
         
     except Exception as e:

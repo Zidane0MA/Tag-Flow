@@ -33,6 +33,11 @@ body {
   }
 }
 
+/* Dynamic viewport height for mobile */
+.h-screen-dvh {
+  height: calc(var(--vh, 1vh) * 100);
+}
+
 /* Line clamp utilities */
 .line-clamp-2 {
   overflow: hidden;

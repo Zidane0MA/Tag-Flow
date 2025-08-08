@@ -18,6 +18,181 @@ logger = logging.getLogger(__name__)
 
 videos_bp = Blueprint('videos', __name__, url_prefix='/api')
 
+def process_video_data_for_api(video):
+    """Procesa un video individual para la API"""
+    # Procesar datos JSON
+    if video.get('detected_characters'):
+        try:
+            video['detected_characters'] = json.loads(video['detected_characters'])
+        except:
+            video['detected_characters'] = []
+    
+    if video.get('final_characters'):
+        try:
+            video['final_characters'] = json.loads(video['final_characters'])
+        except:
+            video['final_characters'] = []
+    else:
+        video['final_characters'] = []
+    
+    # Preparar título apropiado para el frontend
+    if video.get('platform') in ['tiktok', 'instagram'] and video.get('title'):
+        if (video.get('platform') == 'instagram' and 
+            video.get('title') and 
+            video.get('title') != video.get('file_name', '').replace('.mp4', '')):
+            video['display_title'] = video['title']
+        elif video.get('platform') == 'tiktok':
+            video['display_title'] = video['title']
+        else:
+            video['display_title'] = video['file_name']
+    else:
+        video['display_title'] = video['file_name']
+    
+    # Procesar thumbnail_path para usar solo el nombre del archivo
+    if video.get('thumbnail_path'):
+        from pathlib import Path
+        video['thumbnail_path'] = Path(video['thumbnail_path']).name
+    
+    return video
+
+def process_image_carousels(db, videos, filters=None):
+    """
+    Procesa videos para agrupar imágenes de carrusel. 
+    Busca TODOS los carruseles completos en la BD, no solo en esta página.
+    """
+    if not videos:
+        return videos
+    
+    try:
+        video_ids_in_page = [v['id'] for v in videos]
+        
+        # PASO 1: Obtener TODOS los carruseles completos de la BD (no solo esta página)
+        with db.get_connection() as conn:
+            # Construir filtros WHERE si existen
+            where_conditions = ["v.deleted_at IS NULL"]
+            params = []
+            
+            if filters:
+                if filters.get('creator_name'):
+                    where_conditions.append("v.creator_name = ?")
+                    params.append(filters['creator_name'])
+                if filters.get('platform'):
+                    where_conditions.append("v.platform = ?")
+                    params.append(filters['platform'])
+                if filters.get('edit_status'):
+                    where_conditions.append("v.edit_status = ?")
+                    params.append(filters['edit_status'])
+                if filters.get('processing_status'):
+                    where_conditions.append("v.processing_status = ?")
+                    params.append(filters['processing_status'])
+                if filters.get('difficulty_level'):
+                    where_conditions.append("v.difficulty_level = ?")
+                    params.append(filters['difficulty_level'])
+                if filters.get('search'):
+                    where_conditions.append("(v.title LIKE ? OR v.file_name LIKE ? OR v.creator_name LIKE ?)")
+                    search_term = f"%{filters['search']}%"
+                    params.extend([search_term, search_term, search_term])
+            
+            where_clause = " AND ".join(where_conditions)
+            
+            # Buscar TODOS los items de carrusel que cumplen los filtros
+            # Usar búsqueda más flexible para encontrar is_carousel_item
+            query = f'''
+                SELECT v.id, dm.external_metadata
+                FROM videos v
+                JOIN downloader_mapping dm ON v.id = dm.video_id
+                WHERE {where_clause}
+                AND dm.external_metadata IS NOT NULL
+                AND (dm.external_metadata LIKE '%"is_carousel_item":true%' 
+                     OR dm.external_metadata LIKE '%"is_carousel_item": true%')
+            '''
+            
+            cursor = conn.execute(query, params)
+            
+            
+            all_carousel_groups = {}  # {base_id: [items]}
+            row_count = 0
+            
+            for row in cursor:
+                try:
+                    video_id, metadata_json = row[0], row[1]
+                    metadata = json.loads(metadata_json) if metadata_json else {}
+                    
+                    if metadata.get('is_carousel_item'):
+                        relative_path = metadata.get('relative_path', '')
+                        if '_index_' in relative_path:
+                            base_id = relative_path.split('_index_')[0]
+                            if base_id not in all_carousel_groups:
+                                all_carousel_groups[base_id] = []
+                            all_carousel_groups[base_id].append({
+                                'video_id': video_id,
+                                'order': metadata.get('carousel_order', 0)
+                            })
+                except Exception as e:
+                    logger.warning(f"Error procesando metadata para video {row[0]}: {e}")
+                    continue
+        
+        # Solo mantener carruseles con múltiples items
+        complete_carousels = {
+            base_id: items for base_id, items in all_carousel_groups.items() 
+            if len(items) > 1
+        }
+        
+        
+        if not complete_carousels:
+            return videos  # No hay carruseles, devolver originales
+        
+        # PASO 2: Procesar videos de esta página
+        processed_videos = []
+        carousel_processed = set()
+        
+        # Crear lookup: video_id → base_id
+        video_to_carousel = {}
+        for base_id, items in complete_carousels.items():
+            for item in items:
+                video_to_carousel[item['video_id']] = base_id
+        
+        for video in videos:
+            video_id = video['id']
+            
+            if video_id in carousel_processed:
+                continue
+            
+            # Si este video es parte de un carrusel completo
+            if video_id in video_to_carousel:
+                base_id = video_to_carousel[video_id]
+                carousel_items = complete_carousels[base_id]
+                carousel_items.sort(key=lambda x: x['order'])
+                
+                # NUEVA LÓGICA: Mostrar carrusel en el primer video disponible en esta página
+                first_item = carousel_items[0]
+                videos_in_page = [item['video_id'] for item in carousel_items if item['video_id'] in video_ids_in_page]
+                
+                if videos_in_page and video_id == min(videos_in_page):
+                    # Este es el primer video del carrusel disponible en esta página
+                    video['is_carousel'] = True
+                    video['carousel_count'] = len(carousel_items)
+                    video['carousel_items'] = [
+                        {
+                            'id': item['video_id'],
+                            'order': item['order']
+                        } for item in carousel_items
+                    ]
+                    processed_videos.append(video)
+                
+                # Marcar todos los items del carrusel presentes en esta página como procesados
+                for item in carousel_items:
+                    if item['video_id'] in video_ids_in_page:
+                        carousel_processed.add(item['video_id'])
+            else:
+                # Video individual normal
+                processed_videos.append(video)
+        return processed_videos
+        
+    except Exception as e:
+        logger.error(f"❌ ERROR procesando carruseles: {e}")
+        return videos
+
 @videos_bp.route('/videos')
 def api_videos():
     """API endpoint para obtener videos (AJAX)"""
@@ -29,7 +204,7 @@ def api_videos():
         filters = {}
         for key in ['creator_name', 'platform', 'edit_status', 'processing_status', 'difficulty_level']:
             value = request.args.get(key)
-            if value:
+            if value and value != 'All':  # Ignorar 'All' values
                 filters[key] = value
         
         search_query = request.args.get('search')
@@ -42,19 +217,9 @@ def api_videos():
         videos = db.get_videos(filters=filters, limit=limit, offset=offset)
         total_videos = db.count_videos(filters=filters)
         
-        # Procesar para JSON y agregar información de suscripciones/listas reales
+        # Procesar cada video para la API
         for video in videos:
-            if video.get('detected_characters'):
-                try:
-                    video['detected_characters'] = json.loads(video['detected_characters'])
-                except:
-                    video['detected_characters'] = []
-            
-            if video.get('final_characters'):
-                try:
-                    video['final_characters'] = json.loads(video['final_characters'])
-                except:
-                    video['final_characters'] = []
+            process_video_data_for_api(video)
             
             # ✅ NUEVO: Agregar información real de suscripción desde la BD
             if video.get('subscription_id'):
@@ -96,33 +261,25 @@ def api_videos():
                         ]
             except Exception as e:
                 logger.warning(f"Error obteniendo listas para video {video['id']}: {e}")
-            
-            # Preparar título apropiado para el frontend
-            if video.get('platform') in ['tiktok', 'instagram'] and video.get('title'):
-                if (video.get('platform') == 'instagram' and 
-                    video.get('title') and 
-                    video.get('title') != video.get('file_name', '').replace('.mp4', '')):
-                    video['display_title'] = video['title']
-                elif video.get('platform') == 'tiktok':
-                    video['display_title'] = video['title']
-                else:
-                    video['display_title'] = video['file_name']
-            else:
-                video['display_title'] = video['file_name']
-            
-            # Procesar thumbnail_path para usar solo el nombre del archivo
-            if video.get('thumbnail_path'):
-                from pathlib import Path
-                video['thumbnail_path'] = Path(video['thumbnail_path']).name
+        
+        # ✅ NUEVO: Procesar carruseles de imágenes
+        processed_videos = process_image_carousels(db, videos, filters)
+        
+        # Calcular has_more basándose en los videos originales, no procesados
+        original_count = len(videos)
+        has_more = original_count == limit and (offset + original_count) < total_videos if limit > 0 else False
+        
         
         return jsonify({
             'success': True,
-            'videos': videos,
-            'total': total_videos,
+            'videos': processed_videos,
+            'total': total_videos,  # Mantener total original de la BD
             'total_videos': total_videos,  # Para compatibilidad con frontend
             'limit': limit,
             'offset': offset,
-            'has_more': len(videos) == limit and (offset + len(videos)) < total_videos if limit > 0 else False
+            'has_more': has_more,
+            'returned_count': len(processed_videos),  # Para debugging
+            'original_count': original_count  # Para debugging
         })
         
     except Exception as e:
