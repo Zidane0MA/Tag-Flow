@@ -62,10 +62,10 @@ const CreatorPage: React.FC = () => {
     // Hook para scroll infinito
     useInfiniteScroll(infiniteScrollCallback, infiniteScrollOptions);
     
-    // Calculate total post count based on current view
+    // Calculate total post count based on current view - USAR SIEMPRE DATOS DEL BACKEND
     const totalPostCount = useMemo(() => {
         if (activePlatform === undefined) {
-            // When showing "All", use sum of all platform counts or displayed posts length
+            // When showing "All", use sum of all platform counts from backend
             if (creator) {
                 return Object.values(creator?.platforms || {}).reduce((acc: number, p) => {
                     const postCount = (p as CreatorPlatformInfo | undefined)?.postCount || 0;
@@ -74,7 +74,10 @@ const CreatorPage: React.FC = () => {
             }
             return displayedPosts.length;
         } else {
-            // For specific platforms, use displayed posts count to ensure accuracy
+            // For specific platforms, use backend count if available, fallback to displayed count
+            if (creator && creator.platforms[activePlatform]) {
+                return (creator.platforms[activePlatform] as CreatorPlatformInfo)?.postCount || 0;
+            }
             return displayedPosts.length;
         }
     }, [creator, displayedPosts, activePlatform]);
