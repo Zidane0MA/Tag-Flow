@@ -43,14 +43,14 @@ const CreatorPage: React.FC = () => {
         }
     }, [creatorName, activePlatform, subscriptionId]);
 
-    // Infinite scroll callback - SIMPLIFICADO COMO GALLERY
+    // Infinite scroll callback - EXACTAMENTE IGUAL QUE GALLERY
     const infiniteScrollCallback = useCallback(() => {
         if (creatorName && !postsLoading && scrollData.hasMore) {
             loadMoreCreatorPosts(creatorName, activePlatform, subscriptionId);
         }
-    }, [postsLoading, scrollData.hasMore, loadMoreCreatorPosts]); // Dependencias mínimas
+    }, [postsLoading, scrollData.hasMore, loadMoreCreatorPosts]);
 
-    // Simplificar enabled - solo usar condiciones estables como Gallery
+    // Exactamente igual que Gallery - solo condiciones estables
     const infiniteScrollEnabled = scrollData.hasMore && displayedPosts.length > 0;
     
     // Memoizar las opciones para evitar recreaciones constantes
@@ -274,52 +274,54 @@ const CreatorPage: React.FC = () => {
                 />
             )}
             
-            {postsLoading ? (
-                <div className="flex items-center justify-center min-h-[400px]">
-                    <div className="text-center">
-                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-500 mx-auto mb-4"></div>
-                        <p className="text-white text-lg">Cargando videos del creador...</p>
-                    </div>
-                </div>
-            ) : (
-                <>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-                        {displayedPosts.map(post => (
-                            <PostCard 
-                                key={post.id} 
-                                video={post}
-                                videos={[]} // Empty array to avoid re-renders - player navigation handled differently
-                                isSelected={false} 
-                                onSelect={() => {}}
-                                onEdit={() => {}}
-                            />
-                        ))}
-                    </div>
-                    {/* Indicador de carga para más contenido */}
-                    {postsLoading && (
-                        <div className="flex items-center justify-center py-8">
-                            <div className="flex items-center space-x-2 text-gray-400">
-                                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-red-500"></div>
-                                <span>Cargando más videos...</span>
+            {/* EXACTAMENTE IGUAL QUE GALLERY - NUNCA OCULTAR EL GRID */}
+            <div>
+                {displayedPosts.length > 0 ? (
+                    <>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+                            {displayedPosts.map(post => (
+                                <PostCard 
+                                    key={post.id} 
+                                    video={post}
+                                    videos={displayedPosts} // IGUAL QUE GALLERY - pasar array completo
+                                    isSelected={false} 
+                                    onSelect={() => {}}
+                                    onEdit={() => {}}
+                                />
+                            ))}
+                        </div>
+                        
+                        {/* Indicador de carga para más contenido - IGUAL QUE GALLERY */}
+                        {postsLoading && (
+                            <div className="flex items-center justify-center py-8">
+                                <div className="flex items-center space-x-2 text-gray-400">
+                                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-red-500"></div>
+                                    <span>Cargando más videos...</span>
+                                </div>
                             </div>
+                        )}
+                        
+                        {/* Mensaje de final de contenido */}
+                        {!scrollData.hasMore && displayedPosts.length > 0 && (
+                            <div className="text-center py-8 text-gray-400">
+                                <p>Has visto todos los videos disponibles del creador ({displayedPosts.length} videos)</p>
+                            </div>
+                        )}
+                    </>
+                ) : postsLoading && !scrollData.initialLoaded ? (
+                    <div className="flex items-center justify-center min-h-[400px]">
+                        <div className="text-center">
+                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-500 mx-auto mb-4"></div>
+                            <p className="text-white text-lg">Cargando videos del creador...</p>
                         </div>
-                    )}
-                    
-                    {/* Mensaje de final de contenido */}
-                    {!scrollData.hasMore && displayedPosts.length > 0 && (
-                        <div className="text-center py-8 text-gray-400">
-                            <p>Has visto todos los videos disponibles del creador ({displayedPosts.length} videos)</p>
-                        </div>
-                    )}
-                    
-                    {displayedPosts.length === 0 && !postsLoading && scrollData.initialLoaded && (
-                        <div className="text-center py-16">
-                            <h3 className="text-2xl font-semibold text-white">No se encontraron posts</h3>
-                            <p className="text-gray-400 mt-2">No hay contenido que coincida con los filtros seleccionados.</p>
-                        </div>
-                    )}
-                </>
-            )}
+                    </div>
+                ) : (
+                    <div className="text-center py-16">
+                        <h3 className="text-2xl font-semibold text-white">No se encontraron posts</h3>
+                        <p className="text-gray-400 mt-2">No hay contenido que coincida con los filtros seleccionados.</p>
+                    </div>
+                )}
+            </div>
         </div>
     );
 };
