@@ -32,3 +32,18 @@ body {
     transform: rotate(360deg);
   }
 }
+
+/* Line clamp utilities */
+.line-clamp-2 {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.line-clamp-none {
+  overflow: visible;
+  display: block;
+  -webkit-box-orient: initial;
+  -webkit-line-clamp: none;
+}

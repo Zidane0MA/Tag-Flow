@@ -64,6 +64,7 @@ const ReelItem: React.FC<{
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showDifficultyOptions, setShowDifficultyOptions] = useState(false);
+  const [titleExpanded, setTitleExpanded] = useState(false);
 
   useEffect(() => {
     const videoElement = videoRef.current;
@@ -103,7 +104,6 @@ const ReelItem: React.FC<{
           ref={videoRef}
           src={post.postUrl}
           loop
-          muted
           playsInline
           className="w-full h-full object-contain"
           onClick={handleVideoClick}
@@ -122,7 +122,21 @@ const ReelItem: React.FC<{
       
       <div className="absolute bottom-0 left-0 right-0 p-4 pb-6 text-white bg-gradient-to-t from-black/70 to-transparent z-10">
         <h3 className="font-bold text-lg">@{post.creator}</h3>
-        <p className="text-sm mt-1">{post.title}</p>
+        <div className="mt-1">
+          <p className={`text-sm transition-all duration-300 ${
+            titleExpanded ? 'line-clamp-none' : 'line-clamp-2'
+          }`}>
+            {post.title}
+          </p>
+          {post.title && post.title.length > 80 && (
+            <button 
+              onClick={() => setTitleExpanded(!titleExpanded)}
+              className="text-xs text-gray-300 hover:text-white mt-1 transition-colors"
+            >
+              {titleExpanded ? 'menos' : 'más'}
+            </button>
+          )}
+        </div>
         {post.music && (
           <div className="flex items-center gap-2 mt-2 text-sm">
              {React.cloneElement(ICONS.music, { className: 'h-4 w-4 flex-shrink-0' })}

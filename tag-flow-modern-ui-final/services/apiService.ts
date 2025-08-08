@@ -167,7 +167,7 @@ class ApiService {
         
         return `http://192.168.1.135:5000/thumbnail/${encodeURIComponent(filename)}`;
       })(),
-      postUrl: video.file_path, // Para streaming local
+      postUrl: `http://192.168.1.135:5000/video-stream/${video.id}`, // Usar endpoint de streaming
       type: 'Video' as any, // Todos los posts del backend son videos por ahora
       creator: video.creator_name,
       platform: platformMap[video.platform.toLowerCase()] || Platform.CUSTOM,
