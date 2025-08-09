@@ -5,12 +5,6 @@ import { useRealData } from '../hooks/useRealData';
 import { Post, Difficulty, PostType } from '../types';
 import { ICONS } from '../constants';
 
-// Utilidad para detectar dispositivos móviles
-const isMobileDevice = (): boolean => {
-  return /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
-         (window.innerWidth <= 768);
-};
-
 
 const ImageCarousel: React.FC<{ post: Post, isActive: boolean }> = ({ post, isActive }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -72,67 +66,46 @@ const ReelItem: React.FC<{
   const [isPlaying, setIsPlaying] = useState(false);
   const [showDifficultyOptions, setShowDifficultyOptions] = useState(false);
   const [titleExpanded, setTitleExpanded] = useState(false);
-  const [videoError, setVideoError] = useState(false);
-  const [videoLoading, setVideoLoading] = useState(true);
+  const [videoLoaded, setVideoLoaded] = useState(false);
 
-  // Detectar dispositivo móvil una sola vez
-  const isMobile = isMobileDevice();
+  // Cargar video cuando se vuelve activo o debe precargar
+  useEffect(() => {
+    if (!videoLoaded && post.type === PostType.VIDEO) {
+      if (isActive) {
+        setVideoLoaded(true);
+      } else if (shouldPreload) {
+        // Precargar con delay para videos adyacentes
+        const timer = setTimeout(() => {
+          setVideoLoaded(true);
+        }, 1000);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [isActive, shouldPreload, videoLoaded, post.type]);
 
-  // Efecto principal para manejo de video
   useEffect(() => {
     const videoElement = videoRef.current;
-    if (!videoElement || post.type !== PostType.VIDEO) return;
-
-    const handleLoadStart = () => setVideoLoading(true);
-    const handleCanPlay = () => setVideoLoading(false);
-    const handleError = () => {
-      setVideoError(true);
-      setVideoLoading(false);
-    };
-    
-    const handlePlay = () => setIsPlaying(true);
-    const handlePause = () => setIsPlaying(false);
-
-    // Agregar event listeners
-    videoElement.addEventListener('loadstart', handleLoadStart);
-    videoElement.addEventListener('canplay', handleCanPlay);
-    videoElement.addEventListener('error', handleError);
-    videoElement.addEventListener('play', handlePlay);
-    videoElement.addEventListener('pause', handlePause);
-
-    // Manejo de reproducción basado en visibilidad
-    if (isActive) {
-      const playPromise = videoElement.play();
-      if (playPromise !== undefined) {
-        playPromise.catch(error => {
-          console.log("Autoplay prevented:", error);
-          setIsPlaying(false);
-        });
-      }
-    } else {
-      videoElement.pause();
-      // No resetear currentTime para mejor UX
+    if (post.type === PostType.VIDEO && videoElement && videoLoaded) {
+        if (isActive) {
+            videoElement.play().catch(() => {}); // Autoplay might be blocked
+            setIsPlaying(true);
+        } else {
+            videoElement.pause();
+            videoElement.currentTime = 0;
+            setIsPlaying(false);
+        }
     }
+  }, [isActive, post.type, videoLoaded]);
 
-    return () => {
-      videoElement.removeEventListener('loadstart', handleLoadStart);
-      videoElement.removeEventListener('canplay', handleCanPlay);
-      videoElement.removeEventListener('error', handleError);
-      videoElement.removeEventListener('play', handlePlay);
-      videoElement.removeEventListener('pause', handlePause);
-    };
-  }, [isActive, post.type]);
 
   const handleVideoClick = () => {
-    const videoElement = videoRef.current;
-    if (!videoElement || post.type !== PostType.VIDEO) return;
-    
+    if (post.type !== PostType.VIDEO) return;
     if (isPlaying) {
-      videoElement.pause();
+      videoRef.current?.pause();
+      setIsPlaying(false);
     } else {
-      videoElement.play().catch(() => {
-        console.log("Play failed");
-      });
+      videoRef.current?.play().catch(() => {});
+      setIsPlaying(true);
     }
   };
   
@@ -144,62 +117,25 @@ const ReelItem: React.FC<{
   return (
     <div id={`post-item-${post.id}`} className="video-item h-screen w-screen relative snap-start flex-shrink-0 flex items-center justify-center bg-black">
       {post.type === PostType.VIDEO ? (
-        <>
-          <video
-            ref={videoRef}
-            src={post.postUrl}
-            loop
-            autoPlay
-            muted
-            playsInline
-            preload={shouldPreload || isActive ? "metadata" : "none"}
-            controls={false}
-            disablePictureInPicture
-            className="w-full h-full object-cover"
-            onClick={handleVideoClick}
-            style={{ 
-              backgroundColor: '#000',
-              objectFit: 'cover'
-            }}
-            // Propiedades específicas de móvil
-            {...(isMobile && {
-              'webkit-playsinline': 'true',
-              'x5-video-player-type': 'h5',
-              'x5-video-orientation': 'portraint'
-            })}
-          />
-          
-          {/* Indicador de carga */}
-          {videoLoading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/80">
-              <div className="flex items-center gap-2 text-white">
-                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                <span className="text-sm">Cargando video...</span>
-              </div>
-            </div>
-          )}
-
-          {/* Indicador de error */}
-          {videoError && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black">
-              <div className="text-center text-white">
-                <div className="text-4xl mb-2">⚠️</div>
-                <div className="text-sm">Error al cargar video</div>
-              </div>
-            </div>
-          )}
-
-          {/* Botón de play superpuesto */}
-          {!videoLoading && !videoError && !isPlaying && isActive && (
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <div className="bg-black/50 p-4 rounded-full">
-                {React.cloneElement(ICONS.play, { className: 'h-12 w-12 text-white' })}
-              </div>
-            </div>
-          )}
-        </>
+        <video
+          ref={videoRef}
+          src={videoLoaded ? post.postUrl : undefined}
+          loop
+          playsInline
+          preload="none"
+          className="w-full h-full object-contain"
+          onClick={handleVideoClick}
+        />
       ) : (
         <ImageCarousel post={post} isActive={isActive} />
+      )}
+      
+      {post.type === PostType.VIDEO && (
+        <div className={`absolute inset-0 flex items-center justify-center transition-opacity duration-300 ${!isPlaying && isActive ? 'opacity-100' : 'opacity-0'} pointer-events-none`}>
+            <div className="bg-black/50 p-6 rounded-full">
+                {React.cloneElement(ICONS.play, { className: 'h-12 w-12 text-white' })}
+            </div>
+        </div>
       )}
       
       <div className="absolute bottom-0 left-0 right-0 p-4 pb-6 text-white bg-gradient-to-t from-black/70 to-transparent z-10">
@@ -275,8 +211,6 @@ const PostPlayerPage: React.FC = () => {
     const observerRef = useRef<IntersectionObserver | null>(null);
     const initialScrollDone = useRef(false);
     const isScrollingRef = useRef(false);
-    const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-    const lastScrollTimeRef = useRef(0);
     
     const activePostIdRef = useRef(activePostId);
     useEffect(() => {
@@ -300,33 +234,25 @@ const PostPlayerPage: React.FC = () => {
 
     useEffect(() => {
       const handleIntersect = (entries: IntersectionObserverEntry[]) => {
-        let mostVisibleEntry = entries.reduce((prev, current) => {
-          return (current.intersectionRatio > prev.intersectionRatio) ? current : prev;
-        }, entries[0]);
-
-        if (mostVisibleEntry && mostVisibleEntry.isIntersecting) {
-          const newPostId = mostVisibleEntry.target.id.replace('post-item-', '');
-          if(newPostId && newPostId !== activePostIdRef.current) {
-              setActivePostId(newPostId);
-              navigate(`/post/${newPostId}/player`, { 
-                  replace: true, 
-                  state: { 
-                      posts: postsToDisplay,
-                      returnTo: returnPath,
-                      currentVideoId: originalVideoId
-                  } 
-              });
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            const newPostId = entry.target.id.replace('post-item-', '');
+            if(newPostId && newPostId !== activePostIdRef.current) {
+                setActivePostId(newPostId);
+                navigate(`/post/${newPostId}/player`, { 
+                    replace: true, 
+                    state: { 
+                        posts: postsToDisplay,
+                        returnTo: returnPath, // Preserve the original return path
+                        currentVideoId: originalVideoId // Preserve the original video ID
+                    } 
+                });
+            }
           }
-        }
+        });
       };
 
-      // Observer más simple y confiable
-      observerRef.current = new IntersectionObserver(handleIntersect, { 
-        root: null, // Usar viewport completo
-        threshold: [0.1, 0.5, 0.9], // Múltiples thresholds para mejor detección
-        rootMargin: '-10% 0px -10% 0px' // Pequeño margen para center detection
-      });
-      
+      observerRef.current = new IntersectionObserver(handleIntersect, { root: containerRef.current, threshold: 0.8 });
       const currentObserver = observerRef.current;
       const postItems = document.querySelectorAll('.video-item');
       if (postItems.length > 0) {
@@ -339,20 +265,59 @@ const PostPlayerPage: React.FC = () => {
       };
     }, [postsToDisplay, navigate]);
 
-    // Simplificar el scroll - usar solo el intersection observer nativo
     useEffect(() => {
         const container = containerRef.current;
-        if (!container) return;
+        if (!container || postsToDisplay.length <= 1) return;
 
-        // Solo manejar scroll nativo del CSS snap-scroll
-        // Eliminar eventos personalizados que causan conflictos
-        
-        return () => {
-            // Limpiar timeout al desmontar
-            if (scrollTimeoutRef.current) {
-                clearTimeout(scrollTimeoutRef.current);
-                scrollTimeoutRef.current = null;
+        const handleControlledScroll = (direction: 'up' | 'down') => {
+            if (isScrollingRef.current) return;
+
+            const currentIndex = postsToDisplay.findIndex(p => p.id === activePostIdRef.current);
+            if (currentIndex === -1) return;
+
+            let nextIndex = currentIndex;
+            if (direction === 'down') {
+                nextIndex = Math.min(currentIndex + 1, postsToDisplay.length - 1);
+            } else { 
+                nextIndex = Math.max(currentIndex - 1, 0);
             }
+
+            if (nextIndex !== currentIndex) {
+                isScrollingRef.current = true;
+                const nextPostId = postsToDisplay[nextIndex].id;
+                const targetElement = document.getElementById(`post-item-${nextPostId}`);
+                targetElement?.scrollIntoView({ behavior: 'smooth' });
+
+                setTimeout(() => {
+                    isScrollingRef.current = false;
+                }, 600);
+            }
+        };
+
+        const handleWheel = (e: WheelEvent) => {
+            e.preventDefault();
+            if (Math.abs(e.deltaY) < 10) return;
+            handleControlledScroll(e.deltaY > 0 ? 'down' : 'up');
+        };
+
+        let touchStartY = 0;
+        const handleTouchStart = (e: TouchEvent) => { touchStartY = e.touches[0].clientY; };
+        const handleTouchEnd = (e: TouchEvent) => {
+            const deltaY = touchStartY - e.changedTouches[0].clientY;
+            if (Math.abs(deltaY) > 40) {
+                e.preventDefault();
+                handleControlledScroll(deltaY > 0 ? 'down' : 'up');
+            }
+        };
+
+        container.addEventListener('wheel', handleWheel, { passive: false });
+        container.addEventListener('touchstart', handleTouchStart, { passive: true });
+        container.addEventListener('touchend', handleTouchEnd, { passive: true });
+
+        return () => {
+            container.removeEventListener('wheel', handleWheel);
+            container.removeEventListener('touchstart', handleTouchStart);
+            container.removeEventListener('touchend', handleTouchEnd);
         };
     }, [postsToDisplay]);
 
@@ -394,12 +359,7 @@ const PostPlayerPage: React.FC = () => {
         <div
             ref={containerRef}
             className="h-screen w-screen overflow-y-auto snap-y snap-mandatory bg-black no-scrollbar"
-            style={{ 
-                scrollSnapStop: 'always', 
-                overscrollBehavior: 'none',
-                scrollBehavior: 'smooth',
-                WebkitOverflowScrolling: 'touch' // Mejor scroll en iOS
-            }}
+            style={{ scrollSnapStop: 'always', overscrollBehavior: 'contain' }}
         >
             <div className="absolute top-4 left-4 z-20">
                 <button 
@@ -422,20 +382,13 @@ const PostPlayerPage: React.FC = () => {
             
             {postsToDisplay.map((post, index) => {
                 const currentActiveIndex = postsToDisplay.findIndex(p => p.id === activePostId);
-                const isCurrentlyActive = post.id === activePostId;
-                
-                // Estrategia de preload más conservadora:
-                // - Video actual: siempre se carga
-                // - Video siguiente: preload para smooth transition  
-                // - Video anterior: solo si es adyacente
-                const distanceFromActive = Math.abs(index - currentActiveIndex);
-                const shouldPreload = distanceFromActive <= 1;
+                const shouldPreload = Math.abs(index - currentActiveIndex) <= 1; // Precargar video actual y adyacentes
                 
                 return (
                     <ReelItem
                         key={post.id}
                         post={post}
-                        isActive={isCurrentlyActive}
+                        isActive={post.id === activePostId}
                         shouldPreload={shouldPreload}
                         onDelete={handleDelete}
                         onDifficultyChange={handleDifficultyChange}
