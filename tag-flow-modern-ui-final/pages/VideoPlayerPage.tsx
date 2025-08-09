@@ -60,15 +60,32 @@ const ReelItem: React.FC<{
   isActive: boolean;
   onDelete: (id: string) => void;
   onDifficultyChange: (id: string, difficulty: Difficulty) => void;
-}> = ({ post, isActive, onDelete, onDifficultyChange }) => {
+  shouldPreload?: boolean;
+}> = ({ post, isActive, onDelete, onDifficultyChange, shouldPreload = false }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showDifficultyOptions, setShowDifficultyOptions] = useState(false);
   const [titleExpanded, setTitleExpanded] = useState(false);
+  const [videoLoaded, setVideoLoaded] = useState(false);
+
+  // Cargar video cuando se vuelve activo o debe precargar
+  useEffect(() => {
+    if (!videoLoaded && post.type === PostType.VIDEO) {
+      if (isActive) {
+        setVideoLoaded(true);
+      } else if (shouldPreload) {
+        // Precargar con delay para videos adyacentes
+        const timer = setTimeout(() => {
+          setVideoLoaded(true);
+        }, 1000);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [isActive, shouldPreload, videoLoaded, post.type]);
 
   useEffect(() => {
     const videoElement = videoRef.current;
-    if (post.type === PostType.VIDEO && videoElement) {
+    if (post.type === PostType.VIDEO && videoElement && videoLoaded) {
         if (isActive) {
             videoElement.play().catch(() => {}); // Autoplay might be blocked
             setIsPlaying(true);
@@ -78,7 +95,7 @@ const ReelItem: React.FC<{
             setIsPlaying(false);
         }
     }
-  }, [isActive, post.type]);
+  }, [isActive, post.type, videoLoaded]);
 
 
   const handleVideoClick = () => {
@@ -102,9 +119,10 @@ const ReelItem: React.FC<{
       {post.type === PostType.VIDEO ? (
         <video
           ref={videoRef}
-          src={post.postUrl}
+          src={videoLoaded ? post.postUrl : undefined}
           loop
           playsInline
+          preload="none"
           className="w-full h-full object-contain"
           onClick={handleVideoClick}
         />
@@ -182,6 +200,7 @@ const PostPlayerPage: React.FC = () => {
 
     const [postsToDisplay, setPostsToDisplay] = useState<Post[]>(location.state?.posts || allPosts);
     const [activePostId, setActivePostId] = useState(postId);
+    const [preloadedVideos, setPreloadedVideos] = useState<Set<string>>(new Set());
     
     // Get return path and original video from navigation state
     const returnPath = location.state?.returnTo || '/gallery';
@@ -361,15 +380,21 @@ const PostPlayerPage: React.FC = () => {
                 </button>
             </div>
             
-            {postsToDisplay.map(post => (
-                 <ReelItem
-                    key={post.id}
-                    post={post}
-                    isActive={post.id === activePostId}
-                    onDelete={handleDelete}
-                    onDifficultyChange={handleDifficultyChange}
-                />
-            ))}
+            {postsToDisplay.map((post, index) => {
+                const currentActiveIndex = postsToDisplay.findIndex(p => p.id === activePostId);
+                const shouldPreload = Math.abs(index - currentActiveIndex) <= 1; // Precargar video actual y adyacentes
+                
+                return (
+                    <ReelItem
+                        key={post.id}
+                        post={post}
+                        isActive={post.id === activePostId}
+                        shouldPreload={shouldPreload}
+                        onDelete={handleDelete}
+                        onDifficultyChange={handleDifficultyChange}
+                    />
+                );
+            })}
         </div>
     );
 };

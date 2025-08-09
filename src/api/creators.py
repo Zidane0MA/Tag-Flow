@@ -21,20 +21,14 @@ def api_get_creators():
         from src.service_factory import get_database
         db = get_database()
         
-        # Optimización: Obtener todos los videos de una vez y agrupar por creador
-        all_videos = db.get_videos({}, limit=10000)  # Obtener más videos para analysis completo
+        # Usar método más eficiente: obtener creadores únicos directamente
+        unique_creators = db.get_unique_creators()
         
         creators_data = []
-        creators_videos = {}
         
-        # Agrupar videos por creador
-        for video in all_videos:
-            creator_name = video['creator_name']
-            if creator_name not in creators_videos:
-                creators_videos[creator_name] = []
-            creators_videos[creator_name].append(video)
-        
-        for creator_name, videos in creators_videos.items():
+        for creator_name in unique_creators:
+            # Obtener una muestra de videos para detectar plataformas (más eficiente)
+            videos = db.get_videos({'creator_name': creator_name}, limit=100)
             # Agrupar por plataforma
             platforms = {}
             for video in videos:

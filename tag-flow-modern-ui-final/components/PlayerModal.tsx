@@ -26,7 +26,13 @@ const PlayerModal: React.FC<PlayerModalProps> = ({ video: post, onClose }) => {
     <Modal isOpen={true} onClose={onClose} title="Reproductor de Video" size="xl">
       <div className="flex flex-col md:flex-row gap-6">
         <div className="flex-grow md:w-2/3 bg-black rounded-lg overflow-hidden">
-           <video src={post.postUrl} controls className="w-full h-full object-contain"></video>
+           <video 
+             src={post.postUrl} 
+             controls 
+             playsInline
+             preload="metadata"
+             className="w-full h-full object-contain"
+           />
         </div>
         <div className="md:w-1/3 flex flex-col gap-4">
           <div>
