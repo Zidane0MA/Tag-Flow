@@ -303,45 +303,58 @@ const PostPlayerPage: React.FC = () => {
             handleControlledScroll(e.deltaY > 0 ? 'down' : 'up');
         };
 
-        let touchStartY = 0;
+        let touchStartY = 1;
+        let lastTouchY = 1;
         let touchStartTime = 0;
-        let touchHandled = false;
+        let scrollProcessed = false;
+        let scrollDirection: 'up' | 'down' | null = null;
+        
+        // Normalizador: convierte cualquier scroll en nuestro scroll controlado
+        const processNormalizedScroll = (direction: 'up' | 'down') => {
+            if (scrollProcessed) return;
+            scrollProcessed = true;
+            handleControlledScroll(direction);
+        };
         
         const handleTouchStart = (e: TouchEvent) => { 
-            touchStartY = e.touches[0].clientY; 
+            touchStartY = e.touches[0].clientY;
+            lastTouchY = touchStartY;
             touchStartTime = Date.now();
-            touchHandled = false;
+            scrollProcessed = false;
+            scrollDirection = null;
         };
         
         const handleTouchMove = (e: TouchEvent) => {
-            if (touchHandled) return;
-            
             const currentY = e.touches[0].clientY;
-            const deltaY = touchStartY - currentY;
-            const deltaTime = Date.now() - touchStartTime;
+            const totalDelta = touchStartY - currentY;
+            const moveDelta = lastTouchY - currentY;
             
-            // Solo manejar gestos rápidos y significativos
-            if (Math.abs(deltaY) > 80 && deltaTime < 200) {
-                // Intentar prevenir, pero no depender de ello
+            // Detectar dirección en cualquier movimiento > 10px
+            if (Math.abs(totalDelta) > 10 && !scrollDirection) {
+                scrollDirection = totalDelta > 0 ? 'down' : 'up';
+            }
+            
+            // Si hay dirección establecida, bloquear scroll nativo
+            if (scrollDirection) {
                 try {
                     e.preventDefault();
-                } catch (err) {
-                    // Ignorar errores de preventDefault
-                }
-                touchHandled = true;
-                handleControlledScroll(deltaY > 0 ? 'down' : 'up');
+                } catch (err) {}
             }
+            
+            // Procesar cambio de video en cualquier movimiento significativo
+            if (scrollDirection && !scrollProcessed && Math.abs(totalDelta) > 30) {
+                processNormalizedScroll(scrollDirection);
+            }
+            
+            lastTouchY = currentY;
         };
         
         const handleTouchEnd = (e: TouchEvent) => {
-            if (touchHandled) return;
+            const totalDelta = touchStartY - e.changedTouches[0].clientY;
             
-            const deltaY = touchStartY - e.changedTouches[0].clientY;
-            const deltaTime = Date.now() - touchStartTime;
-            
-            // Fallback: manejar en touchend si no se manejó en touchmove
-            if (Math.abs(deltaY) > 100 && deltaTime < 300) {
-                handleControlledScroll(deltaY > 0 ? 'down' : 'up');
+            // Fallback: procesar si no se procesó y hay movimiento mínimo
+            if (!scrollProcessed && Math.abs(totalDelta) > 20) {
+                processNormalizedScroll(totalDelta > 0 ? 'down' : 'up');
             }
         };
 
