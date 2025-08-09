@@ -30,6 +30,7 @@ const PlayerModal: React.FC<PlayerModalProps> = ({ video: post, onClose }) => {
              src={post.postUrl} 
              controls 
              playsInline
+             muted
              preload="metadata"
              className="w-full h-full object-contain"
            />

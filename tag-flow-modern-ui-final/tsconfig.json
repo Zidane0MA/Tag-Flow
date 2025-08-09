@@ -21,6 +21,20 @@
       ]
     },
     "allowImportingTsExtensions": true,
-    "noEmit": true
-  }
+    "noEmit": true,
+    "types": ["vite/client"]
+  },
+  "include": [
+    "src",
+    "services",
+    "pages",
+    "components",
+    "hooks",
+    "*.ts",
+    "*.tsx",
+    "vite-env.d.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
 }

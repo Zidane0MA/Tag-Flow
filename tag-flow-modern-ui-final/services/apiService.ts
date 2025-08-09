@@ -5,7 +5,24 @@
 
 import { Post, Platform, EditStatus, ProcessStatus, Difficulty, Creator, SubscriptionInfo, SubscriptionType, PostType } from '../types';
 
-const API_BASE_URL = 'http://192.168.1.135:5000/api';
+// Configuración dinámica de URL para diferentes entornos
+const getApiBaseUrl = (): string => {
+  // En desarrollo Vite usa puerto 5173, en producción usar el origin actual
+  const isDevMode = import.meta.env.DEV;
+  
+  if (isDevMode) {
+    // En desarrollo, verificar si el backend está en otro puerto/IP
+    const backendHost = import.meta.env.VITE_BACKEND_HOST || 'localhost';
+    const backendPort = import.meta.env.VITE_BACKEND_PORT || '5000';
+    return `http://${backendHost}:${backendPort}/api`;
+  } else {
+    // En producción, usar el mismo origin que el frontend
+    return `${window.location.origin}/api`;
+  }
+};
+
+const API_BASE_URL = getApiBaseUrl();
+const STREAM_BASE_URL = API_BASE_URL.replace('/api', '');
 
 export interface VideoFilters {
   search?: string;
@@ -148,12 +165,12 @@ class ApiService {
       description: video.title || video.file_name || '',
       thumbnailUrl: (() => {
         if (!video.thumbnail_path || !video.thumbnail_path.trim()) {
-          return 'http://192.168.1.135:5000/static/img/no-thumbnail.svg';
+          return `${STREAM_BASE_URL}/static/img/no-thumbnail.svg`;
         }
         
         let filename = video.thumbnail_path.split(/[/\\]/).pop();
         if (!filename || !filename.trim()) {
-          return 'http://192.168.1.135:5000/static/img/no-thumbnail.svg';
+          return `${STREAM_BASE_URL}/static/img/no-thumbnail.svg`;
         }
         
         // Si el filename no termina con _thumb.jpg, intentar construirlo desde file_name
@@ -165,9 +182,9 @@ class ApiService {
           }
         }
         
-        return `http://192.168.1.135:5000/thumbnail/${encodeURIComponent(filename)}`;
+        return `${STREAM_BASE_URL}/thumbnail/${encodeURIComponent(filename)}`;
       })(),
-      postUrl: `http://192.168.1.135:5000/video-stream/${video.id}`,
+      postUrl: `${STREAM_BASE_URL}/video-stream/${video.id}`,
       type: (() => {
         // Si es un carrusel de imágenes, marcarlo como IMAGE
         if ((video as any).is_carousel && (video as any).carousel_items) {
@@ -182,11 +199,11 @@ class ApiService {
         if ((video as any).is_carousel && (video as any).carousel_items) {
           return (video as any).carousel_items
             .sort((a: any, b: any) => a.order - b.order)
-            .map((item: any) => `http://192.168.1.135:5000/video-stream/${item.id}`);
+            .map((item: any) => `${STREAM_BASE_URL}/video-stream/${item.id}`);
         }
         // Para imagen individual
         const isImage = /\.(jpg|jpeg|png|gif|bmp|webp)$/i.test(video.file_path || '');
-        return isImage ? [`http://192.168.1.135:5000/video-stream/${video.id}`] : undefined;
+        return isImage ? [`${STREAM_BASE_URL}/video-stream/${video.id}`] : undefined;
       })(),
       creator: video.creator_name,
       platform: platformMap[video.platform.toLowerCase()] || Platform.CUSTOM,
