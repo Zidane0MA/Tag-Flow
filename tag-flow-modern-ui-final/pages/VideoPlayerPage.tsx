@@ -61,23 +61,38 @@ const ReelItem: React.FC<{
   onDelete: (id: string) => void;
   onDifficultyChange: (id: string, difficulty: Difficulty) => void;
   shouldPreload?: boolean;
-}> = ({ post, isActive, onDelete, onDifficultyChange, shouldPreload = false }) => {
+  globalAudioEnabled: boolean;
+  setGlobalAudioEnabled: (enabled: boolean) => void;
+}> = ({ post, isActive, onDelete, onDifficultyChange, shouldPreload = false, globalAudioEnabled, setGlobalAudioEnabled }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showDifficultyOptions, setShowDifficultyOptions] = useState(false);
   const [titleExpanded, setTitleExpanded] = useState(false);
   const [videoLoaded, setVideoLoaded] = useState(false);
+  const [videoError, setVideoError] = useState(false);
+  const [videoSuspended, setVideoSuspended] = useState(false);
+  const lastReactivationRef = useRef<number>(0);
+  const reactivationCountRef = useRef<number>(0);
+  
+  // El estado muted depende del estado global
+  const isMuted = !globalAudioEnabled;
 
   // Cargar video cuando se vuelve activo o debe precargar
   useEffect(() => {
-    if (!videoLoaded && post.type === PostType.VIDEO) {
-      if (isActive) {
+    if (post.type === PostType.VIDEO) {
+      if (isActive && !videoLoaded) {
         setVideoLoaded(true);
-      } else if (shouldPreload) {
+      } else if (shouldPreload && !videoLoaded) {
         // Precargar con delay para videos adyacentes
         const timer = setTimeout(() => {
           setVideoLoaded(true);
         }, 1000);
+        return () => clearTimeout(timer);
+      } else if (!isActive && !shouldPreload && videoLoaded) {
+        // Liberar memoria de videos lejanos para prevenir problemas en móvil
+        const timer = setTimeout(() => {
+          setVideoLoaded(false);
+        }, 3000);
         return () => clearTimeout(timer);
       }
     }
@@ -86,7 +101,12 @@ const ReelItem: React.FC<{
   useEffect(() => {
     const videoElement = videoRef.current;
     if (post.type === PostType.VIDEO && videoElement && videoLoaded) {
+        // Actualizar muted state basado en configuración global
+        videoElement.muted = isMuted;
+        
         if (isActive) {
+            // Resetear error cuando se vuelve activo
+            setVideoError(false);
             videoElement.play().catch(() => {}); // Autoplay might be blocked
             setIsPlaying(true);
         } else {
@@ -95,11 +115,117 @@ const ReelItem: React.FC<{
             setIsPlaying(false);
         }
     }
-  }, [isActive, post.type, videoLoaded]);
+  }, [isActive, post.type, videoLoaded, isMuted]);
 
+  // Detectar y recuperar videos con problemas
+  useEffect(() => {
+    const videoElement = videoRef.current;
+    if (!videoElement || post.type !== PostType.VIDEO) return;
+
+    const handleError = (e: Event) => {
+      setVideoError(true);
+      // Intentar recargar después de un breve delay
+      setTimeout(() => {
+        setVideoLoaded(false);
+        setTimeout(() => {
+          if (isActive) { // Solo recargar si el video está activo
+            setVideoLoaded(true);
+            setVideoError(false);
+          }
+        }, 200);
+      }, 800);
+    };
+
+    const handleLoadedData = () => {
+      setVideoError(false);
+      setVideoSuspended(false);
+      reactivationCountRef.current = 0; // Resetear contador de reactivaciones
+    };
+
+    const handleStalled = () => {
+      if (isActive) {
+        setVideoError(true);
+      }
+    };
+
+    const handleSuspend = () => {
+      if (isActive) {
+        setVideoSuspended(true);
+      }
+    };
+
+    const handleEmptied = () => {
+      // No reactivar automáticamente en emptied - puede causar bucles
+      // Solo marcar como suspendido si está activo
+      if (isActive) {
+        setVideoSuspended(true);
+      }
+    };
+
+    videoElement.addEventListener('error', handleError);
+    videoElement.addEventListener('loadeddata', handleLoadedData);
+    videoElement.addEventListener('stalled', handleStalled);
+    videoElement.addEventListener('suspend', handleSuspend);
+    videoElement.addEventListener('emptied', handleEmptied);
+
+    return () => {
+      videoElement.removeEventListener('error', handleError);
+      videoElement.removeEventListener('loadeddata', handleLoadedData);
+      videoElement.removeEventListener('stalled', handleStalled);
+      videoElement.removeEventListener('suspend', handleSuspend);
+      videoElement.removeEventListener('emptied', handleEmptied);
+    };
+  }, [post.id, post.type, videoLoaded, isActive]);
+
+  // Detectar y reactivar videos suspendidos cuando se vuelven activos (con throttling)
+  useEffect(() => {
+    if (isActive && videoSuspended && videoLoaded && post.type === PostType.VIDEO) {
+      const now = Date.now();
+      const timeSinceLastReactivation = now - lastReactivationRef.current;
+      
+      // Solo reactivar si han pasado al menos 2 segundos desde la última reactivación
+      // Y no hemos intentado más de 3 veces
+      if (timeSinceLastReactivation > 2000 && reactivationCountRef.current < 3) {
+        const videoElement = videoRef.current;
+        if (videoElement) {
+          reactivationCountRef.current += 1;
+          lastReactivationRef.current = now;
+          
+          videoElement.load();
+          setVideoSuspended(false);
+          
+          setTimeout(() => {
+            if (isActive && videoElement) {
+              videoElement.muted = isMuted; // Restaurar estado de mute
+              videoElement.play().catch(() => {});
+              setIsPlaying(true);
+            }
+          }, 500);
+        }
+      } else if (reactivationCountRef.current >= 3) {
+        setVideoSuspended(false); // Parar de intentar
+      }
+    }
+    
+    // Resetear contador cuando el video se vuelve inactivo
+    if (!isActive) {
+      reactivationCountRef.current = 0;
+    }
+  }, [isActive, videoSuspended, videoLoaded, post.type, post.id]);
 
   const handleVideoClick = () => {
     if (post.type !== PostType.VIDEO) return;
+    
+    // Si es el primer click global, activar audio para todos los videos
+    if (!globalAudioEnabled && videoRef.current) {
+      setGlobalAudioEnabled(true);
+      videoRef.current.muted = false;
+      videoRef.current.play().catch(() => {});
+      setIsPlaying(true);
+      return; // Salir aquí, no hacer toggle de play/pause
+    }
+    
+    // Control normal de play/pause cuando audio ya está habilitado
     if (isPlaying) {
       videoRef.current?.pause();
       setIsPlaying(false);
@@ -124,8 +250,18 @@ const ReelItem: React.FC<{
           loop
           playsInline
           preload="none"
+          muted={isMuted}
           className="w-full h-full object-contain"
           onClick={handleVideoClick}
+          onCanPlay={() => {
+            setVideoError(false);
+          }}
+          onWaiting={() => {
+            if (isActive) setVideoError(true);
+          }}
+          onLoadStart={() => {
+            // Video starting to load
+          }}
         />
       ) : (
         <ImageCarousel post={post} isActive={isActive} />
@@ -133,9 +269,31 @@ const ReelItem: React.FC<{
       
       {post.type === PostType.VIDEO && (
         <div className={`absolute inset-0 flex items-center justify-center transition-opacity duration-300 ${!isPlaying && isActive ? 'opacity-100' : 'opacity-0'} pointer-events-none`}>
-            <div className="bg-black/50 p-6 rounded-full">
-                {React.cloneElement(ICONS.play, { className: 'h-12 w-12 text-white' })}
+            <div className="bg-black/40 p-4 rounded-full">
+                <div className="flex flex-col items-center">
+                  <svg className="h-8 w-8 text-white" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M8 6.82v10.36c0 .79.87 1.27 1.54.84l8.14-5.18c.62-.39.62-1.29 0-1.68L9.54 5.98C8.87 5.55 8 6.03 8 6.82z"/>
+                  </svg>
+                  {!globalAudioEnabled && (
+                    <span className="text-xs mt-1 text-white/80">Tap to enable audio</span>
+                  )}
+                </div>
             </div>
+        </div>
+      )}
+
+      {/* Indicador de estado de audio global en esquina */}
+      {post.type === PostType.VIDEO && isActive && (
+        <div className="absolute top-4 right-4 bg-black/50 rounded-full p-2">
+          {globalAudioEnabled ? (
+            <svg className="h-4 w-4 text-white" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+            </svg>
+          ) : (
+            <svg className="h-4 w-4 text-white" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>
+            </svg>
+          )}
         </div>
       )}
       
@@ -204,6 +362,7 @@ const PostPlayerPage: React.FC = () => {
     const [postsToDisplay, setPostsToDisplay] = useState<Post[]>(location.state?.posts || allPosts);
     const [activePostId, setActivePostId] = useState(postId);
     const [preloadedVideos, setPreloadedVideos] = useState<Set<string>>(new Set());
+    const [globalAudioEnabled, setGlobalAudioEnabled] = useState(false);
     
     // Get return path and original video from navigation state
     const returnPath = location.state?.returnTo || '/gallery';
@@ -304,7 +463,7 @@ const PostPlayerPage: React.FC = () => {
         };
 
         let touchStartY = 1;
-        let lastTouchY = 1;
+        let lastTouchY = 0;
         let touchStartTime = 0;
         let scrollProcessed = false;
         let scrollDirection: 'up' | 'down' | null = null;
@@ -440,7 +599,23 @@ const PostPlayerPage: React.FC = () => {
             
             {postsToDisplay.map((post, index) => {
                 const currentActiveIndex = postsToDisplay.findIndex(p => p.id === activePostId);
-                const shouldPreload = Math.abs(index - currentActiveIndex) <= 1; // Precargar video actual y adyacentes
+                const distance = Math.abs(index - currentActiveIndex);
+                const shouldPreload = distance <= 1; // Solo video actual y adyacentes
+                const shouldRender = distance <= 5; // Solo renderizar videos cercanos para optimizar memoria
+                
+                if (!shouldRender) {
+                    // Placeholder para videos lejanos
+                    return (
+                        <div 
+                            key={post.id} 
+                            id={`post-item-${post.id}`}
+                            className="video-item w-screen relative snap-start flex-shrink-0 flex items-center justify-center bg-black" 
+                            style={{ height: '100dvh' }}
+                        >
+                            <div className="text-white">Loading...</div>
+                        </div>
+                    );
+                }
                 
                 return (
                     <ReelItem
@@ -450,6 +625,8 @@ const PostPlayerPage: React.FC = () => {
                         shouldPreload={shouldPreload}
                         onDelete={handleDelete}
                         onDifficultyChange={handleDifficultyChange}
+                        globalAudioEnabled={globalAudioEnabled}
+                        setGlobalAudioEnabled={setGlobalAudioEnabled}
                     />
                 );
             })}
