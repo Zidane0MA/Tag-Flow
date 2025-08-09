@@ -115,7 +115,8 @@ const ReelItem: React.FC<{
   }
 
   return (
-    <div id={`post-item-${post.id}`} className="video-item h-screen w-screen relative snap-start flex-shrink-0 flex items-center justify-center bg-black">
+    <div id={`post-item-${post.id}`} className="video-item w-screen relative snap-start flex-shrink-0 flex items-center justify-center bg-black" 
+         style={{ height: '100dvh' }}>
       {post.type === PostType.VIDEO ? (
         <video
           ref={videoRef}
@@ -138,7 +139,8 @@ const ReelItem: React.FC<{
         </div>
       )}
       
-      <div className="absolute bottom-0 left-0 right-0 p-4 pb-6 text-white bg-gradient-to-t from-black/70 to-transparent z-10">
+      <div className="absolute bottom-0 left-0 right-0 p-4 pb-safe text-white bg-gradient-to-t from-black/70 to-transparent z-10" 
+           style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}>
         <h3 className="font-bold text-lg">@{post.creator}</h3>
         <div className="mt-1">
           <p className={`text-sm transition-all duration-300 ${
@@ -163,7 +165,8 @@ const ReelItem: React.FC<{
         )}
       </div>
 
-      <div className="absolute right-3 bottom-24 md:bottom-32 flex flex-col items-center gap-6 text-white z-10">
+      <div className="absolute right-3 flex flex-col items-center gap-6 text-white z-10" 
+           style={{ bottom: 'max(6rem, calc(6rem + env(safe-area-inset-bottom)))' }}>
         <div className="relative flex flex-col items-center gap-1">
             <button onClick={() => setShowDifficultyOptions(s => !s)} className="bg-black/40 rounded-full p-3 hover:bg-black/60 transition-colors">
                 {React.cloneElement(ICONS.wrench, { className: 'h-7 w-7' })}
@@ -301,22 +304,56 @@ const PostPlayerPage: React.FC = () => {
         };
 
         let touchStartY = 0;
-        const handleTouchStart = (e: TouchEvent) => { touchStartY = e.touches[0].clientY; };
+        let touchStartTime = 0;
+        let touchHandled = false;
+        
+        const handleTouchStart = (e: TouchEvent) => { 
+            touchStartY = e.touches[0].clientY; 
+            touchStartTime = Date.now();
+            touchHandled = false;
+        };
+        
+        const handleTouchMove = (e: TouchEvent) => {
+            if (touchHandled) return;
+            
+            const currentY = e.touches[0].clientY;
+            const deltaY = touchStartY - currentY;
+            const deltaTime = Date.now() - touchStartTime;
+            
+            // Solo manejar gestos rápidos y significativos
+            if (Math.abs(deltaY) > 80 && deltaTime < 200) {
+                // Intentar prevenir, pero no depender de ello
+                try {
+                    e.preventDefault();
+                } catch (err) {
+                    // Ignorar errores de preventDefault
+                }
+                touchHandled = true;
+                handleControlledScroll(deltaY > 0 ? 'down' : 'up');
+            }
+        };
+        
         const handleTouchEnd = (e: TouchEvent) => {
+            if (touchHandled) return;
+            
             const deltaY = touchStartY - e.changedTouches[0].clientY;
-            if (Math.abs(deltaY) > 40) {
-                e.preventDefault();
+            const deltaTime = Date.now() - touchStartTime;
+            
+            // Fallback: manejar en touchend si no se manejó en touchmove
+            if (Math.abs(deltaY) > 100 && deltaTime < 300) {
                 handleControlledScroll(deltaY > 0 ? 'down' : 'up');
             }
         };
 
         container.addEventListener('wheel', handleWheel, { passive: false });
         container.addEventListener('touchstart', handleTouchStart, { passive: true });
+        container.addEventListener('touchmove', handleTouchMove, { passive: false });
         container.addEventListener('touchend', handleTouchEnd, { passive: true });
 
         return () => {
             container.removeEventListener('wheel', handleWheel);
             container.removeEventListener('touchstart', handleTouchStart);
+            container.removeEventListener('touchmove', handleTouchMove);
             container.removeEventListener('touchend', handleTouchEnd);
         };
     }, [postsToDisplay]);
@@ -359,9 +396,17 @@ const PostPlayerPage: React.FC = () => {
         <div
             ref={containerRef}
             className="h-screen w-screen overflow-y-auto snap-y snap-mandatory bg-black no-scrollbar"
-            style={{ scrollSnapStop: 'always', overscrollBehavior: 'contain' }}
+            style={{ 
+              scrollSnapStop: 'always', 
+              overscrollBehavior: 'contain',
+              height: '100dvh' // Use dynamic viewport height for mobile
+            }}
         >
-            <div className="absolute top-4 left-4 z-20">
+            <div className="absolute z-20" 
+                 style={{ 
+                   top: 'max(1rem, env(safe-area-inset-top))', 
+                   left: '1rem' 
+                 }}>
                 <button 
                     onClick={() => {
                         // Use replace instead of push to avoid double navigation
