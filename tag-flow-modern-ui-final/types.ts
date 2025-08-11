@@ -57,7 +57,8 @@ export interface Post {
   title: string;
   description: string;
   thumbnailUrl: string;
-  postUrl: string; // Renamed from videoUrl
+  postUrl: string; // Para reproducción interna
+  originalUrl?: string; // Para enlace original externo
   type: PostType;
   imageUrls?: string[]; // For image posts
   creator: string; // This is the creator's unique name/ID

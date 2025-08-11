@@ -185,6 +185,7 @@ class ApiService {
         return `${STREAM_BASE_URL}/thumbnail/${encodeURIComponent(filename)}`;
       })(),
       postUrl: `${STREAM_BASE_URL}/video-stream/${video.id}`,
+      originalUrl: video.post_url,
       type: (() => {
         // Si es un carrusel de imágenes, marcarlo como IMAGE
         if ((video as any).is_carousel && (video as any).carousel_items) {

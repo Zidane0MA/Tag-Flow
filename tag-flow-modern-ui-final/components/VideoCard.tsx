@@ -262,9 +262,23 @@ const PostCard: React.FC<PostCardProps> = ({ video: post, videos: posts, isSelec
             {/* === Information Area === */}
             <div className="p-3 flex-grow flex flex-col justify-between space-y-3">
                 {/* Title */}
-                <h3 className="font-bold text-base text-white leading-tight truncate" title={post.description || post.title}>
-                    {post.description || post.title}
-                </h3>
+                <div className="flex items-center justify-between gap-2">
+                    <h3 className="font-bold text-base text-white leading-tight truncate flex-1" title={post.description || post.title}>
+                        {post.description || post.title}
+                    </h3>
+                    {post.originalUrl && (
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                window.open(post.originalUrl, '_blank', 'noopener,noreferrer');
+                            }}
+                            className="flex-shrink-0 text-gray-400 hover:text-white transition-colors rounded hover:bg-gray-700/50"
+                            title="Abrir enlace original"
+                        >
+                            {React.cloneElement(ICONS.external_link, { className: 'h-4 w-4' })}
+                        </button>
+                    )}
+                </div>
 
                 {/* Creator and Subscription */}
                 <div className="flex justify-between items-start gap-2">
