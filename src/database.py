@@ -421,8 +421,16 @@ class DatabaseManager:
         # Aplicar filtros
         if filters:
             if filters.get('creator_name'):
-                query += " AND creator_name LIKE ?"
-                params.append(f"%{filters['creator_name']}%")
+                # Manejar múltiples creadores separados por comas
+                creator_names = [name.strip() for name in filters['creator_name'].split(',') if name.strip()]
+                if creator_names:
+                    if len(creator_names) == 1:
+                        query += " AND creator_name = ?"
+                        params.append(creator_names[0])
+                    else:
+                        placeholders = ','.join(['?' for _ in creator_names])
+                        query += f" AND creator_name IN ({placeholders})"
+                        params.extend(creator_names)
             
             if filters.get('creator_name_exact'):
                 query += " AND creator_name = ?"
@@ -494,8 +502,16 @@ class DatabaseManager:
         # Aplicar los mismos filtros que get_videos
         if filters:
             if filters.get('creator_name'):
-                query += " AND creator_name LIKE ?"
-                params.append(f"%{filters['creator_name']}%")
+                # Manejar múltiples creadores separados por comas (igual que en get_videos)
+                creator_names = [name.strip() for name in filters['creator_name'].split(',') if name.strip()]
+                if creator_names:
+                    if len(creator_names) == 1:
+                        query += " AND creator_name = ?"
+                        params.append(creator_names[0])
+                    else:
+                        placeholders = ','.join(['?' for _ in creator_names])
+                        query += f" AND creator_name IN ({placeholders})"
+                        params.extend(creator_names)
             
             if filters.get('creator_name_exact'):
                 query += " AND creator_name = ?"

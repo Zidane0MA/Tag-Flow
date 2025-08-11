@@ -20,5 +20,27 @@ export default {
       },
     },
   },
-  plugins: [],
+  plugins: [
+    // Plugin personalizado para scrollbar
+    function({ addUtilities }) {
+      addUtilities({
+        '.scrollbar-thin': {
+          'scrollbar-width': 'thin',
+        },
+        '.scrollbar-thin::-webkit-scrollbar': {
+          width: '6px',
+        },
+        '.scrollbar-thumb-gray-500::-webkit-scrollbar-thumb': {
+          'background-color': '#6b7280',
+          'border-radius': '3px',
+        },
+        '.scrollbar-track-gray-700::-webkit-scrollbar-track': {
+          'background-color': '#374151',
+        },
+        '.scrollbar-thin::-webkit-scrollbar-thumb:hover': {
+          'background-color': '#9ca3af',
+        },
+      });
+    },
+  ],
 }

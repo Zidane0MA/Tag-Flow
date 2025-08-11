@@ -50,20 +50,12 @@ export const RealDataProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const lastBackendCreatorsLengthRef = useRef(0);
   
   const creators = useMemo(() => {
-    // Solo recalcular si cambió algo relevante
-    if (backendCreators.length > 0 && lastBackendCreatorsLengthRef.current !== backendCreators.length) {
-      lastBackendCreatorsLengthRef.current = backendCreators.length;
-      creatorsRef.current = backendCreators;
+    // PRIORIDAD 1: Si tenemos backendCreators, siempre usarlos
+    if (backendCreators.length > 0) {
       return backendCreators;
     }
     
-    // Solo recalcular si cambió la longitud de posts (nuevos posts agregados)
-    if (lastPostsLengthRef.current === posts.length && creatorsRef.current.length > 0) {
-      return creatorsRef.current;
-    }
-    
-    lastPostsLengthRef.current = posts.length;
-    
+    // PRIORIDAD 2: Fallback a extraer de posts
     // Fallback: extraer de posts y construir plataformas
     const creatorsMap = new Map<string, { [key: string]: { postCount: number } }>();
     
@@ -146,7 +138,7 @@ export const RealDataProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     
     creatorsRef.current = newCreators;
     return newCreators;
-  }, [posts.length, backendCreators.length]); // Solo depender de longitudes, no del array completo
+  }, [posts.length, backendCreators]); // Depender del array completo para detectar cambios
 
   /**
    * Cargar videos desde el backend con paginación
@@ -163,13 +155,19 @@ export const RealDataProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         offset: 0 
       };
       
-      const { posts: newPosts, total } = await apiService.getVideos(filtersWithPagination);
+      // Cargar videos filtrados y todos los creadores en paralelo
+      const [{ posts: newPosts, total }, creatorsData] = await Promise.all([
+        apiService.getVideos(filtersWithPagination),
+        apiService.getCreators()
+      ]);
+      
       
       setPosts(newPosts);
       setCurrentFilters(filters);
       setCurrentOffset(PAGE_SIZE);
       setTotalVideos(total);
       setHasMore(newPosts.length === PAGE_SIZE && newPosts.length < total);
+      setBackendCreators(creatorsData);
       
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Error loading videos';

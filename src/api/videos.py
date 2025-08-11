@@ -74,8 +74,16 @@ def process_image_carousels(db, videos, filters=None):
             
             if filters:
                 if filters.get('creator_name'):
-                    where_conditions.append("v.creator_name = ?")
-                    params.append(filters['creator_name'])
+                    # Manejar múltiples creadores separados por comas
+                    creator_names = [name.strip() for name in filters['creator_name'].split(',') if name.strip()]
+                    if creator_names:
+                        if len(creator_names) == 1:
+                            where_conditions.append("v.creator_name = ?")
+                            params.append(creator_names[0])
+                        else:
+                            placeholders = ','.join(['?' for _ in creator_names])
+                            where_conditions.append(f"v.creator_name IN ({placeholders})")
+                            params.extend(creator_names)
                 if filters.get('platform'):
                     where_conditions.append("v.platform = ?")
                     params.append(filters['platform'])

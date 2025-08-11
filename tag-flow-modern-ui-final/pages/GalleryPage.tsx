@@ -10,7 +10,7 @@ import { VideoFilters } from '../services/apiService';
 
 const initialFilters = {
   search: '',
-  creator_name: '',
+  creator_name: [] as string[], // Cambiado a array para selección múltiple
   platform: '',
   edit_status: '',
   difficulty_level: '',
@@ -56,6 +56,9 @@ const GalleryPage: React.FC = () => {
     const [selectedPosts, setSelectedPosts] = useState<string[]>([]);
     const [editingPost, setEditingPost] = useState<Post | null>(null);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [isCreatorDropdownOpen, setIsCreatorDropdownOpen] = useState(false);
+    const [creatorSearchTerm, setCreatorSearchTerm] = useState('');
+    const creatorDropdownRef = useRef<HTMLDivElement>(null);
     
     const [filters, setFilters] = useState(initialFilters);
     const [sort, setSort] = useState({ by: 'downloadDate', order: 'desc' });
@@ -66,7 +69,10 @@ const GalleryPage: React.FC = () => {
         const apiFilters: VideoFilters = {};
         
         if (localFilters.search) apiFilters.search = localFilters.search;
-        if (localFilters.creator_name && localFilters.creator_name !== 'All') apiFilters.creator_name = localFilters.creator_name;
+        if (localFilters.creator_name && Array.isArray(localFilters.creator_name) && localFilters.creator_name.length > 0) {
+            // Enviar múltiples creadores como string separado por comas
+            apiFilters.creator_name = localFilters.creator_name.join(',');
+        }
         if (localFilters.platform && localFilters.platform !== 'All') {
             // Mapear plataformas del frontend al backend
             const platformMap: { [key: string]: string } = {
@@ -142,6 +148,21 @@ const GalleryPage: React.FC = () => {
         }
     }, [scrollToVideoId, highlightedVideoId, posts, navigate, location.pathname, location.search]);
 
+    // Hook para cerrar dropdown al hacer clic fuera
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (creatorDropdownRef.current && !creatorDropdownRef.current.contains(event.target as Node)) {
+                setIsCreatorDropdownOpen(false);
+                setCreatorSearchTerm(''); // Limpiar búsqueda al cerrar
+            }
+        };
+
+        if (isCreatorDropdownOpen) {
+            document.addEventListener('mousedown', handleClickOutside);
+            return () => document.removeEventListener('mousedown', handleClickOutside);
+        }
+    }, [isCreatorDropdownOpen]);
+
     // Aplicar filtros (llamar al backend)
     const applyFilters = useCallback(async () => {
         const apiFilters = buildApiFilters(filters);
@@ -172,7 +193,7 @@ const GalleryPage: React.FC = () => {
     useEffect(() => {
         const timeoutId = setTimeout(() => {
             applyFilters();
-        }, 500); // Debounce de 500ms
+        }, 1500); // Debounce de 1500ms para dar tiempo a selecciones múltiples
 
         return () => clearTimeout(timeoutId);
     }, [applyFilters]);
@@ -200,8 +221,32 @@ const GalleryPage: React.FC = () => {
         setFilters(prev => ({ ...prev, [e.target.name]: e.target.value }));
     };
 
+    const handleCreatorToggle = (creatorName: string) => {
+        setFilters(prev => {
+            const currentCreators = Array.isArray(prev.creator_name) ? prev.creator_name : [];
+            const isSelected = currentCreators.includes(creatorName);
+            
+            if (isSelected) {
+                // Remover si ya está seleccionado
+                return { ...prev, creator_name: currentCreators.filter(name => name !== creatorName) };
+            } else {
+                // Añadir si no está seleccionado
+                return { ...prev, creator_name: [...currentCreators, creatorName] };
+            }
+        });
+    };
+
     const handleRemoveFilter = (filterKey: string) => {
         setFilters(prev => ({ ...prev, [filterKey]: initialFilters[filterKey as keyof typeof initialFilters] }));
+    };
+
+    const handleRemoveCreator = (creatorName: string) => {
+        setFilters(prev => ({
+            ...prev,
+            creator_name: Array.isArray(prev.creator_name) 
+                ? prev.creator_name.filter(name => name !== creatorName)
+                : []
+        }));
     };
 
     const handleResetFilters = () => {
@@ -212,18 +257,32 @@ const GalleryPage: React.FC = () => {
         setSort(prev => ({...prev, [e.target.name]: e.target.value}));
     }
 
-    const activeFilters = useMemo(() =>
-        Object.entries(filters).filter(([key, value]) => value !== initialFilters[key as keyof typeof initialFilters]),
-      [filters]
-    );
+    const activeFilters = useMemo(() => {
+        return Object.entries(filters).filter(([key, value]) => {
+            const initialValue = initialFilters[key as keyof typeof initialFilters];
+            if (key === 'creator_name') {
+                return Array.isArray(value) && value.length > 0;
+            }
+            return value !== initialValue;
+        });
+    }, [filters]);
 
-    // Lista de creadores únicos para el filtro
-    const uniqueCreators = useMemo(() => {
+    // Lista de creadores únicos para el filtro (siempre todos los de la BD)
+    const allCreators = useMemo(() => {
         if (creators && creators.length > 0) {
-            return creators.map(c => c.name);
+            return creators.map(c => c.name).sort();
         }
-        return [...new Set(posts.map(p => p.creator))];
-    }, [creators, posts]);
+        // Fallback: si no hay creators del API, usar un set vacío para evitar inconsistencias
+        return [];
+    }, [creators]);
+
+    // Filtrar creadores por el término de búsqueda
+    const filteredCreators = useMemo(() => {
+        if (!creatorSearchTerm) return allCreators;
+        return allCreators.filter(creator => 
+            creator.toLowerCase().includes(creatorSearchTerm.toLowerCase())
+        );
+    }, [allCreators, creatorSearchTerm]);
 
     // Componente skeleton para loading
     const SkeletonCard = () => (
@@ -314,11 +373,67 @@ const GalleryPage: React.FC = () => {
                         onChange={handleFilterChange} 
                         className="bg-gray-700 text-white rounded p-2 focus:ring-2 focus:ring-red-500 focus:outline-none md:col-span-2 lg:col-span-4"
                     />
-                     <select name="creator_name" value={filters.creator_name} onChange={handleFilterChange} className="bg-gray-700 text-white rounded p-2 focus:ring-2 focus:ring-red-500 focus:outline-none">
-                        <option value="">Todos los Creadores</option>
-                        <option value="All">Todos los Creadores</option>
-                        {uniqueCreators.map(c => <option key={c} value={c}>{c}</option>)}
-                    </select>
+                    {/* Selector múltiple de creadores */}
+                    <div className="relative" ref={creatorDropdownRef}>
+                        <div className="bg-gray-700 text-white rounded focus-within:ring-2 focus-within:ring-red-500">
+                            <button 
+                                type="button"
+                                onClick={() => {
+                                    setIsCreatorDropdownOpen(!isCreatorDropdownOpen);
+                                    if (isCreatorDropdownOpen) {
+                                        setCreatorSearchTerm(''); // Limpiar búsqueda al cerrar
+                                    }
+                                }}
+                                className="w-full h-10 px-2 text-left flex justify-between items-center focus:outline-none focus:ring-2 focus:ring-red-500 min-h-[2.5rem]"
+                            >
+                                <span className="truncate flex-1">
+                                    {Array.isArray(filters.creator_name) && filters.creator_name.length > 0 
+                                        ? `${filters.creator_name.length} creador(es) seleccionado(s)`
+                                        : 'Seleccionar Creadores'
+                                    }
+                                </span>
+                                <svg className={`w-4 h-4 flex-shrink-0 ml-2 transition-transform ${isCreatorDropdownOpen ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                                </svg>
+                            </button>
+                            {isCreatorDropdownOpen && (
+                                <div className="absolute z-10 w-full bg-gray-700 border border-gray-600 rounded-b shadow-lg">
+                                    {/* Buscador de creadores */}
+                                    <div className="p-2 border-b border-gray-600">
+                                        <input
+                                            type="text"
+                                            placeholder="Buscar creadores..."
+                                            value={creatorSearchTerm}
+                                            onChange={(e) => setCreatorSearchTerm(e.target.value)}
+                                            className="w-full px-2 py-1 text-sm bg-gray-600 text-white rounded border border-gray-500 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                                            onClick={(e) => e.stopPropagation()}
+                                        />
+                                    </div>
+                                    
+                                    {/* Lista de creadores con scroll personalizado */}
+                                    <div className="max-h-60 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-500 scrollbar-track-gray-700">
+                                        {filteredCreators.length > 0 ? (
+                                            filteredCreators.map(creator => (
+                                                <label key={creator} className="flex items-center p-2 hover:bg-gray-600 cursor-pointer">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={Array.isArray(filters.creator_name) && filters.creator_name.includes(creator)}
+                                                        onChange={() => handleCreatorToggle(creator)}
+                                                        className="mr-2 rounded focus:ring-red-500"
+                                                    />
+                                                    <span className="truncate text-sm">{creator}</span>
+                                                </label>
+                                            ))
+                                        ) : (
+                                            <div className="p-4 text-center text-gray-400 text-sm">
+                                                No se encontraron creadores
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
                     <select name="platform" value={filters.platform} onChange={handleFilterChange} className="bg-gray-700 text-white rounded p-2 focus:ring-2 focus:ring-red-500 focus:outline-none">
                         <option value="">Todas las Plataformas</option>
                         <option value="All">Todas las Plataformas</option>
@@ -356,14 +471,29 @@ const GalleryPage: React.FC = () => {
              {activeFilters.length > 0 && (
                 <div className="mb-6 flex items-center flex-wrap gap-2">
                     <span className="text-sm font-medium text-gray-400">Filtros Activos:</span>
-                    {activeFilters.map(([key, value]) => (
-                        <span key={key} className="flex items-center bg-gray-600 text-white text-xs font-semibold px-2.5 py-1 rounded-full">
-                            {filterLabels[key]}: {String(value)}
-                            <button onClick={() => handleRemoveFilter(key)} className="ml-2 text-gray-300 hover:text-white text-base leading-none">
-                                &times;
-                            </button>
-                        </span>
-                    ))}
+                    {activeFilters.flatMap(([key, value]) => {
+                        if (key === 'creator_name' && Array.isArray(value)) {
+                            // Mostrar cada creador como un chip individual
+                            return value.map((creator: string) => (
+                                <span key={`${key}-${creator}`} className="flex items-center bg-gray-600 text-white text-xs font-semibold px-2.5 py-1 rounded-full">
+                                    {filterLabels[key]}: {creator}
+                                    <button onClick={() => handleRemoveCreator(creator)} className="ml-2 text-gray-300 hover:text-white text-base leading-none">
+                                        &times;
+                                    </button>
+                                </span>
+                            ));
+                        } else {
+                            // Filtros normales
+                            return (
+                                <span key={key} className="flex items-center bg-gray-600 text-white text-xs font-semibold px-2.5 py-1 rounded-full">
+                                    {filterLabels[key]}: {String(value)}
+                                    <button onClick={() => handleRemoveFilter(key)} className="ml-2 text-gray-300 hover:text-white text-base leading-none">
+                                        &times;
+                                    </button>
+                                </span>
+                            );
+                        }
+                    })}
                     <button onClick={handleResetFilters} className="text-sm text-red-500 hover:text-red-400 hover:underline ml-2">
                         Limpiar Todo
                     </button>
