@@ -15,6 +15,8 @@ interface RealDataContextType extends DataContextType {
   refreshData: () => Promise<void>;
   loadVideos: (filters?: VideoFilters) => Promise<void>;
   loadMoreVideos: () => Promise<void>;
+  loadTrashVideos: () => Promise<void>;
+  restoreMultipleFromTrash: (ids: string[]) => Promise<void>;
   getSubscriptionStats: (type: SubscriptionType, id: string) => Promise<any>;
   // Nuevas funciones para infinite scroll
   loadCreatorPosts: (creatorName: string, platform?: Platform, listId?: string) => Promise<Post[]>;
@@ -337,6 +339,34 @@ export const RealDataProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         if (postToMove) {
           setPosts(prevPosts => prevPosts.filter(p => p.id !== id));
           setTrash(prevTrash => [...prevTrash, { ...postToMove, deletedAt: new Date().toISOString() }]);
+          
+          // Also remove from creator scroll data
+          setCreatorScrollData(prev => {
+            const updatedData = { ...prev };
+            Object.keys(updatedData).forEach(key => {
+              if (updatedData[key].posts.some(p => p.id === id)) {
+                updatedData[key] = {
+                  ...updatedData[key],
+                  posts: updatedData[key].posts.filter(p => p.id !== id)
+                };
+              }
+            });
+            return updatedData;
+          });
+          
+          // Also remove from subscription scroll data
+          setSubscriptionScrollData(prev => {
+            const updatedData = { ...prev };
+            Object.keys(updatedData).forEach(key => {
+              if (updatedData[key].posts.some(p => p.id === id)) {
+                updatedData[key] = {
+                  ...updatedData[key],
+                  posts: updatedData[key].posts.filter(p => p.id !== id)
+                };
+              }
+            });
+            return updatedData;
+          });
         }
       } else {
         throw new Error('Failed to move video to trash');
@@ -364,6 +394,36 @@ export const RealDataProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           ...prevTrash, 
           ...postsToMove.map(post => ({ ...post, deletedAt: new Date().toISOString() }))
         ]);
+        
+        // Also remove from creator scroll data
+        setCreatorScrollData(prev => {
+          const updatedData = { ...prev };
+          Object.keys(updatedData).forEach(key => {
+            const hasAnyDeletedVideo = updatedData[key].posts.some(p => ids.includes(p.id));
+            if (hasAnyDeletedVideo) {
+              updatedData[key] = {
+                ...updatedData[key],
+                posts: updatedData[key].posts.filter(p => !ids.includes(p.id))
+              };
+            }
+          });
+          return updatedData;
+        });
+        
+        // Also remove from subscription scroll data
+        setSubscriptionScrollData(prev => {
+          const updatedData = { ...prev };
+          Object.keys(updatedData).forEach(key => {
+            const hasAnyDeletedVideo = updatedData[key].posts.some(p => ids.includes(p.id));
+            if (hasAnyDeletedVideo) {
+              updatedData[key] = {
+                ...updatedData[key],
+                posts: updatedData[key].posts.filter(p => !ids.includes(p.id))
+              };
+            }
+          });
+          return updatedData;
+        });
       } else {
         throw new Error('Failed to move videos to trash');
       }
@@ -378,27 +438,117 @@ export const RealDataProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   }, [posts]);
 
   /**
-   * Restaurar desde trash (por implementar en backend)
+   * Cargar videos de la papelera
+   */
+  const loadTrashVideos = useCallback(async () => {
+    try {
+      const { posts: trashPosts } = await apiService.getTrashVideos();
+      setTrash(trashPosts.map(post => ({ ...post, deletedAt: post.downloadDate || post.uploadDate || new Date().toISOString() })));
+    } catch (err) {
+      console.error('Error loading trash videos:', err);
+      setTrash([]);
+    }
+  }, []);
+
+  /**
+   * Restaurar desde trash
    */
   const restoreFromTrash = useCallback(async (id: string) => {
-    // TODO: Implementar cuando el backend tenga restore endpoint
-    console.warn('Restore from trash not implemented yet');
-  }, []);
+    try {
+      const success = await apiService.restoreVideo(id);
+      
+      if (success) {
+        const postToRestore = trash.find(p => p.id === id);
+        if (postToRestore) {
+          // Remover de trash
+          setTrash(prevTrash => prevTrash.filter(p => p.id !== id));
+          // Agregar de vuelta a posts principales
+          const { deletedAt, ...restoredPost } = postToRestore;
+          setPosts(prevPosts => [restoredPost, ...prevPosts]);
+          
+          // Note: We don't add back to creator/subscription scroll data here
+          // because those pages will reload their data from the backend when navigated to
+        }
+      } else {
+        throw new Error('Failed to restore video');
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Error restoring video';
+      setError(errorMessage);
+      console.error('Error restoring from trash:', err);
+      throw err;
+    }
+  }, [trash]);
 
   /**
-   * Eliminar permanentemente (por implementar en backend)
+   * Restaurar múltiples videos desde trash
    */
-  const deletePermanently = useCallback(async (id: string) => {
-    // TODO: Implementar cuando el backend tenga delete permanente
-    console.warn('Permanent delete not implemented yet');
+  const restoreMultipleFromTrash = useCallback(async (ids: string[]) => {
+    try {
+      const success = await apiService.restoreMultipleVideos(ids);
+      
+      if (success) {
+        const postsToRestore = trash.filter(p => ids.includes(p.id));
+        // Remover de trash
+        setTrash(prevTrash => prevTrash.filter(p => !ids.includes(p.id)));
+        // Agregar de vuelta a posts principales
+        const restoredPosts = postsToRestore.map(({ deletedAt, ...post }) => post);
+        setPosts(prevPosts => [...restoredPosts, ...prevPosts]);
+        
+        // Note: We don't add back to creator/subscription scroll data here
+        // because those pages will reload their data from the backend when navigated to
+      } else {
+        throw new Error('Failed to restore videos');
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Error restoring videos';
+      setError(errorMessage);
+      console.error('Error restoring multiple from trash:', err);
+      throw err;
+    }
+  }, [trash]);
+
+  /**
+   * Eliminar permanentemente
+   */
+  const deletePermanently = useCallback(async (id: string): Promise<{success: boolean, message?: string}> => {
+    try {
+      const result = await apiService.deletePermanently(id);
+      
+      if (result.success) {
+        // Remover de trash permanentemente
+        setTrash(prevTrash => prevTrash.filter(p => p.id !== id));
+        return { success: true, message: result.message };
+      } else {
+        return { success: false, message: 'Failed to permanently delete video' };
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Error permanently deleting video';
+      setError(errorMessage);
+      console.error('Error permanently deleting:', err);
+      return { success: false, message: errorMessage };
+    }
   }, []);
 
   /**
-   * Vaciar trash (por implementar en backend)
+   * Vaciar trash
    */
   const emptyTrash = useCallback(async () => {
-    // TODO: Implementar cuando el backend tenga empty trash
-    console.warn('Empty trash not implemented yet');
+    try {
+      const success = await apiService.emptyTrash();
+      
+      if (success) {
+        // Limpiar todo el trash
+        setTrash([]);
+      } else {
+        throw new Error('Failed to empty trash');
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Error emptying trash';
+      setError(errorMessage);
+      console.error('Error emptying trash:', err);
+      throw err;
+    }
   }, []);
 
   /**
@@ -755,11 +905,13 @@ export const RealDataProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     refreshData,
     loadVideos,
     loadMoreVideos,
+    loadTrashVideos,
     updatePost,
     updateMultiplePosts,
     moveToTrash,
     moveMultipleToTrash,
     restoreFromTrash,
+    restoreMultipleFromTrash,
     deletePermanently,
     emptyTrash,
     analyzePost,
@@ -790,11 +942,13 @@ export const RealDataProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     refreshData,
     loadVideos,
     loadMoreVideos,
+    loadTrashVideos,
     updatePost,
     updateMultiplePosts,
     moveToTrash,
     moveMultipleToTrash,
     restoreFromTrash,
+    restoreMultipleFromTrash,
     deletePermanently,
     emptyTrash,
     analyzePost,

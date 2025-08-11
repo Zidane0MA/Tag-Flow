@@ -562,15 +562,72 @@ def api_permanent_delete_video(video_id):
         db = get_database()
         
         # Obtener video antes de eliminarlo para mostrar información
-        video = db.get_video(video_id)
+        # Note: include_deleted=True because we want to find videos in trash
+        video = db.get_video(video_id, include_deleted=True)
         if not video:
             return jsonify({'success': False, 'error': 'Video not found'}), 404
         
+        # Verify video is actually in trash (deleted)
+        if not video.get('deleted_at'):
+            return jsonify({'success': False, 'error': 'Video is not in trash'}), 400
+        
+        # Mover archivo físico a papelera del sistema
+        file_moved_to_trash = False
+        if video.get('file_path'):
+            try:
+                import platform
+                import shutil
+                from pathlib import Path
+                
+                video_path = Path(video['file_path'])
+                if video_path.exists():
+                    system = platform.system()
+                    
+                    if system == "Windows":
+                        # En Windows, usar send2trash si está disponible, sino mover a Recycle Bin
+                        try:
+                            import send2trash
+                            send2trash.send2trash(str(video_path))
+                            file_moved_to_trash = True
+                        except ImportError:
+                            # Fallback: usar PowerShell para mover a papelera
+                            import subprocess
+                            subprocess.run([
+                                'powershell', '-Command',
+                                f'Add-Type -AssemblyName Microsoft.VisualBasic; [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteFile("{video_path}", "OnlyErrorDialogs", "SendToRecycleBin")'
+                            ], check=True)
+                            file_moved_to_trash = True
+                    elif system == "Darwin":  # macOS
+                        # En macOS, mover a Trash
+                        trash_path = Path.home() / '.Trash' / video_path.name
+                        shutil.move(str(video_path), str(trash_path))
+                        file_moved_to_trash = True
+                    else:  # Linux
+                        # En Linux, intentar usar gio trash
+                        try:
+                            subprocess.run(['gio', 'trash', str(video_path)], check=True)
+                            file_moved_to_trash = True
+                        except (subprocess.CalledProcessError, FileNotFoundError):
+                            # Fallback: mover a ~/.local/share/Trash
+                            trash_dir = Path.home() / '.local/share/Trash/files'
+                            trash_dir.mkdir(parents=True, exist_ok=True)
+                            shutil.move(str(video_path), str(trash_dir / video_path.name))
+                            file_moved_to_trash = True
+                            
+            except Exception as e:
+                logger.warning(f"Could not move file to system trash: {e}")
+        
+        # Eliminar de la base de datos
         success = db.permanent_delete_video(video_id)
         if success:
+            message = f'Video "{video["file_name"]}" eliminado permanentemente de la base de datos'
+            if file_moved_to_trash:
+                message += ' y movido a la papelera del sistema'
+            
             return jsonify({
                 'success': True, 
-                'message': f'Video "{video["file_name"]}" permanently deleted'
+                'message': message,
+                'file_moved_to_trash': file_moved_to_trash
             })
         else:
             return jsonify({'success': False, 'error': 'Error permanently deleting video'}), 500
@@ -686,6 +743,9 @@ def api_bulk_reanalyze_videos():
         except (ValueError, TypeError):
             return jsonify({'success': False, 'error': 'Todos los IDs deben ser números enteros'}), 400
         
+        from src.service_factory import get_database
+        db = get_database()
+        
         # Verificar que todos los videos existen
         missing_videos = []
         for video_id in video_ids:
@@ -778,6 +838,9 @@ def api_bulk_delete_videos():
         if not video_ids:
             return jsonify({'success': False, 'error': 'No video IDs provided'}), 400
         
+        from src.service_factory import get_database
+        db = get_database()
+        
         success_count = 0
         for video_id in video_ids:
             if db.soft_delete_video(video_id):
@@ -802,6 +865,9 @@ def api_bulk_restore_videos():
         
         if not video_ids:
             return jsonify({'success': False, 'error': 'No video IDs provided'}), 400
+        
+        from src.service_factory import get_database
+        db = get_database()
         
         success_count = 0
         for video_id in video_ids:
@@ -939,6 +1005,9 @@ def api_bulk_delete_final():
         if not video_ids:
             return jsonify({'success': False, 'error': 'No video IDs provided'}), 400
         
+        from src.service_factory import get_database
+        db = get_database()
+        
         success_count = 0
         for video_id in video_ids:
             if db.soft_delete_video(video_id):
@@ -954,11 +1023,42 @@ def api_bulk_delete_final():
         logger.error(f"Error en eliminación masiva final: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@videos_bp.route('/trash/videos')
+def api_get_trash_videos():
+    """API para obtener videos en la papelera"""
+    try:
+        from src.service_factory import get_database
+        db = get_database()
+        
+        limit = int(request.args.get('limit', 0))  # 0 = sin límite
+        offset = int(request.args.get('offset', 0))
+        
+        deleted_videos = db.get_deleted_videos(limit=limit, offset=offset)
+        total_deleted = db.count_videos(include_deleted=True) - db.count_videos()
+        
+        # Procesar cada video para la API
+        for video in deleted_videos:
+            process_video_data_for_api(video)
+        
+        return jsonify({
+            'success': True,
+            'videos': deleted_videos,
+            'total': total_deleted,
+            'limit': limit,
+            'offset': offset
+        })
+        
+    except Exception as e:
+        logger.error(f"Error obteniendo videos de papelera: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @videos_bp.route('/trash/stats')
 def api_trash_stats():
     """API para obtener estadísticas de papelera"""
     try:
-        total_deleted = db.count_videos({'is_deleted': True})
+        from src.service_factory import get_database
+        db = get_database()
+        total_deleted = db.count_videos(include_deleted=True) - db.count_videos()
         
         return jsonify({
             'success': True,
@@ -978,6 +1078,9 @@ def api_search():
             return jsonify({'success': False, 'error': 'Query parameter required'}), 400
         
         limit = int(request.args.get('limit', 10))
+        
+        from src.service_factory import get_database
+        db = get_database()
         
         # Buscar en múltiples campos
         videos = db.search_videos(query, limit=limit)

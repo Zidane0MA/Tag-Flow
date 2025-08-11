@@ -29,6 +29,7 @@ requests==2.32.4
 python-dotenv==1.1.1
 tqdm==4.67.1
 python-magic==0.4.27
+send2trash==1.8.2
 
 # Para desarrollo
 Flask-CORS>=4.0.0

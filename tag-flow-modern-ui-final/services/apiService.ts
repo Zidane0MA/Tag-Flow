@@ -664,6 +664,140 @@ class ApiService {
       throw error;
     }
   }
+
+  /**
+   * Obtener videos en la papelera
+   */
+  async getTrashVideos(limit: number = 0, offset: number = 0): Promise<{ posts: Post[], total: number }> {
+    try {
+      const params = new URLSearchParams();
+      if (limit > 0) params.append('limit', limit.toString());
+      if (offset > 0) params.append('offset', offset.toString());
+
+      const response = await fetch(`${API_BASE_URL}/trash/videos?${params}`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      if (!data.success) {
+        throw new Error(data.error || 'Error fetching trash videos');
+      }
+
+      const posts = data.videos.map((video: BackendVideo) => this.convertBackendVideoToPost(video));
+      
+      return {
+        posts,
+        total: data.total || posts.length
+      };
+    } catch (error) {
+      console.error('Error fetching trash videos:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Restaurar video desde la papelera
+   */
+  async restoreVideo(id: string): Promise<boolean> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/video/${id}/restore`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return data.success;
+    } catch (error) {
+      console.error('Error restoring video:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Restaurar múltiples videos desde la papelera
+   */
+  async restoreMultipleVideos(ids: string[]): Promise<boolean> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/videos/restore-bulk`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ video_ids: ids.map(id => parseInt(id)) }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return data.success;
+    } catch (error) {
+      console.error('Error restoring multiple videos:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Eliminar permanentemente un video
+   */
+  async deletePermanently(id: string): Promise<{success: boolean, message?: string, fileMoved?: boolean}> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/video/${id}/permanent-delete`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return {
+        success: data.success,
+        message: data.message,
+        fileMoved: data.file_moved_to_trash
+      };
+    } catch (error) {
+      console.error('Error permanently deleting video:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Vaciar papelera (eliminar todos los videos permanentemente)
+   */
+  async emptyTrash(): Promise<boolean> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/admin/empty-trash`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return data.success;
+    } catch (error) {
+      console.error('Error emptying trash:', error);
+      throw error;
+    }
+  }
 }
 
 export const apiService = new ApiService();

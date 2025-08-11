@@ -9,7 +9,7 @@ interface TrashPostCardProps {
     isSelected: boolean;
     onSelect: (id: string, isSelected: boolean) => void;
     onRestore: (id: string) => void;
-    onDelete: (id: string) => void;
+    onDelete: (video: Post) => void;
 }
 
 const TrashPostCard: React.FC<TrashPostCardProps> = ({ video: post, timeAgo, isSelected, onSelect, onRestore, onDelete }) => {
@@ -17,12 +17,16 @@ const TrashPostCard: React.FC<TrashPostCardProps> = ({ video: post, timeAgo, isS
     const [imageLoaded, setImageLoaded] = useState(false);
     const [imageError, setImageError] = useState(false);
     
-    const handleAction = async (action: (id: string) => void) => {
+    const handleRestore = async () => {
         setIsLoading(true);
         // We don't await here to allow the UI to feel instant, 
         // the item will just disappear from the list via the parent's state update.
-        action(post.id);
+        onRestore(post.id);
         // No need to setIsLoading(false) because the component will unmount.
+    };
+
+    const handleDeleteClick = () => {
+        onDelete(post);
     };
 
     return (
@@ -98,8 +102,8 @@ const TrashPostCard: React.FC<TrashPostCardProps> = ({ video: post, timeAgo, isS
                 
                 {/* Hover Actions */}
                  <div className="absolute inset-0 flex items-center justify-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none group-hover:pointer-events-auto z-30">
-                    <button onClick={() => handleAction(onRestore)} title="Restaurar" className="p-3 bg-black/50 backdrop-blur-sm rounded-full text-white hover:bg-green-600 transition-colors">{ICONS.restore}</button>
-                    <button onClick={() => handleAction(onDelete)} title="Eliminar Permanentemente" className="p-3 bg-black/50 backdrop-blur-sm rounded-full text-white hover:bg-red-700 transition-colors">{ICONS.delete}</button>
+                    <button onClick={handleRestore} title="Restaurar" className="p-3 bg-black/50 backdrop-blur-sm rounded-full text-white hover:bg-green-600 transition-colors">{ICONS.restore}</button>
+                    <button onClick={handleDeleteClick} title="Eliminar Permanentemente" className="p-3 bg-black/50 backdrop-blur-sm rounded-full text-white hover:bg-red-700 transition-colors">{ICONS.delete}</button>
                 </div>
             </div>
 

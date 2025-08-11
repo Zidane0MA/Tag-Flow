@@ -361,7 +361,7 @@ const GalleryPage: React.FC = () => {
                 <summary className="font-semibold text-white cursor-pointer select-none flex justify-between items-center list-none">
                     <span className="text-lg">Filtros y Ordenación</span>
                     <span className="text-xs font-normal text-gray-400 hover:text-white transition-colors">
-                        Haga clic para expandir/colapsar
+                        expandir/colapsar
                     </span>
                 </summary>
                 <div className="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useRealData } from '../hooks/useRealData';
 import { Post } from '../types';
 import { ICONS } from '../constants';
@@ -7,6 +7,8 @@ import TrashVideoCard from '../components/TrashVideoCard';
 import BulkActionBar from '../components/BulkActionBar';
 import Modal from '../components/Modal';
 import Pagination from '../components/Pagination';
+import PermanentDeleteModal from '../components/PermanentDeleteModal';
+import Toast from '../components/Toast';
 
 const timeAgo = (date: string | Date): string => {
     const seconds = Math.floor((new Date().getTime() - new Date(date).getTime()) / 1000);
@@ -24,14 +26,21 @@ const timeAgo = (date: string | Date): string => {
 };
 
 const TrashPage: React.FC = () => {
-    const { trash, restoreFromTrash, deletePermanently, emptyTrash } = useRealData();
+    const { trash, restoreFromTrash, restoreMultipleFromTrash, deletePermanently, emptyTrash, loadTrashVideos } = useRealData();
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [sort, setSort] = useState({ by: 'deletedAt', order: 'desc' });
     const [currentPage, setCurrentPage] = useState(1);
     const [isConfirmingEmpty, setIsConfirmingEmpty] = useState(false);
     const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
+    const [isConfirmingIndividualDelete, setIsConfirmingIndividualDelete] = useState(false);
+    const [individualDeleteVideo, setIndividualDeleteVideo] = useState<Post | null>(null);
     const [loading, setLoading] = useState(false);
+    const [toast, setToast] = useState<{message: string, type: 'success' | 'error', visible: boolean}>({
+        message: '',
+        type: 'success',
+        visible: false
+    });
 
     const ITEMS_PER_PAGE = 12;
 
@@ -73,13 +82,86 @@ const TrashPage: React.FC = () => {
         setLoading(false);
     };
 
-    const handleRestoreSelected = () => executeBulkAction(restoreFromTrash, selectedIds);
+    const handleRestoreSelected = async () => {
+        setLoading(true);
+        try {
+            await restoreMultipleFromTrash(selectedIds);
+            setSelectedIds([]);
+        } catch (error) {
+            console.error('Error restoring selected videos:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
     const handleDeleteSelected = () => setIsConfirmingDelete(true);
     const handleEmptyTrash = () => setIsConfirmingEmpty(true);
     
     const confirmDeleteSelected = async () => {
         setIsConfirmingDelete(false);
-        await executeBulkAction(deletePermanently, selectedIds);
+        setLoading(true);
+        
+        try {
+            // Delete each video individually to get success messages
+            const results = await Promise.all(
+                selectedIds.map(id => deletePermanently(id))
+            );
+            
+            const successCount = results.filter(r => r.success).length;
+            setToast({
+                message: `${successCount} videos eliminados permanentemente de la base de datos y movidos a la papelera del sistema`,
+                type: 'success',
+                visible: true
+            });
+            
+            setSelectedIds([]);
+        } catch (error) {
+            setToast({
+                message: 'Error al eliminar videos permanentemente',
+                type: 'error',
+                visible: true
+            });
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleIndividualDelete = (video: Post) => {
+        setIndividualDeleteVideo(video);
+        setIsConfirmingIndividualDelete(true);
+    };
+
+    const confirmIndividualDelete = async () => {
+        if (!individualDeleteVideo) return;
+        
+        setIsConfirmingIndividualDelete(false);
+        setLoading(true);
+        
+        try {
+            const result = await deletePermanently(individualDeleteVideo.id);
+            
+            if (result.success && result.message) {
+                setToast({
+                    message: result.message,
+                    type: 'success',
+                    visible: true
+                });
+            } else {
+                setToast({
+                    message: result.message || 'Error al eliminar el video permanentemente',
+                    type: 'error',
+                    visible: true
+                });
+            }
+        } catch (error) {
+            setToast({
+                message: 'Error al eliminar el video permanentemente',
+                type: 'error',
+                visible: true
+            });
+        } finally {
+            setLoading(false);
+            setIndividualDeleteVideo(null);
+        }
     };
 
     const confirmEmptyTrash = async () => {
@@ -88,6 +170,11 @@ const TrashPage: React.FC = () => {
         await new Promise(resolve => setTimeout(() => { emptyTrash(); resolve(true); }, 200));
         setLoading(false);
     };
+
+    // Load trash videos on mount
+    useEffect(() => {
+        loadTrashVideos();
+    }, [loadTrashVideos]);
 
     const isAllSelected = paginatedTrash.length > 0 && selectedIds.length === paginatedTrash.length;
 
@@ -111,7 +198,7 @@ const TrashPage: React.FC = () => {
                         <div className="flex items-center gap-3">
                             <input
                                 type="checkbox"
-                                className="h-5 w-5 rounded text-red-600 bg-gray-900 border-gray-500 focus:ring-red-500"
+                                className="h-4 w-4 rounded text-red-600 bg-gray-900 border-gray-500 focus:ring-red-500"
                                 checked={isAllSelected}
                                 onChange={handleSelectAll}
                                 title="Seleccionar todos en esta página"
@@ -150,7 +237,7 @@ const TrashPage: React.FC = () => {
                                         isSelected={selectedIds.includes(post.id)}
                                         onSelect={handleSelect}
                                         onRestore={restoreFromTrash}
-                                        onDelete={deletePermanently}
+                                        onDelete={handleIndividualDelete}
                                     />
                                 ))}
                             </div>
@@ -188,13 +275,34 @@ const TrashPage: React.FC = () => {
                 </div>
             </Modal>
             
-            <Modal isOpen={isConfirmingDelete} onClose={() => setIsConfirmingDelete(false)} title="Confirmar Eliminación Permanente">
-                <p className="text-gray-300 mb-6">¿Estás seguro de que quieres eliminar permanentemente los {selectedIds.length} elementos seleccionados? Esta acción no se puede deshacer.</p>
-                <div className="flex justify-end gap-4">
-                    <button onClick={() => setIsConfirmingDelete(false)} className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-500">Cancelar</button>
-                    <button onClick={confirmDeleteSelected} className="px-4 py-2 bg-red-800 text-white rounded-md hover:bg-red-700">Eliminar Permanentemente</button>
-                </div>
-            </Modal>
+            {/* Bulk Delete Modal */}
+            <PermanentDeleteModal
+                isOpen={isConfirmingDelete}
+                onClose={() => setIsConfirmingDelete(false)}
+                onConfirm={confirmDeleteSelected}
+                videoTitle=""
+                isMultiple={true}
+                count={selectedIds.length}
+            />
+            
+            {/* Individual Delete Modal */}
+            <PermanentDeleteModal
+                isOpen={isConfirmingIndividualDelete}
+                onClose={() => {
+                    setIsConfirmingIndividualDelete(false);
+                    setIndividualDeleteVideo(null);
+                }}
+                onConfirm={confirmIndividualDelete}
+                videoTitle={individualDeleteVideo?.title || ""}
+                isMultiple={false}
+            />
+            
+            <Toast
+                message={toast.message}
+                type={toast.type}
+                isVisible={toast.visible}
+                onClose={() => setToast(prev => ({ ...prev, visible: false }))}
+            />
         </>
     );
 };

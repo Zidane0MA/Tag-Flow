@@ -112,7 +112,7 @@ export interface DataContextType {
   moveToTrash: (id: string) => void;
   moveMultipleToTrash: (ids: string[]) => void;
   restoreFromTrash: (id: string) => void;
-  deletePermanently: (id: string) => void;
+  deletePermanently: (id: string) => Promise<{success: boolean, message?: string}>;
   emptyTrash: () => void;
   analyzePost: (id: string) => Promise<void>;
   reanalyzePosts: (ids:string[]) => Promise<void>;
