@@ -51,7 +51,7 @@ const GalleryPage: React.FC = () => {
     
     // Obtener estadísticas para mostrar total de videos
     const stats = getStats();
-    const totalVideos = stats.total;
+    const totalVideos = stats.totalInDB; // Usar total de la BD, no los cargados actualmente
 
     const [selectedPosts, setSelectedPosts] = useState<string[]>([]);
     const [editingPost, setEditingPost] = useState<Post | null>(null);
@@ -523,7 +523,10 @@ const GalleryPage: React.FC = () => {
                         {/* Mensaje de final de contenido */}
                         {!hasMore && posts.length > 0 && (
                             <div className="text-center py-8 text-gray-400">
-                                <p>Has visto todos los videos disponibles ({posts.length} videos)</p>
+                                <p>Has visto todos los videos disponibles ({posts.length} de {totalVideos} videos mostrados)</p>
+                                <p className="text-sm text-gray-500 mt-1">
+                                    Algunos carruseles de imágenes se muestran como un solo video
+                                </p>
                             </div>
                         )}
                     </>

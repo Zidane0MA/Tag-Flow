@@ -234,9 +234,19 @@ def api_get_creator_videos(creator_name):
         # ✅ NUEVO: Procesar carruseles de imágenes
         processed_videos = process_image_carousels(db, videos, filters)
         
-        # Calcular has_more basándose en los videos originales, no procesados
+        # Calcular has_more correctamente considerando la consolidación de carruseles
         original_count = len(videos)
-        has_more = limit > 0 and original_count == limit and (offset + original_count) < total_videos
+        processed_count = len(processed_videos)
+        
+        # Cálculo simple y directo de has_more
+        if limit > 0:
+            # Verificar si hay más contenido en el siguiente offset normal
+            next_offset = offset + original_count
+            has_more = next_offset < total_videos
+            logger.info(f"📊 CREATOR HAS_MORE - offset:{offset}, original_count:{original_count}, next_offset:{next_offset}, total:{total_videos}, has_more:{has_more}")
+        else:
+            # Sin límite, no hay más
+            has_more = False
         
         return jsonify({
             'success': True,
@@ -492,13 +502,33 @@ def api_get_subscription_videos(subscription_type, subscription_id):
                 from pathlib import Path
                 video['thumbnail_path'] = Path(video['thumbnail_path']).name
         
+        # ✅ NUEVO: Procesar carruseles de imágenes para suscripciones
+        processed_videos = process_image_carousels(db, videos, {})
+        
+        # Calcular has_more correctamente considerando la consolidación de carruseles
+        original_count = len(videos)
+        processed_count = len(processed_videos)
+        
+        # Cálculo simple y directo de has_more
+        if limit > 0:
+            # Verificar si hay más contenido en el siguiente offset normal
+            next_offset = offset + original_count
+            has_more = next_offset < total_videos
+            logger.info(f"📊 SUBSCRIPTION HAS_MORE - offset:{offset}, original_count:{original_count}, next_offset:{next_offset}, total:{total_videos}, has_more:{has_more}")
+        else:
+            # Sin límite, no hay más
+            has_more = False
+        
         return jsonify({
             'success': True,
-            'videos': videos,
+            'videos': processed_videos,
             'total': total_videos,
             'subscription_id': subscription_id,
             'subscription_type': subscription_type,
-            'list_filter': list_filter
+            'list_filter': list_filter,
+            'has_more': has_more,
+            'returned_count': len(processed_videos),
+            'original_count': original_count
         })
         
     except Exception as e:

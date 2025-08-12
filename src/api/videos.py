@@ -63,6 +63,8 @@ def process_image_carousels(db, videos, filters=None):
     if not videos:
         return videos
     
+    logger.info(f"🔍 CAROUSEL PROCESSING - Input videos: {len(videos)}")
+    
     try:
         video_ids_in_page = [v['id'] for v in videos]
         
@@ -103,23 +105,21 @@ def process_image_carousels(db, videos, filters=None):
             
             where_clause = " AND ".join(where_conditions)
             
-            # Buscar TODOS los items de carrusel que cumplen los filtros
-            # Usar búsqueda más flexible para encontrar is_carousel_item
+            # Buscar SOLO los items de carrusel que están en esta página específica
+            video_ids_str = ','.join(str(v['id']) for v in videos)
             query = f'''
                 SELECT v.id, dm.external_metadata
                 FROM videos v
                 JOIN downloader_mapping dm ON v.id = dm.video_id
-                WHERE {where_clause}
+                WHERE v.id IN ({video_ids_str})
                 AND dm.external_metadata IS NOT NULL
                 AND (dm.external_metadata LIKE '%"is_carousel_item":true%' 
                      OR dm.external_metadata LIKE '%"is_carousel_item": true%')
             '''
             
-            cursor = conn.execute(query, params)
+            cursor = conn.execute(query)
             
-            
-            all_carousel_groups = {}  # {base_id: [items]}
-            row_count = 0
+            page_carousel_groups = {}  # Carruseles que tienen videos en esta página
             
             for row in cursor:
                 try:
@@ -130,15 +130,47 @@ def process_image_carousels(db, videos, filters=None):
                         relative_path = metadata.get('relative_path', '')
                         if '_index_' in relative_path:
                             base_id = relative_path.split('_index_')[0]
-                            if base_id not in all_carousel_groups:
-                                all_carousel_groups[base_id] = []
-                            all_carousel_groups[base_id].append({
-                                'video_id': video_id,
-                                'order': metadata.get('carousel_order', 0)
-                            })
+                            page_carousel_groups[base_id] = True
                 except Exception as e:
                     logger.warning(f"Error procesando metadata para video {row[0]}: {e}")
                     continue
+            
+            # Ahora obtener TODOS los items de los carruseles que están en esta página
+            all_carousel_groups = {}  # {base_id: [items]}
+            
+            if page_carousel_groups:
+                for base_id in page_carousel_groups.keys():
+                    escaped_base_id = base_id.replace("'", "''")  # Escape single quotes
+                    query = f'''
+                        SELECT v.id, dm.external_metadata
+                        FROM videos v
+                        JOIN downloader_mapping dm ON v.id = dm.video_id
+                        WHERE {where_clause}
+                        AND dm.external_metadata IS NOT NULL
+                        AND dm.external_metadata LIKE '%"{escaped_base_id}_index_%'
+                    '''
+                    
+                    cursor = conn.execute(query, params)
+                    
+                    for row in cursor:
+                        try:
+                            video_id, metadata_json = row[0], row[1]
+                            metadata = json.loads(metadata_json) if metadata_json else {}
+                            
+                            if metadata.get('is_carousel_item'):
+                                relative_path = metadata.get('relative_path', '')
+                                if '_index_' in relative_path:
+                                    carousel_base_id = relative_path.split('_index_')[0]
+                                    if carousel_base_id == base_id:
+                                        if carousel_base_id not in all_carousel_groups:
+                                            all_carousel_groups[carousel_base_id] = []
+                                        all_carousel_groups[carousel_base_id].append({
+                                            'video_id': video_id,
+                                            'order': metadata.get('carousel_order', 0)
+                                        })
+                        except Exception as e:
+                            logger.warning(f"Error procesando metadata para video {row[0]}: {e}")
+                            continue
         
         # Solo mantener carruseles con múltiples items
         complete_carousels = {
@@ -146,8 +178,10 @@ def process_image_carousels(db, videos, filters=None):
             if len(items) > 1
         }
         
+        logger.info(f"🔍 CAROUSEL PROCESSING - Found {len(complete_carousels)} complete carousels in this page")
         
         if not complete_carousels:
+            logger.info(f"🔍 CAROUSEL PROCESSING - No carousels in this page, returning {len(videos)} original videos")
             return videos  # No hay carruseles, devolver originales
         
         # PASO 2: Procesar videos de esta página
@@ -160,24 +194,41 @@ def process_image_carousels(db, videos, filters=None):
             for item in items:
                 video_to_carousel[item['video_id']] = base_id
         
+        # NUEVO: Pre-determinar qué video de cada carrusel debe ser el representante
+        # Para evitar duplicados, el representante siempre debe ser el video con menor ID del carrusel completo
+        carousel_representatives = {}
+        for base_id, items in complete_carousels.items():
+            videos_in_page = [item['video_id'] for item in items if item['video_id'] in video_ids_in_page]
+            if videos_in_page:
+                # El representante es SIEMPRE el video con menor ID del carrusel completo, no solo de esta página
+                all_video_ids_in_carousel = [item['video_id'] for item in items]
+                global_representative = min(all_video_ids_in_carousel)
+                
+                # Solo incluir este carrusel si el representante está en esta página
+                if global_representative in video_ids_in_page:
+                    carousel_representatives[base_id] = global_representative
+                    logger.info(f"📍 CAROUSEL REP - base_id:{base_id}, representative:{global_representative}, videos_in_page:{videos_in_page}, all_videos:{all_video_ids_in_carousel}")
+                else:
+                    # El representante está en otra página, no incluir este carrusel aquí
+                    logger.info(f"🚫 CAROUSEL SKIP - base_id:{base_id}, representative:{global_representative} not in current page, videos_in_page:{videos_in_page}")
+        
         for video in videos:
             video_id = video['id']
             
             if video_id in carousel_processed:
+                logger.info(f"⏭️ SKIPPING - video_id:{video_id} already processed as part of carousel")
                 continue
             
             # Si este video es parte de un carrusel completo
             if video_id in video_to_carousel:
                 base_id = video_to_carousel[video_id]
-                carousel_items = complete_carousels[base_id]
-                carousel_items.sort(key=lambda x: x['order'])
                 
-                # NUEVA LÓGICA: Mostrar carrusel en el primer video disponible en esta página
-                first_item = carousel_items[0]
-                videos_in_page = [item['video_id'] for item in carousel_items if item['video_id'] in video_ids_in_page]
-                
-                if videos_in_page and video_id == min(videos_in_page):
-                    # Este es el primer video del carrusel disponible en esta página
+                # Solo procesar si el carrusel debe aparecer en esta página (su representante está aquí)
+                if base_id in carousel_representatives and video_id == carousel_representatives[base_id]:
+                    carousel_items = complete_carousels[base_id]
+                    carousel_items.sort(key=lambda x: x['order'])
+                    
+                    # Este es el video representante del carrusel
                     video['is_carousel'] = True
                     video['carousel_count'] = len(carousel_items)
                     video['carousel_items'] = [
@@ -187,14 +238,21 @@ def process_image_carousels(db, videos, filters=None):
                         } for item in carousel_items
                     ]
                     processed_videos.append(video)
-                
-                # Marcar todos los items del carrusel presentes en esta página como procesados
-                for item in carousel_items:
-                    if item['video_id'] in video_ids_in_page:
-                        carousel_processed.add(item['video_id'])
+                    logger.info(f"🎠 CAROUSEL ADDED - base_id:{base_id}, total_items:{len(carousel_items)}, video_id:{video_id}")
+                    
+                    # Marcar TODOS los videos del carrusel en esta página como procesados
+                    videos_in_page = [item['video_id'] for item in carousel_items if item['video_id'] in video_ids_in_page]
+                    for vid in videos_in_page:
+                        carousel_processed.add(vid)
+                else:
+                    # Este video es parte de un carrusel pero no es el representante O el representante no está en esta página
+                    logger.info(f"🚫 CAROUSEL NON-REP - base_id:{base_id}, video_id:{video_id}, skipping (rep not in this page or not representative)")
+                    carousel_processed.add(video_id)  # Marcar como procesado para que no se incluya como video individual
             else:
                 # Video individual normal
                 processed_videos.append(video)
+        
+        logger.info(f"🔍 CAROUSEL PROCESSING - Output: {len(processed_videos)} videos (reduced from {len(videos)})")
         return processed_videos
         
     except Exception as e:
@@ -222,7 +280,9 @@ def api_videos():
         limit = int(request.args.get('limit', 0))  # 0 = sin límite
         offset = int(request.args.get('offset', 0))
         
-        videos = db.get_videos(filters=filters, limit=limit, offset=offset)
+        # Obtener más videos de los necesarios para compensar la consolidación de carruseles
+        adjusted_limit = min(limit * 3, 150) if limit > 0 else 0  # Triplicar el límite pero max 150
+        videos = db.get_videos(filters=filters, limit=adjusted_limit, offset=offset)
         total_videos = db.count_videos(filters=filters)
         
         # Procesar cada video para la API
@@ -273,9 +333,19 @@ def api_videos():
         # ✅ NUEVO: Procesar carruseles de imágenes
         processed_videos = process_image_carousels(db, videos, filters)
         
-        # Calcular has_more basándose en los videos originales, no procesados
+        # Calcular has_more correctamente considerando la consolidación de carruseles
         original_count = len(videos)
-        has_more = original_count == limit and (offset + original_count) < total_videos if limit > 0 else False
+        processed_count = len(processed_videos)
+        
+        # Cálculo simple y directo de has_more
+        if limit > 0:
+            # Verificar si hay más contenido en el siguiente offset normal
+            next_offset = offset + original_count
+            has_more = next_offset < total_videos
+            logger.info(f"📊 HAS_MORE - offset:{offset}, original_count:{original_count}, next_offset:{next_offset}, total:{total_videos}, has_more:{has_more}")
+        else:
+            # Sin límite, no hay más
+            has_more = False
         
         
         return jsonify({
@@ -287,7 +357,8 @@ def api_videos():
             'offset': offset,
             'has_more': has_more,
             'returned_count': len(processed_videos),  # Para debugging
-            'original_count': original_count  # Para debugging
+            'original_count': original_count,  # Para debugging
+            'reduction_factor': processed_count / original_count if original_count > 0 else 1  # Para debugging
         })
         
     except Exception as e:

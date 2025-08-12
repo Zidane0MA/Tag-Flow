@@ -158,7 +158,7 @@ export const RealDataProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       };
       
       // Cargar videos filtrados y todos los creadores en paralelo
-      const [{ posts: newPosts, total }, creatorsData] = await Promise.all([
+      const [{ posts: newPosts, total, hasMore: backendHasMore }, creatorsData] = await Promise.all([
         apiService.getVideos(filtersWithPagination),
         apiService.getCreators()
       ]);
@@ -168,7 +168,7 @@ export const RealDataProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       setCurrentFilters(filters);
       setCurrentOffset(PAGE_SIZE);
       setTotalVideos(total);
-      setHasMore(newPosts.length === PAGE_SIZE && newPosts.length < total);
+      setHasMore(backendHasMore); // Usar hasMore del backend
       setBackendCreators(creatorsData);
       
     } catch (err) {
@@ -199,7 +199,7 @@ export const RealDataProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         offset: currentOffset
       };
       
-      const { posts: newPosts, total } = await apiService.getVideos(filtersWithPagination);
+      const { posts: newPosts, total, hasMore: backendHasMore } = await apiService.getVideos(filtersWithPagination);
       
       setPosts(prevPosts => {
         // Evitar duplicados basándose en el ID
@@ -211,9 +211,7 @@ export const RealDataProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       const newOffset = currentOffset + PAGE_SIZE;
       setCurrentOffset(newOffset);
       setTotalVideos(total);
-      
-      const hasMoreVideos = newPosts.length === PAGE_SIZE && newOffset < total;
-      setHasMore(hasMoreVideos);
+      setHasMore(backendHasMore); // Usar hasMore del backend
       
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Error loading more videos';
@@ -254,7 +252,7 @@ export const RealDataProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         offset: 0 
       };
       
-      const [{ posts: newPosts, total }, creatorsData] = await Promise.all([
+      const [{ posts: newPosts, total, hasMore: backendHasMore }, creatorsData] = await Promise.all([
         apiService.getVideos(filtersWithPagination),
         apiService.getCreators()
       ]);
@@ -263,7 +261,7 @@ export const RealDataProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       setCurrentFilters({});
       setCurrentOffset(PAGE_SIZE);
       setTotalVideos(total);
-      setHasMore(newPosts.length === PAGE_SIZE && newPosts.length < total);
+      setHasMore(backendHasMore); // Usar hasMore del backend
       setBackendCreators(creatorsData);
       
     } catch (err) {
@@ -665,8 +663,8 @@ export const RealDataProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     try {
       const PAGE_SIZE = 50;
-      const { posts: creatorPosts } = await apiService.getCreatorVideos(creatorName, platform, listId, PAGE_SIZE, 0);
-      setCreatorScrollData(prev => ({ ...prev, [key]: { posts: creatorPosts, offset: PAGE_SIZE, hasMore: creatorPosts.length === PAGE_SIZE, loading: false, initialLoaded: true } }));
+      const { posts: creatorPosts, hasMore: backendHasMore } = await apiService.getCreatorVideos(creatorName, platform, listId, PAGE_SIZE, 0);
+      setCreatorScrollData(prev => ({ ...prev, [key]: { posts: creatorPosts, offset: PAGE_SIZE, hasMore: backendHasMore, loading: false, initialLoaded: true } }));
       return creatorPosts;
     } catch (error) {
       console.error('Error loading creator posts:', error);
@@ -688,7 +686,7 @@ export const RealDataProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     try {
       const PAGE_SIZE = 50;
-      const { posts: newPosts } = await apiService.getCreatorVideos(creatorName, platform, listId, PAGE_SIZE, currentData.offset);
+      const { posts: newPosts, hasMore: backendHasMore } = await apiService.getCreatorVideos(creatorName, platform, listId, PAGE_SIZE, currentData.offset);
       
       setCreatorScrollData(prev => {
         const currentScrollData = prev[key];
@@ -704,7 +702,7 @@ export const RealDataProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             ...currentScrollData,  // Mantener referencia del objeto existente
             posts: [...currentScrollData.posts, ...uniqueNewPosts], // Concatenación simple
             offset: currentScrollData.offset + PAGE_SIZE,
-            hasMore: newPosts.length === PAGE_SIZE,
+            hasMore: backendHasMore, // Usar hasMore del backend
             loading: false
           } 
         };
@@ -776,8 +774,8 @@ export const RealDataProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     try {
       const PAGE_SIZE = 50;
-      const { posts: subscriptionPosts } = await apiService.getSubscriptionVideos(type, id, list, PAGE_SIZE, 0);
-      setSubscriptionScrollData(prev => ({ ...prev, [key]: { posts: subscriptionPosts, offset: PAGE_SIZE, hasMore: subscriptionPosts.length === PAGE_SIZE, loading: false, initialLoaded: true } }));
+      const { posts: subscriptionPosts, hasMore: backendHasMore } = await apiService.getSubscriptionVideos(type, id, list, PAGE_SIZE, 0);
+      setSubscriptionScrollData(prev => ({ ...prev, [key]: { posts: subscriptionPosts, offset: PAGE_SIZE, hasMore: backendHasMore, loading: false, initialLoaded: true } }));
       return subscriptionPosts;
     } catch (error) {
       console.error('Error loading subscription posts:', error);
@@ -799,7 +797,7 @@ export const RealDataProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     try {
       const PAGE_SIZE = 50;
-      const { posts: newPosts } = await apiService.getSubscriptionVideos(type, id, list, PAGE_SIZE, currentData.offset);
+      const { posts: newPosts, hasMore: backendHasMore } = await apiService.getSubscriptionVideos(type, id, list, PAGE_SIZE, currentData.offset);
 
       setSubscriptionScrollData(prev => {
         const currentScrollData = prev[key];
@@ -815,7 +813,7 @@ export const RealDataProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             ...currentScrollData,  // Mantener referencia del objeto existente
             posts: [...currentScrollData.posts, ...uniqueNewPosts], // Concatenación simple
             offset: currentScrollData.offset + PAGE_SIZE,
-            hasMore: newPosts.length === PAGE_SIZE,
+            hasMore: backendHasMore, // Usar hasMore del backend
             loading: false
           } 
         };

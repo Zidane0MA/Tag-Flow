@@ -19,19 +19,15 @@ export const useInfiniteScroll = (
   const enabledRef = useRef(enabled);
   const lastTriggeredRef = useRef<number>(0);
   const isTriggering = useRef(false);
-  const listenerSetup = useRef(false);
 
   // Always keep callback updated
   callbackRef.current = callback;
   enabledRef.current = enabled;
 
   useEffect(() => {
-    // Only setup once
-    if (listenerSetup.current) {
+    if (!enabled) {
       return;
     }
-    
-    listenerSetup.current = true;
 
     const handleScroll = () => {
       if (!enabledRef.current || isTriggering.current) {
@@ -129,10 +125,8 @@ export const useInfiniteScroll = (
       if (flexContainer) {
         flexContainer.removeEventListener('scroll', throttledScroll);
       }
-      
-      listenerSetup.current = false;
     };
-  }, []); // NO DEPENDENCIES - only runs once
+  }, [enabled, threshold]); // Dependencies: enabled and threshold
 };
 
 export default useInfiniteScroll;

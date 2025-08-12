@@ -227,7 +227,7 @@ class ApiService {
   /**
    * Obtener videos con filtros
    */
-  async getVideos(filters: VideoFilters = {}): Promise<{ posts: Post[], total: number }> {
+  async getVideos(filters: VideoFilters = {}): Promise<{ posts: Post[], total: number, hasMore: boolean }> {
     try {
       const params = new URLSearchParams();
       
@@ -253,7 +253,8 @@ class ApiService {
       
       return {
         posts,
-        total: data.total || data.total_videos || posts.length
+        total: data.total || data.total_videos || posts.length,
+        hasMore: data.has_more || false
       };
     } catch (error) {
       console.error('Error fetching videos:', error);
@@ -512,7 +513,7 @@ class ApiService {
     subscriptionId?: string,
     limit: number = 0, // 0 = sin límite por defecto
     offset: number = 0
-  ): Promise<{ posts: Post[], total: number }> {
+  ): Promise<{ posts: Post[], total: number, hasMore: boolean }> {
     try {
       const params = new URLSearchParams();
       if (platform && platform !== 'all') params.append('platform', platform);
@@ -536,7 +537,8 @@ class ApiService {
       
       return {
         posts,
-        total: data.total || posts.length
+        total: data.total || posts.length,
+        hasMore: data.has_more || false
       };
     } catch (error) {
       console.error('Error fetching creator videos:', error);
@@ -634,7 +636,7 @@ class ApiService {
     listFilter?: string,
     limit: number = 0, // 0 = sin límite por defecto
     offset: number = 0
-  ): Promise<{ posts: Post[], total: number }> {
+  ): Promise<{ posts: Post[], total: number, hasMore: boolean }> {
     try {
       const params = new URLSearchParams();
       if (listFilter && listFilter !== 'all') params.append('list', listFilter);
@@ -657,7 +659,8 @@ class ApiService {
       
       return {
         posts,
-        total: data.total || posts.length
+        total: data.total || posts.length,
+        hasMore: data.has_more || false
       };
     } catch (error) {
       console.error('Error fetching subscription videos:', error);

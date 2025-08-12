@@ -35,13 +35,36 @@ url_description
   - url (link del video)
 
 Nota:
-- Los videos de otras plataformas no figuran en `media_item_metadata` por lo que no tienen informacion de `type` y `value`, crear los campos de todas formas, los campos faltantes se agregaran desde el frontend.
+- Los videos de otras plataformas no figuran en `media_item_metadata` por lo que no tienen informacion de `type` y `value`, crear los campos de todas formas, los campos faltantes se agregaran desde el frontend. (Facebook, bilibili, etc.) se debe soportar el autodescubrimiento de estas plataformas.
 - Como la url del creador se puede armar como `http://www.youtube.com/@type(0)`
 
 ## CASO: 4k Tokkit (Solo Tiktok)
+### Contexto
+La app agrupa los videos de diferentes maneras:
+- Publicaciones sueltas como: `\\Single videos\\video.mp4|imagen.jpg`, vistas desde la db en la tabla `MediaItems` y tienen `subscriptionDatabaseId` como NULL. Descargados como publicaciones individuales
+- Suscripcion como cuenta (`type` = 1): Estas se registran como un grupo en la tabla `Subscriptions` (tienen un `type`) y sus publicaciones se registran en la tabla `MediaItems` donde llevan su respectivo `subscriptionDatabaseId` y `authorName`. Estas carpetas tienen la siguiente estructura:
+  - Feed: `\\name\\video.mp4|imagen.jpg`
+  - `\\name\\Liked`
+  - `\\name\\Favorites`
+  > Nota 1: Algunas suscripciones tendran el mismo name y type pero la app las guarda bajo la misma carpeta `\\name`.
+  > Nota 2: Las suscripciones tiene un icono de avatar como `upminaa.cos_0_963a4f0cd578446d5243a89e4df5f360_avatar.jpeg` se debe catalogar en otro lugar.
+
+- Suscripcion como Listas (`type` = 2,3): Estas se registran similar al anterior pero tienen sus particularidades:
+  - `type` = 2: La carpeta de este tipo se guarda con un #.
+      - `\\#name\\video.mp4|imagen.jpg`
+  - `type` = 2: La carpeta de este tipo se guarda con un "(Subscriptions.id)".
+      - `\\name(Subscriptions.id)\\video.mp4|imagen.jpg`
+
+- Importante: 
+  - Las imagenes se guardan como por ejemplo: `anxl3tii_1754166899_7534089319917735182_index_0_3.jpeg`
+  - La MediaItems.id de las imagenes son como: `7534089319917735182_index_0_3`
+  - Para armar la url e identificar las imagenes de un del post se necesita el campo MediaItems.id sin `_index_n1_n2`
+  - Para el orden de las imagenes para el carrusel del frontend necesitamos de `_index_n1_n2` el valor n1 (en orden menor a mayor)
+
 ### BD Tokkit
 Subscriptions
   - databaseId
+  - MediaType(2=video, 3=imagen) (1=coverimg[ignorar])
   - type (n=name)
   - name (1=cuenta, 2=hashtag, 3=musica)
   - id (para armar la url de la lista tipo musica)
@@ -49,7 +72,7 @@ Subscriptions
   Notas:
   - url tipo cuenta se arman como `https://www.tiktok.com/@name`
   - url tipo hashtag se arman como `https://www.tiktok.com/tag/name`
-  - url tipo musica se arman como `https://www.tiktok.com/music/name-id`
+  - url tipo musica se arman como `https://www.tiktok.com/music/name-Subscriptions.id`
     - Cuando es tipo musica el name puede tener espacios, se deben rellenar con "-"
     - Ejemplo "cancion nueva cinco" -> "cancion-nueva-cinco"
 
@@ -59,13 +82,16 @@ MediaItems
   - id (para armar la url del post)
   - authorName
   - description (usar como titulo del post)
+  - downloaded (1=si) (Importante para solo poblar los videos descargados y no generar errores)
   - relativePath
-    - \name\video.mp4
-    - \name\Liked\video.mp4
-    - \name\Favorites\video.mp4
 
   Notas:
-  - Links de los posts se arman como `https://www.tiktok.com/@authorName/video/id`
+  - Links de los posts tipo video se arman como `https://www.tiktok.com/@authorName/video/MediaItems.id`
+  - Links de los posts tipo imagen se arman como `https://www.tiktok.com/@authorName/photo/MediaItems.id(sin _index_n1_n2)`
+
+### Objetivos
+- Las Publicaciones sueltas seran listas al igual que las Suscripcion como Listas (`type` = 2,3).
+- Las Publicaciones como cuenta (`type` = 1) seran subcripciones de tipo cuenta en mi bd y tendran tabs subtabs como "feed, Liked, Favorites".
 
 ## CASO: 4k Strogram (Solo Instagram)
 ### Contexto
@@ -84,14 +110,13 @@ La app agrupa los videos de diferentes maneras:
     - type (n=display_name)
     - display_name  (1=cuenta, 2=hashtag, 3=location, 4=guardados de la cuenta)
 
-    Nota: Independientemente del type, las s
-
 2. photos
     - subscriptionId
     - web_url (url de la publicacion)
     - title (titulo/descripcion de la publicacion)
     - file (path relativo de la publicacion)
     - is_video (65=video, [0,2]=imagen)
+    - state (4=descargado)
     - ownerName (Creador de la publicacion)
 
     Nota:

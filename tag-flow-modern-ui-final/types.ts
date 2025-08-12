@@ -118,6 +118,7 @@ export interface DataContextType {
   reanalyzePosts: (ids:string[]) => Promise<void>;
   getStats: () => {
     total: number;
+    totalInDB: number;
     withMusic: number;
     withCharacters: number;
     processed: number;
