@@ -800,6 +800,33 @@ class ApiService {
       throw error;
     }
   }
+
+  /**
+   * Abrir carpeta del video en el explorador
+   */
+  async openFolder(id: string): Promise<{success: boolean, message?: string}> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/video/${id}/open-folder`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return {
+        success: data.success,
+        message: data.message
+      };
+    } catch (error) {
+      console.error('Error opening folder:', error);
+      throw error;
+    }
+  }
 }
 
 export const apiService = new ApiService();

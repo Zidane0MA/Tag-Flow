@@ -5,6 +5,7 @@ import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { Post, EditStatus, ProcessStatus, Difficulty, PostType, SubscriptionType } from '../types';
 import { ICONS, getSubscriptionIcon, getListIcon } from '../constants';
 import { useRealData } from '../hooks/useRealData';
+import { apiService } from '../services/apiService';
 
 interface PostCardProps {
     video: Post; // Renamed to video to avoid large-scale refactor in GalleryPage for now. It is a Post object.
@@ -154,6 +155,20 @@ const PostCard: React.FC<PostCardProps> = ({ video: post, videos: posts, isSelec
         });
     };
 
+    const handleOpenFolder = async (e: React.MouseEvent) => {
+        e.stopPropagation();
+        try {
+            const result = await apiService.openFolder(post.id);
+            if (result.success) {
+                console.log('Carpeta abierta exitosamente:', result.message);
+            } else {
+                console.error('Error al abrir carpeta');
+            }
+        } catch (error) {
+            console.error('Error al abrir carpeta:', error);
+        }
+    };
+
     const baseClasses = "bg-[#212121] rounded-lg overflow-hidden shadow-lg flex flex-col group text-sm";
     const animationClasses = "transition-all ease-in-out hover:-translate-y-1 hover:shadow-2xl will-change-[transform,box-shadow]";
     
@@ -254,7 +269,7 @@ const PostCard: React.FC<PostCardProps> = ({ video: post, videos: posts, isSelec
                     <button onClick={handleAnalyze} disabled={isAnalyzing || post.processStatus === 'Procesando'} title="Analizar" className="p-3 bg-black/50 backdrop-blur-sm rounded-full text-white hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
                        {isAnalyzing || post.processStatus === 'Procesando' ? ICONS.spinner : ICONS.analyze}
                     </button>
-                    <button onClick={(e) => { e.stopPropagation(); }} title="Mostrar Archivo" className="p-3 bg-black/50 backdrop-blur-sm rounded-full text-white hover:bg-red-600 transition-colors">{ICONS.folder}</button>
+                    <button onClick={handleOpenFolder} title="Mostrar Archivo" className="p-3 bg-black/50 backdrop-blur-sm rounded-full text-white hover:bg-red-600 transition-colors">{ICONS.folder}</button>
                     <button onClick={(e) => { e.stopPropagation(); moveToTrash(post.id); }} title="Eliminar" className="p-3 bg-black/50 backdrop-blur-sm rounded-full text-white hover:bg-red-500 transition-colors">{ICONS.delete}</button>
                 </div>
             </div>

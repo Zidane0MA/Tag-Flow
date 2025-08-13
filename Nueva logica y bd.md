@@ -21,7 +21,7 @@ media_item_metadata
 
   Notas:
   - Solo hay videos de la plataforma de youtube (sea lista o no)
-  - Las lista de likes y otras listas manejan: type(0=creator post, 1=url creator, 3=playlist name, 4=url playlist, 7=downloader_subscription_info(uuid))
+  - Las suscripciones de tipo playlist (lista de likes y otras listas) manejan: type(0=creator post, 1=url creator, 3=playlist name, 4=url playlist, 7=downloader_subscription_info(uuid))
   - Los creadores manejan: type(0=creator post, 1=url creator, 5=playlist name, 6=url playlist, 7=downloader_subscription_info(uuid))
   - Videos de youtube sueltos que no pertenecen a listas: type(0=creator post, 1=url creator)
 
@@ -32,11 +32,20 @@ media_item_description
 url_description
   - media_item_description_id
   - service_name (Nombre de la plataforma)
-  - url (link del video)
+  - url (url del video)
 
 Nota:
 - Los videos de otras plataformas no figuran en `media_item_metadata` por lo que no tienen informacion de `type` y `value`, crear los campos de todas formas, los campos faltantes se agregaran desde el frontend. (Facebook, bilibili, etc.) se debe soportar el autodescubrimiento de estas plataformas.
 - Como la url del creador se puede armar como `http://www.youtube.com/@type(0)`
+
+
+Problemas con el poblado de la base de datos:
+- Videos sueltos como `D:\4K Video Downloader+\NOMBREDELVIDEO.mkv` que vienen de la app 4k video downloader, se poblan teniendo como suscripciones el nombre del creador en el caso de youtube y el nombre/titulo del video para otras plataformas. Quiero que todos estos videos sueltos se guarden en mi bd bajo la suscripcion de Single media y de type folder similar a instagram.
+
+- En tiktok un creador sin contenido propio (no figura en la tabla de creadores), se le asiga un creador_id no relacionado.
+
+
+
 
 ## CASO: 4k Tokkit (Solo Tiktok)
 ### Contexto
@@ -46,13 +55,12 @@ La app agrupa los videos de diferentes maneras:
   - Feed: `\\name\\video.mp4|imagen.jpg`
   - `\\name\\Liked`
   - `\\name\\Favorites`
-  > Nota 1: Algunas suscripciones tendran el mismo name y type pero la app las guarda bajo la misma carpeta `\\name`.
-  > Nota 2: Las suscripciones tiene un icono de avatar como `upminaa.cos_0_963a4f0cd578446d5243a89e4df5f360_avatar.jpeg` se debe catalogar en otro lugar.
+  > Nota: Algunas suscripciones tendran el mismo name y type pero la app las guarda bajo la misma carpeta `\\name`.
 
 - Suscripcion como Listas (`type` = 2,3): Estas se registran similar al anterior pero tienen sus particularidades:
   - `type` = 2: La carpeta de este tipo se guarda con un #.
       - `\\#name\\video.mp4|imagen.jpg`
-  - `type` = 2: La carpeta de este tipo se guarda con un "(Subscriptions.id)".
+  - `type` = 3: La carpeta de este tipo se guarda con un "(Subscriptions.id)".
       - `\\name(Subscriptions.id)\\video.mp4|imagen.jpg`
 
 - Importante: 
@@ -64,7 +72,6 @@ La app agrupa los videos de diferentes maneras:
 ### BD Tokkit
 Subscriptions
   - databaseId
-  - MediaType(2=video, 3=imagen) (1=coverimg[ignorar])
   - type (n=name)
   - name (1=cuenta, 2=hashtag, 3=musica)
   - id (para armar la url de la lista tipo musica)
@@ -79,6 +86,7 @@ Subscriptions
 MediaItems
   - databaseId
   - subscriptionDatabaseId
+  - MediaType(2=video, 3=imagen) (1=coverimg[ignorar])
   - id (para armar la url del post)
   - authorName
   - description (usar como titulo del post)

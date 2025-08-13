@@ -58,7 +58,62 @@ def create_app():
                 return send_file(thumbnail_path)
             else:
                 logger.warning(f"Thumbnail no encontrado: {thumbnail_path}")
-                # Thumbnail por defecto
+                
+                # 🎠 FALLBACK: Verificar si es un carrusel de imágenes y servir la primera imagen
+                try:
+                    from src.service_factory import get_database
+                    from pathlib import Path
+                    
+                    # Extraer nombre base del archivo (remover _thumb.jpg)
+                    if clean_filename.endswith('_thumb.jpg'):
+                        base_filename = clean_filename[:-10]  # Remover '_thumb.jpg'
+                        
+                        # Buscar video por file_name
+                        db = get_database()
+                        with db.get_connection() as conn:
+                            cursor = conn.execute('''
+                                SELECT v.id, v.file_path, dm.is_carousel_item, dm.carousel_base_id, dm.carousel_order
+                                FROM videos v
+                                LEFT JOIN downloader_mapping dm ON v.id = dm.video_id  
+                                WHERE v.file_name = ? OR v.file_path LIKE ?
+                            ''', (base_filename, f'%{base_filename}%'))
+                            
+                            video_row = cursor.fetchone()
+                            if video_row:
+                                video_id, file_path, is_carousel_item, carousel_base_id, carousel_order = video_row
+                                
+                                # Si es parte de un carrusel, buscar la primera imagen del carrusel
+                                if is_carousel_item and carousel_base_id:
+                                    cursor = conn.execute('''
+                                        SELECT v.file_path 
+                                        FROM videos v
+                                        JOIN downloader_mapping dm ON v.id = dm.video_id
+                                        WHERE dm.carousel_base_id = ? AND dm.is_carousel_item = TRUE
+                                        ORDER BY dm.carousel_order ASC
+                                        LIMIT 1
+                                    ''', (carousel_base_id,))
+                                    
+                                    first_image_row = cursor.fetchone()
+                                    if first_image_row:
+                                        first_image_path = Path(first_image_row[0])
+                                        # Verificar si es imagen y existe
+                                        if (first_image_path.exists() and 
+                                            any(first_image_path.suffix.lower().endswith(ext) for ext in ['.jpg', '.jpeg', '.png', '.gif', '.webp'])):
+                                            logger.info(f"🖼️ CAROUSEL FALLBACK - Serving first image: {first_image_path}")
+                                            return send_file(first_image_path)
+                                
+                                # Si es imagen individual, servirla directamente  
+                                elif file_path:
+                                    image_path = Path(file_path)
+                                    if (image_path.exists() and 
+                                        any(image_path.suffix.lower().endswith(ext) for ext in ['.jpg', '.jpeg', '.png', '.gif', '.webp'])):
+                                        logger.info(f"🖼️ IMAGE FALLBACK - Serving original image: {image_path}")
+                                        return send_file(image_path)
+                
+                except Exception as e:
+                    logger.warning(f"Error en fallback de carrusel para {clean_filename}: {e}")
+                
+                # Thumbnail por defecto si no se puede resolver
                 return send_file(config.STATIC_DIR / 'img' / 'no-thumbnail.svg')
         except Exception as e:
             logger.error(f"Error sirviendo thumbnail {filename}: {e}")

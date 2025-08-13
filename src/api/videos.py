@@ -228,6 +228,25 @@ def process_image_carousels(db, videos, filters=None):
                             'order': item['order']
                         } for item in carousel_items
                     ]
+                    
+                    # 🖼️ Para carruseles de imágenes, usar la primera imagen como thumbnail automáticamente
+                    if carousel_items:
+                        first_item_id = carousel_items[0]['video_id']
+                        # Obtener la primera imagen del carrusel para usar como thumbnail
+                        try:
+                            with conn:
+                                thumb_cursor = conn.execute('SELECT file_path FROM videos WHERE id = ?', (first_item_id,))
+                                first_item_row = thumb_cursor.fetchone()
+                                if first_item_row:
+                                    first_item_path = first_item_row[0]
+                                    # Verificar si es imagen
+                                    if first_item_path and any(first_item_path.lower().endswith(ext) for ext in ['.jpg', '.jpeg', '.png', '.gif', '.webp']):
+                                        # Para carruseles de imágenes, usar la primera imagen como thumbnail_path
+                                        video['thumbnail_path'] = first_item_path
+                                        logger.info(f"🖼️ CAROUSEL THUMBNAIL - Using first image: {first_item_path}")
+                        except Exception as e:
+                            logger.warning(f"Error setting carousel thumbnail for {video_id}: {e}")
+                    
                     processed_videos.append(video)
                     logger.info(f"🎠 CAROUSEL ADDED - base_id:{base_id}, total_items:{len(carousel_items)}, video_id:{video_id}")
                     
@@ -305,7 +324,7 @@ def api_videos():
             try:
                 with db.get_connection() as conn:
                     cursor = conn.execute('''
-                        SELECT vl.list_type, vl.source_path 
+                        SELECT vl.list_type 
                         FROM video_lists vl 
                         WHERE vl.video_id = ?
                     ''', (video['id'],))
@@ -314,8 +333,7 @@ def api_videos():
                         video['video_lists'] = [
                             {
                                 'type': row[0],
-                                'name': row[0].replace('_', ' ').title(),
-                                'source_path': row[1]
+                                'name': row[0].replace('_', ' ').title()
                             } for row in list_rows
                         ]
             except Exception as e:
@@ -406,7 +424,7 @@ def api_get_video(video_id):
         try:
             with db.get_connection() as conn:
                 cursor = conn.execute('''
-                    SELECT vl.list_type, vl.source_path 
+                    SELECT vl.list_type 
                     FROM video_lists vl 
                     WHERE vl.video_id = ?
                 ''', (video_id,))
@@ -415,8 +433,7 @@ def api_get_video(video_id):
                     video['video_lists'] = [
                         {
                             'type': row[0],
-                            'name': row[0].replace('_', ' ').title(),
-                            'source_path': row[1]
+                            'name': row[0].replace('_', ' ').title()
                         } for row in list_rows
                     ]
         except Exception as e:
@@ -553,7 +570,7 @@ def api_update_video(video_id):
 
 @videos_bp.route('/video/<int:video_id>/open-folder', methods=['POST'])
 def api_open_folder(video_id):
-    """API para abrir la carpeta del video en el explorador"""
+    """API para mostrar y seleccionar el archivo de video en el explorador"""
     try:
         from src.service_factory import get_database
         db = get_database()
@@ -567,18 +584,107 @@ def api_open_folder(video_id):
         
         folder_path = video_path.parent
         
-        # Abrir carpeta según el sistema operativo
+        # Mostrar archivo específico según el sistema operativo
         import platform
         system = platform.system()
         
         if system == "Windows":
-            os.startfile(folder_path)
+            # En Windows, usar método directo y simple que funcione correctamente
+            windows_path = str(video_path).replace('/', '\\')
+            
+            try:
+                # Abrir el explorador con el archivo seleccionado y traer al frente
+                powershell_cmd = f'''
+                # Abrir explorer con el archivo seleccionado
+                Start-Process "explorer.exe" -ArgumentList "/select,`"{windows_path}`""
+                
+                # Esperar un momento para que se abra
+                Start-Sleep -Milliseconds 1000
+                
+                # Traer la ventana del explorador al frente
+                Add-Type @"
+                    using System;
+                    using System.Runtime.InteropServices;
+                    public class Win32 {{
+                        [DllImport("user32.dll")]
+                        public static extern bool SetForegroundWindow(IntPtr hWnd);
+                        [DllImport("user32.dll")]
+                        public static extern IntPtr FindWindow(string lpClassName, string lpWindowName);
+                        [DllImport("user32.dll")]
+                        public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+                    }}
+"@
+                
+                # Buscar y activar la ventana del explorador
+                $shell = New-Object -ComObject Shell.Application
+                $windows = $shell.Windows()
+                foreach ($window in $windows) {{
+                    try {{
+                        if ($window.Document -and $window.Document.Folder.Self.Path -eq "{str(folder_path).replace('/', '\\')}") {{
+                            $hwnd = $window.HWND
+                            [Win32]::ShowWindow($hwnd, 9)  # SW_RESTORE
+                            [Win32]::SetForegroundWindow($hwnd)
+                            break
+                        }}
+                    }} catch {{ }}
+                }}
+                '''
+                
+                subprocess.run([
+                    "powershell.exe", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-Command", powershell_cmd
+                ], creationflags=subprocess.CREATE_NO_WINDOW, timeout=8)
+                
+            except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
+                # Fallback: método estándar simple
+                subprocess.run(["explorer.exe", "/select,", windows_path])
         elif system == "Darwin":  # macOS
-            subprocess.run(["open", folder_path])
+            # En macOS, usar open -R para revelar el archivo en Finder
+            subprocess.run(["open", "-R", str(video_path)])
         else:  # Linux
-            subprocess.run(["xdg-open", folder_path])
+            # En Linux, intentar diferentes gestores de archivos con múltiples métodos
+            file_selected = False
+            
+            # Método 1: Intentar con dbus (Nautilus, Dolphin modernas)
+            try:
+                subprocess.run([
+                    "dbus-send", "--session", "--dest=org.freedesktop.FileManager1",
+                    "--type=method_call", "/org/freedesktop/FileManager1",
+                    "org.freedesktop.FileManager1.ShowItems",
+                    f"array:string:file://{video_path}", "string:"
+                ], check=True, timeout=5)
+                file_selected = True
+            except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
+                pass
+            
+            # Método 2: Intentar con Nautilus directamente
+            if not file_selected:
+                try:
+                    subprocess.run(["nautilus", "--select", str(video_path)], check=True, timeout=5)
+                    file_selected = True
+                except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
+                    pass
+            
+            # Método 3: Intentar con Dolphin
+            if not file_selected:
+                try:
+                    subprocess.run(["dolphin", "--select", str(video_path)], check=True, timeout=5)
+                    file_selected = True
+                except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
+                    pass
+            
+            # Método 4: Intentar con Thunar (XFCE)
+            if not file_selected:
+                try:
+                    subprocess.run(["thunar", str(video_path)], check=True, timeout=5)
+                    file_selected = True
+                except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
+                    pass
+            
+            # Fallback: usar xdg-open en la carpeta
+            if not file_selected:
+                subprocess.run(["xdg-open", str(folder_path)])
         
-        return jsonify({'success': True, 'message': f'Carpeta abierta: {folder_path}'})
+        return jsonify({'success': True, 'message': f'Archivo mostrado: {video_path}'})
         
     except Exception as e:
         logger.error(f"Error abriendo carpeta para video {video_id}: {e}")

@@ -215,7 +215,7 @@ def api_get_creator_videos(creator_name):
             try:
                 with db.get_connection() as conn:
                     cursor = conn.execute('''
-                        SELECT vl.list_type, vl.source_path 
+                        SELECT vl.list_type 
                         FROM video_lists vl 
                         WHERE vl.video_id = ?
                     ''', (video['id'],))
@@ -224,8 +224,7 @@ def api_get_creator_videos(creator_name):
                         video['video_lists'] = [
                             {
                                 'type': row[0],
-                                'name': row[0].replace('_', ' ').title(),
-                                'source_path': row[1]
+                                'name': row[0].replace('_', ' ').title()
                             } for row in list_rows
                         ]
             except Exception as e:
@@ -411,8 +410,9 @@ def api_get_subscription_videos(subscription_type, subscription_id):
         
         # Construir filtros para videos de la suscripción
         query = '''
-            SELECT v.* FROM videos v
+            SELECT v.*, c.name as creator_name FROM videos v
             JOIN subscriptions s ON v.subscription_id = s.id
+            LEFT JOIN creators c ON v.creator_id = c.id
             WHERE s.id = ? AND s.type = ? AND v.deleted_at IS NULL
         '''
         params = [subscription_id, subscription_type]
@@ -438,7 +438,7 @@ def api_get_subscription_videos(subscription_type, subscription_id):
             videos = [dict(row) for row in cursor.fetchall()]
             
             # Contar total
-            count_query = query.replace('SELECT v.*', 'SELECT COUNT(*)').split(' ORDER BY')[0]
+            count_query = query.replace('SELECT v.*, c.name as creator_name', 'SELECT COUNT(*)').split(' ORDER BY')[0]
             count_params = params[:-2] if limit > 0 else params
             cursor = conn.execute(count_query, count_params)
             total_videos = cursor.fetchone()[0]
@@ -481,7 +481,7 @@ def api_get_subscription_videos(subscription_type, subscription_id):
             # Agregar video_lists
             try:
                 cursor = conn.execute('''
-                    SELECT vl.list_type, vl.source_path 
+                    SELECT vl.list_type 
                     FROM video_lists vl 
                     WHERE vl.video_id = ?
                 ''', (video['id'],))
@@ -490,8 +490,7 @@ def api_get_subscription_videos(subscription_type, subscription_id):
                     video['video_lists'] = [
                         {
                             'type': row[0],
-                            'name': row[0].replace('_', ' ').title(),
-                            'source_path': row[1]
+                            'name': row[0].replace('_', ' ').title()
                         } for row in list_rows
                     ]
             except Exception as e:

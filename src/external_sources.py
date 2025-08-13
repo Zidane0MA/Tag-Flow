@@ -361,15 +361,12 @@ class ExternalSourcesManager:
             if 'downloader_data' in video_data and creator_info.get('creator_name'):
                 video_data['downloader_data']['creator_from_downloader'] = creator_info['creator_name']
         else:
-            # Otras plataformas (Facebook, Twitter, etc.): solo URL del video
-            video_data.update({
-                'creator_name': None,
-                'creator_url': None,
-                'subscription_name': None,
-                'subscription_type': None,
-                'subscription_url': None,
-                'list_types': None  # No listas para plataformas secundarias
-            })
+            # Otras plataformas (Facebook, Twitter, etc.): extraer creador de metadata o usar fallback
+            creator_info = self._determine_4k_creator_fallback(metadata, file_path, platform_name)
+            video_data.update(creator_info)
+            # Actualizar creator_from_downloader con el creador determinado
+            if 'downloader_data' in video_data and creator_info.get('creator_name'):
+                video_data['downloader_data']['creator_from_downloader'] = creator_info['creator_name']
         
         return video_data
     
@@ -430,6 +427,52 @@ class ExternalSourcesManager:
             result['subscription_type'] = 'account'
             result['subscription_url'] = result['creator_url']
             result['list_types'] = ['feed']
+        
+        return result
+    
+    def _determine_4k_creator_fallback(self, metadata: Dict, file_path: Path, platform_name: str) -> Dict:
+        """Determinar creador para plataformas no principales (Facebook, Bilibili, etc.)"""
+        result = {
+            'creator_name': None,
+            'creator_url': None,
+            'subscription_name': None,
+            'subscription_type': None,
+            'subscription_url': None,
+            'list_types': ['feed']  # Por defecto
+        }
+        
+        # Obtener nombre del creador desde metadata
+        creator_name = metadata.get('creator_name')
+        
+        # Fallback 1: usar el nombre de la carpeta padre
+        if not creator_name:
+            creator_name = file_path.parent.name
+            # Evitar nombres genéricos de carpetas de aplicaciones
+            if creator_name in ['4K Video Downloader+', '4K Video Downloader', 'Downloads']:
+                creator_name = None
+        
+        # Fallback 2: usar nombre del archivo
+        if not creator_name:
+            creator_name = file_path.stem
+            # Si el nombre del archivo es muy largo o tiene patrones de ID, usar fallback genérico
+            if len(creator_name) > 50 or any(char in creator_name for char in ['_', '-']) and len(creator_name.split('_')) > 3:
+                creator_name = f"Usuario_{platform_name.title()}"
+        
+        # Fallback 3: nombre genérico basado en plataforma
+        if not creator_name:
+            creator_name = f"Usuario_{platform_name.title()}"
+        
+        result['creator_name'] = creator_name
+        
+        # Construir URL del creador si está disponible en metadata
+        if metadata.get('creator_url'):
+            result['creator_url'] = metadata['creator_url']
+        
+        # Para plataformas no principales, usar cuenta como suscripción
+        result['subscription_name'] = creator_name
+        result['subscription_type'] = 'account'
+        result['subscription_url'] = result['creator_url']
+        result['list_types'] = ['feed']
         
         return result
     

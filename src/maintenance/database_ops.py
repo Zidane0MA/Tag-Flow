@@ -1090,8 +1090,8 @@ class DatabaseOperations:
                 validation_stats['existing_files'] = len(all_videos)
                 
             elif platform == 'youtube':
-                all_videos = external_sources.extract_youtube_videos(offset=0, limit=None)
-                validation_stats['existing_files'] = len(all_videos)
+                # Evitar doble extracción - usar estadísticas rápidas desde la BD
+                validation_stats['existing_files'] = 0  # Se calculará desde los videos procesados
             else:
                 return validation_stats
             
@@ -1114,9 +1114,9 @@ class DatabaseOperations:
         print("┌─────────────────────────────┬──────────┐")
         print(f"│ Nuevos videos agregados     │ {result['videos_added']:8} │")
         
-        # Calcular videos ya existentes desde external stats
-        total_processed = validation_stats.get('total_external_records', 0)
-        existing_count = total_processed - result['videos_added']
+        # Calcular videos ya existentes desde external stats (evitar valores negativos)
+        total_processed = validation_stats.get('total_external_records', result['videos_added'])
+        existing_count = max(0, total_processed - result['videos_added'])  # Evitar valores negativos
         print(f"│ Videos ya existentes        │ {existing_count:8} │")
         
         missing_count = validation_stats.get('missing_files', 0)
