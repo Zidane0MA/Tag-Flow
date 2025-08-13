@@ -335,11 +335,11 @@ def api_get_subscription_info(subscription_type, subscription_id):
             
             # Si tiene creator_id, obtener información del creador
             if subscription_info['creator_id']:
-                cursor = conn.execute('SELECT name, display_name FROM creators WHERE id = ?', (subscription_info['creator_id'],))
+                cursor = conn.execute('SELECT name FROM creators WHERE id = ?', (subscription_info['creator_id'],))
                 creator_row = cursor.fetchone()
                 if creator_row:
                     subscription_info['creator'] = creator_row[0]
-                    subscription_info['creatorDisplayName'] = creator_row[1]
+                    subscription_info['creatorDisplayName'] = creator_row[0]  # Usar name como display_name
         
         return jsonify({
             'success': True,
@@ -533,4 +533,171 @@ def api_get_subscription_videos(subscription_type, subscription_id):
         
     except Exception as e:
         logger.error(f"Error obteniendo videos de subscription {subscription_id}: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# ========================================
+# 🆕 ENDPOINTS PARA GESTIÓN DE CUENTAS SECUNDARIAS
+# ========================================
+
+@creators_bp.route('/creator/<int:creator_id>/link-secondary', methods=['POST'])
+def api_link_secondary_account(creator_id):
+    """API endpoint para enlazar cuenta secundaria a creador principal"""
+    try:
+        from src.service_factory import get_database
+        db = get_database()
+        
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'error': 'No data provided'}), 400
+        
+        secondary_creator_id = data.get('secondary_creator_id')
+        alias_type = data.get('alias_type', 'secondary')
+        
+        if not secondary_creator_id:
+            return jsonify({'success': False, 'error': 'secondary_creator_id is required'}), 400
+        
+        # Validar que el alias_type sea válido
+        valid_types = ['secondary', 'collaboration', 'alias']
+        if alias_type not in valid_types:
+            return jsonify({'success': False, 'error': f'alias_type must be one of: {valid_types}'}), 400
+        
+        # Verificar que el creador secundario existe
+        secondary_creator = db.get_creator_by_name("")  # Usar método alternativo
+        with db.get_connection() as conn:
+            cursor = conn.execute('SELECT id, name FROM creators WHERE id = ?', (secondary_creator_id,))
+            secondary_creator = cursor.fetchone()
+            if not secondary_creator:
+                return jsonify({'success': False, 'error': 'Secondary creator not found'}), 404
+        
+        # Enlazar
+        if db.link_creator_as_secondary(secondary_creator_id, creator_id, alias_type):
+            return jsonify({
+                'success': True, 
+                'message': f'Creator {secondary_creator[1]} linked as {alias_type} account'
+            })
+        else:
+            return jsonify({'success': False, 'error': 'Failed to link accounts'}), 400
+        
+    except Exception as e:
+        logger.error(f"Error linking secondary account: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@creators_bp.route('/creator/<int:creator_id>/unlink-secondary', methods=['POST'])
+def api_unlink_secondary_account(creator_id):
+    """API endpoint para desenlazar cuenta secundaria (convertirla en independiente)"""
+    try:
+        from src.service_factory import get_database
+        db = get_database()
+        
+        # Verificar que el creador existe y es secundario
+        with db.get_connection() as conn:
+            cursor = conn.execute('''
+                SELECT id, name, parent_creator_id, is_primary 
+                FROM creators WHERE id = ?
+            ''', (creator_id,))
+            creator = cursor.fetchone()
+            
+            if not creator:
+                return jsonify({'success': False, 'error': 'Creator not found'}), 404
+            
+            if creator[3]:  # is_primary = True
+                return jsonify({'success': False, 'error': 'Cannot unlink primary creator'}), 400
+            
+            if not creator[2]:  # parent_creator_id = None
+                return jsonify({'success': False, 'error': 'Creator is already independent'}), 400
+        
+        # Desenlazar
+        if db.unlink_secondary_creator(creator_id):
+            return jsonify({
+                'success': True, 
+                'message': f'Creator {creator[1]} is now independent'
+            })
+        else:
+            return jsonify({'success': False, 'error': 'Failed to unlink account'}), 400
+        
+    except Exception as e:
+        logger.error(f"Error unlinking secondary account: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@creators_bp.route('/creator/<int:creator_id>/hierarchy')
+def api_get_creator_hierarchy(creator_id):
+    """API endpoint para obtener jerarquía completa de un creador"""
+    try:
+        from src.service_factory import get_database
+        db = get_database()
+        
+        creator_data = db.get_creator_with_secondaries(creator_id)
+        if not creator_data:
+            return jsonify({'success': False, 'error': 'Creator not found'}), 404
+        
+        return jsonify({
+            'success': True,
+            'creator': creator_data
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting creator hierarchy: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@creators_bp.route('/creator/<int:creator_id>/hierarchy/stats')
+def api_get_creator_hierarchy_stats(creator_id):
+    """API endpoint para obtener estadísticas de jerarquía de un creador"""
+    try:
+        from src.service_factory import get_database
+        db = get_database()
+        
+        stats = db.get_creator_hierarchy_stats(creator_id)
+        if not stats:
+            return jsonify({'success': False, 'error': 'Creator not found'}), 404
+        
+        return jsonify({
+            'success': True,
+            'stats': stats
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting creator hierarchy stats: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@creators_bp.route('/creators/search-hierarchy')
+def api_search_creators_with_hierarchy():
+    """API endpoint para buscar creadores incluyendo jerarquía"""
+    try:
+        from src.service_factory import get_database
+        db = get_database()
+        
+        search_term = request.args.get('q', '')
+        if not search_term:
+            return jsonify({'success': False, 'error': 'Search term required'}), 400
+        
+        creators = db.search_creators_with_hierarchy(search_term)
+        
+        return jsonify({
+            'success': True,
+            'creators': creators,
+            'count': len(creators)
+        })
+        
+    except Exception as e:
+        logger.error(f"Error searching creators with hierarchy: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@creators_bp.route('/video/<int:video_id>/primary-creator')
+def api_get_video_primary_creator(video_id):
+    """API endpoint para obtener el creador principal de un video"""
+    try:
+        from src.service_factory import get_database
+        db = get_database()
+        
+        creator_info = db.get_primary_creator_for_video(video_id)
+        if not creator_info:
+            return jsonify({'success': False, 'error': 'Video not found'}), 404
+        
+        return jsonify({
+            'success': True,
+            'creator_info': creator_info
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting primary creator for video: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500

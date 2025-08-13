@@ -191,6 +191,7 @@ class DatabaseOperations:
                             videos_to_update.append(processed_video)
                     else:
                         # Saltar video existente
+                        logger.info(f"➡️ Video ya existe en la base de datos, saltando: {file_path}")
                         continue
                 else:
                     # Insertar video nuevo
@@ -263,8 +264,6 @@ class DatabaseOperations:
                 'file_name': video_data['file_name'],
                 'title': video_data.get('title'),
                 'post_url': video_data.get('post_url'),
-                'external_video_id': video_data.get('external_video_id'),
-                'creator_name': video_data.get('creator_name') or 'Desconocido',  # Mantener para compatibilidad
                 'platform': video_data.get('platform', 'youtube'),
                 'creator_id': creator_id,
                 'subscription_id': subscription_id,

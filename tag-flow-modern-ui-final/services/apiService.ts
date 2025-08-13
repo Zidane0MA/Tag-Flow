@@ -58,7 +58,6 @@ export interface BackendVideo {
   created_at: string;
   last_updated: string;
   post_url?: string;
-  external_video_id?: string;
 }
 
 export interface BackendResponse<T> {

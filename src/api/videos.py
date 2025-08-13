@@ -76,15 +76,15 @@ def process_image_carousels(db, videos, filters=None):
             
             if filters:
                 if filters.get('creator_name'):
-                    # Manejar múltiples creadores separados por comas
+                    # 🚀 OPTIMIZADO: Usar JOIN con creators table
                     creator_names = [name.strip() for name in filters['creator_name'].split(',') if name.strip()]
                     if creator_names:
                         if len(creator_names) == 1:
-                            where_conditions.append("v.creator_name = ?")
+                            where_conditions.append("c.name = ?")
                             params.append(creator_names[0])
                         else:
                             placeholders = ','.join(['?' for _ in creator_names])
-                            where_conditions.append(f"v.creator_name IN ({placeholders})")
+                            where_conditions.append(f"c.name IN ({placeholders})")
                             params.extend(creator_names)
                 if filters.get('platform'):
                     where_conditions.append("v.platform = ?")
@@ -99,22 +99,21 @@ def process_image_carousels(db, videos, filters=None):
                     where_conditions.append("v.difficulty_level = ?")
                     params.append(filters['difficulty_level'])
                 if filters.get('search'):
-                    where_conditions.append("(v.title LIKE ? OR v.file_name LIKE ? OR v.creator_name LIKE ?)")
+                    where_conditions.append("(v.title LIKE ? OR v.file_name LIKE ? OR c.name LIKE ?)")
                     search_term = f"%{filters['search']}%"
                     params.extend([search_term, search_term, search_term])
             
             where_clause = " AND ".join(where_conditions)
             
-            # Buscar SOLO los items de carrusel que están en esta página específica
+            # 🚀 OPTIMIZADO: Buscar SOLO los items de carrusel que están en esta página específica
             video_ids_str = ','.join(str(v['id']) for v in videos)
             query = f'''
-                SELECT v.id, dm.external_metadata
+                SELECT v.id, dm.carousel_base_id, dm.carousel_order
                 FROM videos v
+                LEFT JOIN creators c ON v.creator_id = c.id
                 JOIN downloader_mapping dm ON v.id = dm.video_id
                 WHERE v.id IN ({video_ids_str})
-                AND dm.external_metadata IS NOT NULL
-                AND (dm.external_metadata LIKE '%"is_carousel_item":true%' 
-                     OR dm.external_metadata LIKE '%"is_carousel_item": true%')
+                AND dm.is_carousel_item = TRUE
             '''
             
             cursor = conn.execute(query)
@@ -123,16 +122,12 @@ def process_image_carousels(db, videos, filters=None):
             
             for row in cursor:
                 try:
-                    video_id, metadata_json = row[0], row[1]
-                    metadata = json.loads(metadata_json) if metadata_json else {}
+                    video_id, carousel_base_id, carousel_order = row[0], row[1], row[2]
                     
-                    if metadata.get('is_carousel_item'):
-                        relative_path = metadata.get('relative_path', '')
-                        if '_index_' in relative_path:
-                            base_id = relative_path.split('_index_')[0]
-                            page_carousel_groups[base_id] = True
+                    if carousel_base_id:  # Si tiene base_id, es parte de un carrusel
+                        page_carousel_groups[carousel_base_id] = True
                 except Exception as e:
-                    logger.warning(f"Error procesando metadata para video {row[0]}: {e}")
+                    logger.warning(f"Error procesando carrusel para video {row[0]}: {e}")
                     continue
             
             # Ahora obtener TODOS los items de los carruseles que están en esta página
@@ -140,36 +135,32 @@ def process_image_carousels(db, videos, filters=None):
             
             if page_carousel_groups:
                 for base_id in page_carousel_groups.keys():
-                    escaped_base_id = base_id.replace("'", "''")  # Escape single quotes
+                    # 🚀 OPTIMIZADO: Usar columnas específicas con JOIN a creators
                     query = f'''
-                        SELECT v.id, dm.external_metadata
+                        SELECT v.id, dm.carousel_base_id, dm.carousel_order
                         FROM videos v
+                        LEFT JOIN creators c ON v.creator_id = c.id
                         JOIN downloader_mapping dm ON v.id = dm.video_id
                         WHERE {where_clause}
-                        AND dm.external_metadata IS NOT NULL
-                        AND dm.external_metadata LIKE '%"{escaped_base_id}_index_%'
+                        AND dm.carousel_base_id = ?
+                        AND dm.is_carousel_item = TRUE
                     '''
                     
-                    cursor = conn.execute(query, params)
+                    cursor = conn.execute(query, params + [base_id])
                     
                     for row in cursor:
                         try:
-                            video_id, metadata_json = row[0], row[1]
-                            metadata = json.loads(metadata_json) if metadata_json else {}
+                            video_id, carousel_base_id, carousel_order = row[0], row[1], row[2]
                             
-                            if metadata.get('is_carousel_item'):
-                                relative_path = metadata.get('relative_path', '')
-                                if '_index_' in relative_path:
-                                    carousel_base_id = relative_path.split('_index_')[0]
-                                    if carousel_base_id == base_id:
-                                        if carousel_base_id not in all_carousel_groups:
-                                            all_carousel_groups[carousel_base_id] = []
-                                        all_carousel_groups[carousel_base_id].append({
-                                            'video_id': video_id,
-                                            'order': metadata.get('carousel_order', 0)
-                                        })
+                            if carousel_base_id == base_id:
+                                if carousel_base_id not in all_carousel_groups:
+                                    all_carousel_groups[carousel_base_id] = []
+                                all_carousel_groups[carousel_base_id].append({
+                                    'video_id': video_id,
+                                    'order': carousel_order or 0
+                                })
                         except Exception as e:
-                            logger.warning(f"Error procesando metadata para video {row[0]}: {e}")
+                            logger.warning(f"Error procesando carrusel para video {row[0]}: {e}")
                             continue
         
         # Solo mantener carruseles con múltiples items

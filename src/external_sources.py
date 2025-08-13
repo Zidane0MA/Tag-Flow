@@ -332,13 +332,15 @@ class ExternalSourcesManager:
             'title': row['video_title'] or file_path.stem,
             'post_url': row['video_url'],
             'platform': self._normalize_platform_name(row['platform']) or 'youtube',
-            'external_video_id': self._extract_video_id_from_url(row['video_url']),
             
             # Datos del downloader
             'downloader_data': {
                 'download_item_id': row['download_id'],
                 'external_db_source': '4k_video',
-                'external_metadata': json.dumps(metadata)
+                'creator_from_downloader': None,  # Se actualizará después según el creador determinado
+                'is_carousel_item': False,  # YouTube no tiene carruseles típicamente
+                'carousel_order': None,
+                'carousel_base_id': None
             }
         }
         
@@ -349,6 +351,9 @@ class ExternalSourcesManager:
             # YouTube: crear estructura completa
             creator_info = self._determine_4k_creator_and_subscription(metadata, file_path)
             video_data.update(creator_info)
+            # Actualizar creator_from_downloader con el creador determinado
+            if 'downloader_data' in video_data and creator_info.get('creator_name'):
+                video_data['downloader_data']['creator_from_downloader'] = creator_info['creator_name']
         else:
             # Otras plataformas (Facebook, Twitter, etc.): solo URL del video
             video_data.update({
@@ -587,20 +592,16 @@ class ExternalSourcesManager:
             'title': row['video_title'] or file_path.stem,  # Usar description como título
             'post_url': post_url,  # URL del post según especificación
             'platform': 'tiktok',
-            'external_video_id': row['tiktok_id'],
             'content_type': 'video' if is_video else 'image',
             
             # Datos del downloader
             'downloader_data': {
                 'download_item_id': row['media_id'],
                 'external_db_source': '4k_tokkit',
-                'external_metadata': json.dumps({
-                    'subscription_id': str(row['subscriptionDatabaseId']) if row['subscriptionDatabaseId'] else None,
-                    'author_name': row['authorName'],
-                    'relative_path': row['relativePath'],
-                    'is_carousel_item': '_index_' in str(row['tiktok_id']),
-                    'carousel_order': self._extract_carousel_order(str(row['tiktok_id']))
-                })
+                'creator_from_downloader': row['authorName'],
+                'is_carousel_item': '_index_' in str(row['tiktok_id']),
+                'carousel_order': self._extract_carousel_order(str(row['tiktok_id'])) if '_index_' in str(row['tiktok_id']) else None,
+                'carousel_base_id': str(row['tiktok_id']).split('_index_')[0] if '_index_' in str(row['tiktok_id']) else None
             }
         }
         
@@ -773,9 +774,10 @@ class ExternalSourcesManager:
             # Procesar cada publicación (puede tener múltiples archivos)
             for web_url, post_rows in posts_by_url.items():
                 try:
-                    post_data = self._process_stogram_post_with_carousel(post_rows, instagram_base)
-                    if post_data:
-                        content.append(post_data)
+                    post_data_list = self._process_stogram_post_with_carousel(post_rows, instagram_base)
+                    if post_data_list:
+                        # Ahora post_data_list es una lista, agregar cada elemento individualmente
+                        content.extend(post_data_list)
                 except Exception as e:
                     logger.error(f"Error procesando post Instagram {web_url}: {e}")
                     continue
@@ -835,39 +837,37 @@ class ExternalSourcesManager:
         if valid_files_count == 0:
             return None
         
-        # Usar el primer archivo válido como archivo principal
-        main_file = media_files[0]
+        # Crear una entrada por cada archivo del carrusel
+        all_posts = []
+        is_carousel = len(media_files) > 1
         
-        # Datos básicos de la publicación
-        post_data = {
-            'file_path': main_file['file_path'],
-            'file_name': main_file['file_name'],
-            'title': main_row['title'] or Path(main_file['file_path']).stem,
-            'post_url': main_row['web_url'],  # URL del post de Instagram
-            'platform': 'instagram',
-            'external_video_id': str(main_row['photo_id']),
-            
-            # Datos del downloader con información de carrusel
-            'downloader_data': {
-                'download_item_id': main_row['photo_id'],
-                'external_db_source': '4k_stogram',
-                'external_metadata': json.dumps({
-                    'subscription_id': str(main_row['subscriptionId']) if main_row['subscriptionId'] else None,
-                    'owner_name': main_row['ownerName'],
-                    'relative_path': main_row['relative_path'],
-                    'is_video': main_row['is_video'],
-                    'is_carousel': len(media_files) > 1,
-                    'carousel_files': media_files,
-                    'total_files': len(media_files)
-                })
+        for idx, media_file in enumerate(media_files):
+            # Datos básicos de la publicación para cada archivo
+            post_data = {
+                'file_path': media_file['file_path'],
+                'file_name': media_file['file_name'],
+                'title': main_row['title'] or Path(media_file['file_path']).stem,
+                'post_url': main_row['web_url'],  # URL del post de Instagram
+                'platform': 'instagram',
+                
+                # Datos del downloader con información de carrusel
+                'downloader_data': {
+                    'download_item_id': media_file['photo_id'],  # Usar el photo_id específico del archivo
+                    'external_db_source': '4k_stogram',
+                    'creator_from_downloader': main_row['ownerName'],
+                    'is_carousel_item': is_carousel,
+                    'carousel_order': idx if is_carousel else None,  # Solo para carruseles
+                    'carousel_base_id': main_row['web_url'] if is_carousel else None  # Solo para carruseles
+                }
             }
-        }
+            
+            # Determinar creador y suscripción según especificación
+            creator_info = self._determine_stogram_creator_and_subscription(main_row, Path(media_file['file_path']))
+            post_data.update(creator_info)
+            
+            all_posts.append(post_data)
         
-        # Determinar creador y suscripción según especificación
-        creator_info = self._determine_stogram_creator_and_subscription(main_row, Path(main_file['file_path']))
-        post_data.update(creator_info)
-        
-        return post_data
+        return all_posts
     
     def _determine_stogram_creator_and_subscription(self, row, file_path: Path) -> Dict:
         """Determinar creador y suscripción para Instagram según especificación exacta"""
