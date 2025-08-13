@@ -253,7 +253,8 @@ Ejemplos de uso:
         )
         
         if result['success']:
-            logger.info(f"✅ Base de datos poblada exitosamente: {result.get('message', 'Completado')}")
+            # El reporte profesional ya se mostró, no necesitamos log adicional
+            logger.debug(f"✅ Base de datos poblada exitosamente: {result.get('message', 'Completado')}")
         else:
             logger.error(f"❌ Error poblando base de datos: {result.get('error', 'Error desconocido')}")
     

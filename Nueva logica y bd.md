@@ -122,7 +122,7 @@ La app agrupa los videos de diferentes maneras:
     Nota:
     - Como no se puede asociar la publicaciones con el tipo directamente desde la bd, se tendra que usar el campo `file` que los agrupa correctamente.
     - Para las imagenes no me fio de file por lo que sera mejor comprobar la extension desde `file`.
-    - Como sabes instagram tambien maneja publicaciones tipo carrusel/múltiple, la unica forma de saber que imagenes son parte de una misma publicacion es con el campo `web_url`.
+    - Como sabes instagram tambien maneja publicaciones tipo carrusel/múltiple, la unica forma de saber que imagenes son parte de una misma publicacion es con el campo `web_url`, para saber el orden solo tenemos photos.id de menor a mayor.
 
 ## Consideraciones:
 1. `python -X utf8 main.py populate-db --source db --platform youtube --limit 5` debe extraer los videos de la app de 4k con plataforma youtube, sean de listas o individuales. 

@@ -47,9 +47,9 @@ class ExternalSourcesManager:
             control_chars = [char for char in path_str if ord(char) < 32 and char not in '\t\n\r']
             if control_chars:
                 logger.warning(f"Caracteres de control detectados en EXTERNAL_YOUTUBE_DB: {[hex(ord(c)) for c in control_chars]}")
-            logger.info(f"YouTube DB configurada: {self.external_youtube_db.exists()}")
-            logger.info(f"TikTok DB configurada: {self.tiktok_db_path.exists()}")
-            logger.info(f"Instagram DB configurada: {self.instagram_db_path.exists()}")
+            logger.debug(f"YouTube DB configurada: {self.external_youtube_db.exists()}")
+            logger.debug(f"TikTok DB configurada: {self.tiktok_db_path.exists()}")
+            logger.debug(f"Instagram DB configurada: {self.instagram_db_path.exists()}")
         
         # Rutas de las carpetas organizadas (desde config)
         self.organized_base_path = config.ORGANIZED_BASE_PATH
@@ -322,6 +322,12 @@ class ExternalSourcesManager:
         if not file_path or file_path.suffix.lower() not in self.video_extensions:
             return None
         
+        # ✅ NUEVO: Verificar que el archivo realmente existe
+        if not file_path.exists():
+            logger.warning(f"⚠️ Archivo no existe (eliminado manualmente?): {file_path}")
+            logger.info(f"   📍 URL: {row.get('video_url', 'URL no disponible')}")
+            return None
+        
         # Procesar metadata
         metadata = self._parse_4k_metadata(row['metadata_concat'])
         
@@ -470,9 +476,9 @@ class ExternalSourcesManager:
         Solo incluye videos que han sido descargados (downloaded=1)
         """
         if limit is not None:
-            logger.info(f"Extrayendo videos de TikTok descargados (offset: {offset}, limit: {limit})...")
+            logger.debug(f"Extrayendo videos de TikTok descargados (offset: {offset}, limit: {limit})...")
         else:
-            logger.info("Extrayendo videos de TikTok descargados...")
+            logger.debug("Extrayendo videos de TikTok descargados...")
         videos = []
 
         conn = self._get_connection(self.tiktok_db_path)
@@ -482,26 +488,52 @@ class ExternalSourcesManager:
         try:
             # Query completa con datos de suscripción según especificación
             if limit is not None:
-                query = """
-                SELECT 
-                    mi.databaseId as media_id,
-                    mi.subscriptionDatabaseId,
-                    mi.id as tiktok_id,
-                    mi.authorName,
-                    mi.description as video_title,
-                    mi.relativePath,
-                    
-                    s.type as subscription_type,
-                    s.name as subscription_name,
-                    s.id as subscription_external_id
-                    
+                # Para asegurar integridad de carruseles de TikTok, primero obtenemos los base_ids únicos
+                # con el límite aplicado, luego obtenemos todos los elementos de esos carruseles
+                base_id_query = """
+                SELECT DISTINCT 
+                    CASE 
+                        WHEN mi.id LIKE '%_index_%' THEN SUBSTR(mi.id, 1, INSTR(mi.id, '_index_') - 1)
+                        ELSE mi.id
+                    END as base_id
                 FROM MediaItems mi
-                LEFT JOIN Subscriptions s ON mi.subscriptionDatabaseId = s.databaseId
                 WHERE mi.relativePath IS NOT NULL
-                ORDER BY mi.databaseId DESC
+                GROUP BY base_id
+                ORDER BY MIN(mi.databaseId) DESC
                 LIMIT ? OFFSET ?
                 """
-                cursor = conn.execute(query, (limit, offset))
+                base_id_cursor = conn.execute(base_id_query, (limit, offset))
+                base_ids = [row[0] for row in base_id_cursor.fetchall()]
+                
+                if not base_ids:
+                    rows = []
+                else:
+                    # Ahora obtenemos todos los elementos de esos carruseles/posts específicos
+                    base_id_placeholders = ','.join(['?' for _ in base_ids])
+                    query = f"""
+                    SELECT 
+                        mi.databaseId as media_id,
+                        mi.subscriptionDatabaseId,
+                        mi.id as tiktok_id,
+                        mi.authorName,
+                        mi.description as video_title,
+                        mi.relativePath,
+                        
+                        s.type as subscription_type,
+                        s.name as subscription_name,
+                        s.id as subscription_external_id
+                        
+                    FROM MediaItems mi
+                    LEFT JOIN Subscriptions s ON mi.subscriptionDatabaseId = s.databaseId
+                    WHERE mi.relativePath IS NOT NULL
+                    AND (
+                        (mi.id LIKE '%_index_%' AND SUBSTR(mi.id, 1, INSTR(mi.id, '_index_') - 1) IN ({base_id_placeholders}))
+                        OR (mi.id NOT LIKE '%_index_%' AND mi.id IN ({base_id_placeholders}))
+                    )
+                    ORDER BY mi.databaseId DESC
+                    """
+                    cursor = conn.execute(query, base_ids + base_ids)
+                    rows = cursor.fetchall()
             else:
                 query = """
                 SELECT 
@@ -523,8 +555,7 @@ class ExternalSourcesManager:
                 LIMIT -1 OFFSET ?
                 """
                 cursor = conn.execute(query, (offset,))
-            
-            rows = cursor.fetchall()
+                rows = cursor.fetchall()
             
             # Obtener ruta base de TikTok
             if not self.tiktok_db_path:
@@ -533,16 +564,36 @@ class ExternalSourcesManager:
             
             tiktok_base = Path(self.tiktok_db_path).parent  # D:/4K Tokkit/data.sqlite -> D:/4K Tokkit
             
+            # Track statistics
+            processed_count = 0
+            valid_count = 0
+            missing_files_count = 0
+            
             for row in rows:
                 try:
+                    processed_count += 1
                     video_data = self._process_tokkit_row_with_structure(row, tiktok_base)
                     if video_data:
                         videos.append(video_data)
+                        valid_count += 1
+                    else:
+                        # Si video_data es None, significa que el archivo no existe
+                        missing_files_count += 1
                 except Exception as e:
                     logger.error(f"Error procesando fila TikTok {row['media_id']}: {e}")
                     continue
             
-            logger.info(f"✓ Extraídos {len(videos)} videos de TikTok desde BD (solo descargados)")
+            logger.debug(f"✓ Extraídos {valid_count} videos de TikTok desde BD (solo descargados)")
+            if missing_files_count > 0:
+                logger.debug(f"⚠️ {missing_files_count} archivos no encontrados (eliminados manualmente?)")
+            logger.debug(f"📊 Procesados: {processed_count}, Válidos: {valid_count}, Archivos faltantes: {missing_files_count}")
+            
+            # Guardar estadísticas para el resumen profesional
+            self._last_tiktok_stats = {
+                'processed': processed_count,
+                'valid': valid_count,
+                'missing': missing_files_count
+            }
             
         except Exception as e:
             logger.error(f"Error extrayendo videos de TikTok: {e}")
@@ -562,8 +613,10 @@ class ExternalSourcesManager:
             
         file_path = tiktok_base / relative_path
         
-        # Verificar que sea video y exista - también incluir imágenes para carruseles
+        # ✅ Verificar que el archivo exista ANTES de verificar tipo
         if not file_path.exists():
+            logger.debug(f"⚠️ Archivo no existe (eliminado manualmente?): {file_path}")
+            logger.debug(f"   📍 URL: https://www.tiktok.com/@{row['authorName']}/video/{row['tiktok_id']}")
             return None
             
         # Aceptar tanto videos como imágenes (para carruseles de TikTok)
@@ -700,9 +753,9 @@ class ExternalSourcesManager:
     def extract_instagram_content(self, offset: int = 0, limit: int = None) -> List[Dict]:
         """🆕 NUEVA ESTRUCTURA: Extraer contenido de Instagram desde 4K Stogram con soporte completo"""
         if limit is not None:
-            logger.info(f"Extrayendo contenido de Instagram (offset: {offset}, limit: {limit})...")
+            logger.debug(f"Extrayendo contenido de Instagram (offset: {offset}, limit: {limit})...")
         else:
-            logger.info("Extrayendo contenido de Instagram...")
+            logger.debug("Extrayendo contenido de Instagram...")
         content = []
         
         conn = self._get_connection(self.instagram_db_path)
@@ -712,26 +765,45 @@ class ExternalSourcesManager:
         try:
             # Query completa con JOIN para obtener datos de suscripción
             if limit is not None:
-                query = """
-                SELECT 
-                    p.id as photo_id,
-                    p.subscriptionId,
-                    p.web_url,
-                    p.title,
-                    p.file as relative_path,
-                    p.is_video,
-                    p.ownerName,
-                    
-                    s.type as subscription_type,
-                    s.display_name as subscription_display_name
-                    
+                # Para asegurar integridad de carruseles, primero obtenemos las URLs de posts únicos
+                # con el limite aplicado, luego obtenemos todas las fotos de esos posts
+                url_query = """
+                SELECT DISTINCT p.web_url
                 FROM photos p
-                LEFT JOIN subscriptions s ON p.subscriptionId = s.id
                 WHERE p.file IS NOT NULL AND p.state = 4
-                ORDER BY p.web_url, p.id DESC
+                GROUP BY p.web_url
+                ORDER BY MIN(p.id) ASC
                 LIMIT ? OFFSET ?
                 """
-                cursor = conn.execute(query, (limit, offset))
+                url_cursor = conn.execute(url_query, (limit, offset))
+                urls = [row[0] for row in url_cursor.fetchall()]
+                
+                if not urls:
+                    rows = []
+                else:
+                    # Ahora obtenemos todas las fotos de esos posts específicos
+                    url_placeholders = ','.join(['?' for _ in urls])
+                    query = f"""
+                    SELECT 
+                        p.id as photo_id,
+                        p.subscriptionId,
+                        p.web_url,
+                        p.title,
+                        p.file as relative_path,
+                        p.is_video,
+                        p.ownerName,
+                        
+                        s.type as subscription_type,
+                        s.display_name as subscription_display_name
+                        
+                    FROM photos p
+                    LEFT JOIN subscriptions s ON p.subscriptionId = s.id
+                    WHERE p.file IS NOT NULL AND p.state = 4 
+                    AND p.web_url IN ({url_placeholders})
+                    ORDER BY p.web_url, p.id ASC
+                    """
+                    cursor = conn.execute(query, urls)
+                    rows = cursor.fetchall()
             else:
                 query = """
                 SELECT 
@@ -749,12 +821,11 @@ class ExternalSourcesManager:
                 FROM photos p
                 LEFT JOIN subscriptions s ON p.subscriptionId = s.id
                 WHERE p.file IS NOT NULL AND p.state = 4
-                ORDER BY p.web_url, p.id DESC
+                ORDER BY p.web_url, p.id ASC
                 LIMIT -1 OFFSET ?
                 """
                 cursor = conn.execute(query, (offset,))
-            
-            rows = cursor.fetchall()
+                rows = cursor.fetchall()
             
             # Obtener ruta base de Instagram
             if not self.instagram_db_path:
@@ -782,7 +853,7 @@ class ExternalSourcesManager:
                     logger.error(f"Error procesando post Instagram {web_url}: {e}")
                     continue
             
-            logger.info(f"✓ Extraídos {len(content)} posts de Instagram desde BD")
+            logger.debug(f"✓ Extraídos {len(content)} posts de Instagram desde BD")
             
         except Exception as e:
             logger.error(f"Error extrayendo contenido de Instagram: {e}")
@@ -815,6 +886,8 @@ class ExternalSourcesManager:
             
             # Verificar que el archivo exista
             if not file_path.exists():
+                logger.warning(f"⚠️ Archivo de Instagram no existe (eliminado manualmente?): {file_path}")
+                logger.info(f"   📍 URL: {row.get('web_url', 'URL no disponible')}")
                 continue
             
             # Determinar tipo de archivo
@@ -1204,7 +1277,7 @@ class ExternalSourcesManager:
             # Extraer de cada plataforma según disponibilidad
             for platform_name in platforms_to_extract:
                 platform_offset = get_dynamic_offset(platform_name)
-                logger.info(f"🔍 Extrayendo videos de {platform_name.title()} (offset: {platform_offset})...")
+                logger.debug(f"🔍 Extrayendo videos de {platform_name.title()} (offset: {platform_offset})...")
                 
                 if platform_name == 'tiktok':
                     # TikTok usa 4K Tokkit
@@ -1243,7 +1316,7 @@ class ExternalSourcesManager:
             logger.info(f"🔢 Aplicando límite final: {len(unique_videos)} -> {limit} videos")
             unique_videos = unique_videos[:limit]
         
-        logger.info(f"Total de videos únicos extraídos: {len(unique_videos)}")
+        logger.debug(f"Total de videos únicos extraídos: {len(unique_videos)}")
         return unique_videos
     
     def get_available_platforms(self) -> Dict[str, Dict]:

@@ -238,7 +238,7 @@ class DatabaseManager:
             conn.execute('CREATE INDEX IF NOT EXISTS idx_downloader_mapping_carousel_base ON downloader_mapping(carousel_base_id)')
             
             conn.commit()
-            logger.info("Base de datos inicializada correctamente")
+            logger.debug("Base de datos inicializada correctamente")
     
     def add_video(self, video_data: Dict) -> int:
         """Agregar nuevo video a la base de datos (con resolución automática de creator_id)"""
@@ -372,7 +372,7 @@ class DatabaseManager:
                             logger.debug(f"🎠 CAROUSEL DEBUG - File: {video_data.get('file_name')}, is_carousel: {is_carousel_item}, order: {carousel_order}, base_id: {carousel_base_id}")
                             
                             if is_carousel_item:
-                                logger.info(f"✅ CAROUSEL DETECTED - File: {video_data.get('file_name')}, order: {carousel_order}, base_id: {carousel_base_id}")
+                                logger.debug(f"✅ CAROUSEL DETECTED - File: {video_data.get('file_name')}, order: {carousel_order}, base_id: {carousel_base_id}")
                             
                             conn.execute('''
                                 INSERT INTO downloader_mapping (
@@ -400,7 +400,7 @@ class DatabaseManager:
                                 ''', (video_id, list_type))
                     
                     successful = len(video_ids)
-                    logger.info(f"Inserción por lotes exitosa: {successful} videos")
+                    logger.debug(f"Inserción por lotes exitosa: {successful} videos")
                 
                 conn.commit()
                 
@@ -1118,9 +1118,9 @@ class DatabaseManager:
             creator_id = cursor.lastrowid
             
             if parent_creator_id:
-                logger.info(f"Creador secundario creado con ID {creator_id}: {name} (padre: {parent_creator_id}, tipo: {alias_type})")
+                logger.debug(f"Creador secundario creado con ID {creator_id}: {name} (padre: {parent_creator_id}, tipo: {alias_type})")
             else:
-                logger.info(f"Creador principal creado con ID {creator_id}: {name}")
+                logger.debug(f"Creador principal creado con ID {creator_id}: {name}")
             return creator_id
     
     def get_creator_by_name(self, name: str) -> Optional[Dict]:
@@ -1164,7 +1164,7 @@ class DatabaseManager:
                     INSERT OR REPLACE INTO creator_urls (creator_id, platform, url)
                     VALUES (?, ?, ?)
                 ''', (creator_id, platform, url))
-                logger.info(f"URL agregada para creador {creator_id} en {platform}: {url}")
+                logger.debug(f"URL agregada para creador {creator_id} en {platform}: {url}")
                 return True
         except Exception as e:
             logger.error(f"Error agregando URL de creador: {e}")
@@ -1381,7 +1381,7 @@ class DatabaseManager:
                 VALUES (?, ?, ?, ?, ?)
             ''', (name, type, platform, creator_id, subscription_url))
             subscription_id = cursor.lastrowid
-            logger.info(f"Suscripción creada con ID {subscription_id}: {name} ({type})")
+            logger.debug(f"Suscripción creada con ID {subscription_id}: {name} ({type})")
             return subscription_id
     
     def get_subscription_by_name_and_platform(self, name: str, platform: str, type: str = None) -> Optional[Dict]:

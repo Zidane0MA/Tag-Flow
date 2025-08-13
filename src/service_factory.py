@@ -44,9 +44,9 @@ class ServiceFactory:
         if service_name not in cls._instances:
             with cls._locks[service_name]:
                 if service_name not in cls._instances:
-                    logger.info(f"🚀 Inicializando servicio: {service_name}")
+                    logger.debug(f"🚀 Inicializando servicio: {service_name}")
                     cls._instances[service_name] = cls._factories[service_name]()
-                    logger.info(f"✅ Servicio inicializado: {service_name}")
+                    logger.debug(f"✅ Servicio inicializado: {service_name}")
         
         return cls._instances[service_name]
     

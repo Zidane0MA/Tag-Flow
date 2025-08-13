@@ -99,7 +99,7 @@ class DatabaseOperations:
             external_sources = self.external_sources
             
             # La base de datos se inicializa automáticamente con la nueva estructura
-            logger.info("✅ Base de datos inicializada con nueva estructura")
+            logger.debug("✅ Base de datos inicializada con nueva estructura")
             
             # Obtener videos desde fuentes externas
             all_videos = external_sources.get_all_videos_from_source(
@@ -141,7 +141,10 @@ class DatabaseOperations:
             if stats['errors']:
                 result['error_details'] = stats['errors'][:5]  # Primeros 5 errores
             
-            logger.info(f"✅ {result['message']} (tiempo: {execution_time:.2f}s)")
+            # Generar reporte profesional
+            validation_stats = self._validate_external_files(source, platform)
+            self._print_professional_summary(result, validation_stats, platform.upper(), execution_time)
+            
             return result
             
         except Exception as e:
@@ -170,7 +173,7 @@ class DatabaseOperations:
         creator_cache = {}  # {name: creator_id}
         subscription_cache = {}  # {(name, platform, type): subscription_id}
         
-        logger.info(f"📊 Procesando {len(all_videos)} videos con nueva estructura")
+        logger.debug(f"📊 Procesando {len(all_videos)} videos con nueva estructura")
         
         # Verificar existencia de videos
         file_paths = [video['file_path'] for video in all_videos]
@@ -190,8 +193,8 @@ class DatabaseOperations:
                         if processed_video:
                             videos_to_update.append(processed_video)
                     else:
-                        # Saltar video existente
-                        logger.info(f"➡️ Video ya existe en la base de datos, saltando: {file_path}")
+                        # Saltar video existente (log debug para evitar ruido)
+                        logger.debug(f"➡️ Video ya existe en la base de datos, saltando: {file_path}")
                         continue
                 else:
                     # Insertar video nuevo
@@ -214,7 +217,7 @@ class DatabaseOperations:
             try:
                 added, failed = self.db.batch_insert_videos(videos_to_insert, force=False)
                 videos_added = added
-                logger.info(f"✅ Insertados {added} videos nuevos (fallidos: {failed})")
+                logger.debug(f"✅ Insertados {added} videos nuevos (fallidos: {failed})")
             except Exception as e:
                 logger.error(f"Error en inserción en lote: {e}")
                 stats['errors'].append(f"Batch insert error: {e}")
@@ -223,7 +226,7 @@ class DatabaseOperations:
             try:
                 # TODO: Implementar batch update con nueva estructura
                 videos_updated = len(videos_to_update)
-                logger.info(f"✅ Actualizados {videos_updated} videos existentes")
+                logger.debug(f"✅ Actualizados {videos_updated} videos existentes")
             except Exception as e:
                 logger.error(f"Error en actualización en lote: {e}")
                 stats['errors'].append(f"Batch update error: {e}")
@@ -1055,7 +1058,88 @@ class DatabaseOperations:
         """Aplicar migración específica"""
         # Implementar aplicación de migraciones
         pass
-
+    
+    def _validate_external_files(self, source: str, platform: str) -> Dict:
+        """Validar todos los archivos de la BD externa contando también archivos faltantes"""
+        validation_stats = {
+            'total_external_records': 0,
+            'existing_files': 0,
+            'missing_files': 0,
+            'missing_details': []
+        }
+        
+        try:
+            from src.service_factory import ServiceFactory
+            external_sources = ServiceFactory.get_service('external_sources')
+            
+            # Obtener estadísticas del último escaneo guardadas por external_sources
+            if platform == 'tiktok':
+                all_videos = external_sources.extract_tiktok_videos(offset=0, limit=None)
+                validation_stats['existing_files'] = len(all_videos)
+                
+                # Obtener estadísticas detalladas si están disponibles
+                if hasattr(external_sources, '_last_tiktok_stats'):
+                    stats = external_sources._last_tiktok_stats
+                    validation_stats['total_external_records'] = stats['processed']
+                    validation_stats['missing_files'] = stats['missing']
+                else:
+                    validation_stats['total_external_records'] = len(all_videos)
+                
+            elif platform == 'instagram':
+                all_videos = external_sources.extract_instagram_content(offset=0, limit=None)
+                validation_stats['existing_files'] = len(all_videos)
+                
+            elif platform == 'youtube':
+                all_videos = external_sources.extract_youtube_videos(offset=0, limit=None)
+                validation_stats['existing_files'] = len(all_videos)
+            else:
+                return validation_stats
+            
+            # Nota: Los archivos faltantes ya se reportan en los logs de external_sources
+            # Esta función se enfoca en dar un resumen limpio al usuario
+            validation_stats['total_external_records'] = validation_stats['existing_files']
+            
+        except Exception as e:
+            logger.error(f"Error en validación de archivos: {e}")
+        
+        return validation_stats
+    
+    def _print_professional_summary(self, result: Dict, validation_stats: Dict, platform: str, execution_time: float):
+        """Imprimir resumen profesional del poblado"""
+        
+        # Limpiar logs anteriores del terminal (solo mostrar resumen final)
+        print(f"\n✅ POBLADO COMPLETADO EXITOSAMENTE")
+        
+        print(f"\n📊 RESUMEN DE POBLADO - {platform}")
+        print("┌─────────────────────────────┬──────────┐")
+        print(f"│ Nuevos videos agregados     │ {result['videos_added']:8} │")
+        
+        # Calcular videos ya existentes desde external stats
+        total_processed = validation_stats.get('total_external_records', 0)
+        existing_count = total_processed - result['videos_added']
+        print(f"│ Videos ya existentes        │ {existing_count:8} │")
+        
+        missing_count = validation_stats.get('missing_files', 0)
+        print(f"│ Archivos no encontrados     │ {missing_count:8} │")
+        print(f"│ Total procesado             │ {total_processed:8} │")
+        print("└─────────────────────────────┴──────────┘")
+        
+        # Información adicional
+        if result['creators_created'] > 0:
+            print(f"\n👤 Creadores nuevos: {result['creators_created']}")
+        if result['subscriptions_created'] > 0:
+            print(f"📋 Suscripciones nuevas: {result['subscriptions_created']}")
+        
+        # Advertencias importantes
+        if missing_count > 0:
+            print(f"\n⚠️  ARCHIVOS FALTANTES DETECTADOS: {missing_count}")
+            print("    (Archivos registrados en BD externa pero no existen en disco)")
+        
+        # Errores si los hay
+        if result.get('errors', 0) > 0:
+            print(f"\n❌ Errores encontrados: {result['errors']}")
+        
+        print(f"\n⏱️  Tiempo de ejecución: {execution_time:.2f}s\n")
 
 # Funciones de conveniencia para compatibilidad
 def populate_database(source: str = 'all', platform: Optional[str] = None, 
