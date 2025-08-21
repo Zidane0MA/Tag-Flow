@@ -44,7 +44,7 @@ Problemas con el poblado de la base de datos:
 
 - En tiktok un creador sin contenido propio (no figura en la tabla de creadores), se le asiga un creador_id no relacionado.
 
-
+- shorts de youtube, encontrar solucion.
 
 
 ## CASO: 4k Tokkit (Solo Tiktok)
