@@ -125,10 +125,47 @@ class DownloaderIntegration:
                 SELECT 
                     di.id,
                     di.filename AS file_path,
-                    mim.value AS creator_name
+                    mid.title,
+                    ud.service_name,
+                    ud.url,
+                    -- Obtener información del creador (type 0)
+                    creator_meta.value AS creator_name,
+                    creator_url.value AS creator_url,
+                    -- Obtener información de playlist/subscription (type 3,4,5,6,7)
+                    playlist_name.value AS playlist_name,
+                    playlist_url.value AS playlist_url,
+                    subscription_info.value AS subscription_uuid,
+                    -- Determinar tipo de suscripción basado en los types presentes
+                    -- PRIORIDAD: playlist_subscription > creator_subscription > individual_video
+                    CASE 
+                        -- 🎯 PLAYLIST SUBSCRIPTION: Videos que pertenecen a una playlist específica (likes, etc.)
+                        WHEN playlist_name.value IS NOT NULL THEN 'playlist_subscription'
+                        -- 🎯 CREATOR SUBSCRIPTION: Videos que pertenecen a una suscripción de canal específico
+                        WHEN creator_channel_name.value IS NOT NULL THEN 'creator_subscription'  
+                        -- 🎯 INDIVIDUAL VIDEO: Videos descargados individualmente
+                        ELSE 'individual_video'
+                    END AS video_source_type
                 FROM download_item di
-                LEFT JOIN media_item_metadata mim
-                    ON di.id = mim.download_item_id AND mim.type = 0
+                LEFT JOIN media_item_description mid ON di.id = mid.download_item_id
+                LEFT JOIN url_description ud ON mid.id = ud.media_item_description_id
+                -- Información del creador (type 0,1)
+                LEFT JOIN media_item_metadata creator_meta 
+                    ON di.id = creator_meta.download_item_id AND creator_meta.type = 0
+                LEFT JOIN media_item_metadata creator_url 
+                    ON di.id = creator_url.download_item_id AND creator_url.type = 1
+                -- Información de playlist subscription (type 3,4)
+                LEFT JOIN media_item_metadata playlist_name 
+                    ON di.id = playlist_name.download_item_id AND playlist_name.type = 3
+                LEFT JOIN media_item_metadata playlist_url 
+                    ON di.id = playlist_url.download_item_id AND playlist_url.type = 4
+                -- Información de creator subscription (type 5,6)
+                LEFT JOIN media_item_metadata creator_channel_name 
+                    ON di.id = creator_channel_name.download_item_id AND creator_channel_name.type = 5
+                LEFT JOIN media_item_metadata creator_channel_url 
+                    ON di.id = creator_channel_url.download_item_id AND creator_channel_url.type = 6
+                -- UUID de suscripción (type 7)
+                LEFT JOIN media_item_metadata subscription_info 
+                    ON di.id = subscription_info.download_item_id AND subscription_info.type = 7
                 WHERE di.filename IS NOT NULL
                     AND di.filename != ''
                 ORDER BY di.id DESC
@@ -166,16 +203,25 @@ class DownloaderIntegration:
                 logger.debug(f"Video ya existe en BD: {file_path_obj.name}")
                 return False
             
+            # Determinar y crear/buscar la suscripción correcta
+            subscription_id = self._get_or_create_subscription(download_item)
+            
             # Preparar datos para inserción
             video_data = {
                 'file_path': str(file_path_obj),
                 'file_name': file_path_obj.name,
+                'title': download_item['title'] if 'title' in download_item.keys() else file_path_obj.stem,
                 'creator_name': self._extract_creator_name(download_item),
                 'platform': self._detect_platform(download_item),
+                'post_url': download_item['url'] if 'url' in download_item.keys() else None,
                 'file_size': download_item['file_size'] if 'file_size' in download_item.keys() else None,
                 'duration_seconds': download_item['duration'] if 'duration' in download_item.keys() else None,
                 'processing_status': 'pendiente'
             }
+            
+            # Agregar subscription_id si se encontró/creó una suscripción
+            if subscription_id:
+                video_data['subscription_id'] = subscription_id
             
             # Insertar en BD
             video_id = self.db.add_video(video_data)
@@ -185,21 +231,213 @@ class DownloaderIntegration:
             with db_conn:
                 db_conn.execute("""
                     INSERT INTO downloader_mapping 
-                    (video_id, download_item_id, original_filename, creator_from_downloader)
-                    VALUES (?, ?, ?, ?)
+                    (video_id, download_item_id, original_filename, creator_from_downloader, external_db_source)
+                    VALUES (?, ?, ?, ?, ?)
                 """, (
                     video_id,
                     download_item['id'],
                     download_item['title'] if 'title' in download_item.keys() else '',
-                    download_item['creator_name'] if 'creator_name' in download_item.keys() else ''
+                    download_item['creator_name'] if 'creator_name' in download_item.keys() else '',
+                    '4k_video'  # Source identifier
                 ))
         
-            logger.info(f"Video importado desde 4K Downloader: {file_path_obj.name}")
+            subscription_info = f" (Suscripción ID: {subscription_id})" if subscription_id else ""
+            logger.info(f"Video importado desde 4K Downloader: {file_path_obj.name}{subscription_info}")
             return True
             
         except Exception as e:
             logger.error(f"Error procesando item de descarga: {e}")
             return False
+    
+    def _get_or_create_subscription(self, download_item: sqlite3.Row) -> Optional[int]:
+        """Buscar o crear la suscripción correcta basada en el tipo de fuente y retornar su ID"""
+        try:
+            video_source_type = download_item['video_source_type'] if 'video_source_type' in download_item.keys() else 'individual_video'
+            platform = self._detect_platform(download_item)
+            
+            # Videos individuales no tienen suscripción específica
+            if video_source_type == 'individual_video':
+                return None
+            
+            subscription_name = None
+            subscription_type = None
+            creator_id = None
+            subscription_url = None
+            
+            if video_source_type == 'playlist_subscription':
+                # Para suscripciones de playlist (likes, etc.)
+                playlist_name = download_item['playlist_name'] if 'playlist_name' in download_item.keys() else None
+                if playlist_name:
+                    subscription_name = playlist_name.strip()
+                    # 🔄 NORMALIZAR nombres equivalentes para usar un nombre preferido
+                    if subscription_name in ['Liked videos', 'Videos que me gustan']:
+                        subscription_name = 'Liked videos'  # Usar nombre en inglés como preferido
+                else:
+                    # Fallback: extraer desde la ruta del archivo
+                    file_path = download_item['file_path'] if 'file_path' in download_item.keys() else ''
+                    if file_path:
+                        path_obj = Path(file_path)
+                        if len(path_obj.parts) >= 2:
+                            subscription_name = path_obj.parts[-2]  # Directorio padre
+                    
+                    if not subscription_name:
+                        return None  # No crear suscripción si no se puede determinar
+                
+                # 🚫 VERIFICAR: No crear suscripciones para playlists que son solo videos individuales
+                if not self._is_valid_playlist_subscription(subscription_name, platform):
+                    logger.debug(f"Omitiendo suscripción de playlist para video individual: {subscription_name}")
+                    return None
+                
+                subscription_type = 'playlist'
+                subscription_url = download_item['playlist_url'] if 'playlist_url' in download_item.keys() else None
+            
+            elif video_source_type == 'creator_subscription':
+                # Para suscripciones de creador (SOLO para videos que NO pertenecen a playlists)
+                creator_name = self._extract_creator_name(download_item)
+                
+                # 🚫 VERIFICAR: Solo crear suscripciones de creador si hay múltiples videos del mismo creador
+                # Y el creador NO es parte de videos de playlist
+                if not self._is_valid_creator_subscription(creator_name, platform):
+                    logger.debug(f"Omitiendo suscripción de creador para video individual: {creator_name}")
+                    return None
+                
+                subscription_name = creator_name  # Usar solo el nombre del creador
+                subscription_type = 'account'
+                subscription_url = download_item['creator_url'] if 'creator_url' in download_item.keys() else None
+                
+                # Buscar creator_id si existe
+                creator = self.db.get_creator_by_name(creator_name)
+                if creator:
+                    creator_id = creator['id']
+            
+            if not subscription_name:
+                return None
+            
+            # Buscar suscripción existente
+            existing_subscription = self._find_existing_subscription(subscription_name, subscription_type, platform, creator_id)
+            if existing_subscription:
+                return existing_subscription['id']
+            
+            # Crear nueva suscripción solo si es válida
+            return self._create_subscription(subscription_name, subscription_type, platform, creator_id, subscription_url)
+                
+        except Exception as e:
+            logger.warning(f"Error gestionando suscripción: {e}")
+            return None
+    
+    def _is_valid_playlist_subscription(self, playlist_name: str, platform: str) -> bool:
+        """Verificar si una playlist tiene múltiples videos y merece ser una suscripción"""
+        try:
+            # Verificar si ya hay videos en la BD con esta playlist (en la ruta)
+            # o si hay múltiples items en 4K Downloader con el mismo playlist_name
+            with self.get_downloader_connection() as conn:
+                if not conn:
+                    return False
+                
+                # Contar cuántos videos hay con este nombre de playlist en 4K Downloader
+                cursor = conn.execute("""
+                    SELECT COUNT(DISTINCT di.id)
+                    FROM download_item di
+                    LEFT JOIN media_item_metadata mim ON di.id = mim.download_item_id AND mim.type = 3
+                    WHERE mim.value = ? OR di.filename LIKE ?
+                """, (playlist_name, f"%{playlist_name}%"))
+                
+                count = cursor.fetchone()[0] if cursor.fetchone() else 0
+                
+                # Solo crear suscripción si hay 2 o más videos
+                return count >= 2
+                
+        except Exception as e:
+            logger.debug(f"Error verificando playlist válida: {e}")
+            # En caso de error, ser conservador y no crear la suscripción
+            return False
+    
+    def _is_valid_creator_subscription(self, creator_name: str, platform: str) -> bool:
+        """Verificar si un creador tiene múltiples videos Y NO es parte de playlists"""
+        try:
+            with self.get_downloader_connection() as conn:
+                if not conn:
+                    return False
+                
+                # Verificar si este creador tiene videos que NO pertenecen a playlists
+                cursor = conn.execute("""
+                    SELECT COUNT(DISTINCT di.id) as total_videos,
+                           COUNT(DISTINCT CASE WHEN playlist_meta.value IS NULL THEN di.id END) as non_playlist_videos
+                    FROM download_item di
+                    LEFT JOIN media_item_metadata creator_meta ON di.id = creator_meta.download_item_id AND creator_meta.type = 0
+                    LEFT JOIN media_item_metadata playlist_meta ON di.id = playlist_meta.download_item_id AND playlist_meta.type = 3
+                    WHERE creator_meta.value = ?
+                """, (creator_name,))
+                
+                row = cursor.fetchone()
+                if not row:
+                    return False
+                
+                total_videos = row[0]
+                non_playlist_videos = row[1]
+                
+                # Solo crear suscripción si:
+                # 1. Tiene 3+ videos en total del creador
+                # 2. Al menos 2 videos NO pertenecen a playlists
+                return total_videos >= 3 and non_playlist_videos >= 2
+                
+        except Exception as e:
+            logger.debug(f"Error verificando creador válido: {e}")
+            return False
+    
+    def _find_existing_subscription(self, name: str, subscription_type: str, platform: str, creator_id: Optional[int]) -> Optional[Dict]:
+        """Buscar suscripción existente, incluyendo búsqueda por UUID para playlists"""
+        try:
+            with self.db.get_connection() as conn:
+                # Para playlists, buscar también por UUID equivalente
+                if subscription_type == 'playlist':
+                    # Nombres equivalentes para la misma playlist
+                    equivalent_names = []
+                    if name in ['Liked videos', 'Videos que me gustan']:
+                        equivalent_names = ['Liked videos', 'Videos que me gustan']
+                    else:
+                        equivalent_names = [name]
+                    
+                    placeholders = ','.join(['?' for _ in equivalent_names])
+                    cursor = conn.execute(f"""
+                        SELECT * FROM subscriptions 
+                        WHERE name IN ({placeholders}) AND type = ? AND platform = ? AND creator_id IS NULL
+                        LIMIT 1
+                    """, equivalent_names + [subscription_type, platform])
+                else:
+                    # Para creators, búsqueda normal
+                    if creator_id:
+                        cursor = conn.execute("""
+                            SELECT * FROM subscriptions 
+                            WHERE name = ? AND type = ? AND platform = ? AND creator_id = ?
+                        """, (name, subscription_type, platform, creator_id))
+                    else:
+                        cursor = conn.execute("""
+                            SELECT * FROM subscriptions 
+                            WHERE name = ? AND type = ? AND platform = ? AND creator_id IS NULL
+                        """, (name, subscription_type, platform))
+                
+                row = cursor.fetchone()
+                return dict(row) if row else None
+        except Exception as e:
+            logger.error(f"Error buscando suscripción: {e}")
+            return None
+    
+    def _create_subscription(self, name: str, subscription_type: str, platform: str, creator_id: Optional[int], subscription_url: Optional[str]) -> Optional[int]:
+        """Crear nueva suscripción y retornar su ID"""
+        try:
+            with self.db.get_connection() as conn:
+                cursor = conn.execute("""
+                    INSERT INTO subscriptions (name, type, platform, creator_id, subscription_url)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (name, subscription_type, platform, creator_id, subscription_url))
+                
+                subscription_id = cursor.lastrowid
+                logger.info(f"Nueva suscripción creada: {name} (ID: {subscription_id})")
+                return subscription_id
+        except Exception as e:
+            logger.error(f"Error creando suscripción: {e}")
+            return None
     
     def _extract_creator_name(self, download_item: sqlite3.Row) -> str:
         """Extraer nombre del creador desde los datos de descarga"""

@@ -388,7 +388,7 @@ class ExternalSourcesManager:
         return metadata
     
     def _determine_4k_creator_and_subscription(self, metadata: Dict, file_path: Path) -> Dict:
-        """Determinar creador y suscripción para 4K Video Downloader"""
+        """Determinar creador y suscripción para 4K Video Downloader con lógica corregida"""
         result = {
             'creator_name': None,
             'creator_url': None,
@@ -398,34 +398,54 @@ class ExternalSourcesManager:
             'list_types': ['feed']  # Por defecto
         }
         
-        # Obtener nombre del creador
+        # Obtener información de los metadata
         creator_name = metadata.get('creator_name')
+        playlist_name = metadata.get('playlist_name')
+        channel_name = metadata.get('channel_name')
+        
+        # Fallback para el creador si no está en metadata
         if not creator_name:
-            # Fallback: usar el nombre de la carpeta padre
             creator_name = file_path.parent.name
             if creator_name in ['4K Video Downloader+', '4K Video Downloader']:
-                creator_name = file_path.stem  # Usar nombre del archivo
+                creator_name = file_path.stem
         
         result['creator_name'] = creator_name
         
-        # Construir URL del creador (por ahora solo YouTube)
+        # Construir URL del creador
         if metadata.get('creator_url'):
             result['creator_url'] = metadata['creator_url']
         elif creator_name:
             result['creator_url'] = f"https://www.youtube.com/@{creator_name}"
         
-        # Determinar tipo de suscripción
-        if metadata.get('playlist_name'):
-            # Es una playlist
-            result['subscription_name'] = metadata['playlist_name']
+        # 🎯 LÓGICA CORREGIDA: Priorizar playlist sobre creator
+        # PRIORIDAD: playlist_subscription > creator_subscription > individual_video
+        
+        if playlist_name:
+            # 🎯 PLAYLIST SUBSCRIPTION: Videos que pertenecen a una playlist específica (likes, etc.)
+            # Normalizar nombres equivalentes
+            normalized_playlist = playlist_name.strip()
+            if normalized_playlist in ['Liked videos', 'Videos que me gustan']:
+                normalized_playlist = 'Liked videos'  # Usar nombre en inglés como preferido
+            
+            result['subscription_name'] = normalized_playlist
             result['subscription_type'] = 'playlist'
             result['subscription_url'] = metadata.get('playlist_url')
             result['list_types'] = ['playlist']
-        else:
-            # Es canal/cuenta principal
-            result['subscription_name'] = creator_name
+            
+        elif channel_name:
+            # 🎯 CREATOR SUBSCRIPTION: Videos que pertenecen a una suscripción de canal específico
+            # Solo crear si NO es parte de una playlist
+            result['subscription_name'] = channel_name
             result['subscription_type'] = 'account'
-            result['subscription_url'] = result['creator_url']
+            result['subscription_url'] = metadata.get('channel_url')
+            result['list_types'] = ['feed']
+            
+        else:
+            # 🎯 INDIVIDUAL VIDEO: Videos descargados individualmente
+            # NO crear suscripción para videos individuales
+            result['subscription_name'] = None
+            result['subscription_type'] = None
+            result['subscription_url'] = None
             result['list_types'] = ['feed']
         
         return result
@@ -444,23 +464,11 @@ class ExternalSourcesManager:
         # Obtener nombre del creador desde metadata
         creator_name = metadata.get('creator_name')
         
-        # Fallback 1: usar el nombre de la carpeta padre
+        # 🚫 NO usar nombre del archivo o carpeta como creador
+        # Para videos sin creador definido, usar un nombre genérico unificado
         if not creator_name:
-            creator_name = file_path.parent.name
-            # Evitar nombres genéricos de carpetas de aplicaciones
-            if creator_name in ['4K Video Downloader+', '4K Video Downloader', 'Downloads']:
-                creator_name = None
-        
-        # Fallback 2: usar nombre del archivo
-        if not creator_name:
-            creator_name = file_path.stem
-            # Si el nombre del archivo es muy largo o tiene patrones de ID, usar fallback genérico
-            if len(creator_name) > 50 or any(char in creator_name for char in ['_', '-']) and len(creator_name.split('_')) > 3:
-                creator_name = f"Usuario_{platform_name.title()}"
-        
-        # Fallback 3: nombre genérico basado en plataforma
-        if not creator_name:
-            creator_name = f"Usuario_{platform_name.title()}"
+            # 🎯 NOMBRE GENÉRICO UNIFICADO para todos los videos sin creador
+            creator_name = "Creador Desconocido"
         
         result['creator_name'] = creator_name
         
@@ -468,11 +476,11 @@ class ExternalSourcesManager:
         if metadata.get('creator_url'):
             result['creator_url'] = metadata['creator_url']
         
-        # Para plataformas no principales, usar cuenta como suscripción
-        result['subscription_name'] = creator_name
-        result['subscription_type'] = 'account'
-        result['subscription_url'] = result['creator_url']
-        result['list_types'] = ['feed']
+        # 🚫 NO crear suscripciones para videos individuales de otras plataformas
+        # Estos videos se pueden organizar manualmente desde el frontend
+        result['subscription_name'] = None
+        result['subscription_type'] = None
+        result['subscription_url'] = None
         
         return result
     
