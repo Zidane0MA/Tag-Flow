@@ -18,6 +18,16 @@ class YouTube4KHandler(DatabaseExtractor):
     
     def __init__(self, db_path: Optional[Path] = None):
         super().__init__(db_path)
+        
+        # 🚀 CACHE EN MEMORIA: Pre-computar mapeos para ultra-velocidad
+        self._resolution_cache = self._build_resolution_cache()
+        
+        # 🚀 Cache de prepared statements para ultra-velocidad
+        self._prepared_statements_cache = {
+            'main_query': None,
+            'platform_filter': None
+        }
+        
         self.platform_mapping = {
             'youtube': 'youtube',
             'facebook': 'facebook',
@@ -79,126 +89,102 @@ class YouTube4KHandler(DatabaseExtractor):
             return platforms
     
     def extract_videos(self, offset: int = 0, limit: Optional[int] = None) -> List[Dict]:
-        """🆕 NUEVA ESTRUCTURA: Extraer videos de 4K Video Downloader con soporte completo"""
-        self.logger.info("Extrayendo videos de 4K Video Downloader con nueva estructura...")
-        videos = []
-        
+        """🚀 Extract videos ultra-fast con todas las optimizaciones posibles"""
         if not self.is_available():
-            return videos
+            return []
         
         try:
-            # Query completa para obtener todos los metadatos necesarios
-            query = """
-            SELECT 
-                di.id as download_id,
-                di.filename as file_path,
-                mid.title as video_title,
-                ud.service_name as platform,
-                ud.url as video_url,
-                
-                -- Metadatos del creador y playlist
-                GROUP_CONCAT(
-                    CASE 
-                        WHEN mim.type = 0 THEN 'creator_name:' || mim.value
-                        WHEN mim.type = 1 THEN 'creator_url:' || mim.value  
-                        WHEN mim.type = 3 THEN 'playlist_name:' || mim.value
-                        WHEN mim.type = 4 THEN 'playlist_url:' || mim.value
-                        WHEN mim.type = 5 THEN 'channel_name:' || mim.value
-                        WHEN mim.type = 6 THEN 'channel_url:' || mim.value
-                        WHEN mim.type = 7 THEN 'subscription_info:' || mim.value
-                    END, '|||'
-                ) as metadata_concat
-                
-            FROM download_item di
-            LEFT JOIN media_item_description mid ON di.id = mid.download_item_id
-            LEFT JOIN url_description ud ON mid.id = ud.media_item_description_id
-            LEFT JOIN media_item_metadata mim ON di.id = mim.download_item_id
-            WHERE di.filename IS NOT NULL
-            GROUP BY di.id, di.filename, mid.title, ud.service_name, ud.url
-            ORDER BY di.id
-            """
+            # 🚀 USAR PREPARED STATEMENT CACHEADO
+            query_key = 'main_query'
+            if self._prepared_statements_cache[query_key] is None:
+                # Preparar query una sola vez con estructura correcta de 4K Video Downloader
+                self._prepared_statements_cache[query_key] = '''
+                    SELECT 
+                        di.id as download_id,
+                        di.filename as file_path,
+                        mid.title as video_title,
+                        ud.service_name as platform,
+                        ud.url as video_url,
+                        mid.duration as duration_ms,
+                        vi.dimension as dimension_code,
+                        vi.resolution as resolution_code,
+                        vi.fps as fps,
+                        di.id as created_at
+                    FROM download_item di
+                    LEFT JOIN media_item_description mid ON di.id = mid.download_item_id
+                    LEFT JOIN url_description ud ON mid.id = ud.media_item_description_id
+                    LEFT JOIN media_info mi ON di.id = mi.download_item_id
+                    LEFT JOIN video_info vi ON mi.id = vi.media_info_id
+                    WHERE di.filename IS NOT NULL
+                    ORDER BY di.id DESC
+                '''
             
+            main_query = self._prepared_statements_cache[query_key]
+            
+            # Añadir paginación
             if limit:
-                query += f" LIMIT {limit} OFFSET {offset}"
+                main_query += f' LIMIT {limit}'
+            if offset > 0:
+                main_query += f' OFFSET {offset}'
             
-            rows = self._execute_query(query)
+            return self._process_videos_ultra_fast(main_query, [])
+        except Exception as e:
+            self.logger.error(f"Error en extract_videos optimized: {e}")
+            return []
+    
+    def extract_by_platform(self, platform: str, offset: int = 0, limit: Optional[int] = None) -> List[Dict]:
+        """🚀 Extract videos by platform ultra-fast con todas las optimizaciones"""
+        if not self.is_available() or not platform:
+            return []
+        
+        try:
+            # 🚀 Construir condición de plataforma
+            platform_condition, platform_params = self._build_platform_condition(platform)
             
-            for row in rows:
-                video_data = self._process_4k_video_row(row)
-                if video_data:
-                    videos.append(video_data)
+            # 🚀 USAR PREPARED STATEMENT CACHEADO para plataforma
+            query_key = f'platform_{platform.lower()}'
+            if query_key not in self._prepared_statements_cache:
+                # Preparar query específica para esta plataforma con estructura correcta
+                self._prepared_statements_cache[query_key] = f'''
+                    SELECT 
+                        di.id as download_id,
+                        di.filename as file_path,
+                        mid.title as video_title,
+                        ud.service_name as platform,
+                        ud.url as video_url,
+                        mid.duration as duration_ms,
+                        vi.dimension as dimension_code,
+                        vi.resolution as resolution_code,
+                        vi.fps as fps,
+                        di.id as created_at
+                    FROM download_item di
+                    LEFT JOIN media_item_description mid ON di.id = mid.download_item_id
+                    LEFT JOIN url_description ud ON mid.id = ud.media_item_description_id
+                    LEFT JOIN media_info mi ON di.id = mi.download_item_id
+                    LEFT JOIN video_info vi ON mi.id = vi.media_info_id
+                    WHERE di.filename IS NOT NULL
+                        AND {platform_condition}
+                    ORDER BY di.id DESC
+                '''
             
-            self.logger.info(f"Extraídos {len(videos)} videos de 4K Video Downloader")
-            return videos
+            main_query = self._prepared_statements_cache[query_key]
+            
+            # Añadir paginación
+            if limit:
+                main_query += f' LIMIT {limit}'
+            if offset > 0:
+                main_query += f' OFFSET {offset}'
+            
+            return self._process_videos_ultra_fast(main_query, platform_params)
             
         except Exception as e:
-            self.logger.error(f"Error extrayendo videos de 4K Video Downloader: {e}")
-            return videos
+            self.logger.error(f"Error en extract_by_platform {platform}: {e}")
+            return []
     
-    def extract_by_platform(self, platform_filter: str, offset: int = 0, limit: Optional[int] = None) -> List[Dict]:
-        """Extraer videos filtrados por plataforma específica"""
-        self.logger.info(f"Extrayendo videos de 4K Video Downloader - Plataforma: {platform_filter}")
-        videos = []
-        
-        if not self.is_available():
-            return videos
-        
+    def _process_4k_video_row(self, row, file_existence_cache: Dict[str, bool] = None) -> Optional[Dict]:
+        """🚀 Procesar una fila de video de 4K Video Downloader con cache de existencia"""
         try:
-            # Build platform filter condition based on platform_filter
-            platform_condition, platform_params = self._build_platform_condition(platform_filter)
-            
-            # Query similar pero con filtro de plataforma mejorado
-            query = f"""
-            SELECT 
-                di.id as download_id,
-                di.filename as file_path,
-                mid.title as video_title,
-                ud.service_name as platform,
-                ud.url as video_url,
-                
-                GROUP_CONCAT(
-                    CASE 
-                        WHEN mim.type = 0 THEN 'creator_name:' || mim.value
-                        WHEN mim.type = 1 THEN 'creator_url:' || mim.value  
-                        WHEN mim.type = 3 THEN 'playlist_name:' || mim.value
-                        WHEN mim.type = 4 THEN 'playlist_url:' || mim.value
-                        WHEN mim.type = 5 THEN 'channel_name:' || mim.value
-                        WHEN mim.type = 6 THEN 'channel_url:' || mim.value
-                        WHEN mim.type = 7 THEN 'subscription_info:' || mim.value
-                    END, '|||'
-                ) as metadata_concat
-                
-            FROM download_item di
-            LEFT JOIN media_item_description mid ON di.id = mid.download_item_id
-            LEFT JOIN url_description ud ON mid.id = ud.media_item_description_id
-            LEFT JOIN media_item_metadata mim ON di.id = mim.download_item_id
-            WHERE di.filename IS NOT NULL 
-            AND {platform_condition}
-            GROUP BY di.id, di.filename, mid.title, ud.service_name, ud.url
-            ORDER BY di.id
-            """
-            
-            if limit:
-                query += f" LIMIT {limit} OFFSET {offset}"
-            
-            rows = self._execute_query(query, platform_params)
-            
-            for row in rows:
-                video_data = self._process_4k_video_row(row)
-                if video_data:
-                    videos.append(video_data)
-            
-            self.logger.info(f"Extraídos {len(videos)} videos de {platform_filter}")
-            return videos
-            
-        except Exception as e:
-            self.logger.error(f"Error extrayendo videos de {platform_filter}: {e}")
-            return videos
-    
-    def _process_4k_video_row(self, row) -> Optional[Dict]:
-        """Procesar una fila de video de 4K Video Downloader"""
-        try:
-            file_path_str = self._safe_str(row['file_path'])
+            file_path_str = self._safe_str(row[1])  # row[1] = file_path (acceso directo por índice)
             if not file_path_str:
                 return None
             
@@ -206,8 +192,8 @@ class YouTube4KHandler(DatabaseExtractor):
             if not file_path.exists():
                 return None
             
-            # Parsear metadatos
-            metadata_concat = self._safe_str(row['metadata_concat'])
+            # 🚀 ULTRA-FAST: Acceso directo por índices
+            metadata_concat = self._safe_str(row[9])  # row[9] = metadata_concat
             metadata = self._parse_4k_metadata(metadata_concat)
             
             # Determinar creador y suscripción
@@ -226,9 +212,9 @@ class YouTube4KHandler(DatabaseExtractor):
             video_data = {
                 'file_path': str(file_path),
                 'file_name': file_path.name,
-                'title': self._safe_str(row['video_title']) or file_path.stem,
-                'platform': self._normalize_platform_name(self._safe_str(row['platform'])),
-                'post_url': self._safe_str(row['video_url']),  # Cambiar video_url -> post_url para consistencia
+                'title': self._safe_str(row[2]) or file_path.stem,  # row[2] = video_title
+                'platform': self._normalize_platform_name(self._safe_str(row[3])),  # row[3] = platform
+                'post_url': self._safe_str(row[4]),  # row[4] = video_url
                 'source': 'db',
                 
                 # Información del creador y suscripción
@@ -241,7 +227,7 @@ class YouTube4KHandler(DatabaseExtractor):
                 
                 # Datos del downloader - CRÍTICO para batch_insert_videos
                 'downloader_data': {
-                    'download_item_id': row['download_id'],
+                    'download_item_id': row[0],  # row[0] = download_id
                     'external_db_source': '4k_video',
                     'creator_from_downloader': creator_subscription_data.get('creator_name'),
                     'is_carousel_item': False,  # YouTube no tiene carruseles típicamente
@@ -255,12 +241,12 @@ class YouTube4KHandler(DatabaseExtractor):
                 'playlist_name': metadata.get('playlist_name'),
                 'playlist_url': metadata.get('playlist_url'),
                 
-                # Información de archivo
-                'file_size': file_path.stat().st_size if file_path.exists() else 0,
+                # 🚀 ULTRA-FAST: Usar cache de existencia pre-computado
+                'file_size': self._get_file_size_cached(file_path_str, file_existence_cache),
                 
-                # 🚀 OPTIMIZACIÓN: Obtener duración directamente de 4K DB (100x más rápido)
-                'duration_seconds': self._get_duration_from_db(row['download_id']),
-                'video_dimensions': self._get_dimensions_from_db(row['download_id']),
+                # 🚀 OPTIMIZACIÓN ULTRA: Usar datos que ya vienen en la query principal (0 queries adicionales)
+                'duration_seconds': self._process_duration_optimized(row),
+                'video_dimensions': self._process_dimensions_optimized(row),
             }
             
             return video_data
@@ -608,6 +594,117 @@ class YouTube4KHandler(DatabaseExtractor):
         
         return resolution_map.get(resolution_code)
     
+    def _build_resolution_cache(self) -> Dict[int, Dict]:
+        """🚀 Pre-computar cache de resoluciones con dimensiones calculadas para ultra-velocidad"""
+        cache = {}
+        
+        # Mapeo base + cálculos pre-computados
+        resolution_map = {
+            5: {'width': 640, 'height': 360},    # 360p
+            6: {'width': 854, 'height': 480},    # 480p  
+            7: {'width': 1280, 'height': 720},   # 720p (videos largos)
+            8: {'width': 1080, 'height': 1920},  # 1080p vertical (Shorts)
+            9: {'width': 1440, 'height': 1080},  # 1080p+ (some vertical)
+            10: {'width': 1920, 'height': 1080}, # 1080p horizontal (Videos)
+            11: {'width': 2560, 'height': 1440}, # 1440p
+        }
+        
+        # Pre-computar todos los cálculos
+        for code, dims in resolution_map.items():
+            width, height = dims['width'], dims['height']
+            aspect_ratio = width / height
+            cache[code] = {
+                'width': width,
+                'height': height,
+                'aspect_ratio': aspect_ratio,
+                'is_vertical': width < height
+            }
+        
+        return cache
+    
+    def _decode_resolution_code_ultra_fast(self, resolution_code: int) -> Optional[Dict]:
+        """🚀 Decodificación ultra-rápida usando cache pre-computado"""
+        return self._resolution_cache.get(resolution_code)
+    
+    def _batch_check_file_existence(self, file_paths: List[str]) -> Dict[str, bool]:
+        """🚀 Verificar existencia de archivos en batch para ultra-velocidad"""
+        try:
+            from pathlib import Path
+            import os
+            
+            existence_cache = {}
+            
+            # Batch check usando os.path.exists (más rápido que Path.exists())
+            for file_path_str in file_paths:
+                if file_path_str:
+                    existence_cache[file_path_str] = os.path.exists(file_path_str)
+                else:
+                    existence_cache[file_path_str] = False
+            
+            return existence_cache
+            
+        except Exception as e:
+            self.logger.debug(f"Error in batch file existence check: {e}")
+            # Fallback: asumir que todos existen
+            return {path: True for path in file_paths}
+    
+    def _get_file_size_cached(self, file_path_str: str, file_existence_cache: Dict[str, bool] = None) -> int:
+        """🚀 Obtener file_size usando cache de existencia"""
+        try:
+            # Si tenemos cache de existencia, usarlo
+            if file_existence_cache and file_path_str in file_existence_cache:
+                if file_existence_cache[file_path_str]:
+                    from pathlib import Path
+                    return Path(file_path_str).stat().st_size
+                else:
+                    return 0
+            
+            # Fallback: verificación directa
+            from pathlib import Path
+            file_path = Path(file_path_str)
+            return file_path.stat().st_size if file_path.exists() else 0
+            
+        except Exception:
+            return 0
+    
+    def _process_duration_optimized(self, row) -> Optional[int]:
+        """🚀 Procesar duración de datos que ya vienen en la query principal"""
+        try:
+            # Los datos ya vienen del JOIN en la query principal (sqlite3.Row)
+            duration_ms = row[5] if len(row) > 5 else None  # duration_ms está en posición 5
+            return duration_ms if duration_ms else None  # Mantener en ms según modificación previa
+        except Exception as e:
+            self.logger.debug(f"Error processing duration: {e}")
+            return None
+    
+    def _process_dimensions_optimized(self, row) -> Optional[Dict]:
+        """🚀 Procesar dimensiones de datos que ya vienen en la query principal"""
+        try:
+            # Los datos ya vienen del JOIN en la query principal (sqlite3.Row)
+            # Posiciones: 5=duration_ms, 6=dimension_code, 7=resolution_code, 8=fps
+            dimension_code = row[6] if len(row) > 6 else None
+            resolution_code = row[7] if len(row) > 7 else None 
+            fps = row[8] if len(row) > 8 else None
+            
+            if resolution_code is not None:
+                # 🚀 ULTRA-FAST: Cache lookup sin cálculos adicionales
+                cached_dims = self._decode_resolution_code_ultra_fast(resolution_code)
+                
+                if cached_dims:
+                    return {
+                        'width': cached_dims['width'],
+                        'height': cached_dims['height'], 
+                        'aspect_ratio': cached_dims['aspect_ratio'],  # Pre-computado
+                        'is_vertical': cached_dims['is_vertical'],    # Pre-computado
+                        'fps': fps,
+                        'resolution_code': resolution_code,
+                        'dimension_code': dimension_code
+                    }
+            return None
+        except Exception as e:
+            self.logger.debug(f"Error processing dimensions: {e}")
+            return None
+    
     def _build_platform_condition(self, platform_filter: str) -> Tuple[str, List[str]]:
         """Build SQL condition for platform filtering"""
         platform_lower = platform_filter.lower()
@@ -622,3 +719,117 @@ class YouTube4KHandler(DatabaseExtractor):
         else:
             # Exact match for other platforms
             return "LOWER(ud.service_name) = LOWER(?)", [platform_filter]
+    
+    def _process_videos_ultra_fast(self, query: str, params: List) -> List[Dict]:
+        """🚀 Procesar videos con optimizaciones extremas para sub-1ms por video"""
+        try:
+            conn = self._get_connection(self.db_path)
+            if not conn:
+                return []
+            
+            with conn:
+                # 🚀 ULTRA-OPTIMIZATION: Usar cursor con arraysize para mejor rendimiento
+                cursor = conn.execute(query, params)
+                cursor.arraysize = 1000  # Fetch en chunks grandes
+                
+                rows = cursor.fetchall()
+                
+                if not rows:
+                    return []
+                
+                # 🚀 STAGE 1: Pre-allocate lists con tamaño conocido para evitar resize
+                row_count = len(rows)
+                file_paths = [None] * row_count
+                
+                # 🚀 STAGE 2: Build file paths con minimal string operations
+                for i, row in enumerate(rows):
+                    # Con la nueva estructura: row[1] = di.filename (que es el path completo)
+                    file_path_str = row[1]  # di.filename ya es el path completo
+                    if file_path_str:
+                        file_paths[i] = file_path_str
+                
+                # 🚀 STAGE 3: Batch check file existence con filtrado de None
+                valid_paths = [p for p in file_paths if p is not None]
+                file_existence_cache = self._batch_check_file_existence(valid_paths)
+                
+                # 🚀 STAGE 4: Pre-allocate videos list con capacidad estimada
+                videos = []
+                videos_capacity = int(row_count * 0.8)  # Estimate 80% files exist
+                
+                # 🚀 STAGE 5: Process rows con optimizaciones extremas
+                for i, row in enumerate(rows):
+                    file_path_str = file_paths[i]
+                    
+                    # Skip si el archivo no existe (verificación ultra-rápida)
+                    if not file_path_str or not file_existence_cache.get(file_path_str, False):
+                        continue
+                    
+                    # 🚀 ULTRA-FAST: Acceso directo por índice (sin nombres de columna)
+                    # Nueva estructura: 0=download_id, 1=file_path, 2=video_title, 3=platform, 4=video_url,
+                    #                  5=duration_ms, 6=dimension_code, 7=resolution_code, 8=fps, 9=created_at
+                    
+                    service_name = row[3]  # platform
+                    platform = self._normalize_platform_name(service_name or "")
+                    
+                    # 🚀 Procesar duración usando acceso directo
+                    duration_ms = row[5] if len(row) > 5 else None
+                    
+                    # 🚀 Procesar dimensiones usando cache pre-computado
+                    resolution_code = row[7] if len(row) > 7 else None
+                    dimensions = None
+                    if resolution_code is not None:
+                        dimensions = self._resolution_cache.get(resolution_code)
+                    
+                    # 🚀 Detectar tipo de video (Shorts vs Videos) con mínima lógica
+                    video_type = "video"  # default
+                    is_short = False
+                    
+                    if platform == "youtube" and duration_ms is not None and dimensions:
+                        # 🚀 ULTRA-FAST: Usar datos pre-computados del cache
+                        duration_seconds = duration_ms / 1000
+                        is_vertical = dimensions['is_vertical']  # Pre-computado
+                        
+                        # Lógica ultra-optimizada para Shorts
+                        if duration_seconds <= 60 and is_vertical:
+                            video_type = "shorts"
+                            is_short = True
+                    
+                    # 🚀 File size usando cache de existencia
+                    file_size = self._get_file_size_cached(file_path_str, file_existence_cache)
+                    
+                    # 🚀 Build video dict con mínimas operaciones (usar dict literal)
+                    file_name = Path(file_path_str).name if file_path_str else "unknown"
+                    video = {
+                        'file_path': file_path_str,
+                        'file_name': file_name,
+                        'title': row[2] or file_name,  # video_title
+                        'platform': platform,
+                        'post_url': row[4],   # video_url 
+                        'file_size': file_size,
+                        'duration_seconds': duration_ms // 1000 if duration_ms else None,
+                        'creator_name': self._extract_creator_from_path(Path(file_path_str)) or "undefined",
+                        'video_type': video_type,
+                        'is_short': is_short,
+                        'downloader_mapping': {
+                            'download_item_id': row[0],  # download_id
+                            'external_db_source': 'youtube_4k',
+                            'creator_from_downloader': service_name
+                        }
+                    }
+                    
+                    # Añadir dimensiones si están disponibles (optimización condicional)
+                    if dimensions:
+                        video.update({
+                            'width': dimensions['width'],
+                            'height': dimensions['height'],
+                            'fps': row[8] if len(row) > 8 else None  # fps directo
+                        })
+                    
+                    videos.append(video)
+                
+                self.logger.debug(f"🚀 ULTRA-FAST: Processed {len(videos)} videos from {len(rows)} rows")
+                return videos
+                
+        except Exception as e:
+            self.logger.error(f"Error en _process_videos_ultra_fast: {e}")
+            return []
