@@ -272,8 +272,8 @@ class DatabaseOperations:
             }
             
             # 4. Agregar datos del downloader si existen
-            if 'downloader_data' in video_data:
-                processed_video['downloader_mapping'] = video_data['downloader_data']
+            if 'downloader_mapping' in video_data:
+                processed_video['downloader_mapping'] = video_data['downloader_mapping']
             
             # 5. Guardar tipos de lista para procesar después (puede ser None para plataformas secundarias)
             processed_video['list_types'] = video_data.get('list_types') or []

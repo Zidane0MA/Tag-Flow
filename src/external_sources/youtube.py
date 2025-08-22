@@ -97,7 +97,7 @@ class YouTube4KHandler(DatabaseExtractor):
             # 🚀 USAR PREPARED STATEMENT CACHEADO
             query_key = 'main_query'
             if self._prepared_statements_cache[query_key] is None:
-                # Preparar query una sola vez con estructura correcta de 4K Video Downloader
+                # Preparar query una sola vez con estructura correcta y metadatos completos
                 self._prepared_statements_cache[query_key] = '''
                     SELECT 
                         di.id as download_id,
@@ -109,23 +109,39 @@ class YouTube4KHandler(DatabaseExtractor):
                         vi.dimension as dimension_code,
                         vi.resolution as resolution_code,
                         vi.fps as fps,
-                        di.id as created_at
+                        GROUP_CONCAT(
+                            CASE 
+                                WHEN mim.type = 0 THEN 'creator_name:' || mim.value
+                                WHEN mim.type = 1 THEN 'creator_url:' || mim.value  
+                                WHEN mim.type = 3 THEN 'playlist_name:' || mim.value
+                                WHEN mim.type = 4 THEN 'playlist_url:' || mim.value
+                                WHEN mim.type = 5 THEN 'channel_name:' || mim.value
+                                WHEN mim.type = 6 THEN 'channel_url:' || mim.value
+                                WHEN mim.type = 7 THEN 'subscription_info:' || mim.value
+                            END, '|||'
+                        ) as metadata_concat
                     FROM download_item di
                     LEFT JOIN media_item_description mid ON di.id = mid.download_item_id
                     LEFT JOIN url_description ud ON mid.id = ud.media_item_description_id
+                    LEFT JOIN media_item_metadata mim ON di.id = mim.download_item_id
                     LEFT JOIN media_info mi ON di.id = mi.download_item_id
                     LEFT JOIN video_info vi ON mi.id = vi.media_info_id
                     WHERE di.filename IS NOT NULL
+                    GROUP BY di.id, di.filename, mid.title, ud.service_name, ud.url, mid.duration, vi.dimension, vi.resolution, vi.fps
                     ORDER BY di.id DESC
                 '''
             
             main_query = self._prepared_statements_cache[query_key]
             
-            # Añadir paginación
-            if limit:
-                main_query += f' LIMIT {limit}'
-            if offset > 0:
-                main_query += f' OFFSET {offset}'
+            # Añadir paginación (SQLite requiere LIMIT antes de OFFSET)
+            if limit or offset > 0:
+                if limit:
+                    main_query += f' LIMIT {limit}'
+                    if offset > 0:
+                        main_query += f' OFFSET {offset}'
+                else:
+                    # Si solo hay offset sin limit, usar un limit muy grande
+                    main_query += f' LIMIT 999999 OFFSET {offset}'
             
             return self._process_videos_ultra_fast(main_query, [])
         except Exception as e:
@@ -144,7 +160,7 @@ class YouTube4KHandler(DatabaseExtractor):
             # 🚀 USAR PREPARED STATEMENT CACHEADO para plataforma
             query_key = f'platform_{platform.lower()}'
             if query_key not in self._prepared_statements_cache:
-                # Preparar query específica para esta plataforma con estructura correcta
+                # Preparar query específica para esta plataforma con metadatos completos
                 self._prepared_statements_cache[query_key] = f'''
                     SELECT 
                         di.id as download_id,
@@ -156,24 +172,40 @@ class YouTube4KHandler(DatabaseExtractor):
                         vi.dimension as dimension_code,
                         vi.resolution as resolution_code,
                         vi.fps as fps,
-                        di.id as created_at
+                        GROUP_CONCAT(
+                            CASE 
+                                WHEN mim.type = 0 THEN 'creator_name:' || mim.value
+                                WHEN mim.type = 1 THEN 'creator_url:' || mim.value  
+                                WHEN mim.type = 3 THEN 'playlist_name:' || mim.value
+                                WHEN mim.type = 4 THEN 'playlist_url:' || mim.value
+                                WHEN mim.type = 5 THEN 'channel_name:' || mim.value
+                                WHEN mim.type = 6 THEN 'channel_url:' || mim.value
+                                WHEN mim.type = 7 THEN 'subscription_info:' || mim.value
+                            END, '|||'
+                        ) as metadata_concat
                     FROM download_item di
                     LEFT JOIN media_item_description mid ON di.id = mid.download_item_id
                     LEFT JOIN url_description ud ON mid.id = ud.media_item_description_id
+                    LEFT JOIN media_item_metadata mim ON di.id = mim.download_item_id
                     LEFT JOIN media_info mi ON di.id = mi.download_item_id
                     LEFT JOIN video_info vi ON mi.id = vi.media_info_id
                     WHERE di.filename IS NOT NULL
                         AND {platform_condition}
+                    GROUP BY di.id, di.filename, mid.title, ud.service_name, ud.url, mid.duration, vi.dimension, vi.resolution, vi.fps
                     ORDER BY di.id DESC
                 '''
             
             main_query = self._prepared_statements_cache[query_key]
             
-            # Añadir paginación
-            if limit:
-                main_query += f' LIMIT {limit}'
-            if offset > 0:
-                main_query += f' OFFSET {offset}'
+            # Añadir paginación (SQLite requiere LIMIT antes de OFFSET)  
+            if limit or offset > 0:
+                if limit:
+                    main_query += f' LIMIT {limit}'
+                    if offset > 0:
+                        main_query += f' OFFSET {offset}'
+                else:
+                    # Si solo hay offset sin limit, usar un limit muy grande
+                    main_query += f' LIMIT 999999 OFFSET {offset}'
             
             return self._process_videos_ultra_fast(main_query, platform_params)
             
@@ -756,7 +788,7 @@ class YouTube4KHandler(DatabaseExtractor):
                 videos = []
                 videos_capacity = int(row_count * 0.8)  # Estimate 80% files exist
                 
-                # 🚀 STAGE 5: Process rows con optimizaciones extremas
+                # 🚀 STAGE 5: Process rows con optimizaciones extremas + lógica completa
                 for i, row in enumerate(rows):
                     file_path_str = file_paths[i]
                     
@@ -766,66 +798,159 @@ class YouTube4KHandler(DatabaseExtractor):
                     
                     # 🚀 ULTRA-FAST: Acceso directo por índice (sin nombres de columna)
                     # Nueva estructura: 0=download_id, 1=file_path, 2=video_title, 3=platform, 4=video_url,
-                    #                  5=duration_ms, 6=dimension_code, 7=resolution_code, 8=fps, 9=created_at
+                    #                  5=duration_ms, 6=dimension_code, 7=resolution_code, 8=fps, 9=metadata_concat
                     
-                    service_name = row[3]  # platform
-                    platform = self._normalize_platform_name(service_name or "")
-                    
-                    # 🚀 Procesar duración usando acceso directo
-                    duration_ms = row[5] if len(row) > 5 else None
-                    
-                    # 🚀 Procesar dimensiones usando cache pre-computado
-                    resolution_code = row[7] if len(row) > 7 else None
-                    dimensions = None
-                    if resolution_code is not None:
-                        dimensions = self._resolution_cache.get(resolution_code)
-                    
-                    # 🚀 Detectar tipo de video (Shorts vs Videos) con mínima lógica
-                    video_type = "video"  # default
-                    is_short = False
-                    
-                    if platform == "youtube" and duration_ms is not None and dimensions:
-                        # 🚀 ULTRA-FAST: Usar datos pre-computados del cache
-                        duration_seconds = duration_ms / 1000
-                        is_vertical = dimensions['is_vertical']  # Pre-computado
+                    try:
+                        file_path = Path(file_path_str)
+                        service_name = row[3]  # platform
+                        platform = self._normalize_platform_name(service_name or "")
                         
-                        # Lógica ultra-optimizada para Shorts
-                        if duration_seconds <= 60 and is_vertical:
-                            video_type = "shorts"
-                            is_short = True
-                    
-                    # 🚀 File size usando cache de existencia
-                    file_size = self._get_file_size_cached(file_path_str, file_existence_cache)
-                    
-                    # 🚀 Build video dict con mínimas operaciones (usar dict literal)
-                    file_name = Path(file_path_str).name if file_path_str else "unknown"
-                    video = {
-                        'file_path': file_path_str,
-                        'file_name': file_name,
-                        'title': row[2] or file_name,  # video_title
-                        'platform': platform,
-                        'post_url': row[4],   # video_url 
-                        'file_size': file_size,
-                        'duration_seconds': duration_ms // 1000 if duration_ms else None,
-                        'creator_name': self._extract_creator_from_path(Path(file_path_str)) or "undefined",
-                        'video_type': video_type,
-                        'is_short': is_short,
-                        'downloader_mapping': {
+                        # 🚀 Parse metadata ultra-fast (solo si existe)
+                        metadata_concat = row[9] if len(row) > 9 else ""
+                        metadata = {}
+                        creator_name = None
+                        creator_url = None
+                        subscription_name = None
+                        subscription_type = None
+                        subscription_url = None
+                        
+                        # 🚀 ULTRA-FAST: Parseo directo sin funciones adicionales cuando es posible
+                        if metadata_concat:
+                            metadata = self._parse_4k_metadata(metadata_concat)
+                            # Extraer directamente los valores más comunes
+                            creator_name = metadata.get('creator_name')
+                            creator_url = metadata.get('creator_url')
+                            playlist_name = metadata.get('playlist_name')
+                            playlist_url = metadata.get('playlist_url')
+                            channel_name = metadata.get('channel_name')
+                            channel_url = metadata.get('channel_url')
+                            subscription_info = metadata.get('subscription_info')
+                            
+                            # 🚀 Lógica de suscripción corregida según estructura real de 4K Video Downloader
+                            if playlist_name:
+                                # ✅ PLAYLIST SUBSCRIPTION: Solo cuando hay playlist_name (type=3)
+                                subscription_name = playlist_name.strip()
+                                if subscription_name in ['Liked videos', 'Videos que me gustan']:
+                                    subscription_name = 'Liked videos'
+                                subscription_type = 'playlist'
+                                subscription_url = playlist_url
+                                creator_name = creator_name or channel_name
+                                creator_url = creator_url or channel_url
+                            elif channel_name and subscription_info:
+                                # ✅ ACCOUNT SUBSCRIPTION: Solo cuando hay channel_name (type=5) + subscription_info (type=7)
+                                # Esto indica una verdadera suscripción de canal, no un video individual
+                                subscription_name = channel_name
+                                subscription_type = 'account'
+                                subscription_url = channel_url
+                                creator_name = creator_name or channel_name
+                                creator_url = creator_url or channel_url
+                            else:
+                                # ✅ VIDEO INDIVIDUAL: Solo asignar creador, NO crear suscripción
+                                creator_name = creator_name or channel_name
+                                creator_url = creator_url or channel_url
+                                # subscription_name, subscription_type, subscription_url quedan None
+                        
+                        # Fallback ultra-rápido si no hay creador
+                        if not creator_name:
+                            creator_name = self._extract_creator_from_path(file_path) or "undefined"
+                        
+                        # 🚀 Procesar duración usando acceso directo
+                        duration_ms = row[5] if len(row) > 5 else None
+                        
+                        # 🚀 Procesar dimensiones usando cache pre-computado
+                        resolution_code = row[7] if len(row) > 7 else None
+                        dimensions = None
+                        video_dimensions = None
+                        if resolution_code is not None:
+                            dimensions = self._resolution_cache.get(resolution_code)
+                            if dimensions:
+                                video_dimensions = {
+                                    'width': dimensions['width'],
+                                    'height': dimensions['height'], 
+                                    'aspect_ratio': dimensions['aspect_ratio'],
+                                    'is_vertical': dimensions['is_vertical'],
+                                    'fps': row[8] if len(row) > 8 else None,
+                                    'resolution_code': resolution_code,
+                                    'dimension_code': row[6] if len(row) > 6 else None
+                                }
+                        
+                        # 🚀 Detectar tipo de video ultra-rápido (Shorts vs Videos)
+                        video_type = "video"  # default
+                        is_short = False
+                        
+                        if platform == "youtube" and duration_ms is not None and dimensions:
+                            duration_seconds = duration_ms / 1000
+                            is_vertical = dimensions['is_vertical']  # Pre-computado
+                            # Ultra-fast detection: solo verificar criterios básicos
+                            if duration_seconds <= 60 and is_vertical:
+                                video_type = "shorts"
+                                is_short = True
+                        
+                        # 🚀 File size usando cache de existencia
+                        file_size = self._get_file_size_cached(file_path_str, file_existence_cache)
+                        
+                        # 🚀 Build video dict optimizado con lógica directa
+                        file_name = file_path.name
+                        list_types = [video_type]  # Lista directa basada en video_type
+                        
+                        # 🎯 CRÍTICO: Asegurar downloader_mapping primero
+                        downloader_mapping = {
                             'download_item_id': row[0],  # download_id
                             'external_db_source': 'youtube_4k',
-                            'creator_from_downloader': service_name
+                            'creator_from_downloader': creator_name,
+                            'is_carousel_item': False,  # YouTube no tiene carruseles típicamente
+                            'carousel_order': None,
+                            'carousel_base_id': None
                         }
-                    }
-                    
-                    # Añadir dimensiones si están disponibles (optimización condicional)
-                    if dimensions:
-                        video.update({
-                            'width': dimensions['width'],
-                            'height': dimensions['height'],
-                            'fps': row[8] if len(row) > 8 else None  # fps directo
-                        })
-                    
-                    videos.append(video)
+                        
+                        video = {
+                            'file_path': file_path_str,
+                            'file_name': file_name,
+                            'title': row[2] or file_path.stem,  # video_title
+                            'platform': platform,
+                            'post_url': row[4],   # video_url 
+                            'source': 'db',
+                            'file_size': file_size,
+                            'duration_seconds': duration_ms // 1000 if duration_ms else None,
+                            'video_type': video_type,
+                            'is_short': is_short,
+                            
+                            # 🎯 CRÍTICO: Downloader mapping debe estar presente
+                            'downloader_mapping': downloader_mapping,
+                            
+                            # 🎯 Información del creador y suscripción (directo, sin funciones)
+                            'creator_name': creator_name,
+                            'creator_url': creator_url,
+                            'subscription_name': subscription_name,
+                            'subscription_type': subscription_type,
+                            'subscription_url': subscription_url,
+                            'list_types': list_types,
+                            
+                            # 🎯 Metadatos adicionales (directos del metadata ya parseado)
+                            'channel_name': metadata.get('channel_name'),
+                            'channel_url': metadata.get('channel_url'),
+                            'playlist_name': metadata.get('playlist_name'),
+                            'playlist_url': metadata.get('playlist_url'),
+                            
+                            # 🚀 Video dimensions si están disponibles
+                            'video_dimensions': video_dimensions,
+                        }
+                        
+                        # Añadir dimensiones directamente si están disponibles (compatibilidad)
+                        if dimensions:
+                            video.update({
+                                'width': dimensions['width'],
+                                'height': dimensions['height'],
+                                'fps': row[8] if len(row) > 8 else None
+                            })
+                        
+                        videos.append(video)
+                        
+                    except Exception as e:
+                        self.logger.error(f"Error procesando video individual ultra-fast: {e}")
+                        import traceback
+                        self.logger.error(traceback.format_exc())
+                        continue
                 
                 self.logger.debug(f"🚀 ULTRA-FAST: Processed {len(videos)} videos from {len(rows)} rows")
                 return videos

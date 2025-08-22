@@ -11,10 +11,12 @@ config/tag-flow-0268193d12b4.json
 !data/
 *.db
 .claude/
+.gemini/
 *.sqlite
 *.sqlite3
 datos_videos.json
 videos.db
+*example*.md
 
 # Thumbnails y archivos generados
 thumbnails/*
