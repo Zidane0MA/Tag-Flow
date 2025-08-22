@@ -136,7 +136,7 @@ class DatabaseOperations:
             
             # Generar reporte profesional
             validation_stats = self._validate_external_files(source, platform)
-            self._print_professional_summary(result, validation_stats, platform.upper(), execution_time)
+            self._print_professional_summary(result, validation_stats, platform.upper() if platform else "TODAS", execution_time)
             
             return result
             
@@ -263,7 +263,12 @@ class DatabaseOperations:
                 'platform': video_data.get('platform', 'youtube'),
                 'creator_id': creator_id,
                 'subscription_id': subscription_id,
-                'processing_status': 'pendiente'
+                'processing_status': 'pendiente',
+                
+                # 🔥 CAMPOS FALTANTES CRÍTICOS:
+                'file_size': video_data.get('file_size'),
+                'duration_seconds': video_data.get('duration_seconds'),
+                'thumbnail_path': video_data.get('thumbnail_path')
             }
             
             # 4. Agregar datos del downloader si existen
@@ -1079,7 +1084,7 @@ class DatabaseOperations:
                     validation_stats['total_external_records'] = len(all_videos)
                 
             elif platform == 'instagram':
-                all_videos = external_sources.extract_instagram_content(offset=0, limit=None)
+                all_videos = external_sources.extract_instagram_videos(offset=0, limit=None)
                 validation_stats['existing_files'] = len(all_videos)
                 
             elif platform == 'youtube':

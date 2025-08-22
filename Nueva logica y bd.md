@@ -40,12 +40,10 @@ Nota:
 
 
 Problemas con el poblado de la base de datos:
-- Videos sueltos como `D:\4K Video Downloader+\NOMBREDELVIDEO.mkv` que vienen de la app 4k video downloader, se poblan teniendo como suscripciones el nombre del creador en el caso de youtube y el nombre/titulo del video para otras plataformas. Quiero que todos estos videos sueltos se guarden en mi bd bajo la suscripcion de Single media y de type folder similar a instagram.
+- Arreglar el poblado de file_size y duration_seconds de la tabla videos. 
+- Para los videos de youtube, quiero diferenciarlos entre shorts y videos, pero no se como hacerlo, una opcion es con la metadas de las dimensiones del video, que propones?. Estos, (shorts y videos) deben ser registrados en video_lists.list_type, que actualmente se registran como "playlist".
 
 - En tiktok un creador sin contenido propio (no figura en la tabla de creadores), se le asiga un creador_id no relacionado.
-
-- shorts de youtube, encontrar solucion.
-
 
 ## CASO: 4k Tokkit (Solo Tiktok)
 ### Contexto

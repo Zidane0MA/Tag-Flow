@@ -305,3 +305,4 @@ test_videos/
 test/*.png
 sample_videos/
 examples/videos/
+*legacy*.py

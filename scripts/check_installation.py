@@ -224,7 +224,8 @@ def test_basic_functionality():
         from config import config
         print("   ✅ Configuración")
         
-        from src.database import db
+        from src.service_factory import get_database
+        db = get_database()
         print("   ✅ Base de datos")
         
         from src.video_processor import video_processor

@@ -110,7 +110,8 @@ def _create_video_processor():
 def _create_external_sources():
     """Factory para ExternalSourcesManager"""
     from src.external_sources import ExternalSourcesManager
-    return ExternalSourcesManager()
+    from config import config
+    return ExternalSourcesManager(config)
 
 
 
