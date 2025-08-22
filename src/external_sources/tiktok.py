@@ -7,6 +7,7 @@ import re
 from pathlib import Path
 from typing import Dict, List, Optional
 from .base import DatabaseExtractor
+import subprocess
 
 import logging
 logger = logging.getLogger(__name__)
@@ -123,169 +124,158 @@ class TikTokTokkitHandler(DatabaseExtractor):
             return videos
 
     def _process_tokkit_row_with_structure(self, row, tiktok_base: Path) -> Optional[Dict]:
-        """Procesar una fila de TikTok Tokkit con estructura completa"""
-        try:
-            relative_path = self._safe_str(row['relativePath'])
-            if not relative_path:
-                return None
-
-            # Strip leading slash from relative path to properly join with base path
-            clean_relative_path = relative_path.lstrip('/')
-            file_path = tiktok_base / clean_relative_path
-            if not file_path.exists():
-                self.logger.debug(f"Archivo TikTok no encontrado: {file_path}")
-                return None
-
-            tiktok_id = self._safe_str(row['tiktok_id'])
-            if not tiktok_id:
-                return None
-
-            # Determinar creador y suscripción usando la nueva lógica v2
-            creator_subscription_data = self._determine_tokkit_creator_and_subscription_v2(row)
-
-            # Construir estructura completa del video
-            video_data = {
-                'file_path': str(file_path),
-                'file_name': file_path.name,
-                'title': self._safe_str(row['video_title']) or file_path.stem,
-                'platform': 'tiktok',
-                'video_url': f"https://www.tiktok.com/@{creator_subscription_data.get('creator_name', 'unknown')}/video/{tiktok_id}",
-                'source': 'db',
-
-                # Información del creador y suscripción
-                'creator_name': creator_subscription_data.get('creator_name'),
-                'creator_url': creator_subscription_data.get('creator_url'),
-                'subscription_name': creator_subscription_data.get('subscription_name'),
-                'subscription_type': creator_subscription_data.get('subscription_type'),
-                'subscription_url': creator_subscription_data.get('subscription_url'),
-
-                # Metadatos específicos de TikTok
-                'tiktok_id': tiktok_id,
-                'media_id': self._safe_int(row['media_id']),
-
-                # Información de archivo
-                'file_size': file_path.stat().st_size if file_path.exists() else 0,
-            }
-
-            # Detectar si es parte de un carrusel
-            carousel_order = self._extract_carousel_order(tiktok_id)
-            if carousel_order is not None:
-                video_data['carousel_order'] = carousel_order
-                # Extraer base_id para carruseles
-                if '_index_' in tiktok_id:
-                    video_data['carousel_base_id'] = tiktok_id.split('_index_')[0]
-
-            return video_data
-
-        except Exception as e:
-            self.logger.error(f"Error procesando fila de TikTok Tokkit: {e}")
+        """Procesar una fila de 4K Tokkit con nueva estructura completa según especificación"""
+        # Construir ruta completa del archivo
+        relative_path = row['relativePath']
+        if relative_path.startswith('/'):
+            relative_path = relative_path[1:]
+        if relative_path.startswith('\\'):
+            relative_path = relative_path[1:]
+            
+        file_path = tiktok_base / relative_path
+        
+        # ✅ Verificar que el archivo exista ANTES de verificar tipo
+        if not file_path.exists():
+            self.logger.debug(f"⚠️ Archivo no existe (eliminado manualmente?): {file_path}")
+            self.logger.debug(f"   📍 URL: https://www.tiktok.com/@{row['authorName']}/video/{row['tiktok_id']}")
             return None
+            
+        # Aceptar tanto videos como imágenes (para carruseles de TikTok)
+        video_extensions = {'.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm'}
+        image_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp'}
+        
+        is_video = file_path.suffix.lower() in video_extensions
+        is_image = file_path.suffix.lower() in image_extensions
+        
+        if not (is_video or is_image):
+            return None
+        
+        # Construir URL del post según especificación
+        tiktok_id_clean = row['tiktok_id']
+        if '_index_' in str(tiktok_id_clean):
+            # Para imágenes: remover _index_n1_n2 del ID
+            tiktok_id_clean = tiktok_id_clean.split('_index_')[0]
+        
+        # URLs según especificación
+        if is_video:
+            post_url = f"https://www.tiktok.com/@{row['authorName']}/video/{tiktok_id_clean}"
+        else:
+            post_url = f"https://www.tiktok.com/@{row['authorName']}/photo/{tiktok_id_clean}"
+        
+        # Datos básicos del video
+        video_data = {
+            'file_path': str(file_path),
+            'file_name': file_path.name,
+            'title': row['video_title'] or file_path.stem,  # Usar description como título
+            'post_url': post_url,  # URL del post según especificación
+            'platform': 'tiktok',
+            'content_type': 'video' if is_video else 'image',
+            'source': 'db',
+            'file_size': file_path.stat().st_size if file_path.exists() else 0,
+            
+            # Datos del downloader - CRÍTICO para batch_insert_videos
+            'downloader_mapping': {
+                'download_item_id': row['media_id'],
+                'external_db_source': '4k_tokkit',
+                'creator_from_downloader': row['authorName'],
+                'is_carousel_item': '_index_' in str(row['tiktok_id']),
+                'carousel_order': self._extract_carousel_order(str(row['tiktok_id'])) if '_index_' in str(row['tiktok_id']) else None,
+                'carousel_base_id': str(row['tiktok_id']).split('_index_')[0] if '_index_' in str(row['tiktok_id']) else None
+            }
+        }
+        
+        # Determinar creador y suscripción según especificación
+        creator_info = self._determine_tokkit_creator_and_subscription_v2(row)
+        video_data.update(creator_info)
+        
+        return video_data
 
     def _determine_tokkit_creator_and_subscription_v2(self, row) -> Dict:
-        """Determinar creador y suscripción para TikTok Tokkit usando estructura v2"""
+        """Determinar creador y suscripción para TikTok según especificación exacta"""
         result = {
-            'creator_name': None,
-            'creator_url': None,
+            'creator_name': row['authorName'],
+            'creator_url': f"https://www.tiktok.com/@{row['authorName']}",
             'subscription_name': None,
             'subscription_type': None,
-            'subscription_url': None
+            'subscription_url': None,
+            'list_types': ['single']  # Por defecto para publicaciones sueltas
         }
-
-        try:
-            # Información del creador individual del video
-            author_name = self._safe_str(row['authorName'])
+        
+        # CASO 1: Publicaciones sueltas (subscriptionDatabaseId = NULL)
+        if not row['subscriptionDatabaseId']:
+            # Videos sin suscripción - no crear suscripción
+            result['subscription_name'] = None
+            result['subscription_type'] = None
+            result['subscription_url'] = None
+            result['list_types'] = []  # Sin listas específicas
+            return result
+        
+        # CASO 2: Suscripciones con subscription_type
+        subscription_types = {
+            1: 'account',    # cuenta - tipo 1
+            2: 'hashtag',    # hashtag - tipo 2 
+            3: 'music'       # música - tipo 3
+        }
+        
+        if row['subscription_type'] in subscription_types:
+            sub_type = subscription_types[row['subscription_type']]
+            result['subscription_type'] = sub_type
+            subscription_name = row['subscription_name']
+            result['subscription_name'] = subscription_name
             
-            # Información de la suscripción
-            subscription_type_raw = self._safe_str(row['subscription_type'])
-            subscription_name = self._safe_str(row['subscription_name'])
-            subscription_external_id = self._safe_str(row['subscription_external_id'])
-
-            # 🎯 ESTABLECER CREADOR DEL VIDEO (siempre el autor individual)
-            if author_name:
-                result['creator_name'] = author_name
-                result['creator_url'] = f"https://www.tiktok.com/@{author_name}"
-
-            # 🎯 ESTABLECER SUSCRIPCIÓN SEGÚN TIPO
-            if subscription_name and subscription_type_raw:
-                # Mapear tipos de suscripción de Tokkit
-                subscription_type_map = {
-                    '0': 'account',      # Cuenta de usuario
-                    '1': 'hashtag',      # Hashtag
-                    '2': 'search',       # Búsqueda
-                    'account': 'account',
-                    'hashtag': 'hashtag',
-                    'search': 'search'
-                }
-
-                subscription_type = subscription_type_map.get(subscription_type_raw, 'unknown')
-
-                if subscription_type == 'account':
-                    # 🎯 SUSCRIPCIÓN TIPO CUENTA: Videos de un usuario específico
-                    result['subscription_name'] = subscription_name
-                    result['subscription_type'] = 'creator'
-                    result['subscription_url'] = f"https://www.tiktok.com/@{subscription_name}" if subscription_name else None
-
-                elif subscription_type == 'hashtag':
-                    # 🎯 SUSCRIPCIÓN TIPO HASHTAG: Videos de un hashtag específico
-                    result['subscription_name'] = subscription_name
-                    result['subscription_type'] = 'hashtag'
-                    result['subscription_url'] = f"https://www.tiktok.com/tag/{subscription_name}" if subscription_name else None
-
-                elif subscription_type == 'search':
-                    # 🎯 SUSCRIPCIÓN TIPO BÚSQUEDA: Videos de una búsqueda específica
-                    result['subscription_name'] = subscription_name
-                    result['subscription_type'] = 'search'
-                    result['subscription_url'] = None
-
-            # 🎯 FALLBACK: Si no hay suscripción clara, crear una basada en el creador
-            if not result['subscription_name'] and result['creator_name']:
-                result['subscription_name'] = result['creator_name']
-                result['subscription_type'] = 'creator'
-                result['subscription_url'] = result['creator_url']
-
-            # 🎯 DETECTAR SUBLISTAS DE CUENTA (favoritos, etc.)
-            relative_path = self._safe_str(row['relativePath'] if 'relativePath' in row.keys() else '')
-            account_sublists = self._detect_account_sublists_tiktok(relative_path)
-            if account_sublists:
-                # Si hay sublistas, usar la primera como tipo de suscripción más específico
-                result['subscription_type'] = 'playlist'
-                result['subscription_name'] = f"{result['subscription_name']} - {account_sublists[0]}"
-
-            return result
-
-        except Exception as e:
-            self.logger.error(f"Error determinando creador/suscripción TikTok v2: {e}")
-            return result
+            # Construir URL de suscripción según especificación
+            if sub_type == 'account':
+                result['subscription_url'] = f"https://www.tiktok.com/@{subscription_name}"
+                # Para cuentas, detectar sub-listas desde relativePath y modificar nombre si es necesario
+                detected_sublists = self._detect_account_sublists_tiktok(row['relativePath'])
+                result['list_types'] = detected_sublists
+                
+                # Si es una sublista específica, modificar el nombre de suscripción para distinguirlas
+                if detected_sublists == ['liked']:
+                    result['subscription_name'] = f"{subscription_name} - Liked"
+                elif detected_sublists == ['favorites']:
+                    result['subscription_name'] = f"{subscription_name} - Favorites"
+            elif sub_type == 'hashtag':
+                result['subscription_url'] = f"https://www.tiktok.com/tag/{subscription_name}"
+                result['list_types'] = ['hashtag']  # Los hashtags son listas simples
+            elif sub_type == 'music':
+                # Música: "cancion nueva cinco" -> "cancion-nueva-cinco"
+                clean_name = subscription_name.replace(' ', '-')
+                result['subscription_url'] = f"https://www.tiktok.com/music/{clean_name}-{row['subscription_external_id']}"
+                result['list_types'] = ['music']  # Las músicas son listas simples
+        else:
+            # Tipo desconocido - tratar como cuenta
+            result['subscription_type'] = 'account'
+            subscription_name = row['subscription_name'] or row['authorName']
+            result['subscription_url'] = f"https://www.tiktok.com/@{subscription_name}"
+            
+            # Detectar sublistas y modificar nombre si es necesario
+            detected_sublists = self._detect_account_sublists_tiktok(row['relativePath'])
+            result['list_types'] = detected_sublists
+            
+            if detected_sublists == ['liked']:
+                result['subscription_name'] = f"{subscription_name} - Liked"
+            elif detected_sublists == ['favorites']:
+                result['subscription_name'] = f"{subscription_name} - Favorites"  
+            else:
+                result['subscription_name'] = subscription_name
+        
+        return result
 
     def _detect_account_sublists_tiktok(self, relative_path: str) -> List[str]:
-        """Detectar sublistas de cuenta TikTok (favoritos, etc.) desde la ruta relativa"""
-        sublists = []
-
-        try:
-            if not relative_path:
-                return sublists
-
-            # Patrones comunes para sublistas de TikTok
-            sublist_patterns = {
-                'favorites': ['favorites', 'favoritos', 'liked'],
-                'private': ['private', 'privado'],
-                'drafts': ['drafts', 'borradores'],
-                'collection': ['collection', 'colección']
-            }
-
-            path_lower = relative_path.lower()
-
-            for sublist_type, patterns in sublist_patterns.items():
-                for pattern in patterns:
-                    if pattern in path_lower:
-                        sublists.append(sublist_type.title())
-                        break
-
-            return sublists
-
-        except Exception as e:
-            self.logger.error(f"Error detectando sublistas TikTok: {e}")
-            return sublists
+        """Detectar sublistas para cuentas TikTok según estructura de carpetas"""
+        if not relative_path:
+            return ['feed']
+            
+        # Normalizar separadores
+        path_normalized = relative_path.replace('\\', '/').lower()
+        
+        if '/liked/' in path_normalized or '/liked' in path_normalized:
+            return ['liked']
+        elif '/favorites/' in path_normalized or '/favorites' in path_normalized:
+            return ['favorites']
+        else:
+            return ['feed']  # Por defecto: feed principal
 
     def _extract_carousel_order(self, tiktok_id: str) -> Optional[int]:
         """Extraer el orden del carrusel desde el ID de TikTok"""

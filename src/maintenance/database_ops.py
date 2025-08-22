@@ -244,11 +244,25 @@ class DatabaseOperations:
             # 2. Gestionar suscripción (solo si existe)
             subscription_id = None
             if video_data.get('subscription_name'):
+                # Para suscripciones account, el creator_id debe corresponder al nombre de la suscripción
+                subscription_creator_id = creator_id
+                if video_data.get('subscription_type') == 'account':
+                    # Extraer nombre base de la suscripción (sin " - Liked" / " - Favorites")
+                    subscription_base_name = video_data.get('subscription_name', '').replace(' - Liked', '').replace(' - Favorites', '')
+                    if subscription_base_name:
+                        subscription_creator_id = self._get_or_create_creator(
+                            subscription_base_name, 
+                            video_data.get('platform', 'youtube'),
+                            None,  # No creator_url específica para este caso
+                            creator_cache,
+                            stats
+                        )
+                
                 subscription_id = self._get_or_create_subscription(
                     video_data.get('subscription_name'),
                     video_data.get('subscription_type', 'account'),
                     video_data.get('platform', 'youtube'),
-                    creator_id,
+                    subscription_creator_id,
                     video_data.get('subscription_url'),
                     subscription_cache,
                     stats
