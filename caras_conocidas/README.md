@@ -9,6 +9,12 @@ Este directorio contiene fotos de referencia para el reconocimiento automático 
 3. **Calidad**: Imagen clara del rostro, bien iluminada
 4. **Nombre del archivo**: nombre_del_personaje.jpg
 
+## Estructura de carpetas
+- `caras_conocidas/`
+  - `Serie o juego/`
+    - `nombre_del_personaje.jpg`
+    - `otro_personaje.jpg`
+
 ---
 
-⚠️ **Nota**: Solo usa imágenes que tengas derecho a usar. Las imágenes oficiales de miHoYo/HoYoverse son propiedad de la empresa.
+⚠️ **Nota**: Solo usa imágenes que tengas derecho a usar.

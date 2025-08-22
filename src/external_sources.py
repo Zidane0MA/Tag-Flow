@@ -1,18 +1,16 @@
 """
-Tag-Flow V2 - Manejo de Fuentes Externas con Nueva Estructura
+Tag-Flow V2 - Manejo de Fuentes Externas
 Extracción de datos desde múltiples bases de datos y carpetas organizadas
-CON SOPORTE COMPLETO PARA CREADORES, SUSCRIPCIONES Y LISTAS
 """
 
 import sqlite3
 import json
 import re
+import sys
+import logging
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
-import logging
 
-# Usar config para las rutas
-import sys
 sys.path.append(str(Path(__file__).parent.parent))
 from config import config
 

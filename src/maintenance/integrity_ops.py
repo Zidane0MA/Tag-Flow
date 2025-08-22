@@ -23,11 +23,6 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 import config
-# 🚀 MIGRADO: Eliminados imports directos, ahora se usan via service factory
-# Los módulos se importan solo cuando se necesitan mediante lazy loading
-
-# Referencias eliminadas para evitar inicialización automática
-
 
 class IntegrityOperations:
     """
@@ -43,8 +38,6 @@ class IntegrityOperations:
     """
     
     def __init__(self):
-        # 🚀 MIGRADO: Usar service factory para gestión centralizada
-        # NO instanciar servicios en __init__ para máximo lazy loading
         self._db = None
         self._character_intelligence = None
     
@@ -1065,7 +1058,6 @@ class IntegrityOperations:
         
         if not fix_issues:
             logger.info("\n💡 Para intentar corregir automáticamente, usa --fix-issues")
-
 
 # Funciones de conveniencia para compatibilidad
 def verify_database_integrity(fix_issues: bool = False) -> Dict[str, Any]:

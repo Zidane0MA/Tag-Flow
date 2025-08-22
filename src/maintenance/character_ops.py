@@ -23,11 +23,6 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 import config
-# 🚀 MIGRADO: Eliminados imports directos, ahora se usan via service factory
-# Los módulos se importan solo cuando se necesitan mediante lazy loading
-
-# Referencias eliminadas para evitar inicialización automática
-
 
 class CharacterOperations:
     """
@@ -43,8 +38,6 @@ class CharacterOperations:
     """
     
     def __init__(self):
-        # 🚀 MIGRADO: Usar service factory para gestión centralizada
-        # NO instanciar servicios en __init__ para máximo lazy loading
         self._db = None
         self._character_intelligence = None
     
@@ -834,7 +827,6 @@ class CharacterOperations:
         except Exception as e:
             logger.warning(f"Error en mock download: {e}")
             return 0
-
 
 # Funciones de conveniencia para compatibilidad
 def show_character_stats() -> Dict[str, Any]:

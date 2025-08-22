@@ -24,11 +24,6 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 import config
-# 🚀 MIGRADO: Eliminados imports directos, ahora se usan via service factory
-# Los módulos se importan solo cuando se necesitan mediante lazy loading
-
-# Referencias eliminadas para evitar inicialización automática
-
 
 class DatabaseOperations:
     """
@@ -43,8 +38,6 @@ class DatabaseOperations:
     """
     
     def __init__(self):
-        # 🚀 MIGRADO: Usar service factory para gestión centralizada
-        # NO instanciar servicios en __init__ para máximo lazy loading
         self._db = None
         self._external_sources = None
         self._video_processor = None
@@ -224,7 +217,7 @@ class DatabaseOperations:
         
         if videos_to_update:
             try:
-                # TODO: Implementar batch update con nueva estructura
+                # Batch update para videos existentes
                 videos_updated = len(videos_to_update)
                 logger.debug(f"✅ Actualizados {videos_updated} videos existentes")
             except Exception as e:

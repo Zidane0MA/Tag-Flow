@@ -210,6 +210,4 @@ class VideoProcessor:
             logger.error(f"Error obteniendo frame de {video_path}: {e}")
             return None
 
-# DEPRECATED: Global instance deprecated in favor of ServiceFactory
-# Use: from src.services.service_factory import ServiceFactory; service_factory = ServiceFactory(); video_processor = service_factory.get_video_processor()
 # video_processor = VideoProcessor()

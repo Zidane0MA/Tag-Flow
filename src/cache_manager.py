@@ -331,7 +331,6 @@ class CacheManager:
         else:
             return 'NEEDS_IMPROVEMENT'
 
-
 # Instancia global del cache manager
 _global_cache_manager = None
 _cache_lock = threading.Lock()
@@ -381,7 +380,6 @@ def get_cache_stats() -> Dict[str, Any]:
     cache = get_global_cache_manager()
     return cache.get_stats()
 
-# 🚀 MIGRADO: Funciones específicas para cache de videos pendientes
 def get_pending_videos_cached(cache_key: str, db_manager, platform_filter: str = None, 
                              source_filter: str = 'all', limit: int = None) -> List[Dict]:
     """

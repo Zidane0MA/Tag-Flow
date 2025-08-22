@@ -1037,5 +1037,4 @@ class ThumbnailGenerator:
                 logger.info("⚡ CPU limitada detectada, configurando modo ultra-rápido")
                 self.enable_ultra_fast_mode()
 
-# ⚠️ DEPRECATED: Instancia global removida para eliminar dependencias circulares
 # Usar ServiceFactory.get_service('thumbnail_generator') o get_thumbnail_generator() desde service_factory

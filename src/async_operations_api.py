@@ -29,7 +29,6 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import config
-# 🚀 MIGRADO: Eliminado import directo, ahora se usa via service factory
 from src.maintenance.thumbnail_ops import ThumbnailOperations
 from src.maintenance.database_ops import DatabaseOperations
 from src.maintenance.backup_ops import BackupOperations
@@ -37,7 +36,6 @@ from src.maintenance.character_ops import CharacterOperations
 from src.maintenance.integrity_ops import IntegrityOperations
 from src.core.operation_manager import get_operation_manager, OperationPriority
 from src.core.websocket_manager import get_websocket_manager, send_notification
-
 
 class AsyncOperationsAPI:
     """
@@ -54,7 +52,6 @@ class AsyncOperationsAPI:
     """
     
     def __init__(self):
-        # 🚀 MIGRADO: Lazy loading para todos los servicios
         self._db = None
         self.thumbnail_ops = ThumbnailOperations()
         self.database_ops = DatabaseOperations()
@@ -973,7 +970,6 @@ class AsyncOperationsAPI:
             'websocket_manager': self.websocket_manager.get_stats()
         }
 
-
 # Instancia global (singleton)
 _async_operations_api_instance = None
 
@@ -989,14 +985,12 @@ def get_maintenance_api() -> AsyncOperationsAPI:
     """Alias para compatibilidad - usar get_async_operations_api()"""
     return get_async_operations_api()
 
-
 # Funciones de conveniencia
 def start_regenerate_thumbnails(video_ids: List[int], 
                               force: bool = False,
                               priority: OperationPriority = OperationPriority.NORMAL) -> str:
     """Iniciar regeneración de thumbnails asíncrona"""
     return get_maintenance_api().regenerate_thumbnails_bulk(video_ids, force, priority)
-
 
 def start_populate_database(source: str = 'all', 
                           platform: Optional[str] = None,
@@ -1006,26 +1000,21 @@ def start_populate_database(source: str = 'all',
     """Iniciar población de BD asíncrona"""
     return get_maintenance_api().populate_database_bulk(source, platform, limit, force, priority)
 
-
 def get_operation_status(operation_id: str) -> Optional[Dict[str, Any]]:
     """Obtener estado de operación"""
     return get_maintenance_api().get_operation_progress(operation_id)
-
 
 def cancel_operation(operation_id: str) -> bool:
     """Cancelar operación"""
     return get_maintenance_api().cancel_operation(operation_id)
 
-
 def get_system_health() -> Dict[str, Any]:
     """Obtener salud del sistema"""
     return get_maintenance_api().get_system_health()
 
-
 def send_notification(message: str, level: str = "info", data: Dict[str, Any] = None):
     """Enviar notificación"""
     return get_maintenance_api().send_custom_notification(message, level, data)
-
 
 def start_populate_thumbnails(platform: Optional[str] = None,
                              limit: Optional[int] = None,
@@ -1034,17 +1023,14 @@ def start_populate_thumbnails(platform: Optional[str] = None,
     """Iniciar población de thumbnails asíncrona"""
     return get_maintenance_api().populate_thumbnails_bulk(platform, limit, force, priority)
 
-
 def start_clean_thumbnails(force: bool = False,
                           priority: OperationPriority = OperationPriority.NORMAL) -> str:
     """Iniciar limpieza de thumbnails asíncrona"""
     return get_maintenance_api().clean_thumbnails_bulk(force, priority)
 
-
 def start_optimize_database(priority: OperationPriority = OperationPriority.LOW) -> str:
     """Iniciar optimización de BD asíncrona"""
     return get_maintenance_api().optimize_database_bulk(priority)
-
 
 def start_clear_database(platform: Optional[str] = None,
                         force: bool = False,
@@ -1052,12 +1038,10 @@ def start_clear_database(platform: Optional[str] = None,
     """Iniciar limpieza de BD asíncrona"""
     return get_maintenance_api().clear_database_bulk(platform, force, priority)
 
-
 def start_backup_database(backup_path: Optional[str] = None,
                          priority: OperationPriority = OperationPriority.NORMAL) -> str:
     """Iniciar backup de BD asíncrona"""
     return get_maintenance_api().backup_database_bulk(backup_path, priority)
-
 
 def cleanup_operations(max_age_hours: int = 24) -> int:
     """Limpiar operaciones completadas antiguas"""

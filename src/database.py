@@ -20,7 +20,6 @@ class DatabaseManager:
     def __init__(self, db_path: Path = None):
         self.db_path = db_path or config.DATABASE_PATH
         
-        # 🚀 MIGRADO: Sistema de métricas de performance de optimized_database.py
         self.query_times = {}  # {query_name: [times]}
         self.total_queries = 0
         self.cache_hits = 0
@@ -1589,8 +1588,7 @@ class DatabaseManager:
             
             return stats
     
-    # 🚀 MIGRADO: Sistema de métricas de performance de optimized_database.py
-    
+        
     def _track_query(self, query_name: str, execution_time: float):
         """Registrar tiempo de ejecución de una consulta para métricas"""
         if query_name not in self.query_times:
@@ -1696,28 +1694,6 @@ class DatabaseManager:
                 logger.info(f"  {query_name}: {stats['avg_time_ms']}ms avg ({stats['count']} calls)")
         
         logger.info("="*50)
-
-# ⚠️ DEPRECATED: Instancia global removida para eliminar dependencias circulares
-# Usar ServiceFactory.get_service('database') o get_database() desde service_factory
-# 
-# Funciones de compatibilidad temporal (serán removidas en futuras versiones)
-def get_database_manager():
-    """
-    🔄 MIGRACIÓN: Función de compatibilidad temporal
-    TODO: Reemplazar todos los usos con ServiceFactory.get_service('database')
-    """
-    from src.service_factory import get_database
-    return get_database()
-
-# Variable global para compatibilidad temporal
-db = None
-
-def _ensure_global_db():
-    """Asegurar que db global esté inicializado (solo para compatibilidad)"""
-    global db
-    if db is None:
-        db = get_database_manager()
-    return db
 
 # Monkey-patch para compatibilidad temporal
 import sys

@@ -8,7 +8,6 @@ from pathlib import Path
 from typing import List, Union, Dict
 
 from config import config
-# 🚀 MIGRADO: Eliminados imports directos, ahora se usan via service factory
 from .video_analyzer import VideoAnalyzer
 
 logger = logging.getLogger(__name__)

@@ -24,11 +24,6 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 import config
-# 🚀 MIGRADO: Eliminados imports directos, ahora se usan via service factory
-# Los módulos se importan solo cuando se necesitan mediante lazy loading
-
-# Referencias eliminadas para evitar inicialización automática
-
 
 class BackupOperations:
     """
@@ -49,8 +44,6 @@ class BackupOperations:
     def __init__(self, backup_dir: Optional[Path] = None):
         self.backup_dir = backup_dir or Path('backups')
         self.backup_dir.mkdir(exist_ok=True)
-        # 🚀 MIGRADO: Usar service factory para gestión centralizada
-        # NO instanciar servicios en __init__ para máximo lazy loading
         self._db = None
     
     @property
@@ -857,7 +850,6 @@ class BackupOperations:
         except Exception as e:
             logger.error(f"Error restaurando archivos adicionales: {e}")
             return False
-
 
 # Funciones de conveniencia para compatibilidad
 def create_backup(include_thumbnails: bool = True, thumbnail_limit: int = 100, compress: bool = True) -> Dict[str, Any]:

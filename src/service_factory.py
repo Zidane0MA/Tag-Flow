@@ -112,10 +112,6 @@ def _create_external_sources():
     from src.external_sources import ExternalSourcesManager
     return ExternalSourcesManager()
 
-def _create_downloader_integration():
-    """Factory para DownloaderIntegration"""
-    from src.downloader_integration import DownloaderIntegration
-    return DownloaderIntegration()
 
 
 # Registrar todos los factories
@@ -126,7 +122,6 @@ ServiceFactory.register_factory('face_recognizer', _create_face_recognizer)
 ServiceFactory.register_factory('music_recognizer', _create_music_recognizer)
 ServiceFactory.register_factory('video_processor', _create_video_processor)
 ServiceFactory.register_factory('external_sources', _create_external_sources)
-ServiceFactory.register_factory('downloader_integration', _create_downloader_integration)
 
 
 # Funciones de conveniencia para mantener compatibilidad
@@ -158,6 +153,3 @@ def get_external_sources():
     """Obtener instancia de ExternalSourcesManager"""
     return ServiceFactory.get_service('external_sources')
 
-def get_downloader_integration():
-    """Obtener instancia de DownloaderIntegration"""
-    return ServiceFactory.get_service('downloader_integration')

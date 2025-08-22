@@ -20,11 +20,8 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 import config
-# 🚀 MIGRADO: Eliminados imports directos, ahora se usan via service factory
-# Los módulos se importan solo cuando se necesitan mediante lazy loading
 
 # Referencias eliminadas para evitar inicialización automática
-
 
 class ThumbnailOperations:
     """
@@ -39,8 +36,6 @@ class ThumbnailOperations:
     """
     
     def __init__(self):
-        # 🚀 MIGRADO: Usar service factory para gestión centralizada
-        # NO instanciar servicios en __init__ para máximo lazy loading
         self._db = None
         self._thumbnail_generator = None
     
@@ -988,7 +983,6 @@ class ThumbnailOperations:
             
         except Exception as e:
             logger.error(f"Error optimizando base de datos: {e}")
-
 
 # Funciones de conveniencia para compatibilidad
 def regenerate_thumbnails(force: bool = False) -> Dict[str, Any]:

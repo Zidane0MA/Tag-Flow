@@ -24,10 +24,7 @@ temp/
 tmp/
 
 # Caras conocidas (imágenes personales)
-caras_conocidas/**/*.jpg
-caras_conocidas/**/*.png
-caras_conocidas/**/*.jpeg
-caras_conocidas/**/*.webp
+caras_conocidas/*
 !caras_conocidas/**/README.md
 
 # Videos y archivos multimedia

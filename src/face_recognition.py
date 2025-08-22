@@ -432,6 +432,4 @@ class FaceRecognizer:
         
         return results
 
-# DEPRECATED: Global instance deprecated in favor of ServiceFactory
-# Use: from src.services.service_factory import ServiceFactory; service_factory = ServiceFactory(); face_recognizer = service_factory.get_face_recognizer()
 # face_recognizer = FaceRecognizer()

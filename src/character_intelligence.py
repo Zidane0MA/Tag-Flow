@@ -1010,8 +1010,7 @@ class CharacterIntelligence:
         else:
             logger.info("No hay cache que limpiar (detector legacy)")
     
-    # 🚀 MIGRADO: Procesamiento avanzado de hashtags de optimized_detector.py
-    
+        
     def extract_hashtag_content_advanced(self, title: str) -> str:
         """
         🚀 OPTIMIZADO: Extracción inteligente de contenido de hashtags
@@ -1112,5 +1111,3 @@ class CharacterIntelligence:
         
         return processed
 
-# ⚠️ DEPRECATED: Instancia global removida para eliminar dependencias circulares
-# Usar ServiceFactory.get_service('character_intelligence') o get_character_intelligence() desde service_factory
