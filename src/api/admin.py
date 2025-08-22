@@ -30,48 +30,6 @@ def admin_page():
                              error="Error al cargar la administración",
                              details=str(e)), 500
 
-@admin_bp.route('/api/admin/populate-db', methods=['POST'])
-def api_populate_db():
-    """API para poblar la base de datos desde fuentes externas"""
-    try:
-        data = request.get_json() or {}
-        source = data.get('source', 'all')
-        limit = data.get('limit', None)
-        
-        def run_populate():
-            try:
-                logger.info(f"Iniciando población de BD - Source: {source}, Limit: {limit}")
-                
-                # Ejecutar comando main.py
-                cmd = ['python', 'main.py', 'populate-db', '--source', source]
-                if limit:
-                    cmd.extend(['--limit', str(limit)])
-                
-                result = subprocess.run(cmd, capture_output=True, text=True, cwd=Path.cwd())
-                
-                if result.returncode == 0:
-                    logger.info("Población de BD completada exitosamente")
-                else:
-                    logger.error(f"Error en población de BD: {result.stderr}")
-                    
-            except Exception as e:
-                logger.error(f"Error ejecutando población de BD: {e}")
-        
-        # Ejecutar en thread separado para no bloquear
-        thread = threading.Thread(target=run_populate)
-        thread.daemon = True
-        thread.start()
-        
-        return jsonify({
-            'success': True, 
-            'message': f'Población de BD iniciada desde {source}' + (f' (limit: {limit})' if limit else ''),
-            'status': 'running'
-        })
-        
-    except Exception as e:
-        logger.error(f"Error iniciando población de BD: {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
-
 @admin_bp.route('/api/admin/analyze-videos', methods=['POST'])
 def api_analyze_videos():
     """API para analizar videos nuevos usando AsyncOperationsAPI"""
@@ -185,39 +143,6 @@ def api_generate_thumbnails():
         logger.error(f"Error iniciando generación de thumbnails: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
-@admin_bp.route('/api/admin/backup', methods=['POST'])
-def api_backup():
-    """API para crear backup del sistema"""
-    try:
-        def run_backup():
-            try:
-                logger.info("Iniciando backup del sistema")
-                
-                cmd = ['python', 'main.py', 'backup']
-                result = subprocess.run(cmd, capture_output=True, text=True, cwd=Path.cwd())
-                
-                if result.returncode == 0:
-                    logger.info("Backup completado exitosamente")
-                else:
-                    logger.error(f"Error en backup: {result.stderr}")
-                    
-            except Exception as e:
-                logger.error(f"Error ejecutando backup: {e}")
-        
-        # Ejecutar en thread separado
-        thread = threading.Thread(target=run_backup)
-        thread.daemon = True
-        thread.start()
-        
-        return jsonify({
-            'success': True, 
-            'message': 'Backup del sistema iniciado',
-            'status': 'running'
-        })
-        
-    except Exception as e:
-        logger.error(f"Error iniciando backup: {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
 
 @admin_bp.route('/api/admin/optimize-db', methods=['POST'])
 def api_optimize_db():
@@ -320,34 +245,6 @@ def api_empty_trash():
         logger.error(f"Error vaciando papelera: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
-@admin_bp.route('/api/admin/reset-database', methods=['POST'])
-def api_reset_database():
-    """API para reinicializar la base de datos (PELIGROSO)"""
-    try:
-        data = request.get_json() or {}
-        confirm = data.get('confirm', False)
-        
-        if not confirm:
-            return jsonify({
-                'success': False, 
-                'error': 'Confirmación requerida para esta operación'
-            }), 400
-        
-        from src.service_factory import get_database
-        db = get_database()
-        
-        # Reinicializar base de datos
-        success = db.reset_database()
-        
-        if success:
-            return jsonify({
-                'success': True, 
-                'message': 'Base de datos reinicializada exitosamente'
-            })
-        else:
-            return jsonify({'success': False, 'error': 'Error reinicializando BD'}), 500
-        
-    except Exception as e:
         logger.error(f"Error reinicializando BD: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 

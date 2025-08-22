@@ -14,7 +14,7 @@ sys.path.append(str(Path(__file__).parent / 'src'))
 
 from config import config
 # Database will be imported lazily within functions
-from src.api import gallery_bp, videos_bp, admin_bp, maintenance_bp, creators_bp
+from src.api import gallery_bp, videos_core_bp, videos_streaming_bp, videos_bulk_bp, stats_bp, admin_bp, maintenance_bp, creators_bp
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
@@ -33,7 +33,10 @@ def create_app():
     
     # Registrar blueprints
     app.register_blueprint(gallery_bp)
-    app.register_blueprint(videos_bp)
+    app.register_blueprint(videos_core_bp)
+    app.register_blueprint(videos_streaming_bp)
+    app.register_blueprint(videos_bulk_bp)
+    app.register_blueprint(stats_bp)
     app.register_blueprint(admin_bp)
     app.register_blueprint(maintenance_bp)
     app.register_blueprint(creators_bp)
