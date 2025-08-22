@@ -148,12 +148,10 @@ D:\4K All\
 ├── Plataforma\
 │   ├── Suscripcion tipo Cuenta | Creador\
 │   │   ├── folfer.json        # Metadata del folder
-│   │   ├── media.json         # Metadata de los videos
 │   │   ├── video1.mp4
 │   │   └── video2.mp4
 │   └── Suscripcion tipo lista\
 │       ├── folder.json        # Metadata de la lista
-│       ├── media.json         # Metadata de los videos
 │       └── MrBeast\
 │           ├── folder.json    # Metadata del creador
 │           └── video_like.mp4
@@ -163,13 +161,18 @@ D:\4K All\
 - Suscripcion tipo lista siempre es una suscripcion.
 
 ### Tipos de descarga en wfdownloader
-El programa maneja suscripciones para links que sean de tipo cuenta o lista, las cuales se pueden abordar de diferentes maneras, investigando encontre que para obtener los datos que necesito para mi bd, debo crear 2 suscripciones para el mismo link, 
+El programa maneja suscripciones para links que sean de tipo cuenta o lista, las cuales se pueden abordar de diferentes maneras, investigando encontre que para obtener los datos debo crear 2 suscripciones en wfdownloader.
 
+https://x.com/suzuR423/status/1692590883299029104
+
+armar la url del creador: https://x.com/`nombre de la carpeta`
+
+El nombre del archivo debe ser de este tipo: 1692590637256958031_1.mp4
+- Para armar la url del crea
 
 Para un suscripcion tipo cuenta | creador: https://x.com/ImmortalsNine, debido a que con una sola sucrip
 
 necesito 2 capertas:
-- D:\4K All\X\ImmortalsNine, para los videos con un json llamado media.json con informacion sencilla.
 - D:\4K All\X\ImmortalsNine.data, que es usad
 
 
@@ -184,3 +187,10 @@ La app wfdownloader, me permite extraer datos que necesito de la siguiente forma
 
 ### JSON OTHER
 El json folder.json
+
+
+        "has_media": "true",
+
+        "is_retweet": "false",
+        "is_quoted_tweet": "true",
+        "is_reply_tweet": "false",
