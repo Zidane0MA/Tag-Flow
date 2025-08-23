@@ -85,6 +85,7 @@
 - **Web Interface**: React frontend moderno en `http://localhost:5173`
 - **Procesamiento ultra-rápido**: 1000 videos procesados en <8 segundos
 - **Control granular**: Separación clara entre fuentes y plataformas
+- **Limpieza inteligente**: Detecta y limpia archivos faltantes en BDs externas
 - **Desarrollo en tiempo real**: Hot reload con Vite para desarrollo frontend
 
 ## 📋 Requisitos
@@ -377,18 +378,32 @@ tail -f tag_flow_processing.log
 **Performance issues**
 ```bash
 # Verificar optimizaciones
-python main.py maintenance character-stats
+python main.py character-stats
 # Cache hit rate debe ser >90%
+```
+
+**Archivos faltantes en bases de datos externas**
+```bash
+# Detectar archivos eliminados manualmente
+python main.py cleanup-missing-files --dry-run
+
+# Limpiar registros específicos de TikTok
+python main.py cleanup-missing-files --platform tiktok
+
+# Obtener links para re-descarga manual
+# (Los links aparecen en el reporte detallado)
 ```
 
 ## 📚 Comandos Principales
 
 ### **Sistema de Mantenimiento**
 ```bash
-python main.py maintenance backup          # Crear backup
-python main.py maintenance verify          # Verificar integridad
-python main.py maintenance database-stats  # Estadísticas BD
-python main.py maintenance character-stats # Stats de IA
+python main.py backup                      # Crear backup completo
+python main.py verify                      # Verificar integridad del sistema
+python main.py db-stats                    # Estadísticas de base de datos
+python main.py character-stats             # Estadísticas de IA y personajes
+python main.py cleanup-missing-files --dry-run  # Detectar archivos faltantes
+python main.py cleanup-missing-files --force    # Limpiar registros huérfanos
 ```
 
 ### **Procesamiento de Videos**

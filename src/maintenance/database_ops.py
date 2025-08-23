@@ -252,8 +252,8 @@ class DatabaseOperations:
                     if subscription_base_name:
                         subscription_creator_id = self._get_or_create_creator(
                             subscription_base_name, 
-                            video_data.get('platform', 'youtube'),
                             None,  # No creator_url específica para este caso
+                            video_data.get('platform', 'youtube'),
                             creator_cache,
                             stats
                         )

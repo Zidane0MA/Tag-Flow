@@ -84,6 +84,11 @@ Ejemplos de uso:
   python main.py character-detection-report # Reporte de detección
   python main.py list-backups               # Listar backups disponibles
   python main.py cleanup-backups            # Limpiar backups antiguos
+
+🗑️ LIMPIEZA DE ARCHIVOS FALTANTES:
+  python main.py cleanup-missing-files --dry-run           # Detectar archivos faltantes sin limpiar
+  python main.py cleanup-missing-files --platform tiktok  # Limpiar solo TikTok
+  python main.py cleanup-missing-files --force            # Limpiar todos sin confirmación
             """
         )
         
@@ -186,6 +191,15 @@ Ejemplos de uso:
         # Estadísticas
         subparsers.add_parser('show-stats', help='Mostrar estadísticas del sistema')
         subparsers.add_parser('character-stats', help='Estadísticas de personajes')
+        
+        # Limpieza de archivos faltantes
+        cleanup_missing_parser = subparsers.add_parser('cleanup-missing-files', help='Detectar y limpiar archivos faltantes en BDs externas')
+        cleanup_missing_parser.add_argument('--platform', choices=['youtube', 'tiktok', 'instagram', 'all'], 
+                                          default='all', help='Plataforma específica (default: all)')
+        cleanup_missing_parser.add_argument('--dry-run', action='store_true', 
+                                          help='Mostrar archivos faltantes sin eliminar registros')
+        cleanup_missing_parser.add_argument('--force', action='store_true',
+                                          help='Limpiar registros sin confirmación')
         
         return parser
     
@@ -481,6 +495,51 @@ Ejemplos de uso:
                 for key, value in stats.items():
                     logger.info(f"  {key}: {value}")
                 return
+        
+        elif command == 'cleanup-missing-files':
+            from src.maintenance.missing_files_ops import MissingFilesOperations
+            ops = MissingFilesOperations()
+            
+            # Detectar archivos faltantes
+            logger.info("🔍 Detectando archivos faltantes en bases de datos externas...")
+            missing_records = ops.detect_missing_files(platform=getattr(args, 'platform', 'all'))
+            
+            # Generar reporte
+            report = ops.generate_missing_files_report(missing_records)
+            print(report)
+            
+            # Contar total de archivos faltantes
+            total_missing = sum(len(records) for records in missing_records.values())
+            
+            if total_missing == 0:
+                logger.info("✅ No se encontraron archivos faltantes")
+                return
+            
+            # Si es dry-run, solo mostrar
+            if getattr(args, 'dry_run', False):
+                logger.info(f"🧪 DRY-RUN: {total_missing} registros serían procesados")
+                return
+            
+            # Confirmar limpieza si no se usa --force
+            if not getattr(args, 'force', False):
+                response = input(f"\n¿Limpiar {total_missing} registros de archivos faltantes? [y/N]: ")
+                if response.lower() not in ['y', 'yes', 'sí', 'si']:
+                    logger.info("⏹️ Limpieza cancelada")
+                    return
+            
+            # Ejecutar limpieza
+            all_missing = []
+            for records in missing_records.values():
+                all_missing.extend(records)
+            
+            cleanup_stats = ops.cleanup_missing_records(all_missing, dry_run=False)
+            
+            logger.info("🗑️ Limpieza completada:")
+            logger.info(f"  ✅ Registros limpiados: {cleanup_stats['cleaned']}")
+            if cleanup_stats['errors'] > 0:
+                logger.warning(f"  ⚠️ Errores: {cleanup_stats['errors']}")
+            
+            return
                 
         else:
             logger.error(f"❌ Comando no reconocido: {command}")

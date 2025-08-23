@@ -25,13 +25,14 @@ class TikTokTokkitHandler(DatabaseExtractor):
             self.base_path = base_path
     
     def extract_videos(self, offset: int = 0, limit: Optional[int] = None) -> List[Dict]:
-        """Extraer videos de TikTok desde BD de 4K Tokkit con nueva estructura completa
-        Solo incluye videos que han sido descargados (downloaded=1)
+        """Extraer videos e imágenes de TikTok desde BD de 4K Tokkit con nueva estructura completa
+        Solo incluye contenido descargado (downloaded=1) y excluye imágenes de perfil (MediaType IN (2,3))
+        MediaType: 2=video, 3=imagen, 1=coverimg (ignorar)
         """
         if limit is not None:
-            self.logger.debug(f"Extrayendo videos de TikTok descargados (offset: {offset}, limit: {limit})...")
+            self.logger.debug(f"Extrayendo contenido de TikTok descargado (offset: {offset}, limit: {limit})...")
         else:
-            self.logger.debug("Extrayendo videos de TikTok descargados...")
+            self.logger.debug("Extrayendo contenido de TikTok descargado...")
         videos = []
 
         if not self.is_available():
@@ -49,7 +50,9 @@ class TikTokTokkitHandler(DatabaseExtractor):
                         ELSE mi.id
                     END as base_id
                 FROM MediaItems mi
-                WHERE mi.relativePath IS NOT NULL AND mi.downloaded = 1
+                WHERE mi.relativePath IS NOT NULL 
+                AND mi.downloaded = 1 
+                AND mi.MediaType IN (2, 3)
                 GROUP BY base_id
                 ORDER BY MIN(mi.databaseId) DESC
                 LIMIT ? OFFSET ?
@@ -76,7 +79,9 @@ class TikTokTokkitHandler(DatabaseExtractor):
                         
                     FROM MediaItems mi
                     LEFT JOIN Subscriptions s ON mi.subscriptionDatabaseId = s.databaseId
-                    WHERE mi.relativePath IS NOT NULL AND mi.downloaded = 1
+                    WHERE mi.relativePath IS NOT NULL 
+                    AND mi.downloaded = 1
+                    AND mi.MediaType IN (2, 3)
                     AND (
                         CASE 
                             WHEN mi.id LIKE '%_index_%' THEN SUBSTR(mi.id, 1, INSTR(mi.id, '_index_') - 1)
@@ -87,7 +92,7 @@ class TikTokTokkitHandler(DatabaseExtractor):
                     """
                     rows = self._execute_query(query, base_ids)
             else:
-                # Sin límite: obtener todos los videos descargados
+                # Sin límite: obtener todos los videos e imágenes descargados
                 query = """
                 SELECT 
                     mi.databaseId as media_id,
@@ -103,7 +108,9 @@ class TikTokTokkitHandler(DatabaseExtractor):
                     
                 FROM MediaItems mi
                 LEFT JOIN Subscriptions s ON mi.subscriptionDatabaseId = s.databaseId
-                WHERE mi.relativePath IS NOT NULL AND mi.downloaded = 1
+                WHERE mi.relativePath IS NOT NULL 
+                AND mi.downloaded = 1
+                AND mi.MediaType IN (2, 3)
                 ORDER BY mi.databaseId DESC
                 """
                 rows = self._execute_query(query)
@@ -116,7 +123,7 @@ class TikTokTokkitHandler(DatabaseExtractor):
                 if video_data:
                     videos.append(video_data)
 
-            self.logger.info(f"Extraídos {len(videos)} videos de TikTok desde Tokkit")
+            self.logger.info(f"Extraídos {len(videos)} elementos de TikTok desde Tokkit (videos e imágenes)")
             return videos
 
         except Exception as e:
@@ -162,6 +169,11 @@ class TikTokTokkitHandler(DatabaseExtractor):
         else:
             post_url = f"https://www.tiktok.com/@{row['authorName']}/photo/{tiktok_id_clean}"
         
+        # Obtener duración para videos (optimizado)
+        duration_seconds = None
+        if is_video:
+            duration_seconds = self._get_video_duration(file_path)
+
         # Datos básicos del video
         video_data = {
             'file_path': str(file_path),
@@ -172,6 +184,7 @@ class TikTokTokkitHandler(DatabaseExtractor):
             'content_type': 'video' if is_video else 'image',
             'source': 'db',
             'file_size': file_path.stat().st_size if file_path.exists() else 0,
+            'duration_seconds': duration_seconds,
             
             # Datos del downloader - CRÍTICO para batch_insert_videos
             'downloader_mapping': {
@@ -261,6 +274,31 @@ class TikTokTokkitHandler(DatabaseExtractor):
                 result['subscription_name'] = subscription_name
         
         return result
+
+    def _get_video_duration(self, file_path: Path) -> Optional[float]:
+        """Obtener duración del video usando FFprobe (rápido y ligero)"""
+        try:
+            # Solo procesar videos, no imágenes
+            video_extensions = {'.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm'}
+            if file_path.suffix.lower() not in video_extensions:
+                return None
+            
+            # Usar FFprobe para obtener duración rápidamente
+            result = subprocess.run([
+                'ffprobe', '-v', 'quiet', '-show_entries', 'format=duration',
+                '-of', 'csv=p=0', str(file_path)
+            ], capture_output=True, text=True, timeout=5)
+            
+            if result.returncode == 0 and result.stdout.strip():
+                duration = float(result.stdout.strip())
+                return duration
+                
+        except (subprocess.TimeoutExpired, subprocess.SubprocessError, ValueError) as e:
+            self.logger.debug(f"Error obteniendo duración de {file_path.name}: {e}")
+        except Exception as e:
+            self.logger.debug(f"Error inesperado obteniendo duración: {e}")
+            
+        return None
 
     def _detect_account_sublists_tiktok(self, relative_path: str) -> List[str]:
         """Detectar sublistas para cuentas TikTok según estructura de carpetas"""

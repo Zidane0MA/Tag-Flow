@@ -88,6 +88,42 @@ Comandos diseñados para diagnosticar y reparar la salud de la base de datos, lo
 
 ---
 
+### 🗑️ Limpieza de Archivos Faltantes
+
+Comando especializado para detectar y limpiar archivos eliminados manualmente que permanecen marcados como descargados en las bases de datos externas.
+
+- **`cleanup-missing-files`**
+  - **Función:** Detecta archivos que están marcados como descargados en las bases de datos de aplicaciones externas (4K Video Downloader+, 4K Tokkit, 4K Stogram) pero que fueron eliminados manualmente del disco. El sistema muestra un reporte detallado con links para re-descarga y permite limpiar estos registros marcándolos como no descargados.
+  - **Características:**
+    - **Detección inteligente:** Escanea las BDs externas verificando la existencia física de archivos
+    - **Reporte detallado:** Muestra autor, ID, descripción, links de TikTok/YouTube, y rutas de archivos
+    - **Limpieza segura:** Marca registros como `downloaded=0` en lugar de eliminarlos permanentemente
+    - **Soporte multi-plataforma:** TikTok (implementado), YouTube e Instagram (próximamente)
+  - **Opciones:**
+    - `--platform {youtube,tiktok,instagram,all}`: Plataforma específica a verificar (por defecto: all)
+    - `--dry-run`: Muestra los archivos faltantes sin realizar limpieza
+    - `--force`: Ejecuta la limpieza sin pedir confirmación
+  - **Flujo de trabajo recomendado:**
+    1. **Detectar:** `python -X utf8 main.py cleanup-missing-files --dry-run`
+    2. **Revisar links:** Usar los enlaces mostrados para re-descargar videos si es necesario
+    3. **Limpiar:** `python -X utf8 main.py cleanup-missing-files --platform tiktok`
+  - **Ejemplos:**
+    ```bash
+    # Detectar archivos faltantes sin limpiar
+    python -X utf8 main.py cleanup-missing-files --dry-run
+    
+    # Verificar solo TikTok
+    python -X utf8 main.py cleanup-missing-files --platform tiktok --dry-run
+    
+    # Limpiar con confirmación
+    python -X utf8 main.py cleanup-missing-files --platform tiktok
+    
+    # Limpiar todas las plataformas sin confirmación
+    python -X utf8 main.py cleanup-missing-files --force
+    ```
+
+---
+
 ### 🖼️ Operaciones de Thumbnails
 
 Administra la generación, limpieza y estadísticas de las miniaturas de los videos. Estos comandos están optimizados para un alto rendimiento.
