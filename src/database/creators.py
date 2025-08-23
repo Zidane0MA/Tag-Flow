@@ -100,17 +100,17 @@ class CreatorOperations(DatabaseBase):
     
     # --- BATCH OPERATIONS FOR PERFORMANCE ---
     
-    def batch_create_creators(self, creators_data: List[Dict]) -> Dict[str, int]:
+    def batch_create_creators(self, creators_data: List[Dict]) -> tuple[Dict[str, int], int]:
         """Batch create multiple creators at once
         
         Args:
             creators_data: List of dicts with keys: name, parent_creator_id, is_primary, alias_type
         
         Returns:
-            Dict mapping creator names to their IDs
+            Tuple: (Dict mapping creator names to their IDs, count of new creators created)
         """
         if not creators_data:
-            return {}
+            return {}, 0
             
         self._ensure_initialized()
         start_time = time.time()
@@ -118,6 +118,17 @@ class CreatorOperations(DatabaseBase):
         
         try:
             with self.get_connection() as conn:
+                # First, get existing creators to count new ones
+                creator_names = [creator['name'] for creator in creators_data]
+                placeholders = ','.join(['?' for _ in creator_names])
+                cursor = conn.execute(f'''
+                    SELECT name FROM creators WHERE name IN ({placeholders})
+                ''', creator_names)
+                existing_names = {row[0] for row in cursor.fetchall()}
+                
+                # Calculate how many are new
+                new_creators_count = len(creator_names) - len(existing_names)
+                
                 # Prepare batch data for creators
                 creator_records = []
                 for creator in creators_data:
@@ -135,8 +146,6 @@ class CreatorOperations(DatabaseBase):
                 ''', creator_records)
                 
                 # Get all creator IDs (including existing ones)
-                creator_names = [creator['name'] for creator in creators_data]
-                placeholders = ','.join(['?' for _ in creator_names])
                 cursor = conn.execute(f'''
                     SELECT name, id FROM creators WHERE name IN ({placeholders})
                 ''', creator_names)
@@ -145,12 +154,12 @@ class CreatorOperations(DatabaseBase):
                     name_to_id[name] = creator_id
                 
                 self._track_query('batch_create_creators', time.time() - start_time)
-                logger.debug(f"✅ Batch created/retrieved {len(name_to_id)} creators")
-                return name_to_id
+                logger.debug(f"✅ Batch created/retrieved {len(name_to_id)} creators ({new_creators_count} nuevos)")
+                return name_to_id, new_creators_count
                 
         except Exception as e:
             logger.error(f"Error in batch creator creation: {e}")
-            return {}
+            return {}, 0
     
     def batch_add_creator_urls(self, url_data: List[Dict]) -> int:
         """Batch add creator URLs

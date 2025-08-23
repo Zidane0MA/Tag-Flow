@@ -1114,8 +1114,11 @@ class DatabaseOperations:
         print("┌─────────────────────────────┬──────────┐")
         print(f"│ Nuevos videos agregados     │ {result['videos_added']:8} │")
         
-        # Calcular videos ya existentes desde external stats (evitar valores negativos)
-        total_processed = validation_stats.get('total_external_records', result['videos_added'])
+        # Calcular total procesado desde el resultado real o external stats
+        total_processed = validation_stats.get('total_external_records', 0)
+        if total_processed == 0:
+            # Para YouTube y otros casos donde no tenemos stats externos, usar videos añadidos + actualizados
+            total_processed = result['videos_added'] + result.get('videos_updated', 0)
         existing_count = max(0, total_processed - result['videos_added'])  # Evitar valores negativos
         print(f"│ Videos ya existentes        │ {existing_count:8} │")
         
@@ -1206,10 +1209,9 @@ class DatabaseOperations:
         creator_cache = {}
         if creators_to_create:
             creator_list = list(creators_to_create.values())
-            creator_cache = self.db.batch_create_creators(creator_list)
-            stats['creators_created'] = len([name for name in creator_cache.keys() 
-                                           if not self.db.get_creator_by_name(name)])
-            logger.debug(f"✅ Batch creado: {len(creator_cache)} creadores")
+            creator_cache, new_creators_count = self.db.batch_create_creators(creator_list)
+            stats['creators_created'] = new_creators_count
+            logger.debug(f"✅ Batch creado: {len(creator_cache)} creadores ({new_creators_count} nuevos)")
         
         # Batch crear URLs de creadores
         if creator_urls_to_add and creator_cache:

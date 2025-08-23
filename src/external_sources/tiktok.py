@@ -8,9 +8,6 @@ from pathlib import Path
 from typing import Dict, List, Optional
 from .base import DatabaseExtractor
 import subprocess
-import json
-import os
-from datetime import datetime, timedelta
 
 import logging
 logger = logging.getLogger(__name__)
@@ -26,11 +23,6 @@ class TikTokTokkitHandler(DatabaseExtractor):
             self.base_path = db_path.parent  # Database is in the same folder as downloaded content
         else:
             self.base_path = base_path
-            
-        # Duration cache system
-        self.duration_cache_file = Path("data/duration_cache_tiktok.json")
-        self.duration_cache = self._load_duration_cache()
-        self.cache_expiry_days = 30  # Cache válido por 30 días
     
     def extract_videos(self, offset: int = 0, limit: Optional[int] = None) -> List[Dict]:
         """Extraer videos e imágenes de TikTok desde BD de 4K Tokkit con nueva estructura completa
@@ -356,88 +348,64 @@ class TikTokTokkitHandler(DatabaseExtractor):
         return None
     
     def _get_batch_video_durations(self, video_files: List[str]) -> Dict[str, Optional[float]]:
-        """Obtener duraciones de múltiples videos usando cache + batch ffprobe (paralelo)"""
+        """Obtener duraciones de múltiples videos usando batch ffprobe (paralelo)"""
         if not video_files:
             return {}
             
         durations = {}
-        files_to_process = []
-        cache_hits = 0
+        self.logger.debug(f"🎬 Extrayendo duración de {len(video_files)} videos en lote...")
         
-        # Primero, intentar obtener duraciones desde cache
-        for file_path in video_files:
-            cached_duration = self._get_cached_duration(file_path)
-            if cached_duration is not None:
-                durations[file_path] = cached_duration
-                cache_hits += 1
-            else:
-                files_to_process.append(file_path)
-        
-        self.logger.debug(f"🎬 Cache hits: {cache_hits}/{len(video_files)}, procesando: {len(files_to_process)} videos")
-        
-        # Procesar archivos que no están en cache
-        if files_to_process:
-            try:
-                import concurrent.futures
-                import threading
-                
-                def get_duration(file_path: str) -> tuple[str, Optional[float]]:
-                    """Get duration for single video file"""
-                    try:
-                        path = Path(file_path)
-                        video_extensions = {'.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm'}
-                        
-                        if path.suffix.lower() not in video_extensions:
-                            return file_path, None
-                        
-                        # Usar FFprobe con timeout reducido para batch
-                        result = subprocess.run([
-                            'ffprobe', '-v', 'quiet', '-show_entries', 'format=duration',
-                            '-of', 'csv=p=0', str(path)
-                        ], capture_output=True, text=True, timeout=3)  # Timeout reducido
-                        
-                        if result.returncode == 0 and result.stdout.strip():
-                            duration = float(result.stdout.strip())
-                            return file_path, duration
-                        return file_path, None
-                            
-                    except Exception as e:
-                        self.logger.debug(f"Error obteniendo duración de {Path(file_path).name}: {e}")
-                        return file_path, None
-                
-                # Procesar en paralelo con ThreadPoolExecutor
-                max_workers = min(8, len(files_to_process))  # Máximo 8 hilos para evitar sobrecarga
-                
-                with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-                    # Enviar todas las tareas
-                    future_to_file = {executor.submit(get_duration, file_path): file_path 
-                                    for file_path in files_to_process}
+        try:
+            import concurrent.futures
+            
+            def get_duration(file_path: str) -> tuple[str, Optional[float]]:
+                """Get duration for single video file"""
+                try:
+                    path = Path(file_path)
+                    video_extensions = {'.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm'}
                     
-                    # Recoger resultados y cachear
-                    for future in concurrent.futures.as_completed(future_to_file, timeout=30):
-                        file_path, duration = future.result()
-                        durations[file_path] = duration
-                        # Cachear resultado para futuras ejecuciones
-                        self._cache_duration(file_path, duration)
+                    if path.suffix.lower() not in video_extensions:
+                        return file_path, None
+                    
+                    # Usar FFprobe con timeout reducido para batch
+                    result = subprocess.run([
+                        'ffprobe', '-v', 'quiet', '-show_entries', 'format=duration',
+                        '-of', 'csv=p=0', str(path)
+                    ], capture_output=True, text=True, timeout=3)  # Timeout reducido
+                    
+                    if result.returncode == 0 and result.stdout.strip():
+                        duration = float(result.stdout.strip())
+                        return file_path, duration
+                    return file_path, None
                         
-                self.logger.debug(f"✅ Duraciones extraídas: {len(files_to_process)} nuevas, {cache_hits} desde cache")
+                except Exception as e:
+                    self.logger.debug(f"Error obteniendo duración de {Path(file_path).name}: {e}")
+                    return file_path, None
+            
+            # Procesar en paralelo con ThreadPoolExecutor
+            max_workers = min(8, len(video_files))  # Máximo 8 hilos para evitar sobrecarga
+            
+            with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+                # Enviar todas las tareas
+                future_to_file = {executor.submit(get_duration, file_path): file_path 
+                                for file_path in video_files}
                 
-                # Guardar cache actualizado
-                self._save_duration_cache()
-                
-            except Exception as e:
-                self.logger.warning(f"Error en batch duration extraction, fallback a método individual: {e}")
-                
-                # Fallback: procesar uno por uno si batch falla
-                for file_path in files_to_process:
-                    duration = self._get_video_duration(Path(file_path))
+                # Recoger resultados
+                for future in concurrent.futures.as_completed(future_to_file, timeout=30):
+                    file_path, duration = future.result()
                     durations[file_path] = duration
-                    self._cache_duration(file_path, duration)
+                    
+            self.logger.debug(f"✅ Duraciones extraídas: {len(durations)} archivos procesados")
+            return durations
+            
+        except Exception as e:
+            self.logger.warning(f"Error en batch duration extraction, fallback a método individual: {e}")
+            
+            # Fallback: procesar uno por uno si batch falla
+            for file_path in video_files:
+                durations[file_path] = self._get_video_duration(Path(file_path))
                 
-                # Guardar cache incluso en fallback
-                self._save_duration_cache()
-        
-        return durations
+            return durations
     
     def _batch_file_operations(self, file_paths: List[str]) -> Dict[str, Optional[object]]:
         """Batch file existence and stat operations for better performance"""
@@ -495,77 +463,6 @@ class TikTokTokkitHandler(DatabaseExtractor):
                     file_stats[file_path] = None
                     
             return file_stats
-    
-    def _load_duration_cache(self) -> Dict[str, Dict]:
-        """Cargar cache de duraciones desde archivo"""
-        try:
-            if self.duration_cache_file.exists():
-                with open(self.duration_cache_file, 'r', encoding='utf-8') as f:
-                    cache_data = json.load(f)
-                
-                # Limpiar entradas expiradas
-                current_time = datetime.now()
-                cleaned_cache = {}
-                for file_path, entry in cache_data.items():
-                    cache_time = datetime.fromisoformat(entry['cached_at'])
-                    if current_time - cache_time < timedelta(days=self.cache_expiry_days):
-                        cleaned_cache[file_path] = entry
-                
-                if len(cleaned_cache) != len(cache_data):
-                    self.logger.debug(f"Limpiado cache: {len(cache_data) - len(cleaned_cache)} entradas expiradas")
-                
-                self.logger.debug(f"📦 Cache de duración cargado: {len(cleaned_cache)} entradas")
-                return cleaned_cache
-        except Exception as e:
-            self.logger.debug(f"Error cargando cache de duración: {e}")
-        
-        return {}
-    
-    def _save_duration_cache(self) -> None:
-        """Guardar cache de duraciones a archivo"""
-        try:
-            # Crear directorio si no existe
-            self.duration_cache_file.parent.mkdir(exist_ok=True)
-            
-            with open(self.duration_cache_file, 'w', encoding='utf-8') as f:
-                json.dump(self.duration_cache, f, indent=2, ensure_ascii=False)
-            
-            self.logger.debug(f"💾 Cache de duración guardado: {len(self.duration_cache)} entradas")
-        except Exception as e:
-            self.logger.warning(f"Error guardando cache de duración: {e}")
-    
-    def _get_cached_duration(self, file_path: str) -> Optional[float]:
-        """Obtener duración desde cache si está disponible y válida"""
-        try:
-            path_str = str(file_path)
-            if path_str in self.duration_cache:
-                entry = self.duration_cache[path_str]
-                
-                # Verificar que el archivo no haya cambiado
-                file_stat = Path(file_path).stat()
-                if (entry['file_size'] == file_stat.st_size and 
-                    entry['modified_time'] == file_stat.st_mtime):
-                    return entry['duration']
-            
-        except Exception as e:
-            self.logger.debug(f"Error verificando cache para {file_path}: {e}")
-        
-        return None
-    
-    def _cache_duration(self, file_path: str, duration: Optional[float]) -> None:
-        """Cachear duración de un archivo"""
-        try:
-            path_str = str(file_path)
-            file_stat = Path(file_path).stat()
-            
-            self.duration_cache[path_str] = {
-                'duration': duration,
-                'file_size': file_stat.st_size,
-                'modified_time': file_stat.st_mtime,
-                'cached_at': datetime.now().isoformat()
-            }
-        except Exception as e:
-            self.logger.debug(f"Error cacheando duración para {file_path}: {e}")
 
     def _detect_account_sublists_tiktok(self, relative_path: str) -> List[str]:
         """Detectar sublistas para cuentas TikTok según estructura de carpetas"""

@@ -196,7 +196,7 @@ class DatabaseManager:
         """Add creator URL for platform"""
         return self.creators.add_creator_url(creator_id, platform, url)
     
-    def batch_create_creators(self, creators_data: List[Dict]) -> Dict[str, int]:
+    def batch_create_creators(self, creators_data: List[Dict]) -> tuple[Dict[str, int], int]:
         """Batch create multiple creators"""
         return self.creators.batch_create_creators(creators_data)
     
