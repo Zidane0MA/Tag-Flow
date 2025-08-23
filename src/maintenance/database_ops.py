@@ -162,43 +162,54 @@ class DatabaseOperations:
         videos_to_insert = []
         videos_to_update = []
         
-        # Cache de creadores y suscripciones para evitar duplicados
-        creator_cache = {}  # {name: creator_id}
-        subscription_cache = {}  # {(name, platform, type): subscription_id}
+        logger.debug(f"📊 Procesando {len(all_videos)} videos con nueva estructura (BATCH MODE)")
         
-        logger.debug(f"📊 Procesando {len(all_videos)} videos con nueva estructura")
-        
-        # Verificar existencia de videos
+        # 1. Verificar existencia de videos en lote
         file_paths = [video['file_path'] for video in all_videos]
         existing_videos = self.db.check_videos_exist_batch(file_paths)
         
+        # 2. Separar videos nuevos vs existentes
+        new_videos = []
+        update_videos = []
+        
         for video_data in all_videos:
+            file_path = video_data['file_path']
+            if existing_videos.get(file_path, False):
+                if force:
+                    update_videos.append(video_data)
+            else:
+                new_videos.append(video_data)
+        
+        logger.debug(f"📊 Videos para procesar: {len(new_videos)} nuevos, {len(update_videos)} actualizaciones")
+        
+        # 3. BATCH PROCESSING: Crear todos los creadores y suscripciones primero
+        creator_cache, subscription_cache = self._batch_create_creators_and_subscriptions(new_videos + update_videos, stats)
+        
+        # 4. Procesar videos usando los caches pre-poblados (mucho más rápido)
+        for video_data in new_videos:
             try:
-                file_path = video_data['file_path']
-                
-                # Verificar si ya existe
-                if existing_videos.get(file_path, False):
-                    if force:
-                        # Actualizar video existente
-                        processed_video = self._process_single_video_new_structure(
-                            video_data, creator_cache, subscription_cache, stats, update=True
-                        )
-                        if processed_video:
-                            videos_to_update.append(processed_video)
-                    else:
-                        # Saltar video existente (log debug para evitar ruido)
-                        logger.debug(f"➡️ Video ya existe en la base de datos, saltando: {file_path}")
-                        continue
-                else:
-                    # Insertar video nuevo
-                    processed_video = self._process_single_video_new_structure(
-                        video_data, creator_cache, subscription_cache, stats, update=False
-                    )
-                    if processed_video:
-                        videos_to_insert.append(processed_video)
+                processed_video = self._process_single_video_new_structure(
+                    video_data, creator_cache, subscription_cache, stats, update=False
+                )
+                if processed_video:
+                    videos_to_insert.append(processed_video)
                         
             except Exception as e:
                 logger.error(f"Error procesando video {video_data.get('file_path', 'unknown')}: {e}")
+                stats['errors'].append(str(e))
+                continue
+        
+        # 5. Procesar videos de actualización
+        for video_data in update_videos:
+            try:
+                processed_video = self._process_single_video_new_structure(
+                    video_data, creator_cache, subscription_cache, stats, update=True
+                )
+                if processed_video:
+                    videos_to_update.append(processed_video)
+                        
+            except Exception as e:
+                logger.error(f"Error procesando video para actualización {video_data.get('file_path', 'unknown')}: {e}")
                 stats['errors'].append(str(e))
                 continue
         
@@ -230,43 +241,20 @@ class DatabaseOperations:
                                           subscription_cache: Dict, stats: Dict, update: bool = False) -> Optional[Dict]:
         """Procesar un video individual con nueva estructura"""
         try:
-            # 1. Gestionar creador (solo si existe)
+            # 1. Gestionar creador (usar cache pre-poblado)
             creator_id = None
-            if video_data.get('creator_name'):
-                creator_id = self._get_or_create_creator(
-                    video_data.get('creator_name'),
-                    video_data.get('creator_url'),
-                    video_data.get('platform', 'youtube'),
-                    creator_cache,
-                    stats
-                )
+            creator_name = video_data.get('creator_name')
+            if creator_name:
+                creator_id = creator_cache.get(creator_name)
             
-            # 2. Gestionar suscripción (solo si existe)
+            # 2. Gestionar suscripción (usar cache pre-poblado)
             subscription_id = None
-            if video_data.get('subscription_name'):
-                # Para suscripciones account, el creator_id debe corresponder al nombre de la suscripción
-                subscription_creator_id = creator_id
-                if video_data.get('subscription_type') == 'account':
-                    # Extraer nombre base de la suscripción (sin " - Liked" / " - Favorites")
-                    subscription_base_name = video_data.get('subscription_name', '').replace(' - Liked', '').replace(' - Favorites', '')
-                    if subscription_base_name:
-                        subscription_creator_id = self._get_or_create_creator(
-                            subscription_base_name, 
-                            None,  # No creator_url específica para este caso
-                            video_data.get('platform', 'youtube'),
-                            creator_cache,
-                            stats
-                        )
-                
-                subscription_id = self._get_or_create_subscription(
-                    video_data.get('subscription_name'),
-                    video_data.get('subscription_type', 'account'),
-                    video_data.get('platform', 'youtube'),
-                    subscription_creator_id,
-                    video_data.get('subscription_url'),
-                    subscription_cache,
-                    stats
-                )
+            subscription_name = video_data.get('subscription_name')
+            if subscription_name:
+                platform = video_data.get('platform', 'youtube')
+                subscription_type = video_data.get('subscription_type', 'account')
+                sub_key = (subscription_name, platform, subscription_type)
+                subscription_id = subscription_cache.get(sub_key)
             
             # 3. Preparar datos del video
             processed_video = {
@@ -1152,6 +1140,112 @@ class DatabaseOperations:
             print(f"\n❌ Errores encontrados: {result['errors']}")
         
         print(f"\n⏱️  Tiempo de ejecución: {execution_time:.2f}s\n")
+
+    def _batch_create_creators_and_subscriptions(self, all_videos: List[Dict], stats: Dict) -> tuple[Dict, Dict]:
+        """Crear todos los creadores y suscripciones en lote para máxima performance"""
+        logger.debug("🚀 Iniciando batch creation de creadores y suscripciones...")
+        
+        # Recopilar todos los creadores y suscripciones únicos
+        creators_to_create = {}  # {name: {data}}
+        subscriptions_to_create = {}  # {(name, platform, type): {data}}
+        creator_urls_to_add = []  # [{creator_id, platform, url}]
+        
+        # Escanear todos los videos para extraer creadores y suscripciones
+        for video_data in all_videos:
+            platform = video_data.get('platform', 'youtube')
+            
+            # 1. Creador principal
+            creator_name = video_data.get('creator_name')
+            creator_url = video_data.get('creator_url')
+            if creator_name:
+                creators_to_create[creator_name] = {
+                    'name': creator_name,
+                    'parent_creator_id': None,
+                    'is_primary': True,
+                    'alias_type': 'main'
+                }
+                if creator_url:
+                    creator_urls_to_add.append({
+                        'creator_name': creator_name,  # Temporal, será reemplazado por creator_id
+                        'platform': platform,
+                        'url': creator_url
+                    })
+            
+            # 2. Creador de suscripción (si es diferente)
+            subscription_name = video_data.get('subscription_name')
+            subscription_type = video_data.get('subscription_type', 'account')
+            subscription_url = video_data.get('subscription_url')
+            
+            if subscription_name and subscription_type == 'account':
+                # Extraer nombre base de la suscripción
+                subscription_base_name = subscription_name.replace(' - Liked', '').replace(' - Favorites', '')
+                if subscription_base_name and subscription_base_name != creator_name:
+                    creators_to_create[subscription_base_name] = {
+                        'name': subscription_base_name,
+                        'parent_creator_id': None,
+                        'is_primary': True,
+                        'alias_type': 'main'
+                    }
+                    # No añadir URL específica para subscription creators
+            
+            # 3. Suscripción
+            if subscription_name:
+                sub_key = (subscription_name, platform, subscription_type)
+                if sub_key not in subscriptions_to_create:
+                    subscriptions_to_create[sub_key] = {
+                        'name': subscription_name,
+                        'type': subscription_type,
+                        'platform': platform,
+                        'url': subscription_url,
+                        'creator_name': subscription_base_name if subscription_type == 'account' else creator_name
+                    }
+        
+        logger.debug(f"📊 Identificados: {len(creators_to_create)} creadores únicos, {len(subscriptions_to_create)} suscripciones únicas")
+        
+        # Batch crear creadores
+        creator_cache = {}
+        if creators_to_create:
+            creator_list = list(creators_to_create.values())
+            creator_cache = self.db.batch_create_creators(creator_list)
+            stats['creators_created'] = len([name for name in creator_cache.keys() 
+                                           if not self.db.get_creator_by_name(name)])
+            logger.debug(f"✅ Batch creado: {len(creator_cache)} creadores")
+        
+        # Batch crear URLs de creadores
+        if creator_urls_to_add and creator_cache:
+            url_data = []
+            for url_info in creator_urls_to_add:
+                creator_name = url_info['creator_name']
+                if creator_name in creator_cache:
+                    url_data.append({
+                        'creator_id': creator_cache[creator_name],
+                        'platform': url_info['platform'],
+                        'url': url_info['url']
+                    })
+            
+            if url_data:
+                urls_added = self.db.batch_add_creator_urls(url_data)
+                logger.debug(f"✅ Batch añadidas: {urls_added} URLs de creadores")
+        
+        # Crear suscripciones individualmente (por ahora, batch en siguiente iteración)
+        subscription_cache = {}
+        for sub_key, sub_data in subscriptions_to_create.items():
+            creator_name = sub_data['creator_name']
+            creator_id = creator_cache.get(creator_name) if creator_name else None
+            
+            subscription_id = self._get_or_create_subscription(
+                sub_data['name'],
+                sub_data['type'],
+                sub_data['platform'],
+                creator_id,
+                sub_data['url'],
+                subscription_cache,
+                stats
+            )
+            subscription_cache[sub_key] = subscription_id
+        
+        logger.debug(f"✅ BATCH CREATION completado: {len(creator_cache)} creadores, {len(subscription_cache)} suscripciones")
+        return creator_cache, subscription_cache
 
 # Funciones de conveniencia para compatibilidad
 def populate_database(source: str = 'all', platform: Optional[str] = None, 

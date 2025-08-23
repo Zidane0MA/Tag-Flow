@@ -98,6 +98,101 @@ class CreatorOperations(DatabaseBase):
             logger.error(f"Error adding creator URL: {e}")
             return False
     
+    # --- BATCH OPERATIONS FOR PERFORMANCE ---
+    
+    def batch_create_creators(self, creators_data: List[Dict]) -> Dict[str, int]:
+        """Batch create multiple creators at once
+        
+        Args:
+            creators_data: List of dicts with keys: name, parent_creator_id, is_primary, alias_type
+        
+        Returns:
+            Dict mapping creator names to their IDs
+        """
+        if not creators_data:
+            return {}
+            
+        self._ensure_initialized()
+        start_time = time.time()
+        name_to_id = {}
+        
+        try:
+            with self.get_connection() as conn:
+                # Prepare batch data for creators
+                creator_records = []
+                for creator in creators_data:
+                    creator_records.append((
+                        creator['name'],
+                        creator.get('parent_creator_id'),
+                        creator.get('is_primary', True),
+                        creator.get('alias_type', 'main')
+                    ))
+                
+                # Batch insert creators
+                cursor = conn.executemany('''
+                    INSERT OR IGNORE INTO creators (name, parent_creator_id, is_primary, alias_type)
+                    VALUES (?, ?, ?, ?)
+                ''', creator_records)
+                
+                # Get all creator IDs (including existing ones)
+                creator_names = [creator['name'] for creator in creators_data]
+                placeholders = ','.join(['?' for _ in creator_names])
+                cursor = conn.execute(f'''
+                    SELECT name, id FROM creators WHERE name IN ({placeholders})
+                ''', creator_names)
+                
+                for name, creator_id in cursor.fetchall():
+                    name_to_id[name] = creator_id
+                
+                self._track_query('batch_create_creators', time.time() - start_time)
+                logger.debug(f"✅ Batch created/retrieved {len(name_to_id)} creators")
+                return name_to_id
+                
+        except Exception as e:
+            logger.error(f"Error in batch creator creation: {e}")
+            return {}
+    
+    def batch_add_creator_urls(self, url_data: List[Dict]) -> int:
+        """Batch add creator URLs
+        
+        Args:
+            url_data: List of dicts with keys: creator_id, platform, url
+        
+        Returns:
+            Number of URLs successfully added
+        """
+        if not url_data:
+            return 0
+            
+        self._ensure_initialized()
+        start_time = time.time()
+        
+        try:
+            with self.get_connection() as conn:
+                # Prepare batch data for URLs
+                url_records = []
+                for url_info in url_data:
+                    url_records.append((
+                        url_info['creator_id'],
+                        url_info['platform'],
+                        url_info['url']
+                    ))
+                
+                # Batch insert URLs
+                cursor = conn.executemany('''
+                    INSERT OR REPLACE INTO creator_urls (creator_id, platform, url)
+                    VALUES (?, ?, ?)
+                ''', url_records)
+                
+                added_count = cursor.rowcount if cursor.rowcount > 0 else len(url_records)
+                self._track_query('batch_add_creator_urls', time.time() - start_time)
+                logger.debug(f"✅ Batch added {added_count} creator URLs")
+                return added_count
+                
+        except Exception as e:
+            logger.error(f"Error in batch URL creation: {e}")
+            return 0
+    
     # --- CREATOR HIERARCHY MANAGEMENT (SECONDARY ACCOUNTS) ---
     
     def link_creator_as_secondary(self, secondary_creator_id: int, primary_creator_id: int, 

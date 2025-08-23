@@ -196,6 +196,14 @@ class DatabaseManager:
         """Add creator URL for platform"""
         return self.creators.add_creator_url(creator_id, platform, url)
     
+    def batch_create_creators(self, creators_data: List[Dict]) -> Dict[str, int]:
+        """Batch create multiple creators"""
+        return self.creators.batch_create_creators(creators_data)
+    
+    def batch_add_creator_urls(self, url_data: List[Dict]) -> int:
+        """Batch add creator URLs"""
+        return self.creators.batch_add_creator_urls(url_data)
+    
     def link_creator_as_secondary(self, secondary_creator_id: int, primary_creator_id: int, 
                                  alias_type: str = 'secondary') -> bool:
         """Link creator as secondary account"""
