@@ -175,7 +175,7 @@ class TikTokTokkitHandler(DatabaseExtractor):
             self.logger.error(f"Error extrayendo videos de TikTok desde Tokkit: {e}")
             return videos
 
-    def _process_tokkit_row_with_structure(self, row, tiktok_base: Path, extract_duration: bool = True, file_stat = None) -> Optional[Dict]:
+    def _process_tokkit_row_with_structure(self, row, tiktok_base: Path, extract_duration: bool = False, file_stat = None) -> Optional[Dict]:
         """Procesar una fila de 4K Tokkit con nueva estructura completa según especificación"""
         # Construir ruta completa del archivo
         relative_path = row['relativePath']
@@ -186,13 +186,11 @@ class TikTokTokkitHandler(DatabaseExtractor):
             
         file_path = tiktok_base / relative_path
         
-        # ✅ Usar estadísticas pre-calculadas si están disponibles
+        # ✅ Usar estadísticas pre-calculadas (batch file operations)
         if file_stat is None:
-            # Fallback para compatibilidad
-            if not file_path.exists():
-                self.logger.debug(f"⚠️ Archivo no existe (eliminado manualmente?): {file_path}")
-                self.logger.debug(f"   📍 URL: https://www.tiktok.com/@{row['authorName']}/video/{row['tiktok_id']}")
-                return None
+            # Archivo no existe (detectado por batch operations)
+            self.logger.debug(f"⚠️ Archivo no existe: {file_path}")
+            return None
             
         # Aceptar tanto videos como imágenes (para carruseles de TikTok)
         video_extensions = {'.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm'}
@@ -216,10 +214,7 @@ class TikTokTokkitHandler(DatabaseExtractor):
         else:
             post_url = f"https://www.tiktok.com/@{row['authorName']}/photo/{tiktok_id_clean}"
         
-        # Obtener duración para videos (optimizado)
-        duration_seconds = None
-        if is_video and extract_duration:
-            duration_seconds = self._get_video_duration(file_path)
+        # Duración se obtiene por batch processing - individual extraction eliminado
 
         # Datos básicos del video
         video_data = {
@@ -230,8 +225,8 @@ class TikTokTokkitHandler(DatabaseExtractor):
             'platform': 'tiktok',
             'content_type': 'video' if is_video else 'image',
             'source': 'db',
-            'file_size': file_stat.st_size if file_stat else (file_path.stat().st_size if file_path.exists() else 0),
-            'duration_seconds': duration_seconds,
+            'file_size': file_stat.st_size if file_stat else 0,
+            'duration_seconds': None,  # Se asigna por batch processing posteriormente
             
             # Datos del downloader - CRÍTICO para batch_insert_videos
             'downloader_mapping': {

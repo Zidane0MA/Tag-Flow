@@ -112,8 +112,6 @@ class InstagramStogramHandler(DatabaseExtractor):
             for web_url, post_rows in posts_by_url.items():
                 carousel_items = self._process_stogram_carousel_elements(post_rows, instagram_base, web_url)
                 content.extend(carousel_items)
-
-            self.logger.info(f"Extraídos {len(content)} posts de Instagram desde Stogram")
             return content
 
         except Exception as e:
@@ -271,80 +269,6 @@ class InstagramStogramHandler(DatabaseExtractor):
 
         except Exception as e:
             self.logger.error(f"Error procesando elemento optimizado de Instagram Stogram: {e}")
-            return None
-
-    def _process_single_stogram_element(self, row, instagram_base: Path, web_url: str, is_carousel: bool, carousel_order: int) -> Optional[Dict]:
-        """Procesar un solo elemento de Instagram (parte de carrusel o post individual)"""
-        try:
-            # Verificar que el archivo existe
-            relative_path = self._safe_str(row['relative_path'])
-            if not relative_path:
-                return None
-                
-            file_path = instagram_base / relative_path
-            if not file_path.exists():
-                self.logger.debug(f"⚠️ Archivo no existe: {file_path}")
-                return None
-
-            # Verificar que es un tipo de archivo válido
-            video_extensions = {'.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm'}
-            image_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp'}
-            
-            is_video_file = file_path.suffix.lower() in video_extensions
-            is_image_file = file_path.suffix.lower() in image_extensions
-            
-            if not (is_video_file or is_image_file):
-                return None
-
-            # Determinar creador y suscripción
-            creator_subscription_data = self._determine_stogram_creator_and_subscription(row, file_path)
-
-            # Detectar tipo de lista desde la ruta del archivo
-            list_type = self._detect_instagram_list_type(relative_path)
-
-            # Construir estructura completa del elemento
-            video_data = {
-                'file_path': str(file_path),
-                'file_name': file_path.name,
-                'title': self._safe_str(row['title']) or file_path.stem,
-                'platform': 'instagram',
-                'post_url': web_url,
-                'source': 'db',
-
-                # Información del creador y suscripción
-                'creator_name': creator_subscription_data.get('creator_name'),
-                'creator_url': creator_subscription_data.get('creator_url'),
-                'subscription_name': creator_subscription_data.get('subscription_name'),
-                'subscription_type': creator_subscription_data.get('subscription_type'),
-                'subscription_url': creator_subscription_data.get('subscription_url'),
-
-                # Metadatos específicos de Instagram
-                'photo_id': self._safe_int(row['photo_id']),
-                'is_video': self._safe_int(row['is_video']) == 1,
-                'web_url': web_url,
-
-                # Información de archivo
-                'file_size': file_path.stat().st_size if file_path.exists() else 0,
-                'duration_seconds': self._get_video_duration(file_path) if is_video_file else None,
-
-                # 🆕 LISTA TYPES - Detectado desde ruta de archivo
-                'list_types': [list_type],
-
-                # 🆕 DOWNLOADER MAPPING - Para trazabilidad con BD Stogram
-                'downloader_mapping': {
-                    'download_item_id': self._safe_int(row['photo_id']),
-                    'external_db_source': '4k_stogram',
-                    'creator_from_downloader': creator_subscription_data.get('creator_name'),
-                    'is_carousel_item': is_carousel,
-                    'carousel_order': carousel_order if is_carousel else None,
-                    'carousel_base_id': web_url if is_carousel else None
-                }
-            }
-
-            return video_data
-
-        except Exception as e:
-            self.logger.error(f"Error procesando elemento de Instagram Stogram: {e}")
             return None
 
     def _process_stogram_post_with_carousel(self, post_rows, instagram_base: Path) -> Optional[Dict]:

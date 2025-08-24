@@ -287,43 +287,19 @@ class DatabaseOperations:
             stats['errors'].append(f"Process video error: {e}")
             return None
     
-    def _get_or_create_creator(self, creator_name: str, creator_url: str, platform: str, 
-                             creator_cache: Dict, stats: Dict) -> int:
-        """Obtener o crear creador"""
-        if not creator_name:
-            creator_name = f"Unknown_{platform}"
-        
-        # Verificar cache
-        if creator_name in creator_cache:
-            return creator_cache[creator_name]
-        
-        # Buscar en BD
-        existing_creator = self.db.get_creator_by_name(creator_name)
-        if existing_creator:
-            creator_id = existing_creator['id']
-            creator_cache[creator_name] = creator_id
-            
-            # Agregar URL si no existe para esta plataforma
-            if creator_url:
-                self.db.add_creator_url(creator_id, platform, creator_url)
-            
-            return creator_id
-        
-        # Crear nuevo creador
-        creator_id = self.db.create_creator(creator_name)
-        creator_cache[creator_name] = creator_id
-        stats['creators_created'] += 1
-        
-        # Agregar URL si existe
-        if creator_url:
-            self.db.add_creator_url(creator_id, platform, creator_url)
-        
-        return creator_id
+    # ❌ DEAD CODE REMOVED: _get_or_create_creator() method (32 lines)
+    # Replaced by: _batch_create_creators_and_subscriptions() batch processing
+    # This individual creator method was NEVER called in the optimized flow
     
     def _get_or_create_subscription(self, subscription_name: str, subscription_type: str,
                                    platform: str, creator_id: int, subscription_url: str,
                                    subscription_cache: Dict, stats: Dict) -> int:
-        """Obtener o crear suscripción"""
+        """Obtener o crear suscripción
+        
+        ⚠️  INCONSISTENCY WARNING: This method uses individual processing
+        while creators use batch processing. Consider implementing 
+        batch_create_subscriptions() for consistency.
+        """
         if not subscription_name:
             subscription_name = f"Unknown_{platform}_{subscription_type}"
         
