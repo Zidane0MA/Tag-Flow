@@ -121,7 +121,7 @@ class InstagramStogramHandler(DatabaseExtractor):
             return content
 
     def _process_stogram_carousel_elements(self, post_rows, instagram_base: Path, web_url: str) -> List[Dict]:
-        """Procesar cada elemento de un carrusel de Instagram como registro individual"""
+        """🚀 ULTRA-OPTIMIZED: Procesar cada elemento con batch operations para máximo rendimiento"""
         carousel_items = []
         
         try:
@@ -131,9 +131,65 @@ class InstagramStogramHandler(DatabaseExtractor):
             # Determinar si es carrusel (múltiples elementos)
             is_carousel = len(post_rows) > 1
             
-            # Procesar cada elemento del carrusel individualmente
+            # 🚀 EXTRACT PHASE: Recolectar todas las rutas de archivos
+            file_paths_to_check = []
+            row_to_filepath = {}
+            video_files_for_duration = []
+            all_element_data = []
+            
             for carousel_order, row in enumerate(post_rows):
-                video_data = self._process_single_stogram_element(row, instagram_base, web_url, is_carousel, carousel_order)
+                relative_path = self._safe_str(row['relative_path'])
+                if not relative_path:
+                    continue
+                    
+                file_path = instagram_base / relative_path
+                file_path_str = str(file_path)
+                
+                file_paths_to_check.append(file_path_str)
+                row_to_filepath[carousel_order] = file_path_str
+                
+                # Preparar datos del elemento para procesamiento posterior
+                element_data = {
+                    'row': row,
+                    'carousel_order': carousel_order,
+                    'file_path': file_path,
+                    'file_path_str': file_path_str,
+                    'relative_path': relative_path
+                }
+                all_element_data.append(element_data)
+            
+            # 🚀 BATCH PHASE: Operaciones en lote para máximo rendimiento
+            file_stats = self._batch_file_operations(file_paths_to_check)
+            
+            # Identificar videos para batch duration extraction
+            for element_data in all_element_data:
+                file_path = element_data['file_path']
+                file_stat = file_stats.get(element_data['file_path_str'])
+                
+                if file_stat is None:  # Archivo no existe
+                    continue
+                
+                # Verificar si es video para batch duration
+                video_extensions = {'.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm'}
+                if file_path.suffix.lower() in video_extensions:
+                    video_files_for_duration.append(element_data['file_path_str'])
+                    
+                element_data['file_stat'] = file_stat
+            
+            # Batch extraction de duraciones para todos los videos
+            durations = {}
+            if video_files_for_duration:
+                durations = self._get_batch_video_durations(video_files_for_duration)
+            
+            # 🚀 PROCESS PHASE: Aplicar resultados batch a cada elemento
+            for element_data in all_element_data:
+                file_stat = element_data.get('file_stat')
+                if file_stat is None:  # Skip archivos que no existen
+                    continue
+                    
+                video_data = self._process_single_stogram_element_optimized(
+                    element_data, instagram_base, web_url, is_carousel, file_stat, durations
+                )
                 if video_data:
                     carousel_items.append(video_data)
             
@@ -142,6 +198,80 @@ class InstagramStogramHandler(DatabaseExtractor):
         except Exception as e:
             self.logger.error(f"Error procesando carrusel de Instagram: {e}")
             return carousel_items
+
+    def _process_single_stogram_element_optimized(self, element_data: Dict, instagram_base: Path, web_url: str, is_carousel: bool, file_stat, durations: Dict) -> Optional[Dict]:
+        """🚀 OPTIMIZED: Procesar elemento con datos pre-computados (file_stat, durations)"""
+        try:
+            row = element_data['row']
+            carousel_order = element_data['carousel_order']
+            file_path = element_data['file_path']
+            relative_path = element_data['relative_path']
+
+            # Verificar que es un tipo de archivo válido
+            video_extensions = {'.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm'}
+            image_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp'}
+            
+            is_video_file = file_path.suffix.lower() in video_extensions
+            is_image_file = file_path.suffix.lower() in image_extensions
+            
+            if not (is_video_file or is_image_file):
+                return None
+
+            # Determinar creador y suscripción
+            creator_subscription_data = self._determine_stogram_creator_and_subscription(row, file_path)
+
+            # Detectar tipo de lista desde la ruta del archivo
+            list_type = self._detect_instagram_list_type(relative_path)
+
+            # 🚀 OPTIMIZED: Usar duración pre-computada en lugar de llamada individual
+            duration_seconds = None
+            if is_video_file:
+                duration_seconds = durations.get(element_data['file_path_str'])
+
+            # Construir estructura completa del elemento
+            video_data = {
+                'file_path': str(file_path),
+                'file_name': file_path.name,
+                'title': self._safe_str(row['title']) or file_path.stem,
+                'platform': 'instagram',
+                'post_url': web_url,
+                'source': 'db',
+
+                # Información del creador y suscripción
+                'creator_name': creator_subscription_data.get('creator_name'),
+                'creator_url': creator_subscription_data.get('creator_url'),
+                'subscription_name': creator_subscription_data.get('subscription_name'),
+                'subscription_type': creator_subscription_data.get('subscription_type'),
+                'subscription_url': creator_subscription_data.get('subscription_url'),
+
+                # Metadatos específicos de Instagram
+                'photo_id': self._safe_int(row['photo_id']),
+                'is_video': self._safe_int(row['is_video']) == 1,
+                'web_url': web_url,
+
+                # 🚀 OPTIMIZED: Información de archivo usando file_stat pre-computado
+                'file_size': file_stat.st_size,
+                'duration_seconds': duration_seconds,
+
+                # 🆕 LISTA TYPES - Detectado desde ruta de archivo
+                'list_types': [list_type],
+
+                # 🆕 DOWNLOADER MAPPING - Para trazabilidad con BD Stogram
+                'downloader_mapping': {
+                    'download_item_id': self._safe_int(row['photo_id']),
+                    'external_db_source': '4k_stogram',
+                    'creator_from_downloader': creator_subscription_data.get('creator_name'),
+                    'is_carousel_item': is_carousel,
+                    'carousel_order': carousel_order if is_carousel else None,
+                    'carousel_base_id': web_url if is_carousel else None
+                }
+            }
+
+            return video_data
+
+        except Exception as e:
+            self.logger.error(f"Error procesando elemento optimizado de Instagram Stogram: {e}")
+            return None
 
     def _process_single_stogram_element(self, row, instagram_base: Path, web_url: str, is_carousel: bool, carousel_order: int) -> Optional[Dict]:
         """Procesar un solo elemento de Instagram (parte de carrusel o post individual)"""
@@ -460,6 +590,122 @@ class InstagramStogramHandler(DatabaseExtractor):
             self.logger.debug(f"Error inesperado obteniendo duración: {e}")
             
         return None
+
+    def _get_batch_video_durations(self, video_files: List[str]) -> Dict[str, Optional[float]]:
+        """Obtener duraciones de múltiples videos usando batch ffprobe (paralelo)"""
+        if not video_files:
+            return {}
+            
+        durations = {}
+        self.logger.debug(f"🎬 Extrayendo duración de {len(video_files)} videos en lote...")
+        
+        try:
+            import concurrent.futures
+            
+            def get_duration(file_path: str) -> tuple[str, Optional[float]]:
+                """Get duration for single video file"""
+                try:
+                    path = Path(file_path)
+                    video_extensions = {'.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm'}
+                    
+                    if path.suffix.lower() not in video_extensions:
+                        return file_path, None
+                    
+                    # Usar FFprobe con timeout reducido para batch
+                    result = subprocess.run([
+                        'ffprobe', '-v', 'quiet', '-show_entries', 'format=duration',
+                        '-of', 'csv=p=0', str(path)
+                    ], capture_output=True, text=True, timeout=3)  # Timeout reducido
+                    
+                    if result.returncode == 0 and result.stdout.strip():
+                        duration = float(result.stdout.strip())
+                        return file_path, duration
+                    return file_path, None
+                        
+                except Exception as e:
+                    self.logger.debug(f"Error obteniendo duración de {Path(file_path).name}: {e}")
+                    return file_path, None
+            
+            # Procesar en paralelo con ThreadPoolExecutor
+            max_workers = min(8, len(video_files))  # Máximo 8 hilos para evitar sobrecarga
+            
+            with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+                # Enviar todas las tareas
+                future_to_file = {executor.submit(get_duration, file_path): file_path 
+                                for file_path in video_files}
+                
+                # Recoger resultados
+                for future in concurrent.futures.as_completed(future_to_file, timeout=30):
+                    file_path, duration = future.result()
+                    durations[file_path] = duration
+                    
+            self.logger.debug(f"✅ Duraciones extraídas: {len(durations)} archivos procesados")
+            return durations
+            
+        except Exception as e:
+            self.logger.warning(f"Error en batch duration extraction, fallback a método individual: {e}")
+            
+            # Fallback: procesar uno por uno si batch falla
+            for file_path in video_files:
+                durations[file_path] = self._get_video_duration(Path(file_path))
+                
+            return durations
+
+    def _batch_file_operations(self, file_paths: List[str]) -> Dict[str, Optional[object]]:
+        """Batch file existence and stat operations for better performance"""
+        if not file_paths:
+            return {}
+            
+        file_stats = {}
+        self.logger.debug(f"📁 Verificando existencia y estadísticas de {len(file_paths)} archivos...")
+        
+        try:
+            import concurrent.futures
+            
+            def get_file_stat(file_path: str) -> tuple[str, Optional[object]]:
+                """Get file stat for single file"""
+                try:
+                    path = Path(file_path)
+                    if path.exists():
+                        return file_path, path.stat()
+                    return file_path, None
+                except Exception as e:
+                    self.logger.debug(f"Error getting stat for {file_path}: {e}")
+                    return file_path, None
+            
+            # Procesar en paralelo (más rápido para muchos archivos)
+            max_workers = min(16, len(file_paths))  # Operaciones I/O pueden usar más hilos
+            
+            with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+                # Enviar todas las tareas
+                future_to_file = {executor.submit(get_file_stat, file_path): file_path 
+                                for file_path in file_paths}
+                
+                # Recoger resultados
+                for future in concurrent.futures.as_completed(future_to_file, timeout=30):
+                    file_path, stat_result = future.result()
+                    file_stats[file_path] = stat_result
+                    
+            existing_count = sum(1 for stat in file_stats.values() if stat is not None)
+            self.logger.debug(f"✅ Archivos procesados: {len(file_stats)} total, {existing_count} existentes")
+            return file_stats
+            
+        except Exception as e:
+            self.logger.warning(f"Error en batch file operations, fallback a método individual: {e}")
+            
+            # Fallback: procesar uno por uno si batch falla
+            for file_path in file_paths:
+                try:
+                    path = Path(file_path)
+                    if path.exists():
+                        file_stats[file_path] = path.stat()
+                    else:
+                        file_stats[file_path] = None
+                except Exception as e:
+                    self.logger.debug(f"Error getting stat for {file_path}: {e}")
+                    file_stats[file_path] = None
+                    
+            return file_stats
 
     def _detect_instagram_list_type(self, relative_path: str) -> str:
         """Detectar tipo de lista de Instagram desde la ruta relativa del archivo"""

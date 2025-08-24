@@ -49,9 +49,6 @@ Nota:
 Objetivos:
 - Poblar los campos de mi base de datos con estos campos.
 
-Problemas con el poblado de la base de datos:
-- En tiktok un creador sin contenido propio (no figura en la tabla de creadores), se le asiga un creador_id no relacionado.
-
 ## CASO: 4k Tokkit (Solo Tiktok)
 ### Contexto
 La app agrupa los videos de diferentes maneras:
@@ -106,7 +103,7 @@ MediaItems
 - Las Publicaciones sueltas seran listas al igual que las Suscripcion como Listas (`type` = 2,3).
 - Las Publicaciones como cuenta (`type` = 1) seran subcripciones de tipo cuenta en mi bd y tendran tabs subtabs como "feed, Liked, Favorites".
 
-## CASO: 4k Strogram (Solo Instagram)
+## CASO: 4k Strogram (Solo Instagram ver. gratuita)
 ### Contexto
 La app agrupa los videos de diferentes maneras:
 - Publicaciones sueltas como: `\\Single media\\video.mp4|imagen.jpg`, vistas desde la db en la tabla `photos` y tienen `subscriptionId` como NULL. Descargados como publicaciones individuales
@@ -121,7 +118,7 @@ La app agrupa los videos de diferentes maneras:
 1. subscriptions
     - id (formato: BLOB)
     - type (n=display_name)
-    - display_name  (1=cuenta, 2=hashtag, 3=location, 4=guardados de la cuenta)
+    - display_name  (1=cuenta, 2=hashtag, 3=location, 4=saved)
 
 2. photos
     - subscriptionId
@@ -133,8 +130,7 @@ La app agrupa los videos de diferentes maneras:
     - ownerName (Creador de la publicacion)
 
     Nota:
-    - Como no se puede asociar la publicaciones con el tipo directamente desde la bd, se tendra que usar el campo `file` que los agrupa correctamente.
-    - Para las imagenes no me fio de file por lo que sera mejor comprobar la extension desde `file`.
+    - Como no se puede asociar la publicaciones con el tipo directamente desde la bd, se tendra que usar el campo `file` que los agrupa correctamente y estas se usaran en list_type
     - Como sabes instagram tambien maneja publicaciones tipo carrusel/múltiple, la unica forma de saber que imagenes son parte de una misma publicacion es con el campo `web_url`, para saber el orden solo tenemos photos.id de menor a mayor.
 
 
