@@ -8,6 +8,7 @@ download_item
 - filename
   - D:\4K Video Downloader+\value(type=3 o type=5)\NOMBREDELVIDEO.mp4
   - D:\4K Video Downloader+\NOMBREDELVIDEO.mkv
+- timestampNs (BIGINT nanosegundos desde época Unix - momento exacto de descarga)
 
 media_item_metadata
 - download_item_id
@@ -73,7 +74,7 @@ La app agrupa los videos de diferentes maneras:
 
 ### BD Tokkit
 Subscriptions
-  - databaseId
+  - databaseId (equivalente a UUID)
   - type (n=name)
   - name (1=cuenta, 2=hashtag, 3=musica)
   - id (para armar la url de la lista tipo musica)
@@ -85,6 +86,12 @@ Subscriptions
     - Cuando es tipo musica el name puede tener espacios, se deben rellenar con "-"
     - Ejemplo "cancion nueva cinco" -> "cancion-nueva-cinco"
 
+SubscriptionsDownloadSettings
+  - subscriptionDatabaseId
+  - downloadFeed (0 = FALSE, 1 = TRUE) (Mostrar como videos en mi bd)
+  - downloadLiked (0 = FALSE, 1 = TRUE)
+  - downloadFavorites (0 = FALSE, 1 = TRUE)
+
 MediaItems
   - databaseId
   - subscriptionDatabaseId
@@ -92,6 +99,8 @@ MediaItems
   - id (para armar la url del post)
   - authorName
   - description (usar como titulo del post)
+  - postingDate (INT segundos Unix - fecha de publicación en TikTok)
+  - recordingDate (INT segundos Unix - fecha de descarga/procesamiento por 4K Tokkit)
   - downloaded (1=si) (Importante para solo poblar los videos descargados y no generar errores)
   - relativePath
 
@@ -99,16 +108,12 @@ MediaItems
   - Links de los posts tipo video se arman como `https://www.tiktok.com/@authorName/video/MediaItems.id`
   - Links de los posts tipo imagen se arman como `https://www.tiktok.com/@authorName/photo/MediaItems.id(sin _index_n1_n2)`
 
-### Objetivos
-- Las Publicaciones sueltas seran listas al igual que las Suscripcion como Listas (`type` = 2,3).
-- Las Publicaciones como cuenta (`type` = 1) seran subcripciones de tipo cuenta en mi bd y tendran tabs subtabs como "feed, Liked, Favorites".
-
 ## CASO: 4k Strogram (Solo Instagram ver. gratuita)
 ### Contexto
 La app agrupa los videos de diferentes maneras:
 - Publicaciones sueltas como: `\\Single media\\video.mp4|imagen.jpg`, vistas desde la db en la tabla `photos` y tienen `subscriptionId` como NULL. Descargados como publicaciones individuales
 - Resto de Publicaciones como: `\\display_name`, Estas se registran como un grupo en la tabla `subscriptions` (tienen un `type`) y sus publicaciones se registran en la tabla `photos` que llevan su respectivo `subscriptionId` y `ownerName`. Estas carpetas tienen la siguiente estructura:
-  - `\\display_name\\imagen.jpg`
+  - `\\display_name\\imagen.jpg` (feed)
   - `\\display_name\\highlights`
   - `\\display_name\\reels`
   - `\\display_name\\story`
@@ -128,10 +133,24 @@ La app agrupa los videos de diferentes maneras:
     - is_video (65=video, [0,2]=imagen)
     - state (4=descargado)
     - ownerName (Creador de la publicacion)
+    - created_time (INTEGER segundos Unix - fecha de creación del post original, coincide exactamente con fecha del archivo)
 
     Nota:
     - Como no se puede asociar la publicaciones con el tipo directamente desde la bd, se tendra que usar el campo `file` que los agrupa correctamente y estas se usaran en list_type
     - Como sabes instagram tambien maneja publicaciones tipo carrusel/múltiple, la unica forma de saber que imagenes son parte de una misma publicacion es con el campo `web_url`, para saber el orden solo tenemos photos.id de menor a mayor.
+
+### TIMESTAMPS COMPARACIÓN
+| BD                  | Campo          | Formato        | Propósito                           | Precisión  |
+|---------------------|----------------|----------------|-------------------------------------|------------|
+| 4K Video Downloader| timestampNs    | BIGINT (ns)    | Momento exacto de descarga          | ⭐⭐⭐⭐⭐ |
+| 4K Tokkit          | postingDate    | INT (s)        | Fecha publicación TikTok            | ⭐⭐⭐    |
+| 4K Tokkit          | recordingDate  | INT (s)        | Fecha descarga/procesamiento        | ⭐⭐⭐⭐  |
+| 4K Stogram         | created_time   | INT (s)        | Fecha creación post (coincide archivo) | ⭐⭐⭐⭐⭐ |
+
+**Recomendaciones:**
+- Usar `timestampNs` para orden cronológico de importación 
+- `recordingDate` coincide con fecha del archivo (confirmado como descarga)
+- `created_time` más preciso para cronología de posts originales
 
 
 ## PROMPT for Carpetas Organizadas
