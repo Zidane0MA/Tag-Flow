@@ -1,6 +1,6 @@
-# Estructura Final de Base de Datos - Tag-Flow V2
+# Estructura Final de Base de Datos y Frontend - Tag-Flow V2
 
-## 📊 **Esquema Limpio y Optimizado**
+## 📊 **Backend: Esquema de Base de Datos**
 
 ### **1. platforms** (Normalización)
 ```sql
@@ -22,7 +22,7 @@ INSERT INTO platforms (name, display_name, base_url) VALUES
 ('twitter', 'Twitter/X', 'https://x.com');
 ```
 
-### **2. creators** (Simplificado pero funcional)
+### **2. creators** (Jerarquía y Mapeo)
 ```sql
 CREATE TABLE creators (
     id INTEGER PRIMARY KEY,
@@ -40,7 +40,6 @@ CREATE TABLE creators (
     
     -- Metadata esencial
     creator_name_source TEXT CHECK(creator_name_source IN ('db', 'api', 'scraping', 'manual')),
-    
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -50,13 +49,13 @@ CREATE INDEX idx_creators_parent ON creators(parent_creator_id);
 CREATE UNIQUE INDEX idx_creators_platform_unique ON creators(platform_id, platform_creator_id) WHERE platform_creator_id IS NOT NULL;
 ```
 
-### **3. subscriptions** (Simplificado)
+### **3. subscriptions** (Fuentes de Contenido)
 ```sql
 CREATE TABLE subscriptions (
     id INTEGER PRIMARY KEY,
     name TEXT NOT NULL,
     platform_id INTEGER REFERENCES platforms(id),
-    
+
     -- Tipo de suscripción (basado en 4K apps)
     subscription_type TEXT CHECK(subscription_type IN ('account', 'playlist', 'hashtag', 'location', 'music', 'search', 'liked', 'saved', 'folder')) NOT NULL,
     is_account BOOLEAN DEFAULT FALSE, -- TRUE para cuentas (contenido propio del creador)
@@ -64,8 +63,7 @@ CREATE TABLE subscriptions (
     -- Referencias
     creator_id INTEGER REFERENCES creators(id), -- Para suscripciones de cuenta
     subscription_url TEXT,
-    external_uuid TEXT,              -- databaseId de 4K apps para recovery
-    
+    external_uuid TEXT, -- databaseId de 4K apps para recovery
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -91,7 +89,7 @@ CREATE INDEX idx_subscriptions_account ON subscriptions(is_account);
 | **4K Stogram** | type=2 | hashtag | FALSE | feed/reels | Hashtag |
 | **4K Stogram** | type=4 | saved | FALSE | feed/reels | Contenido guardado |
 
-### **4. posts** (Concepto principal - limpio)
+### **4. posts** (Publicaciones)
 ```sql
 CREATE TABLE posts (
     id INTEGER PRIMARY KEY,
@@ -103,6 +101,7 @@ CREATE TABLE posts (
     
     -- Contenido
     title_post TEXT,                 -- Título/descripción del post
+    use_filename BOOLEAN DEFAULT FALSE,  -- Indicates if title_post was populated using filename
     
     -- Creador y suscripción
     creator_id INTEGER REFERENCES creators(id),
@@ -195,7 +194,6 @@ CREATE TABLE post_categories (
     id INTEGER PRIMARY KEY,
     post_id INTEGER REFERENCES posts(id) NOT NULL,
     category_type TEXT CHECK(category_type IN ('videos', 'shorts', 'feed', 'reels', 'stories', 'highlights', 'tagged')) NOT NULL,
-    
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -235,218 +233,139 @@ CREATE INDEX idx_downloader_mapping_download_item ON downloader_mapping(download
 
 ---
 
-## 🎯 **Ventajas del Diseño Final**
+## 📱 **Frontend: Estructuras de Datos y Navegación**
 
-### **Frontend Performance**
-1. **Una query para carrusel completo**: `SELECT * FROM posts JOIN media WHERE post_id = ? ORDER BY carousel_order`
-2. **Filtros eficientes**: Índices optimizados para todas las búsquedas comunes
-3. **Joins mínimos**: Estructura normalizada pero no sobre-normalizada
+Esta sección describe las interfaces de TypeScript y los conceptos de navegación que el frontend utilizará para interactuar con la data del backend.
 
-### **Lógica de Negocio Clara**
-1. **Posts = Publicaciones** reales de redes sociales
-2. **Media = Archivos técnicos** (videos/imágenes del post)
-3. **Categorías = Tipo de contenido** (videos, shorts, reels, etc.)
-4. **Subscriptions = Agrupación** (account vs listas vs hashtags)
+### **1. Interfaces Principales de TypeScript (`types.ts`)**
 
-### **Mapeo 4K Apps Correcto**
-```sql
--- ✅ CORRECTO: TikTok "Liked" es una suscripción, no categoría
-subscription_type = 'liked'
-category_type = 'videos'  -- El contenido sigue siendo video
+#### **`Creator` Interface**
+Representa a un creador de contenido.
 
--- ✅ CORRECTO: Instagram Reels es categoría de contenido
-subscription_type = 'account'  
-category_type = 'reels'   -- Tipo específico de contenido
+```typescript
+export interface Creator {
+    id: number;
+    name: string;
+    displayName: string;
+    platforms: Partial<Record<string, CreatorPlatformInfo>>; // Clave es platform.name
+}
 ```
 
-### **Queries Optimizadas**
-```sql
--- Posts de un creador con media
-SELECT p.*, m.* FROM posts p 
-JOIN media m ON p.id = m.post_id 
-WHERE p.creator_id = ? 
-ORDER BY p.publication_date DESC;
+#### **`CreatorPlatformInfo` Interface**
+Detalles de un creador en una plataforma específica.
 
--- Posts por suscripción y categoría
-SELECT p.* FROM posts p
-JOIN post_categories pc ON p.id = pc.post_id
-WHERE p.subscription_id = ? AND pc.category_type = ?;
-
--- TikTok: Videos "liked" de un creador
-SELECT p.* FROM posts p
-JOIN subscriptions s ON p.subscription_id = s.id
-WHERE s.creator_id = ? AND s.subscription_type = 'liked';
+```typescript
+export interface CreatorPlatformInfo {
+  url: string;
+  postCount: number;
+  subscriptions: Subscription[];
+}
 ```
 
----
+#### **`Subscription` Interface**
+Fuente de contenido básica, siempre ligada a un creador.
 
-## 📱 **Frontend: Navegación y Tabs**
+```typescript
+export interface Subscription {
+  id: number;
+}
+```
 
-### **Concepto de Navegación**
+#### **`SubscriptionInfo` Interface**
+Vista detallada para páginas de suscripción, incluyendo suscripciones "especiales" (hashtags, música).
 
-#### **1. CREADORES** (Gestión interna de Tag-Flow)
-```javascript
-// URL: /creator/MrBeast
-// Vista: Página completa del creador con todos sus datos y estadísticas
+```typescript
+export interface SubscriptionInfo {
+    id: number;
+    name: string;
+    type: string;
+    platform: string; // platform.name
+    url?: string;
+    postCount: number;
+}
+```
+
+#### **`Post` y `Media` Interfaces**
+Representan una publicación y sus archivos multimedia asociados.
+
+```typescript
+export interface Post {
+  id: number;
+  platformName: string;
+  postUrl: string;
+  title: string;
+  creatorName: string;
+  subscriptionId: number;
+  publicationDate: string; // ISO 8601
+  downloadDate: string;    // ISO 8601
+  media: Media[];
+}
+
+export interface Media {
+    id: number;
+    filePath: string;
+    thumbnailPath?: string;
+    type: 'video' | 'image';
+    resolution: string; // e.g., "1920x1080"
+    duration: number; // en segundos
+}
+```
+
+### **2. Concepto de Navegación y Tabs**
+
+La navegación del frontend se basa en si se visualiza un `Creator` o una `Subscription` y el tipo de esta.
+
+#### **Páginas de Creador (`/creator/:creatorName`)**
+Muestran una vista agregada de todo el contenido de un creador a través de sus plataformas y suscripciones. Los tabs permiten filtrar por tipo de contenido.
+
+```typescript
+// Ejemplo de tabs para la página de un creador
 const creatorTabs = {
   youtube: ['All', 'Videos', 'Shorts', 'Listas'],
-  tiktok: ['All', 'Videos', 'Lista Saved', 'Lista Liked'],
-  instagram: ['All', 'Reels', 'Stories', 'Highlights', 'Tagged', 'Lista Saved'],
-  other_platforms: ['All', 'Videos', 'Shorts']
-}
+  tiktok: ['All', 'Videos', 'Lista Saved', 'Liked'],
+  instagram: ['All', 'Reels', 'Stories', 'Highlights', 'Tagged', 'Saved'],
+};
 ```
 
-#### **2. SUSCRIPCIONES TIPO CUENTA** (Simulación de 4K Apps)
-```javascript
-// URL: /subscription/youtube-mrbeast-account
-// Vista: Simula la experiencia de suscripción en las apps 4K
-// MISMOS TABS que creadores (replica la funcionalidad de la app original)
-const accountSubscriptionTabs = {
-  youtube: ['All', 'Videos', 'Shorts', 'Listas'],        // Simula 4K Video Downloader
-  tiktok: ['All', 'Videos', 'Lista Saved', 'Lista Liked'], // Simula 4K Tokkit  
-  instagram: ['All', 'Reels', 'Stories', 'Highlights', 'Tagged', 'Lista Saved'], // Simula 4K Stogram
-  other_platforms: ['All', 'Videos', 'Shorts']
-}
-```
+#### **Páginas de Suscripción (`/subscription/:type/:id`)**
+La vista depende del tipo de suscripción:
 
-#### **3. SUSCRIPCIONES TIPO LISTA/TEMA** (Sin tabs)
-```javascript
-// URL: /subscription/tiktok-hashtag-dance
-// URL: /subscription/youtube-search-mmd
-// Vista: Lista simple de contenido, sin tabs adicionales
-const listSubscriptions = {
-  playlist: /* Lista simple de videos */,
-  hashtag: /* Lista simple de videos por hashtag */,
-  music: /* Lista simple de videos por música */,
-  location: /* Lista simple de posts por ubicación */,
-  search: /* Lista simple de resultados de búsqueda */
-}
-```
+1.  **Suscripciones de Cuenta (`is_account: true`)**: Replican la experiencia de la app original (ej. 4K Tokkit) y tienen tabs para filtrar contenido.
+    ```typescript
+    // URL: /subscription/account/mrbeast-youtube
+    const accountSubscriptionTabs = {
+      youtube: ['All', 'Videos', 'Shorts'],
+      tiktok: ['All', 'Videos'],
+      instagram: ['All', 'Feed', 'Reels', 'Stories'],
+    };
+    ```
 
-### **Estructura de Sidebar**
+2.  **Suscripciones de Lista/Tema (`is_account: false`)**: Son listas simples de contenido (ej. por hashtag, música) y no tienen tabs.
+    ```typescript
+    // URL: /subscription/hashtag/dance-tiktok
+    // URL: /subscription/music/phonk-tiktok
 
-```javascript
-const sidebarStructure = {
-  creators: [
-    {
-      name: "MrBeast", 
-      platform: "YouTube",
-      url: "/creator/mrbeast-youtube",
-      tabs: ['All', 'Videos', 'Shorts', 'Listas']
-    },
-    {
-      name: "upminaa.cos",
-      platform: "TikTok", 
-      url: "/creator/upminaa-tiktok",
-      tabs: ['All', 'Videos', 'Lista Saved', 'Lista Liked']
-    }
-  ],
-  
-  subscriptions: {
-    accounts: [
-      {
-        name: "MrBeast (YouTube)",
-        url: "/subscription/youtube-mrbeast-account",
-        tabs: ['All', 'Videos', 'Shorts', 'Listas'], // Simula 4K Video Downloader
-        type: "account"
-      },
-      {
-        name: "upminaa.cos (TikTok)",
-        url: "/subscription/tiktok-upminaa-account", 
-        tabs: ['All', 'Videos', 'Lista Saved', 'Lista Liked'], // Simula 4K Tokkit
-        type: "account"
-      }
-    ],
-    
-    lists: [
-      {
-        name: "#dance",
-        platform: "TikTok",
-        url: "/subscription/tiktok-hashtag-dance",
-        tabs: null, // Lista simple sin tabs
-        type: "hashtag"
-      },
-      {
-        name: "Phonk Music",
-        platform: "TikTok", 
-        url: "/subscription/tiktok-music-phonk",
-        tabs: null, // Lista simple sin tabs
-        type: "music"
-      },
-      {
-        name: "Search: MMD",
-        platform: "YouTube",
-        url: "/subscription/youtube-search-mmd", 
-        tabs: null, // Lista simple sin tabs
-        type: "search"
-      }
-    ]
-  }
-}
-```
+    ```
 
-### **Queries por Tipo de Vista**
+### **3. Lógica de Componentes en Frontend**
 
-#### **Creadores (Vista completa)**
-```sql
--- Contenido completo del creador (propio + listas)
-SELECT p.*, pc.category_type FROM posts p
-JOIN post_categories pc ON p.id = pc.post_id
-JOIN subscriptions s ON p.subscription_id = s.id
-WHERE s.creator_id = ? 
-AND s.subscription_type IN ('account', 'liked', 'saved', 'playlist')
-ORDER BY p.publication_date DESC;
-```
-
-#### **Suscripciones tipo Cuenta (Simula 4K Apps)**
-```sql
--- Simula lo que verías en 4K Video Downloader suscrito a MrBeast
-SELECT p.*, pc.category_type FROM posts p
-JOIN post_categories pc ON p.id = pc.post_id  
-WHERE p.subscription_id = ?
-AND subscription_type = 'account'
-AND is_account = TRUE
-ORDER BY p.publication_date DESC;
-```
-
-#### **Suscripciones tipo Lista (Vista simple)**
-```sql
--- Lista simple de contenido por hashtag/música/búsqueda
-SELECT p.*, pc.category_type FROM posts p
-JOIN post_categories pc ON p.id = pc.post_id
-WHERE p.subscription_id = ?
-AND subscription_type IN ('hashtag', 'music', 'search', 'location')
-AND is_account = FALSE
-ORDER BY p.publication_date DESC;
-```
-
-### **Frontend Component Logic**
-
-```javascript
-// Determinar si mostrar tabs o lista simple
-function shouldShowTabs(subscriptionType, isAccount) {
-  if (subscriptionType === 'account' && isAccount === true) {
-    return true; // Suscripciones tipo cuenta tienen tabs
-  }
-  return false; // Listas/hashtags/música son listas simples
+```typescript
+// Lógica para determinar si se muestran tabs
+function shouldShowTabs(subscriptionType: string, isAccount: boolean): boolean {
+  return subscriptionType === 'account' && isAccount;
 }
 
-// Construir tabs dinámicamente
-function buildTabs(platform, subscriptionType, isAccount) {
   if (!shouldShowTabs(subscriptionType, isAccount)) {
-    return null; // Sin tabs, lista simple
+function buildTabs(platform: string, subscriptionType: string, isAccount: boolean): string[] | null {
+  if (!shouldShowTabs(subscriptionType, isAccount)) {
+    return null; // Sin tabs para listas simples
   }
-  
-  // Tabs para cuentas (tanto creadores como suscripciones tipo cuenta)
-  const platformTabs = {
-    youtube: ['All', 'Videos', 'Shorts', 'Listas'],
-    tiktok: ['All', 'Videos', 'Lista Saved', 'Lista Liked'],
-    instagram: ['All', 'Reels', 'Stories', 'Highlights', 'Tagged', 'Lista Saved'],
-    default: ['All', 'Videos', 'Shorts']
+
+  const platformTabs: { [key: string]: string[] } = {
+    youtube: ['All', 'Videos', 'Shorts'],
+    tiktok: ['All', 'Videos'],
   };
-  
+    default: ['All', 'Videos'],
   return platformTabs[platform] || platformTabs.default;
 }
 ```
-
-**¿Esta estructura final te parece sólida para implementar mañana?**

@@ -74,7 +74,7 @@ La app agrupa los videos de diferentes maneras:
 
 ### BD Tokkit
 Subscriptions
-  - databaseId (equivalente a UUID)
+  - databaseId (BLOB, equivalente a UUID)
   - type (n=name)
   - name (1=cuenta, 2=hashtag, 3=musica)
   - id (para armar la url de la lista tipo musica)
@@ -87,14 +87,14 @@ Subscriptions
     - Ejemplo "cancion nueva cinco" -> "cancion-nueva-cinco"
 
 SubscriptionsDownloadSettings
-  - subscriptionDatabaseId
+  - subscriptionDatabaseId (BLOB)
   - downloadFeed (0 = FALSE, 1 = TRUE) (Mostrar como videos en mi bd)
   - downloadLiked (0 = FALSE, 1 = TRUE)
   - downloadFavorites (0 = FALSE, 1 = TRUE)
 
 MediaItems
-  - databaseId
-  - subscriptionDatabaseId
+  - databaseId (BLOB)
+  - subscriptionDatabaseId (BLOB)
   - MediaType(2=video, 3=imagen) (1=coverimg[ignorar])
   - id (para armar la url del post)
   - authorName
@@ -103,6 +103,8 @@ MediaItems
   - recordingDate (INT segundos Unix - fecha de descarga/procesamiento por 4K Tokkit)
   - downloaded (1=si) (Importante para solo poblar los videos descargados y no generar errores)
   - relativePath
+  - height 
+  - width 
 
   Notas:
   - Links de los posts tipo video se arman como `https://www.tiktok.com/@authorName/video/MediaItems.id`
