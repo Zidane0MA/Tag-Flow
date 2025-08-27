@@ -14,17 +14,20 @@ logger = logging.getLogger(__name__)
 class CreatorOperations(DatabaseBase):
     """Creator management with hierarchy and URL support"""
     
-    def create_creator(self, name: str, parent_creator_id: int = None, 
-                      is_primary: bool = True, alias_type: str = 'main') -> int:
+    def create_creator(self, name: str, platform_id: int, parent_creator_id: int = None, 
+                      is_primary: bool = True, alias_type: str = 'main', **kwargs) -> int:
         """Create new creator (with hierarchy support)"""
         self._ensure_initialized()
         start_time = time.time()
         
         with self.get_connection() as conn:
             cursor = conn.execute('''
-                INSERT INTO creators (name, parent_creator_id, is_primary, alias_type)
-                VALUES (?, ?, ?, ?)
-            ''', (name, parent_creator_id, is_primary, alias_type))
+                INSERT INTO creators (name, platform_id, parent_creator_id, is_primary, alias_type, 
+                                     platform_creator_id, profile_url, creator_name_source)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (name, platform_id, parent_creator_id, is_primary, alias_type,
+                  kwargs.get('platform_creator_id'), kwargs.get('profile_url'), 
+                  kwargs.get('creator_name_source', 'db')))
             creator_id = cursor.lastrowid
             
             self._track_query('create_creator', time.time() - start_time)
@@ -460,3 +463,79 @@ class CreatorOperations(DatabaseBase):
         
         self._track_query('get_unique_creators', time.time() - start_time)
         return creators
+
+    # === NEW DATABASE STRUCTURE METHODS ===
+    
+    def get_platform_id(self, platform_name):
+        """Get platform ID by name"""
+        with self.get_connection() as conn:
+            cursor = conn.execute('SELECT id FROM platforms WHERE name = ?', (platform_name,))
+            result = cursor.fetchone()
+            return result[0] if result else None
+
+    def create_or_get_creator(self, name, platform_name, **kwargs):
+        """Create or get creator with platform (new structure with duplicate handling)"""
+        platform_id = self.get_platform_id(platform_name)
+        if not platform_id:
+            raise ValueError(f"Unknown platform: {platform_name}")
+        
+        profile_url = kwargs.get('profile_url')
+        platform_creator_id = kwargs.get('platform_creator_id')
+        
+        with self.get_connection() as conn:
+            # Check for exact match (name + platform + URL or platform_creator_id)
+            if profile_url:
+                cursor = conn.execute('''
+                    SELECT id FROM creators 
+                    WHERE name = ? AND platform_id = ? AND profile_url = ?
+                ''', (name, platform_id, profile_url))
+                result = cursor.fetchone()
+                if result:
+                    return result[0]
+            
+            # Check by platform_creator_id if available
+            if platform_creator_id:
+                cursor = conn.execute('''
+                    SELECT id FROM creators 
+                    WHERE platform_creator_id = ? AND platform_id = ?
+                ''', (platform_creator_id, platform_id))
+                result = cursor.fetchone()
+                if result:
+                    return result[0]
+            
+            # Check for potential duplicates (same name, same platform, different URL/ID)
+            cursor = conn.execute('''
+                SELECT id, profile_url, platform_creator_id, is_primary FROM creators 
+                WHERE name = ? AND platform_id = ?
+                ORDER BY is_primary DESC, id ASC
+            ''', (name, platform_id))
+            existing_creators = cursor.fetchall()
+            
+            if existing_creators:
+                # Found creators with same name but different URLs - handle as duplicates
+                primary_creator = existing_creators[0]  # First one (ordered by is_primary DESC)
+                primary_id = primary_creator[0]
+                
+                # Create secondary creator linked to primary
+                return self.create_creator(
+                    name=name,
+                    platform_id=platform_id,
+                    parent_creator_id=primary_id,
+                    is_primary=False,
+                    alias_type='variation',  # Use 'variation' instead of 'secondary_channel'
+                    platform_creator_id=platform_creator_id,
+                    profile_url=profile_url,
+                    creator_name_source=kwargs.get('creator_name_source', 'db')
+                )
+            else:
+                # No duplicates found - create as primary creator
+                return self.create_creator(
+                    name=name,
+                    platform_id=platform_id,
+                    parent_creator_id=None,
+                    is_primary=True,
+                    alias_type='main',
+                    platform_creator_id=platform_creator_id,
+                    profile_url=profile_url,
+                    creator_name_source=kwargs.get('creator_name_source', 'db')
+                )

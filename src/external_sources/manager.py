@@ -1,338 +1,679 @@
 """
-Tag-Flow V2 - External Sources Manager
-Unified interface for all external source handlers
+Tag-Flow V2 - External Sources Manager  
+Updated for new posts → media database structure
 """
 
 import os
+import time
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Any
+import logging
 
+from ..database.core import DatabaseCore
 from .youtube import YouTube4KHandler
-from .tiktok import TikTokTokkitHandler
+from .tiktok import TikTokTokkitHandler  
 from .instagram import InstagramStogramHandler
 from .organized import OrganizedFoldersHandler
 
-import logging
 logger = logging.getLogger(__name__)
 
 
 class ExternalSourcesManager:
-    """Unified manager for all external source handlers"""
+    """New external sources manager for posts → media structure"""
     
-    def __init__(self, config=None):
-        """Initialize all external source handlers"""
+    def __init__(self, db_core: DatabaseCore = None, config=None):
+        """Initialize with database core"""
+        self.db_core = db_core or DatabaseCore()
         self.config = config or {}
         self.logger = logger
         
         # Initialize handlers
         self._init_handlers()
+        
+        # Category mapping logic
+        self._category_mapping = {
+            'youtube': self._categorize_youtube_content,
+            'tiktok': self._categorize_tiktok_content,
+            'instagram': self._categorize_instagram_content,
+            'bilibili': self._categorize_bilibili_content,
+            'facebook': self._categorize_facebook_content,
+            'twitter': self._categorize_twitter_content
+        }
     
     def _init_handlers(self):
         """Initialize all platform handlers"""
         try:
-            # YouTube 4K Video Downloader
-            youtube_db_path = self._get_config_path('EXTERNAL_YOUTUBE_DB')
-            self.youtube_handler = YouTube4KHandler(youtube_db_path)
+            # Get paths from config or environment
+            youtube_db = os.getenv('EXTERNAL_YOUTUBE_DB') or self.config.get('youtube_db')
+            tiktok_db = os.getenv('EXTERNAL_TIKTOK_DB') or self.config.get('tiktok_db')
+            instagram_db = os.getenv('EXTERNAL_INSTAGRAM_DB') or self.config.get('instagram_db')
+            organized_path = os.getenv('ORGANIZED_BASE_PATH') or self.config.get('organized_path')
             
-            # TikTok 4K Tokkit (base_path auto-derived from db_path)
-            tiktok_db_path = self._get_config_path('EXTERNAL_TIKTOK_DB')
-            self.tiktok_handler = TikTokTokkitHandler(tiktok_db_path)
-            
-            # Instagram 4K Stogram (base_path auto-derived from db_path)
-            instagram_db_path = self._get_config_path('EXTERNAL_INSTAGRAM_DB')
-            self.instagram_handler = InstagramStogramHandler(instagram_db_path)
-            
-            # Organized Folders
-            organized_base_path = self._get_config_path('ORGANIZED_BASE_PATH')
-            self.organized_handler = OrganizedFoldersHandler(organized_base_path)
-            
-            self.logger.debug("External source handlers initialized successfully")
+            # Initialize handlers (convert strings to Path objects)
+            self.youtube_handler = YouTube4KHandler(Path(youtube_db)) if youtube_db else None
+            self.tiktok_handler = TikTokTokkitHandler(Path(tiktok_db)) if tiktok_db else None
+            self.instagram_handler = InstagramStogramHandler(Path(instagram_db)) if instagram_db else None
+            self.organized_handler = OrganizedFoldersHandler(Path(organized_path)) if organized_path else None
             
         except Exception as e:
-            self.logger.error(f"Error initializing external source handlers: {e}")
-    
-    def _get_config_path(self, key: str) -> Optional[Path]:
-        """Get path from configuration or environment"""
-        try:
-            # Try config object attribute first, then environment
-            path_value = None
-            if hasattr(self.config, key):
-                path_value = getattr(self.config, key)
-            elif isinstance(self.config, dict):
-                path_value = self.config.get(key)
-            
-            if not path_value:
-                path_value = os.getenv(key)
-            
-            if path_value:
-                path = Path(path_value)
-                return path if path.exists() else None
-            
-            return None
-            
-        except Exception as e:
-            self.logger.error(f"Error getting config path for {key}: {e}")
-            return None
-    
-    # YouTube Methods
-    def get_youtube_platforms(self) -> Dict[str, int]:
-        """Get available platforms from YouTube 4K Video Downloader"""
-        try:
-            return self.youtube_handler.get_available_platforms()
-        except Exception as e:
-            self.logger.error(f"Error getting YouTube platforms: {e}")
-            return {}
-    
-    def extract_youtube_videos(self, offset: int = 0, limit: Optional[int] = None) -> List[Dict]:
-        """Extract videos from YouTube 4K Video Downloader"""
-        try:
-            return self.youtube_handler.extract_videos(offset, limit)
-        except Exception as e:
-            self.logger.error(f"Error extracting YouTube videos: {e}")
-            return []
-    
-    def extract_youtube_by_platform(self, platform: str, offset: int = 0, limit: Optional[int] = None) -> List[Dict]:
-        """Extract videos from specific platform in YouTube 4K Video Downloader"""
-        try:
-            return self.youtube_handler.extract_by_platform(platform, offset, limit)
-        except Exception as e:
-            self.logger.error(f"Error extracting YouTube videos by platform {platform}: {e}")
-            return []
-    
-    # TikTok Methods
-    def extract_tiktok_videos(self, offset: int = 0, limit: Optional[int] = None) -> List[Dict]:
-        """Extract videos from TikTok 4K Tokkit"""
-        try:
-            return self.tiktok_handler.extract_videos(offset, limit)
-        except Exception as e:
-            self.logger.error(f"Error extracting TikTok videos: {e}")
-            return []
-    
-    # Instagram Methods
-    def extract_instagram_videos(self, offset: int = 0, limit: Optional[int] = None) -> List[Dict]:
-        """Extract content from Instagram 4K Stogram"""
-        try:
-            return self.instagram_handler.extract_videos(offset, limit)
-        except Exception as e:
-            self.logger.error(f"Error extracting Instagram content: {e}")
-            return []
-    
-    # Organized Folders Methods
-    def get_organized_platforms(self) -> Dict:
-        """Get available platforms from organized folders"""
-        try:
-            return self.organized_handler.get_available_platforms()
-        except Exception as e:
-            self.logger.error(f"Error getting organized platforms: {e}")
-            return {'main': {}, 'additional': {}}
-    
-    def extract_organized_videos(self, platform_filter: Optional[str] = None) -> List[Dict]:
-        """Extract videos from organized folders"""
-        try:
-            return self.organized_handler.extract_videos(platform_filter)
-        except Exception as e:
-            self.logger.error(f"Error extracting organized videos: {e}")
-            return []
-    
-    # Unified Methods
-    def get_all_available_platforms(self) -> Dict[str, Any]:
-        """Get all available platforms from all sources"""
-        platforms = {
-            'youtube_4k': self.get_youtube_platforms(),
-            'organized': self.get_organized_platforms(),
-            'tiktok_available': self.tiktok_handler.is_available(),
-            'instagram_available': self.instagram_handler.is_available()
-        }
-        return platforms
-    
-    def get_available_platforms(self) -> Dict[str, Dict]:
-        """Auto-detect all available platforms (main interface for video analyzer)"""
-        platforms = {
-            'main': {
-                'youtube': {
-                    'has_db': self.is_youtube_available(),
-                    'has_organized': False,  # Will be filled from organized handler
-                    'folder_name': 'Youtube'
-                },
-                'tiktok': {
-                    'has_db': self.is_tiktok_available(),
-                    'has_organized': False,
-                    'folder_name': 'Tiktok'
-                },
-                'instagram': {
-                    'has_db': self.is_instagram_available(),
-                    'has_organized': False,
-                    'folder_name': 'Instagram'
-                }
-            },
-            'additional': {}
-        }
+            logger.error(f"Failed to initialize handlers: {e}")
+            raise
+
+    def populate_from_4k_youtube(self, platform_filter=None, limit=None):
+        """Populate from 4K Video Downloader using new structure"""
+        if not self.youtube_handler or not self.youtube_handler.is_available():
+            logger.warning("4K Video Downloader not available")
+            return 0
         
-        # Get organized folder information
-        organized_platforms = self.get_organized_platforms()
+        logger.info(f"Populating from 4K Video Downloader (platform: {platform_filter}, limit: {limit})")
         
-        # Update main platforms with organized folder info
-        for platform in ['youtube', 'tiktok', 'instagram']:
-            if platform in organized_platforms['main']:
-                platforms['main'][platform]['has_organized'] = organized_platforms['main'][platform]['has_organized']
+        # Extract videos from 4K BD
+        videos = self.youtube_handler.extract_videos(platform_filter=platform_filter, limit=limit)
         
-        # Add additional platforms from organized folders
-        platforms['additional'] = organized_platforms['additional']
+        populated_count = 0
         
-        return platforms
-    
-    def get_all_videos_from_source(self, source: str, platform: Optional[str] = None, limit: Optional[int] = None) -> List[Dict]:
-        """Main interface for getting videos from external sources with dynamic offset strategy"""
-        try:
-            all_videos = []
-            
-            # Normalize platform parameter
-            normalized_platform = None if platform in [None, 'all-platforms'] else platform
-            
-            if source in ['db', 'all']:
-                # Extract from database sources with dynamic offset
-                if normalized_platform is None:
-                    # All platforms with dynamic offset
-                    youtube_offset = self._get_dynamic_offset('youtube')
-                    tiktok_offset = self._get_dynamic_offset('tiktok')
-                    instagram_offset = self._get_dynamic_offset('instagram')
-                    
-                    self.logger.debug(f"🔍 Using dynamic offsets - YouTube: {youtube_offset}, TikTok: {tiktok_offset}, Instagram: {instagram_offset}")
-                    
-                    all_videos.extend(self.extract_youtube_videos(youtube_offset, limit))
-                    all_videos.extend(self.extract_tiktok_videos(tiktok_offset, limit))
-                    all_videos.extend(self.extract_instagram_videos(instagram_offset, limit))
-                elif normalized_platform == 'youtube':
-                    offset = self._get_dynamic_offset('youtube')
-                    self.logger.debug(f"🔍 Using dynamic offset for YouTube: {offset}")
-                    # Use platform-specific extraction to get ONLY YouTube videos from 4K DB
-                    all_videos.extend(self.extract_youtube_by_platform('youtube', offset, limit))
-                elif normalized_platform == 'tiktok':
-                    offset = self._get_dynamic_offset('tiktok')
-                    self.logger.debug(f"🔍 Using dynamic offset for TikTok: {offset}")
-                    all_videos.extend(self.extract_tiktok_videos(offset, limit))
-                elif normalized_platform == 'instagram':
-                    offset = self._get_dynamic_offset('instagram')
-                    self.logger.debug(f"🔍 Using dynamic offset for Instagram: {offset}")
-                    all_videos.extend(self.extract_instagram_videos(offset, limit))
-                else:
-                    # Handle other platforms that might be in 4K Video Downloader (facebook, bilibili, etc.)
-                    offset = self._get_dynamic_offset(normalized_platform)
-                    self.logger.debug(f"🔍 Using dynamic offset for {normalized_platform}: {offset}")
-                    # Try to extract from 4K DB first (supports multiple platforms)
-                    all_videos.extend(self.extract_youtube_by_platform(normalized_platform, offset, limit))
-            
-            if source in ['organized', 'all']:
-                # Extract from organized folders
-                all_videos.extend(self.extract_organized_videos(normalized_platform))
-            
-            # Remove duplicates based on file path
-            seen_paths = set()
-            unique_videos = []
-            for video in all_videos:
-                file_path = video.get('file_path')
-                if file_path and file_path not in seen_paths:
-                    seen_paths.add(file_path)
-                    unique_videos.append(video)
-            
-            # Apply limit if specified
-            if limit is not None:
-                unique_videos = unique_videos[:limit]
-            
-            self.logger.debug(f"Total unique videos extracted: {len(unique_videos)}")
-            return unique_videos
-            
-        except Exception as e:
-            self.logger.error(f"Error getting all videos from source {source}: {e}")
-            return []
-    
-    def extract_videos_by_source(self, source: str, platform: Optional[str] = None, 
-                                offset: int = 0, limit: Optional[int] = None) -> List[Dict]:
-        """Extract videos by source type"""
-        try:
-            if source == 'db':
-                # Database sources
-                if platform == 'youtube':
-                    return self.extract_youtube_videos(offset, limit)
-                elif platform == 'tiktok':
-                    return self.extract_tiktok_videos(offset, limit)
-                elif platform == 'instagram':
-                    return self.extract_instagram_videos(offset, limit)
-                else:
-                    # All database sources
-                    videos = []
-                    videos.extend(self.extract_youtube_videos(offset, limit))
-                    videos.extend(self.extract_tiktok_videos(offset, limit))
-                    videos.extend(self.extract_instagram_videos(offset, limit))
-                    return videos
-            
-            elif source == 'organized':
-                # Organized folder sources
-                return self.extract_organized_videos(platform)
-            
-            else:
-                self.logger.warning(f"Unknown source: {source}")
-                return []
+        for video_data in videos:
+            try:
+                # Process video through new structure
+                self._process_4k_youtube_video(video_data)
+                populated_count += 1
                 
-        except Exception as e:
-            self.logger.error(f"Error extracting videos by source {source}: {e}")
-            return []
-    
-    # Availability Methods
-    def is_youtube_available(self) -> bool:
-        """Check if YouTube 4K Video Downloader is available"""
-        return self.youtube_handler.is_available()
-    
-    def is_tiktok_available(self) -> bool:
-        """Check if TikTok 4K Tokkit is available"""
-        return self.tiktok_handler.is_available()
-    
-    def is_instagram_available(self) -> bool:
-        """Check if Instagram 4K Stogram is available"""
-        return self.instagram_handler.is_available()
-    
-    def is_organized_available(self) -> bool:
-        """Check if organized folders are available"""
-        return self.organized_handler.is_available()
-    
-    def get_availability_status(self) -> Dict[str, bool]:
-        """Get availability status of all sources"""
-        return {
-            'youtube_4k': self.is_youtube_available(),
-            'tiktok_tokkit': self.is_tiktok_available(),
-            'instagram_stogram': self.is_instagram_available(),
-            'organized_folders': self.is_organized_available()
+            except Exception as e:
+                logger.error(f"Failed to process YouTube video {video_data.get('title', 'Unknown')}: {e}")
+                continue
+        
+        logger.info(f"Populated {populated_count} videos from 4K Video Downloader")
+        return populated_count
+
+    def _process_4k_youtube_video(self, video_data):
+        """Process single video from 4K Video Downloader into new structure"""
+        
+        # Use database core's new methods
+        from ..database.posts import PostOperations
+        from ..database.creators import CreatorOperations
+        from ..database.subscriptions import SubscriptionOperations
+        
+        post_ops = PostOperations()
+        creator_ops = CreatorOperations()
+        subscription_ops = SubscriptionOperations()
+        
+        # 1. Create or get creator
+        creator_id = None
+        if video_data.get('creator_name'):
+            # Extract platform_creator_id from profile URL if available
+            platform_creator_id = self._extract_platform_creator_id(
+                video_data.get('creator_url'), 
+                video_data['platform']
+            )
+            
+            creator_id = creator_ops.create_or_get_creator(
+                name=video_data['creator_name'],
+                platform_name=video_data['platform'],
+                creator_name_source='db',
+                profile_url=video_data.get('creator_url'),
+                platform_creator_id=platform_creator_id
+            )
+        
+        # 2. Create or get subscription
+        subscription_id = None
+        subscription_type, is_account = self._determine_subscription_type_4k_youtube(video_data)
+        
+        if subscription_type:
+            subscription_name = video_data.get('playlist_name') or video_data.get('creator_name', 'Unknown')
+            
+            # Normalize playlist names for consistency
+            if subscription_type == 'playlist':
+                subscription_name = self._normalize_youtube_playlist_name(subscription_name)
+            
+            # For account type, use creator name if no playlist name
+            if subscription_type == 'account' and not video_data.get('playlist_name'):
+                subscription_name = video_data.get('creator_name', 'Unknown')
+            
+            subscription_id = subscription_ops.create_or_get_subscription(
+                name=subscription_name,
+                platform_name=video_data['platform'],
+                subscription_type=subscription_type,
+                is_account=is_account,
+                creator_id=creator_id if is_account else None,  # Only link creator for account-based subscriptions
+                subscription_url=video_data.get('playlist_url'),
+                external_uuid=video_data.get('downloader_subscription_uuid')
+            )
+        
+        # 3. Prepare post data
+        post_data = {
+            'platform_id': subscription_ops.get_platform_id(video_data['platform']),
+            'platform_post_id': video_data.get('video_id'),
+            'post_url': video_data.get('url'),
+            'title_post': video_data.get('title'),
+            'use_filename': False,  # YouTube doesn't need filename-based titles
+            'creator_id': creator_id,
+            'subscription_id': subscription_id,
+            'download_date': int(video_data.get('timestampNs', 0) / 1_000_000_000) if video_data.get('timestampNs') else None
         }
+        
+        # 4. Prepare media data
+        media_data = [{
+            'file_path': video_data['file_path'],
+            'file_name': video_data['file_name'],
+            'thumbnail_path': video_data.get('thumbnail_path'),
+            'file_size': video_data.get('file_size'),
+            'duration_seconds': video_data.get('duration_seconds'),
+            'media_type': 'video',
+            'resolution_width': video_data.get('resolution_width'),
+            'resolution_height': video_data.get('resolution_height'),
+            'fps': video_data.get('fps')
+        }]
+        
+        # 5. Determine categories
+        category_types = self._categorize_youtube_content(video_data)
+        
+        # 6. Create post with media
+        post_id, media_ids = post_ops.create_post_with_media(post_data, media_data, category_types)
+        
+        # 7. Create downloader mapping
+        if media_ids:
+            post_ops.create_downloader_mapping(media_ids[0], video_data.get('download_item_id'), '4k_youtube')
+        
+        return post_id
+
+    def _normalize_youtube_playlist_name(self, playlist_name):
+        """Normalize YouTube playlist names for consistency"""
+        if not playlist_name:
+            return playlist_name
+            
+        # Normalize common playlist names
+        name_lower = playlist_name.lower().strip()
+        
+        # Liked videos variations
+        if name_lower in ['liked videos', 'videos que me gustan', 'me gusta']:
+            return 'Liked videos'
+        
+        # Watch later variations  
+        elif name_lower in ['watch later', 'ver más tarde', 'ver mas tarde', 'watch later list']:
+            return 'Watch Later'
+            
+        # Return original name if no normalization needed
+        return playlist_name
+
+    def _extract_platform_creator_id(self, profile_url, platform):
+        """Extract platform-specific creator ID from profile URL
+        
+        Examples:
+        - YouTube: http://www.youtube.com/@Frozen_mmd -> @Frozen_mmd
+        - TikTok: https://www.tiktok.com/@username -> @username
+        - Instagram: https://www.instagram.com/username -> username
+        """
+        if not profile_url:
+            return None
+            
+        try:
+            if platform.lower() == 'youtube':
+                # Extract from YouTube URLs: @username format
+                if '@' in profile_url:
+                    # Extract everything after the last @
+                    parts = profile_url.split('@')
+                    if len(parts) > 1:
+                        username = parts[-1].split('/')[0].split('?')[0]  # Remove trailing path/params
+                        return f"@{username}"
+                        
+            elif platform.lower() == 'tiktok':
+                # Extract from TikTok URLs: @username format
+                if '@' in profile_url:
+                    parts = profile_url.split('@')
+                    if len(parts) > 1:
+                        username = parts[-1].split('/')[0].split('?')[0]
+                        return f"@{username}"
+                        
+            elif platform.lower() == 'instagram':
+                # Extract from Instagram URLs: username format (no @ prefix)
+                if 'instagram.com/' in profile_url:
+                    parts = profile_url.split('instagram.com/')
+                    if len(parts) > 1:
+                        username = parts[-1].split('/')[0].split('?')[0]
+                        return username
+                        
+            # For other platforms or if extraction fails, return None
+            return None
+            
+        except Exception as e:
+            logger.debug(f"Error extracting platform creator ID from {profile_url}: {e}")
+            return None
+
+    def _determine_subscription_type_4k_youtube(self, video_data):
+        """Determine subscription type from 4K Video Downloader metadata
+        
+        Mapping based on 4K Apps to Subscriptions table:
+        - type=5: account, is_account=TRUE (Creator's own content)
+        - type=3: playlist, is_account=TRUE (Creator's playlists like Liked videos)
+        """
+        metadata_types = video_data.get('metadata_types', {})
+        
+        # Check for subscription indicators according to the mapping table
+        if 5 in metadata_types:
+            # Account subscription (type=5) - Creator's own content
+            return 'account', True
+        elif 3 in metadata_types:
+            # Playlist subscription (type=3) - Creator's playlists (Liked videos, etc.)
+            return 'playlist', True  # Changed to TRUE according to mapping table
+        else:
+            # Individual video - no subscription
+            return None, False
+
+    def populate_from_4k_tokkit(self, limit=None):
+        """Populate from 4K Tokkit using new structure"""
+        if not self.tiktok_handler or not self.tiktok_handler.is_available():
+            logger.warning("4K Tokkit not available")
+            return 0
+        
+        logger.info(f"Populating from 4K Tokkit (limit: {limit})")
+        
+        # Extract videos from 4K Tokkit
+        videos = self.tiktok_handler.extract_videos(limit=limit)
+        
+        populated_count = 0
+        
+        for video_data in videos:
+            try:
+                self._process_4k_tokkit_video(video_data)
+                populated_count += 1
+                
+            except Exception as e:
+                logger.error(f"Failed to process TikTok video {video_data.get('description', 'Unknown')}: {e}")
+                continue
+        
+        logger.info(f"Populated {populated_count} videos from 4K Tokkit")
+        return populated_count
+
+    def populate_from_4k_stogram(self, limit=None):
+        """Populate from 4K Stogram using new structure"""
+        if not self.instagram_handler or not self.instagram_handler.is_available():
+            logger.warning("4K Stogram not available")
+            return 0
+        
+        logger.info(f"Populating from 4K Stogram (limit: {limit})")
+        
+        # Extract videos from 4K Stogram
+        videos = self.instagram_handler.extract_videos(limit=limit)
+        
+        populated_count = 0
+        
+        for video_data in videos:
+            try:
+                self._process_4k_stogram_video(video_data)
+                populated_count += 1
+                
+            except Exception as e:
+                logger.error(f"Failed to process Instagram video {video_data.get('title', 'Unknown')}: {e}")
+                continue
+        
+        logger.info(f"Populated {populated_count} videos from 4K Stogram")
+        return populated_count
+
+    def get_all_videos_from_source(self, source: str, platform: str = None, limit: int = None, min_download_item_id: int = 0) -> List[Dict]:
+        """Get all videos from specified source for database population"""
+        all_videos = []
+        
+        if source == 'db':
+            # From external databases (4K Apps)
+            if platform is None:
+                # All platforms
+                if self.youtube_handler and self.youtube_handler.is_available():
+                    videos = self.youtube_handler.extract_videos(limit=limit)
+                    all_videos.extend(videos)
+                if self.tiktok_handler and self.tiktok_handler.is_available():
+                    videos = self.tiktok_handler.extract_videos(limit=limit)
+                    all_videos.extend(videos)
+                if self.instagram_handler and self.instagram_handler.is_available():
+                    videos = self.instagram_handler.extract_videos(limit=limit)
+                    all_videos.extend(videos)
+            elif platform in ['youtube', 'bilibili', 'facebook', 'twitter']:
+                # Platforms handled by YouTube handler (4K Video Downloader)
+                if self.youtube_handler and self.youtube_handler.is_available():
+                    videos = self.youtube_handler.extract_by_platform(platform, limit=limit, min_download_item_id=min_download_item_id)
+                    all_videos.extend(videos)
+            elif platform == 'tiktok':
+                if self.tiktok_handler and self.tiktok_handler.is_available():
+                    videos = self.tiktok_handler.extract_videos(limit=limit, min_download_item_id=min_download_item_id)
+                    all_videos.extend(videos)
+            elif platform == 'instagram':
+                if self.instagram_handler and self.instagram_handler.is_available():
+                    videos = self.instagram_handler.extract_videos(limit=limit)
+                    all_videos.extend(videos)
+                    
+        elif source == 'organized':
+            # From organized folder structure
+            if self.organized_handler and self.organized_handler.is_available():
+                videos = self.organized_handler.extract_videos(
+                    platform_filter=platform, limit=limit
+                )
+                all_videos.extend(videos)
+                
+        return all_videos
+
+    def _process_4k_tokkit_video(self, video_data):
+        """Process single video from 4K Tokkit into new structure"""
+        
+        from ..database.posts import PostOperations
+        from ..database.creators import CreatorOperations
+        from ..database.subscriptions import SubscriptionOperations
+        
+        post_ops = PostOperations()
+        creator_ops = CreatorOperations()
+        subscription_ops = SubscriptionOperations()
+        
+        # 1. Create or get creator
+        creator_name = video_data.get('creator_name') or video_data.get('authorName') or 'unknown_creator'
+        creator_id = creator_ops.create_or_get_creator(
+            name=creator_name,
+            platform_name='tiktok',
+            creator_name_source='db',
+            profile_url=video_data.get('creator_url') or f"https://www.tiktok.com/@{creator_name}",
+            platform_creator_id=f"@{creator_name}" if creator_name != 'unknown_creator' else None
+        )
+        
+        # 2. Create or get subscription
+        subscription_id = None
+        subscription_name = video_data.get('subscription_name')
+        subscription_type = video_data.get('subscription_type')
+        
+        if subscription_name and subscription_type:
+            # Map subscription type according to 4K Apps mapping specification
+            # TRUE: account, liked, saved (all belong to accounts)
+            # FALSE: hashtag, music (not associated with accounts)
+            is_account = subscription_type in ['account', 'liked', 'saved']
+            
+            # For liked/saved subscriptions, create the account owner creator
+            subscription_creator_id = None
+            if is_account:
+                if subscription_type in ['liked', 'saved']:
+                    # For liked/saved, subscription_name is the account name (without suffix)
+                    # Create creator for the account that owns the liked/saved list
+                    subscription_creator_id = creator_ops.create_or_get_creator(
+                        name=subscription_name,
+                        platform_name='tiktok',
+                        creator_name_source='db',
+                        profile_url=f"https://www.tiktok.com/@{subscription_name}",
+                        platform_creator_id=f"@{subscription_name}"
+                    )
+                else:
+                    # For account subscriptions, use the video's creator
+                    subscription_creator_id = creator_id
+            
+            subscription_id = subscription_ops.create_or_get_subscription(
+                name=subscription_name,
+                platform_name='tiktok',
+                subscription_type=subscription_type,
+                is_account=is_account,
+                creator_id=subscription_creator_id,
+                subscription_url=video_data.get('subscription_url'),
+                external_uuid=str(video_data.get('subscription_database_id')) if video_data.get('subscription_database_id') else None
+            )
+        
+        # 3. Prepare post data with proper mapping
+        title_from_content = video_data.get('title') or video_data.get('description')
+        use_filename = False
+        
+        # Check if we need to use filename as title (when content has no title/description)
+        if not title_from_content or title_from_content.strip() == '':
+            title_from_content = video_data.get('file_name', '').replace('.mp4', '').replace('.jpg', '').replace('.png', '')
+            use_filename = True
+        
+        post_data = {
+            'platform_id': subscription_ops.get_platform_id('tiktok'),
+            'platform_post_id': str(video_data.get('id')),
+            'post_url': video_data.get('post_url'),
+            'title_post': title_from_content,
+            'use_filename': use_filename,  # New field to track filename usage
+            'creator_id': creator_id,
+            'subscription_id': subscription_id,
+            'publication_date': video_data.get('postingDate'),  # Already Unix timestamp
+            'publication_date_source': '4k_bd' if video_data.get('postingDate') else None,
+            'publication_date_confidence': None,  # Remove hardcoded 95, use NULL as requested
+            'download_date': video_data.get('recordingDate')  # Already Unix timestamp
+        }
+        
+        # 4. Prepare media data - handle carousel properly
+        media_data = []
+        
+        if video_data.get('is_carousel') and video_data.get('carousel_items'):
+            # This is a carousel post with multiple media items
+            for carousel_item in video_data['carousel_items']:
+                media_item = {
+                    'file_path': carousel_item['file_path'],
+                    'file_name': carousel_item['file_name'],
+                    'media_type': carousel_item.get('content_type', 'video'),
+                    'file_size': carousel_item.get('file_size', 0),
+                    'duration_seconds': carousel_item.get('duration_seconds'),
+                    'resolution_width': carousel_item.get('width'),
+                    'resolution_height': carousel_item.get('height'),
+                    'fps': None  # Not available in TikTok data
+                }
+                media_data.append(media_item)
+        else:
+            # Single media item
+            media_item = {
+                'file_path': video_data['file_path'],
+                'file_name': video_data['file_name'],
+                'media_type': video_data.get('content_type', 'video'),
+                'file_size': video_data.get('file_size', 0),
+                'duration_seconds': video_data.get('duration_seconds'),
+                'resolution_width': video_data.get('width'),
+                'resolution_height': video_data.get('height'),
+                'fps': None  # Not available in TikTok data
+            }
+            media_data.append(media_item)
+        
+        # 5. Determine categories for TikTok (always 'videos' according to specification)
+        category_types = ['videos']  # TikTok only has 'videos' category type
+        
+        # 6. Create post with media
+        post_id, media_ids = post_ops.create_post_with_media(post_data, media_data, category_types)
+        
+        # 7. Create downloader mapping for each media
+        if media_ids:
+            if video_data.get('is_carousel') and video_data.get('carousel_items'):
+                # For carousel, map each media to its corresponding carousel item
+                for i, media_id in enumerate(media_ids):
+                    if i < len(video_data['carousel_items']):
+                        carousel_item = video_data['carousel_items'][i]
+                        item_mapping = carousel_item.get('downloader_mapping', {})
+                        download_item_id = item_mapping.get('download_item_id')
+                        if download_item_id:
+                            self._create_downloader_mapping(media_id, download_item_id, '4k_tokkit')
+            else:
+                # Single media item
+                downloader_mapping = video_data.get('downloader_mapping', {})
+                download_item_id = downloader_mapping.get('download_item_id')
+                if download_item_id:
+                    for media_id in media_ids:
+                        self._create_downloader_mapping(media_id, download_item_id, '4k_tokkit')
+        
+        return post_id
     
-    # Legacy compatibility methods
-    def extract_videos_from_youtube_4k(self, limit: Optional[int] = None, offset: int = 0) -> List[Dict]:
-        """Legacy method for YouTube extraction"""
-        return self.extract_youtube_videos(offset, limit)
-    
-    def extract_videos_from_tiktok_tokkit(self, limit: Optional[int] = None, offset: int = 0) -> List[Dict]:
-        """Legacy method for TikTok extraction"""
-        return self.extract_tiktok_videos(offset, limit)
-    
-    def extract_videos_from_instagram_stogram(self, limit: Optional[int] = None, offset: int = 0) -> List[Dict]:
-        """Legacy method for Instagram extraction"""
-        return self.extract_instagram_videos(offset, limit)
-    
-    def extract_videos_from_organized_folders(self, platform: Optional[str] = None) -> List[Dict]:
-        """Legacy method for organized folders extraction"""
-        return self.extract_organized_videos(platform)
-    
-    def _get_dynamic_offset(self, platform_name: str) -> int:
-        """🚀 Calculate dynamic offset based on existing videos in database"""
+    def _create_downloader_mapping(self, media_id: int, download_item_id: int, external_db_source: str):
+        """Create downloader mapping entry"""
         try:
             from src.service_factory import get_database
             db = get_database()
             with db.get_connection() as conn:
-                cursor = conn.execute(
-                    "SELECT COUNT(*) FROM videos WHERE platform = ? AND deleted_at IS NULL",
-                    (platform_name,)
-                )
-                offset = cursor.fetchone()[0]
-                return offset
+                conn.execute('''
+                    INSERT INTO downloader_mapping (media_id, download_item_id, external_db_source)
+                    VALUES (?, ?, ?)
+                ''', (media_id, download_item_id, external_db_source))
         except Exception as e:
-            self.logger.debug(f"Error calculating offset for {platform_name}: {e}")
-            return 0
+            logger.error(f"Error creating downloader mapping: {e}")
+
+    def _process_4k_stogram_video(self, video_data):
+        """Process single video from 4K Stogram into new structure"""
+        
+        from ..database.posts import PostOperations
+        from ..database.creators import CreatorOperations
+        from ..database.subscriptions import SubscriptionOperations
+        
+        post_ops = PostOperations()
+        creator_ops = CreatorOperations()
+        subscription_ops = SubscriptionOperations()
+        
+        # 1. Create or get creator
+        creator_id = creator_ops.create_or_get_creator(
+            name=video_data['creator_name'],
+            platform_name='instagram',
+            creator_name_source='db',
+            profile_url=f"https://www.instagram.com/{video_data['creator_name']}"
+        )
+        
+        # 2. Create or get subscription (Instagram usually account-based)
+        subscription_id = subscription_ops.create_or_get_subscription(
+            name=video_data['creator_name'],
+            platform_name='instagram',
+            subscription_type='account',
+            is_account=True,
+            creator_id=creator_id,
+            subscription_url=f"https://www.instagram.com/{video_data['creator_name']}",
+            external_uuid=video_data.get('subscription_uuid')
+        )
+        
+        # 3. Prepare post data
+        post_data = {
+            'platform_id': subscription_ops.get_platform_id('instagram'),
+            'platform_post_id': video_data.get('post_id'),
+            'post_url': video_data.get('url'),
+            'title_post': video_data.get('title') or video_data.get('description'),
+            'creator_id': creator_id,
+            'subscription_id': subscription_id,
+            'publication_date': video_data.get('publication_date'),
+            'publication_date_source': '4k_bd' if video_data.get('publication_date') else 'fallback',
+            'publication_date_confidence': 85 if video_data.get('publication_date') else 10,
+            'download_date': video_data.get('download_date')
+        }
+        
+        # 4. Prepare media data - handle carousel
+        media_data = []
+        if video_data.get('is_carousel'):
+            # Multiple media items
+            for item in video_data.get('carousel_items', []):
+                media_data.append({
+                    'file_path': item['file_path'],
+                    'file_name': item['file_name'],
+                    'media_type': item.get('media_type', 'image'),
+                    'file_size': item.get('file_size')
+                })
+        else:
+            # Single media item
+            media_data.append({
+                'file_path': video_data['file_path'],
+                'file_name': video_data['file_name'],
+                'media_type': video_data.get('media_type', 'image'),
+                'file_size': video_data.get('file_size')
+            })
+        
+        # 5. Determine categories
+        category_types = self._categorize_instagram_content(video_data)
+        
+        # 6. Create post with media
+        post_id, media_ids = post_ops.create_post_with_media(post_data, media_data, category_types)
+        
+        # 7. Create downloader mapping for each media
+        if media_ids:
+            for media_id in media_ids:
+                post_ops.create_downloader_mapping(media_id, video_data.get('download_item_id'), '4k_stogram')
+        
+        return post_id
+
+    def _determine_subscription_type_4k_tokkit(self, subscription_data):
+        """Determine subscription type from 4K Tokkit data"""
+        sub_type = subscription_data.get('type')
+        download_settings = subscription_data.get('download_settings', {})
+        
+        if sub_type == 1:  # Account
+            # Determine specific type based on download settings
+            if download_settings.get('downloadLiked'):
+                return 'liked', False
+            elif download_settings.get('downloadFavorites'):
+                return 'saved', False
+            else:
+                return 'account', True
+        elif sub_type == 2:  # Hashtag
+            return 'hashtag', False
+        elif sub_type == 3:  # Music
+            return 'music', False
+        else:
+            return 'account', True
+
+    def _build_tiktok_subscription_url(self, subscription_data):
+        """Build TikTok subscription URL"""
+        sub_type = subscription_data.get('type')
+        name = subscription_data.get('name', '')
+        sub_id = subscription_data.get('id')
+        
+        if sub_type == 1:  # Account
+            return f"https://www.tiktok.com/@{name}"
+        elif sub_type == 2:  # Hashtag
+            return f"https://www.tiktok.com/tag/{name}"
+        elif sub_type == 3:  # Music
+            return f"https://www.tiktok.com/music/{name.replace(' ', '-')}-{sub_id}"
+        else:
+            return None
+
+    # Category determination methods
+    def _categorize_youtube_content(self, video_data):
+        """Categorize YouTube content"""
+        categories = ['videos']  # Default
+        
+        # Check for shorts based on dimensions and duration
+        width = video_data.get('resolution_width', 0)
+        height = video_data.get('resolution_height', 0)
+        duration = video_data.get('duration_seconds', 0)
+        
+        if height > width and duration <= 60:  # Vertical and short
+            categories = ['shorts']
+        
+        return categories
+
+    def _categorize_tiktok_content(self, video_data, subscription_data=None):
+        """Categorize TikTok content"""
+        categories = ['videos']  # Default for TikTok
+        
+        # Add subscription-specific categories
+        if subscription_data:
+            download_settings = subscription_data.get('download_settings', {})
+            if download_settings.get('downloadLiked'):
+                categories.append('liked')
+            elif download_settings.get('downloadFavorites'):
+                categories.append('favorites')
+        
+        return categories
+
+    def _categorize_instagram_content(self, video_data):
+        """Categorize Instagram content based on file path"""
+        file_path = video_data.get('file_path', '')
+        categories = ['feed']  # Default
+        
+        if '/reels/' in file_path:
+            categories = ['reels']
+        elif '/stories/' in file_path:
+            categories = ['stories']
+        elif '/highlights/' in file_path:
+            categories = ['highlights']
+        elif '/tagged/' in file_path:
+            categories = ['tagged']
+        
+        return categories
+
+    def _categorize_bilibili_content(self, video_data):
+        """Categorize Bilibili content"""
+        return self._categorize_youtube_content(video_data)  # Similar logic
+
+    def _categorize_facebook_content(self, video_data):
+        """Categorize Facebook content"""
+        return ['videos']  # Simple for now
+
+    def _categorize_twitter_content(self, video_data):
+        """Categorize Twitter content"""
+        return ['videos']  # Simple for now
+
+    def get_population_stats(self):
+        """Get statistics about populated content"""
+        from ..database.posts import PostOperations
+        post_ops = PostOperations()
+        return post_ops.get_platform_statistics()

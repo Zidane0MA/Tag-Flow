@@ -79,15 +79,81 @@ CREATE INDEX idx_subscriptions_account ON subscriptions(is_account);
 | App | External UUID | Subscription Type | Is Account | Category Type | Descripción |
 |-----|--------------|------------------|------------|---------------|-------------|
 | **4K YouTube** | type=5 | account | TRUE | videos/shorts | Contenido propio del creador |
-| **4K YouTube** | type=3 | playlist | FALSE | videos/shorts | Listas del creador (Liked, Watch Later) |
+| **4K YouTube** | type=3 | playlist | TRUE | videos/shorts | Listas del creador (Liked videos, Watch Later) |
 | **4K TikTok** | type=1 + downloadFeed=1 | account | TRUE | videos | Feed del creador |
-| **4K TikTok** | type=1 + downloadLiked=1 | liked | FALSE | videos | Videos que le gustan al creador |
-| **4K TikTok** | type=1 + downloadFavorites=1 | saved | FALSE | videos | Favoritos del creador |
+| **4K TikTok** | type=1 + downloadLiked=1 | liked | TRUE | videos | Videos que le gustan al creador |
+| **4K TikTok** | type=1 + downloadFavorites=1 | saved | TRUE | videos | Favoritos del creador |
 | **4K TikTok** | type=2 | hashtag | FALSE | videos | Hashtag |
 | **4K TikTok** | type=3 | music | FALSE | videos | Música |
 | **4K Stogram** | type=1 | account | TRUE | feed/reels/stories | Cuenta de Instagram |
 | **4K Stogram** | type=2 | hashtag | FALSE | feed/reels | Hashtag |
-| **4K Stogram** | type=4 | saved | FALSE | feed/reels | Contenido guardado |
+| **4K Stogram** | type=4 | saved | TRUE | feed/reels | Contenido guardado |
+
+### **Estrategia de Vinculación de Creadores**
+
+#### **Poblado Automático (Conservador)**
+
+**Reglas Automáticas:**
+1. **Misma plataforma + mismo nombre exacto** → Auto-vinculación con `parent_creator_id`
+   - Ejemplo: "MMDnoECCHY" (YouTube) → "MMDnoECCHY" (YouTube, canal secundario)
+   - `alias_type = 'variation'`, `is_primary = FALSE`
+
+2. **Cross-platform (diferentes plataformas)** → **NO auto-vincular**
+   - Ejemplo: "MMD Archives Daily" (YouTube) + "gianfrancisyap" (TikTok) → Creadores independientes
+   - Evita falsos positivos por nombres genéricos o similares
+
+**Estructura Resultante:**
+```sql
+-- Ejemplo: Creadores independientes por plataforma
+YouTube: "MMD Archives Daily" (ID: 123) → is_primary=TRUE, parent_creator_id=NULL
+TikTok:  "gianfrancisyap" (ID: 456)     → is_primary=TRUE, parent_creator_id=NULL  
+TikTok:  "gian.francis.yap" (ID: 789)   → is_primary=TRUE, parent_creator_id=NULL
+
+-- Solo mismo nombre + misma plataforma se auto-vincula:
+YouTube: "MMDnoECCHY" (ID: 100)        → is_primary=TRUE, parent_creator_id=NULL
+YouTube: "MMDnoECCHY" (ID: 101)        → is_primary=FALSE, parent_creator_id=100, alias_type='variation'
+```
+
+#### **Sistema de Sugerencias (Frontend Manual)**
+
+**Query para detectar posibles matches cross-platform:**
+```sql
+-- Encuentra creadores con nombres/handles similares en diferentes plataformas
+SELECT c1.id, c1.name, c1.platform_id, c1.platform_creator_id, p1.name as platform1,
+       c2.id, c2.name, c2.platform_id, c2.platform_creator_id, p2.name as platform2,
+       -- Métricas de similitud
+       CASE 
+         WHEN LOWER(c1.platform_creator_id) = LOWER(c2.platform_creator_id) THEN 'exact_handle'
+         WHEN LOWER(REPLACE(c1.platform_creator_id, '.', '')) = LOWER(REPLACE(c2.platform_creator_id, '.', '')) THEN 'similar_handle'
+         WHEN LOWER(c1.name) = LOWER(c2.name) THEN 'exact_name'
+         ELSE 'potential'
+       END as match_confidence
+FROM creators c1, creators c2, platforms p1, platforms p2
+WHERE c1.platform_id != c2.platform_id
+  AND c1.id < c2.id  -- Evitar duplicados
+  AND c1.platform_id = p1.id AND c2.platform_id = p2.id
+  AND c1.parent_creator_id IS NULL AND c2.parent_creator_id IS NULL  -- Solo principales
+  AND (
+    -- Handles muy similares (sin puntos/guiones)
+    LOWER(REPLACE(REPLACE(c1.platform_creator_id, '.', ''), '-', '')) = 
+    LOWER(REPLACE(REPLACE(c2.platform_creator_id, '.', ''), '-', ''))
+    -- O nombres exactos
+    OR LOWER(c1.name) = LOWER(c2.name)
+  )
+ORDER BY match_confidence, c1.name;
+```
+
+**Flujo de Vinculación Manual:**
+1. **Algoritmo genera sugerencias** basado en similitud de nombres/handles
+2. **Admin revisa en panel** con vista previa de ambos creadores
+3. **Vinculación manual** mediante drag-and-drop o botón "Vincular"
+4. **Resultado**: Jerarquía correcta sin falsos positivos
+
+**Ventajas del Enfoque Conservador:**
+- ✅ **Sin falsos positivos** durante el poblado automático
+- ✅ **Poblado rápido** sin análisis complejo
+- ✅ **Flexibilidad total** para correcciones manuales
+- ✅ **Escalable** para grandes volúmenes de datos
 
 ### **4. posts** (Publicaciones)
 ```sql
@@ -132,7 +198,8 @@ CREATE INDEX idx_posts_subscription ON posts(subscription_id);
 CREATE INDEX idx_posts_publication_date ON posts(publication_date);
 CREATE INDEX idx_posts_download_date ON posts(download_date);
 CREATE INDEX idx_posts_deleted ON posts(deleted_at);
-CREATE UNIQUE INDEX idx_posts_platform_unique ON posts(platform_id, platform_post_id) WHERE platform_post_id IS NOT NULL;
+-- REMOVED: Unique constraint on platform_post_id to allow same video in multiple lists/downloads
+-- This enables same TikTok video to exist in multiple folders (Liked, Feed, etc.)
 ```
 
 ### **5. media** (Datos técnicos de archivos)

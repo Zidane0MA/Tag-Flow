@@ -376,13 +376,13 @@ class StatsOperations:
                 available_sources['4k_video_youtube'] = platform_stats.get('youtube', 0)
             
             # TikTok (4K Tokkit)
-            if external_sources.tiktok_db_path and external_sources.tiktok_db_path.exists():
-                tiktok_videos = external_sources.extract_tiktok_videos()
+            if external_sources.tiktok_handler and external_sources.tiktok_handler.is_available():
+                tiktok_videos = external_sources.get_all_videos_from_source('db', platform='tiktok', limit=None, min_download_item_id=0)
                 available_sources['4k_tokkit_tiktok'] = len(tiktok_videos)
             
             # Instagram (4K Stogram)
-            if external_sources.instagram_db_path and external_sources.instagram_db_path.exists():
-                instagram_content = external_sources.extract_instagram_content()
+            if external_sources.instagram_handler and external_sources.instagram_handler.is_available():
+                instagram_content = external_sources.get_all_videos_from_source('db', platform='instagram', limit=None, min_download_item_id=0)
                 available_sources['4k_stogram_instagram'] = len(instagram_content)
             
             # Carpetas organizadas

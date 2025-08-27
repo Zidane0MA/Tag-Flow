@@ -14,21 +14,23 @@ logger = logging.getLogger(__name__)
 class SubscriptionOperations(DatabaseBase):
     """Subscription and video list management"""
     
-    def create_subscription(self, name: str, type: str, platform: str, 
-                          creator_id: int = None, subscription_url: str = None) -> int:
+    def create_subscription(self, name: str, platform_id: int, subscription_type: str, 
+                          is_account: bool = False, creator_id: int = None, 
+                          subscription_url: str = None, external_uuid: str = None) -> int:
         """Create new subscription"""
         self._ensure_initialized()
         start_time = time.time()
         
         with self.get_connection() as conn:
             cursor = conn.execute('''
-                INSERT INTO subscriptions (name, type, platform, creator_id, subscription_url)
-                VALUES (?, ?, ?, ?, ?)
-            ''', (name, type, platform, creator_id, subscription_url))
+                INSERT INTO subscriptions (name, platform_id, subscription_type, is_account, 
+                                         creator_id, subscription_url, external_uuid)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            ''', (name, platform_id, subscription_type, is_account, creator_id, subscription_url, external_uuid))
             subscription_id = cursor.lastrowid
             
             self._track_query('create_subscription', time.time() - start_time)
-            logger.debug(f"Subscription created with ID {subscription_id}: {name} ({type})")
+            logger.debug(f"Subscription created with ID {subscription_id}: {name} ({subscription_type})")
             return subscription_id
     
     def get_subscription_by_name_and_platform(self, name: str, platform: str, type: str = None) -> Optional[Dict]:
@@ -347,3 +349,40 @@ class SubscriptionOperations(DatabaseBase):
         
         self._track_query('get_subscription_statistics', time.time() - start_time)
         return stats
+
+    # === NEW DATABASE STRUCTURE METHODS ===
+    
+    def get_platform_id(self, platform_name):
+        """Get platform ID by name"""
+        with self.get_connection() as conn:
+            cursor = conn.execute('SELECT id FROM platforms WHERE name = ?', (platform_name,))
+            result = cursor.fetchone()
+            return result[0] if result else None
+
+    def create_or_get_subscription(self, name: str, platform_name: str, subscription_type: str, **kwargs) -> int:
+        """Create or get subscription with platform (new structure)"""
+        platform_id = self.get_platform_id(platform_name)
+        if not platform_id:
+            raise ValueError(f"Unknown platform: {platform_name}")
+        
+        with self.get_connection() as conn:
+            # Check if subscription exists
+            cursor = conn.execute('''
+                SELECT id FROM subscriptions 
+                WHERE name = ? AND platform_id = ? AND subscription_type = ?
+            ''', (name, platform_id, subscription_type))
+            
+            result = cursor.fetchone()
+            if result:
+                return result[0]
+            
+            # Create new subscription using existing method
+            return self.create_subscription(
+                name=name,
+                platform_id=platform_id,
+                subscription_type=subscription_type,
+                is_account=kwargs.get('is_account', False),
+                creator_id=kwargs.get('creator_id'),
+                subscription_url=kwargs.get('subscription_url'),
+                external_uuid=kwargs.get('external_uuid')
+            )
