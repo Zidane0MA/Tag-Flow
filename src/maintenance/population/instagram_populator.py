@@ -26,7 +26,7 @@ class InstagramPopulator(BasePopulator):
     def supported_sources(self) -> List[str]:
         return ['db', 'organized']
     
-    def get_last_processed_id(self, source: str) -> tuple[Any, List[str]]:
+    def get_last_processed_id(self, source: str, specific_platform: str = None) -> tuple[Any, List[str]]:
         """
         Get last processed Instagram ID for incremental population.
         
@@ -59,7 +59,7 @@ class InstagramPopulator(BasePopulator):
             logger.error(f"Error getting last processed Instagram ID: {e}")
             return None, missing_files
     
-    def extract_videos(self, source: str, limit: Optional[int], last_processed_id: Any) -> List[Dict]:
+    def extract_videos(self, source: str, limit: Optional[int], last_processed_id: Any, specific_platform: str = None) -> List[Dict]:
         """Extract Instagram content from 4K Stogram database"""
         
         if source == 'db':

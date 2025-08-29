@@ -168,9 +168,10 @@ class PostOperations(DatabaseBase):
             cursor = conn.execute('''
                 INSERT INTO posts (
                     platform_id, platform_post_id, post_url, title_post, use_filename,
-                    creator_id, subscription_id, download_date, is_carousel, carousel_count
+                    creator_id, subscription_id, download_date, is_carousel, carousel_count,
+                    publication_date, publication_date_source, publication_date_confidence
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 post_data['platform_id'],
                 post_data.get('platform_post_id'),
@@ -181,7 +182,10 @@ class PostOperations(DatabaseBase):
                 post_data.get('subscription_id'),
                 post_data.get('download_date'),
                 len(media_data) > 1,  # is_carousel
-                len(media_data)  # carousel_count
+                len(media_data),  # carousel_count
+                post_data.get('publication_date'),
+                post_data.get('publication_date_source'),
+                post_data.get('publication_date_confidence')
             ))
             
             post_id = cursor.lastrowid

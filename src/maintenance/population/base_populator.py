@@ -56,9 +56,13 @@ class BasePopulator(ABC):
         pass
     
     @abstractmethod
-    def get_last_processed_id(self, source: str) -> tuple[Any, List[str]]:
+    def get_last_processed_id(self, source: str, specific_platform: str = None) -> tuple[Any, List[str]]:
         """
         Get the last processed ID for incremental population.
+        
+        Args:
+            source: Source type ('db', 'organized', etc.)
+            specific_platform: Optional platform filter for multi-platform handlers
         
         Returns:
             tuple: (last_processed_id, missing_files_list)
@@ -66,7 +70,7 @@ class BasePopulator(ABC):
         pass
     
     @abstractmethod
-    def extract_videos(self, source: str, limit: Optional[int], last_processed_id: Any) -> List[Dict]:
+    def extract_videos(self, source: str, limit: Optional[int], last_processed_id: Any, specific_platform: str = None) -> List[Dict]:
         """
         Extract videos from external source.
         
@@ -74,6 +78,7 @@ class BasePopulator(ABC):
             source: Source type ('db', 'organized', etc.)
             limit: Maximum number of videos to extract
             last_processed_id: Last processed ID for incremental extraction
+            specific_platform: Optional platform filter for multi-platform handlers
             
         Returns:
             List of video data dictionaries
@@ -95,7 +100,8 @@ class BasePopulator(ABC):
         pass
     
     def populate(self, source: str, limit: Optional[int] = None, 
-                force: bool = False, progress_callback: Optional[Callable] = None) -> Dict[str, Any]:
+                force: bool = False, progress_callback: Optional[Callable] = None, 
+                specific_platform: str = None) -> Dict[str, Any]:
         """
         Main population method - orchestrates the entire process.
         
@@ -111,10 +117,10 @@ class BasePopulator(ABC):
         
         try:
             # Step 1: Get incremental position
-            last_processed_id, missing_files = self.get_last_processed_id(source)
+            last_processed_id, missing_files = self.get_last_processed_id(source, specific_platform)
             
             # Step 2: Extract videos
-            videos = self.extract_videos(source, limit, last_processed_id)
+            videos = self.extract_videos(source, limit, last_processed_id, specific_platform)
             
             if not videos:
                 logger.warning(f"No videos found for {self.platform_name} from {source}")

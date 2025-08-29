@@ -27,7 +27,7 @@ class TikTokPopulator(BasePopulator):
     def supported_sources(self) -> List[str]:
         return ['db', 'organized']
     
-    def get_last_processed_id(self, source: str) -> tuple[Any, List[str]]:
+    def get_last_processed_id(self, source: str, specific_platform: str = None) -> tuple[Any, List[str]]:
         """
         Get last processed TikTok ID (BLOB type) for incremental population.
         
@@ -62,7 +62,7 @@ class TikTokPopulator(BasePopulator):
             logger.error(f"Error getting last processed TikTok ID: {e}")
             return None, missing_files
     
-    def extract_videos(self, source: str, limit: Optional[int], last_processed_id: Any) -> List[Dict]:
+    def extract_videos(self, source: str, limit: Optional[int], last_processed_id: Any, specific_platform: str = None) -> List[Dict]:
         """Extract TikTok videos from 4K Tokkit database"""
         
         if source == 'db':

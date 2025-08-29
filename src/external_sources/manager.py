@@ -101,8 +101,15 @@ class ExternalSourcesManager:
         creator_id = None
         if video_data.get('creator_name'):
             # Extract platform_creator_id from profile URL if available
+            # Decode creator URL (4K Video Downloader provides encoded URLs)
+            raw_creator_url = video_data.get('creator_url')
+            decoded_creator_url = None
+            if raw_creator_url:
+                import urllib.parse
+                decoded_creator_url = urllib.parse.unquote(raw_creator_url)
+            
             platform_creator_id = self._extract_platform_creator_id(
-                video_data.get('creator_url'), 
+                raw_creator_url, 
                 video_data['platform']
             )
             
@@ -110,7 +117,7 @@ class ExternalSourcesManager:
                 name=video_data['creator_name'],
                 platform_name=video_data['platform'],
                 creator_name_source='db',
-                profile_url=video_data.get('creator_url'),
+                profile_url=decoded_creator_url,
                 platform_creator_id=platform_creator_id
             )
         
@@ -129,13 +136,35 @@ class ExternalSourcesManager:
             if subscription_type == 'account' and not video_data.get('playlist_name'):
                 subscription_name = video_data.get('creator_name', 'Unknown')
             
+            # Determine subscription URL based on type
+            subscription_url = None
+            subscription_creator_id = None
+            
+            if subscription_type == 'account':
+                # For account subscriptions, use creator_url (channel URL)
+                raw_subscription_url = video_data.get('creator_url') or video_data.get('channel_url')
+                subscription_url = None
+                if raw_subscription_url:
+                    import urllib.parse
+                    subscription_url = urllib.parse.unquote(raw_subscription_url)
+                subscription_creator_id = creator_id  # Account always belongs to the creator
+            elif subscription_type == 'playlist':
+                # For playlist subscriptions, use playlist_url
+                raw_subscription_url = video_data.get('playlist_url')
+                subscription_url = None
+                if raw_subscription_url:
+                    import urllib.parse
+                    subscription_url = urllib.parse.unquote(raw_subscription_url)
+                # ALWAYS NULL for playlists - cannot reliably identify playlist owner from external DB data
+                subscription_creator_id = None
+            
             subscription_id = subscription_ops.create_or_get_subscription(
                 name=subscription_name,
                 platform_name=video_data['platform'],
                 subscription_type=subscription_type,
                 is_account=is_account,
-                creator_id=creator_id if is_account else None,  # Only link creator for account-based subscriptions
-                subscription_url=video_data.get('playlist_url'),
+                creator_id=subscription_creator_id,
+                subscription_url=subscription_url,
                 external_uuid=video_data.get('downloader_subscription_uuid')
             )
         
@@ -207,6 +236,10 @@ class ExternalSourcesManager:
             return None
             
         try:
+            # Decode URL-encoded characters (4K Video Downloader provides encoded URLs)
+            import urllib.parse
+            decoded_url = urllib.parse.unquote(profile_url)
+            profile_url = decoded_url
             if platform.lower() == 'youtube':
                 # Extract from YouTube URLs: @username format
                 if '@' in profile_url:

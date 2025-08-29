@@ -106,8 +106,8 @@ class PopulationCoordinator:
         
         logger.info(f"🎯 Dispatching {platform} population to {populator.__class__.__name__}")
         
-        # Execute population
-        result = populator.populate(source, limit, force, progress_callback)
+        # Execute population with specific platform filter
+        result = populator.populate(source, limit, force, progress_callback, platform)
         
         # Log results
         populator._log_results(result)

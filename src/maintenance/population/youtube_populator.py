@@ -26,11 +26,12 @@ class YouTubePopulator(BasePopulator):
     def supported_sources(self) -> List[str]:
         return ['db', 'organized']
     
-    def get_last_processed_id(self, source: str) -> tuple[Any, List[str]]:
+    def get_last_processed_id(self, source: str, specific_platform: str = None) -> tuple[Any, List[str]]:
         """
         Get last processed YouTube ID (integer type) for incremental population.
         
         YouTube platforms use integer download_item_id values.
+        Now supports platform-specific filtering.
         """
         missing_files = []
         
@@ -38,28 +39,50 @@ class YouTubePopulator(BasePopulator):
             if source != 'db':
                 return 0, missing_files
             
-            # Get last processed integer ID from downloader_mapping
+            # Get last processed integer ID from downloader_mapping, filtered by platform if specified
             with self.db.get_connection() as conn:
-                cursor = conn.execute('''
-                    SELECT MAX(dm.download_item_id) 
-                    FROM downloader_mapping dm
-                    WHERE dm.external_db_source = '4k_youtube'
-                ''')
-                
-                row = cursor.fetchone()
-                if row and row[0]:
-                    last_id = int(row[0])
-                    logger.info(f"🔍 Found last processed YouTube ID: {last_id}")
-                    return last_id, missing_files
+                if specific_platform:
+                    # Filter by specific platform
+                    cursor = conn.execute('''
+                        SELECT MAX(dm.download_item_id) 
+                        FROM downloader_mapping dm
+                        JOIN media m ON dm.media_id = m.id
+                        JOIN posts p ON m.post_id = p.id
+                        JOIN platforms pl ON p.platform_id = pl.id
+                        WHERE dm.external_db_source = '4k_youtube'
+                        AND pl.name = ?
+                    ''', (specific_platform,))
+                    
+                    row = cursor.fetchone()
+                    if row and row[0]:
+                        last_id = int(row[0])
+                        logger.info(f"🔍 Found last processed {specific_platform.title()} ID: {last_id}")
+                        return last_id, missing_files
+                    else:
+                        logger.info(f"🆕 No previous {specific_platform.title()} records found, starting from 0")
+                        return 0, missing_files
                 else:
-                    logger.info(f"🆕 No previous YouTube records found, starting from 0")
-                    return 0, missing_files
+                    # No platform filter - get max across all YouTube-family platforms
+                    cursor = conn.execute('''
+                        SELECT MAX(dm.download_item_id) 
+                        FROM downloader_mapping dm
+                        WHERE dm.external_db_source = '4k_youtube'
+                    ''')
+                    
+                    row = cursor.fetchone()
+                    if row and row[0]:
+                        last_id = int(row[0])
+                        logger.info(f"🔍 Found last processed YouTube-family ID: {last_id}")
+                        return last_id, missing_files
+                    else:
+                        logger.info(f"🆕 No previous YouTube-family records found, starting from 0")
+                        return 0, missing_files
         
         except Exception as e:
             logger.error(f"Error getting last processed YouTube ID: {e}")
             return 0, missing_files
     
-    def extract_videos(self, source: str, limit: Optional[int], last_processed_id: Any) -> List[Dict]:
+    def extract_videos(self, source: str, limit: Optional[int], last_processed_id: Any, specific_platform: str = None) -> List[Dict]:
         """Extract YouTube videos from 4K Video Downloader database"""
         
         if source == 'db':
@@ -68,10 +91,18 @@ class YouTubePopulator(BasePopulator):
                 logger.error("YouTube handler not available")
                 return []
             
-            # Extract from all YouTube-compatible platforms
-            all_videos = []
-            platforms = ['youtube', 'bilibili', 'facebook', 'twitter']
+            # Determine which platforms to process
+            if specific_platform:
+                # If specific platform requested, only process that one
+                platforms = [specific_platform] if specific_platform in ['youtube', 'bilibili', 'facebook', 'twitter'] else []
+                if not platforms:
+                    logger.warning(f"Platform '{specific_platform}' not supported by YouTube handler")
+                    return []
+            else:
+                # If no specific platform, process all YouTube-compatible platforms
+                platforms = ['youtube', 'bilibili', 'facebook', 'twitter']
             
+            all_videos = []
             for platform in platforms:
                 platform_videos = self.external_sources.youtube_handler.extract_by_platform(
                     platform=platform,
@@ -92,10 +123,18 @@ class YouTubePopulator(BasePopulator):
                 logger.error("Organized handler not available")
                 return []
             
-            # Extract from all YouTube-compatible platforms
-            all_videos = []
-            platforms = ['youtube', 'bilibili', 'facebook', 'twitter']
+            # Determine which platforms to process
+            if specific_platform:
+                # If specific platform requested, only process that one
+                platforms = [specific_platform] if specific_platform in ['youtube', 'bilibili', 'facebook', 'twitter'] else []
+                if not platforms:
+                    logger.warning(f"Platform '{specific_platform}' not supported by organized handler")
+                    return []
+            else:
+                # If no specific platform, process all YouTube-compatible platforms
+                platforms = ['youtube', 'bilibili', 'facebook', 'twitter']
             
+            all_videos = []
             for platform in platforms:
                 platform_videos = self.external_sources.organized_handler.extract_videos(
                     platform_filter=platform,

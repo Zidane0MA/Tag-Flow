@@ -100,7 +100,7 @@ class YouTube4KHandler(DatabaseExtractor):
         
         try:
             # 🚀 USAR PREPARED STATEMENT CACHEADO
-            query_key = 'main_query_v2'  # Changed key to invalidate cache
+            query_key = 'main_query_v3'  # Changed key to invalidate cache (added timestampNs)
             if self._prepared_statements_cache.get(query_key) is None:
                 # Preparar query una sola vez con estructura correcta y metadatos completos
                 self._prepared_statements_cache[query_key] = '''
@@ -114,6 +114,7 @@ class YouTube4KHandler(DatabaseExtractor):
                         vi.dimension as dimension_code,
                         vi.resolution as resolution_code,
                         vi.fps as fps,
+                        di.timestampNs as timestamp_ns,
                         GROUP_CONCAT(
                             CASE 
                                 WHEN mim.type = 0 THEN 'creator_name:' || mim.value
@@ -133,7 +134,7 @@ class YouTube4KHandler(DatabaseExtractor):
                     LEFT JOIN media_info mi ON di.id = mi.download_item_id
                     LEFT JOIN video_info vi ON mi.id = vi.media_info_id
                     WHERE di.filename IS NOT NULL
-                    GROUP BY di.id, di.filename, mid.title, ud.service_name, ud.url, mid.duration, vi.dimension, vi.resolution, vi.fps
+                    GROUP BY di.id, di.filename, mid.title, ud.service_name, ud.url, mid.duration, vi.dimension, vi.resolution, vi.fps, di.timestampNs
                     ORDER BY di.id ASC
                 '''
             
@@ -164,7 +165,7 @@ class YouTube4KHandler(DatabaseExtractor):
             platform_condition, platform_params = self._build_platform_condition(platform)
             
             # 🚀 USAR PREPARED STATEMENT CACHEADO para plataforma
-            query_key = f'platform_{platform.lower()}_v2'  # Changed to invalidate cache
+            query_key = f'platform_{platform.lower()}_v3'  # Changed to invalidate cache (added timestampNs)
             if query_key not in self._prepared_statements_cache:
                 # Preparar query específica para esta plataforma con metadatos completos
                 self._prepared_statements_cache[query_key] = f'''
@@ -178,6 +179,7 @@ class YouTube4KHandler(DatabaseExtractor):
                         vi.dimension as dimension_code,
                         vi.resolution as resolution_code,
                         vi.fps as fps,
+                        di.timestampNs as timestamp_ns,
                         GROUP_CONCAT(
                             CASE 
                                 WHEN mim.type = 0 THEN 'creator_name:' || mim.value
@@ -199,7 +201,7 @@ class YouTube4KHandler(DatabaseExtractor):
                     WHERE di.filename IS NOT NULL
                         AND {platform_condition}
                         AND di.id > ?
-                    GROUP BY di.id, di.filename, mid.title, ud.service_name, ud.url, mid.duration, vi.dimension, vi.resolution, vi.fps
+                    GROUP BY di.id, di.filename, mid.title, ud.service_name, ud.url, mid.duration, vi.dimension, vi.resolution, vi.fps, di.timestampNs
                     ORDER BY di.id ASC
                 '''
             
@@ -383,7 +385,8 @@ class YouTube4KHandler(DatabaseExtractor):
                     
                     # 🚀 ULTRA-FAST: Acceso directo por índice (sin nombres de columna)
                     # Nueva estructura: 0=download_id, 1=file_path, 2=video_title, 3=platform, 4=video_url,
-                    #                  5=duration_ms, 6=dimension_code, 7=resolution_code, 8=fps, 9=metadata_concat, 10=metadata_types_concat
+                    #                  5=duration_ms, 6=dimension_code, 7=resolution_code, 8=fps, 9=timestamp_ns,
+                    #                  10=metadata_concat, 11=metadata_types_concat
                     
                     try:
                         file_path = Path(file_path_str)
@@ -391,8 +394,8 @@ class YouTube4KHandler(DatabaseExtractor):
                         platform = self._normalize_platform_name(service_name or "")
                         
                         # 🚀 Parse metadata ultra-fast (solo si existe)
-                        metadata_concat = row[9] if len(row) > 9 else ""
-                        metadata_types_concat = row[10] if len(row) > 10 else ""
+                        metadata_concat = row[10] if len(row) > 10 else ""
+                        metadata_types_concat = row[11] if len(row) > 11 else ""
                         metadata = {}
                         creator_name = None
                         creator_url = None
@@ -443,7 +446,7 @@ class YouTube4KHandler(DatabaseExtractor):
                         
                         # Fallback ultra-rápido si no hay creador
                         if not creator_name:
-                            creator_name = self._extract_creator_from_path(file_path) or "undefined"
+                            creator_name = "undefined"
                         
                         # 🚀 Procesar duración usando acceso directo
                         duration_ms = row[5] if len(row) > 5 else None
@@ -511,7 +514,7 @@ class YouTube4KHandler(DatabaseExtractor):
                             'video_id': str(row[0]),  # download_id como video_id
                             'download_item_id': row[0],  # para mapping
                             'publishing_timestamp': None,  # 4K BD no tiene este dato
-                            'timestampNs': None,  # 4K BD no tiene este dato preciso
+                            'timestampNs': row[9] if len(row) > 9 else None,  # timestamp_ns from 4K BD
                             'downloader_subscription_uuid': metadata.get('subscription_info'),
                             'metadata_types': metadata_types,  # Para lógica de suscripciones
                             
