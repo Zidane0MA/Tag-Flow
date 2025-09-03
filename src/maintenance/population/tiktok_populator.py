@@ -39,21 +39,24 @@ class TikTokPopulator(BasePopulator):
             if source != 'db':
                 return None, missing_files
             
-            # Get last processed BLOB ID from downloader_mapping
+            # Get last processed recordingDate (download_date) from TikTok posts
+            # This replaces the BLOB-based approach with a timestamp-based approach
             with self.db.get_connection() as conn:
                 cursor = conn.execute('''
-                    SELECT dm.download_item_id 
-                    FROM downloader_mapping dm
-                    WHERE dm.external_db_source = '4k_tokkit'
-                    ORDER BY dm.id DESC
+                    SELECT p.download_date
+                    FROM posts p
+                    JOIN platforms pl ON p.platform_id = pl.id
+                    WHERE pl.name = 'tiktok' 
+                    AND p.download_date IS NOT NULL
+                    ORDER BY p.download_date DESC, p.id DESC
                     LIMIT 1
                 ''')
                 
                 row = cursor.fetchone()
                 if row:
-                    last_id = row[0]
-                    logger.info(f"🔍 Found last processed TikTok ID: {last_id}")
-                    return last_id, missing_files
+                    last_recording_date = row[0]
+                    logger.info(f"🔍 Found last processed TikTok recordingDate: {last_recording_date}")
+                    return last_recording_date, missing_files
                 else:
                     logger.info(f"🆕 No previous TikTok records found, starting fresh")
                     return None, missing_files
@@ -71,10 +74,19 @@ class TikTokPopulator(BasePopulator):
                 logger.error("TikTok handler not available")
                 return []
             
-            return self.external_sources.tiktok_handler.extract_videos(
-                limit=limit,
-                min_download_item_id=last_processed_id
-            )
+            # Use recordingDate for incremental processing instead of BLOB databaseId
+            if isinstance(last_processed_id, int):
+                # New method: use recordingDate (timestamp)
+                return self.external_sources.tiktok_handler.extract_videos(
+                    limit=limit,
+                    min_recording_date=last_processed_id
+                )
+            else:
+                # Legacy method: use BLOB databaseId (may not work correctly)
+                return self.external_sources.tiktok_handler.extract_videos(
+                    limit=limit,
+                    min_download_item_id=last_processed_id
+                )
             
         elif source == 'organized':
             # Extract from organized folder structure  

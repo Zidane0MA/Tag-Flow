@@ -906,12 +906,12 @@ class DatabaseOperations:
         print("┌─────────────────────────────┬──────────┐")
         print(f"│ Nuevos videos agregados     │ {result['videos_added']:8} │")
         
-        # Calcular total procesado desde el resultado real o external stats
-        total_processed = validation_stats.get('total_external_records', 0)
-        if total_processed == 0:
-            # Para YouTube y otros casos donde no tenemos stats externos, usar videos añadidos + actualizados
-            total_processed = result['videos_added'] + result.get('videos_updated', 0) + result.get('posts_skipped', 0)
-        existing_count = max(0, total_processed - result['videos_added'])  # Evitar valores negativos
+        # Calcular existing_count de manera más precisa
+        # Si hay 'posts_skipped' significa que encontramos duplicados reales en BD interna
+        existing_count = result.get('posts_skipped', 0)
+        
+        # Total procesado = videos añadidos + videos que ya existían
+        total_processed = result['videos_added'] + existing_count
         print(f"│ Videos ya existentes        │ {existing_count:8} │")
         
         missing_count = validation_stats.get('missing_files', 0)

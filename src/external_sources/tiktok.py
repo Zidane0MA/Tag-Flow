@@ -24,7 +24,7 @@ class TikTokTokkitHandler(DatabaseExtractor):
         else:
             self.base_path = base_path
     
-    def extract_videos(self, offset: int = 0, limit: Optional[int] = None, min_download_item_id = None) -> List[Dict]:
+    def extract_videos(self, offset: int = 0, limit: Optional[int] = None, min_download_item_id = None, min_recording_date: int = None) -> List[Dict]:
         """Extraer videos e imágenes de TikTok desde BD de 4K Tokkit con nueva estructura completa
         Solo incluye contenido descargado (downloaded=1) y excluye imágenes de perfil (mediaType IN (2,3))
         mediaType: 2=video, 3=imagen, 1=coverimg (ignorar)
@@ -43,8 +43,21 @@ class TikTokTokkitHandler(DatabaseExtractor):
             if limit is not None:
                 # Para asegurar integridad de carruseles de TikTok, primero obtenemos los base_ids únicos
                 # con el límite aplicado, luego obtenemos todos los elementos de esos carruseles
-                if min_download_item_id is not None:
-                    base_id_query = """
+                # Usar min_recording_date si se proporciona (nuevo método), sino usar min_download_item_id (legacy)
+                incremental_filter = ""
+                incremental_params = []
+                
+                if min_recording_date is not None:
+                    # Nuevo método: usar recordingDate para incremental (maneja duplicados)
+                    incremental_filter = "AND mi.recordingDate > ?"
+                    incremental_params.append(min_recording_date)
+                elif min_download_item_id is not None:
+                    # Método legacy: usar databaseId (puede no funcionar correctamente con BLOBs)
+                    incremental_filter = "AND mi.databaseId > ?"  
+                    incremental_params.append(min_download_item_id)
+                
+                if incremental_filter:
+                    base_id_query = f"""
                     SELECT DISTINCT 
                         CASE 
                             WHEN mi.id LIKE '%_index_%' THEN SUBSTR(mi.id, 1, INSTR(mi.id, '_index_') - 1)
@@ -54,12 +67,12 @@ class TikTokTokkitHandler(DatabaseExtractor):
                     WHERE mi.relativePath IS NOT NULL 
                     AND mi.downloaded = 1 
                     AND mi.mediaType IN (2, 3)
-                    AND mi.databaseId > ?
+                    {incremental_filter}
                     GROUP BY base_id
-                    ORDER BY MIN(mi.databaseId) ASC
+                    ORDER BY MIN(mi.recordingDate) ASC, MIN(mi.databaseId) ASC
                     LIMIT ? OFFSET ?
                     """
-                    base_ids = [row[0] for row in self._execute_query(base_id_query, (min_download_item_id, limit, offset))]
+                    base_ids = [row[0] for row in self._execute_query(base_id_query, incremental_params + [limit, offset])]
                 else:
                     base_id_query = """
                     SELECT DISTINCT 
@@ -72,7 +85,7 @@ class TikTokTokkitHandler(DatabaseExtractor):
                     AND mi.downloaded = 1 
                     AND mi.mediaType IN (2, 3)
                     GROUP BY base_id
-                    ORDER BY MIN(mi.databaseId) ASC
+                    ORDER BY MIN(mi.recordingDate) ASC, MIN(mi.databaseId) ASC
                     LIMIT ? OFFSET ?
                     """
                     base_ids = [row[0] for row in self._execute_query(base_id_query, (limit, offset))]
@@ -115,13 +128,11 @@ class TikTokTokkitHandler(DatabaseExtractor):
                             ELSE mi.id
                         END
                     ) IN ({base_id_placeholders})
-                    ORDER BY mi.databaseId ASC
                     """
-                    if min_download_item_id is not None:
-                        query += " AND mi.databaseId > ?"
-                        rows = self._execute_query(query, [min_download_item_id] + base_ids)
-                    else:
-                        rows = self._execute_query(query, base_ids)
+                    # NO aplicar filtro incremental aquí - ya fue aplicado en base_id_query
+                    query += " ORDER BY mi.recordingDate ASC, mi.databaseId ASC"
+                    
+                    rows = self._execute_query(query, base_ids)
             else:
                 # Sin límite: obtener todos los videos e imágenes descargados
                 query = """
@@ -152,11 +163,16 @@ class TikTokTokkitHandler(DatabaseExtractor):
                 AND mi.downloaded = 1
                 AND mi.mediaType IN (2, 3)
                 """
-                if min_download_item_id is not None:
-                    query += " AND mi.databaseId > ?"
+                
+                # Aplicar filtro incremental y ordenamiento
+                if min_recording_date is not None:
+                    query += " AND mi.recordingDate > ? ORDER BY mi.recordingDate ASC, mi.databaseId ASC"
+                    rows = self._execute_query(query, (min_recording_date,))
+                elif min_download_item_id is not None:
+                    query += " AND mi.databaseId > ? ORDER BY mi.recordingDate ASC, mi.databaseId ASC"
                     rows = self._execute_query(query, (min_download_item_id,))
                 else:
-                    query += " ORDER BY mi.databaseId ASC"
+                    query += " ORDER BY mi.recordingDate ASC, mi.databaseId ASC"
                     rows = self._execute_query(query)
 
             # Configurar base path para TikTok
