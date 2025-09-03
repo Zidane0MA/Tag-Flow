@@ -444,10 +444,12 @@ class ExternalSourcesManager:
         
         # 3. Prepare post data with proper mapping
         title_from_content = video_data.get('title') or video_data.get('description')
-        use_filename = False
         
-        # Check if we need to use filename as title (when content has no title/description)
-        if not title_from_content or title_from_content.strip() == '':
+        # Check if filename was used as title (either from handler or fallback logic)
+        use_filename = video_data.get('title_is_filename', False)
+        
+        # Fallback logic for handlers that don't provide title_is_filename
+        if not use_filename and (not title_from_content or title_from_content.strip() == ''):
             title_from_content = video_data.get('file_name', '').replace('.mp4', '').replace('.jpg', '').replace('.png', '')
             use_filename = True
         

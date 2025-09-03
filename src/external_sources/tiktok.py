@@ -285,11 +285,17 @@ class TikTokTokkitHandler(DatabaseExtractor):
         
         # Duración se obtiene por batch processing - individual extraction eliminado
 
+        # Check if we need to use filename as title (when no video_title from DB)
+        video_title_from_db = row['video_title']
+        title_is_filename = not video_title_from_db or video_title_from_db.strip() == ''
+        final_title = video_title_from_db if not title_is_filename else file_path.stem
+        
         # Datos básicos del video
         video_data = {
             'file_path': str(file_path),
             'file_name': file_path.name,
-            'title': row['video_title'] or file_path.stem,  # Usar description como título
+            'title': final_title,
+            'title_is_filename': title_is_filename,  # Track if filename was used as title
             'post_url': post_url,  # URL del post según especificación
             'platform': 'tiktok',
             'content_type': 'video' if is_video else 'image',
@@ -300,7 +306,7 @@ class TikTokTokkitHandler(DatabaseExtractor):
             # Campos que espera el manager (legacy compatibility)
             'authorName': author_name,
             'id': str(row['tiktok_id']),
-            'description': row['video_title'] or file_path.stem,
+            'description': final_title,
             'postingDate': row['postingDate'] if 'postingDate' in row.keys() else None,  # Unix timestamp
             'recordingDate': row['recordingDate'] if 'recordingDate' in row.keys() else None,  # Unix timestamp
             'height': row['height'] if 'height' in row.keys() else None,
