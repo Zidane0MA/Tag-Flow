@@ -5,39 +5,37 @@ export enum PostType {
 }
 
 export enum Platform {
-  YOUTUBE = 'YouTube',
-  TIKTOK = 'TikTok',
-  INSTAGRAM = 'Instagram',
-  VIMEO = 'Vimeo',
-  FACEBOOK = 'Facebook',
-  TWITTER = 'Twitter',
-  TWITCH = 'Twitch',
-  DISCORD = 'Discord',
+  YOUTUBE = 'youtube',
+  TIKTOK = 'tiktok',
+  INSTAGRAM = 'instagram',
   BILIBILI = 'bilibili',
-  BILIBILI_TV = 'bilibili.tv',
-  CUSTOM = 'Custom'
+  FACEBOOK = 'facebook',
+  TWITTER = 'twitter',
+  CUSTOM = 'custom'
 }
 
 export enum EditStatus {
-  PENDING = 'Pendiente',
-  IN_PROGRESS = 'En Progreso',
-  COMPLETED = 'Completado',
+  PENDING = 'pendiente',
+  IN_PROGRESS = 'en_proceso',
+  COMPLETED = 'completado',
+  DISCARDED = 'descartado'
 }
 
 export enum ProcessStatus {
-    PENDING = 'Pendiente',
-    PROCESSING = 'Procesando',
-    COMPLETED = 'Completado',
-    ERROR = 'Error'
+    PENDING = 'pending',
+    PROCESSING = 'processing',
+    COMPLETED = 'completed',
+    FAILED = 'failed',
+    SKIPPED = 'skipped'
 }
 
 export enum Difficulty {
-  LOW = 'Bajo',
-  MEDIUM = 'Medio',
-  HIGH = 'Alto',
+  LOW = 'low',
+  MEDIUM = 'medium',
+  HIGH = 'high'
 }
 
-export type SubscriptionType = 'playlist' | 'music' | 'hashtag' | 'saved' | 'location' | 'feed' | 'liked' | 'reels' | 'stories' | 'highlights' | 'tagged' | 'channel' | 'account' | 'watch_later' | 'favorites';
+export type SubscriptionType = 'account' | 'playlist' | 'hashtag' | 'location' | 'music' | 'search' | 'liked' | 'saved' | 'folder';
 
 export interface Subscription {
   type: SubscriptionType;
@@ -45,17 +43,16 @@ export interface Subscription {
   name: string;
 }
 
-export type ListType = 'feed' | 'liked' | 'reels' | 'stories' | 'highlights' | 'tagged' | 'favorites' | 'playlist' | 'saved' | 'watch_later';
+export type CategoryType = 'videos' | 'shorts' | 'feed' | 'reels' | 'stories' | 'highlights' | 'tagged';
 
-export interface List {
-  type: ListType;
+export interface PostCategory {
+  type: CategoryType;
   name: string;
 }
 
 export interface Post {
   id: string;
   title: string;
-  description: string;
   thumbnailUrl: string;
   postUrl: string; // Para reproducción interna
   originalUrl?: string; // Para enlace original externo
@@ -73,10 +70,12 @@ export interface Post {
   duration: number; // in seconds. 0 for images.
   size: number; // in MB
   downloadDate: string;
-  uploadDate?: string;
+  publicationDate?: string;
   deletedAt?: string;
   subscription?: Subscription;
-  lists?: List[]; // Array de listas a las que pertenece el video
+  categories?: PostCategory[]; // Array de categorías del post
+  isCarousel?: boolean;
+  carouselCount?: number;
 }
 
 export interface CreatorPlatformInfo {
@@ -86,20 +85,26 @@ export interface CreatorPlatformInfo {
 }
 
 export interface Creator {
-    name: string; // The unique ID-like name, e.g., "MMD_Creator_X"
-    displayName: string; // The display name, e.g., "MMD Creator X"
+    id: number;
+    name: string; // The creator name
+    displayName: string; // The display name
     platforms: Partial<Record<Platform, CreatorPlatformInfo>>;
+    parentCreatorId?: number; // For alias relationships
+    isPrimary: boolean;
+    aliasType?: 'main' | 'alias' | 'variation';
 }
 
 export interface SubscriptionInfo {
-    id: string;
-    type: SubscriptionType;
+    id: number;
     name: string;
+    type: SubscriptionType;
     platform: Platform;
     url?: string;
     postCount: number;
-    creatorCount?: number; // For special lists
-    creator?: string; // For account subscriptions
+    isAccount: boolean; // TRUE for account subscriptions
+    creatorId?: number; // For account subscriptions
+    creatorName?: string; // Creator name for display
+    externalUuid?: string; // For 4K apps mapping
 }
 
 
@@ -127,8 +132,8 @@ export interface DataContextType {
   };
   getCreatorByName: (name: string) => Creator | undefined;
   getPostsByCreator: (creatorName: string, platform?: Platform, listId?: string) => Promise<Post[]>;
-  getSubscriptionInfo: (type: SubscriptionType, id: string) => SubscriptionInfo | undefined;
-  getPostsBySubscription: (type: SubscriptionType, id: string, list?: string) => Post[];
+  getSubscriptionInfo: (type: SubscriptionType, id: number) => SubscriptionInfo | undefined;
+  getPostsBySubscription: (type: SubscriptionType, id: number, category?: CategoryType) => Post[];
 }
 
 // Interfaz específica para paginación infinita

@@ -41,57 +41,174 @@ def api_videos():
         limit = int(request.args.get('limit', 0))  # 0 = sin límite
         offset = int(request.args.get('offset', 0))
         
-        # Obtener más videos de los necesarios para compensar la consolidación de carruseles
-        adjusted_limit = min(limit * 3, 150) if limit > 0 else 0  # Triplicar el límite pero max 150
-        videos = db.get_videos(filters=filters, limit=adjusted_limit, offset=offset)
-        total_videos = db.count_videos(filters=filters)
+        # Consulta directa usando el nuevo esquema
+        with db.get_connection() as conn:
+            # Construir query con el nuevo esquema
+            query = """
+                SELECT
+                    m.id,
+                    p.title_post,
+                    m.file_path,
+                    m.file_name,
+                    m.thumbnail_path,
+                    m.file_size,
+                    m.duration_seconds,
+                    c.name as creator_name,
+                    pl.name as platform,
+                    m.detected_music,
+                    m.detected_music_artist,
+                    m.detected_characters,
+                    m.final_music,
+                    m.final_music_artist,
+                    m.final_characters,
+                    m.difficulty_level,
+                    m.edit_status,
+                    m.processing_status,
+                    m.notes,
+                    m.created_at,
+                    m.last_updated,
+                    p.post_url,
+                    p.publication_date,
+                    p.download_date,
+                    p.deleted_at,
+                    p.is_carousel,
+                    p.carousel_count,
+                    s.id as subscription_id,
+                    s.name as subscription_name,
+                    s.subscription_type
+                FROM media m
+                JOIN posts p ON m.post_id = p.id
+                LEFT JOIN creators c ON p.creator_id = c.id
+                LEFT JOIN platforms pl ON p.platform_id = pl.id
+                LEFT JOIN subscriptions s ON p.subscription_id = s.id
+                WHERE p.deleted_at IS NULL
+            """
+
+            params = []
+
+            # Agregar filtros
+            if filters.get('search'):
+                query += " AND (p.title_post LIKE ? OR m.file_name LIKE ? OR c.name LIKE ?)"
+                search_param = f"%{filters['search']}%"
+                params.extend([search_param, search_param, search_param])
+
+            if filters.get('creator_name') and filters['creator_name'] != 'All':
+                query += " AND c.name = ?"
+                params.append(filters['creator_name'])
+
+            if filters.get('platform') and filters['platform'] != 'All':
+                query += " AND pl.name = ?"
+                params.append(filters['platform'])
+
+            if filters.get('edit_status') and filters['edit_status'] != 'All':
+                query += " AND m.edit_status = ?"
+                params.append(filters['edit_status'])
+
+            if filters.get('processing_status') and filters['processing_status'] != 'All':
+                query += " AND m.processing_status = ?"
+                params.append(filters['processing_status'])
+
+            if filters.get('difficulty_level') and filters['difficulty_level'] != 'All':
+                query += " AND m.difficulty_level = ?"
+                params.append(filters['difficulty_level'])
+
+            # Orden y límite
+            query += " ORDER BY m.created_at DESC"
+            if limit > 0:
+                query += " LIMIT ? OFFSET ?"
+                params.extend([limit, offset])
+
+            # Obtener videos
+            cursor = conn.execute(query, params)
+            rows = cursor.fetchall()
+
+            # Convertir a formato de videos
+            videos = []
+            for row in rows:
+                video = {
+                    'id': row[0],
+                    'title_post': row[1],
+                    'file_path': row[2],
+                    'file_name': row[3],
+                    'thumbnail_path': row[4],
+                    'file_size': row[5],
+                    'duration_seconds': row[6],
+                    'creator_name': row[7] or 'Unknown',
+                    'platform': row[8] or 'unknown',
+                    'detected_music': row[9],
+                    'detected_music_artist': row[10],
+                    'detected_characters': row[11],
+                    'final_music': row[12],
+                    'final_music_artist': row[13],
+                    'final_characters': row[14],
+                    'difficulty_level': row[15] or 'low',
+                    'edit_status': row[16] or 'pendiente',
+                    'processing_status': row[17] or 'pending',
+                    'notes': row[18],
+                    'created_at': row[19],
+                    'last_updated': row[20],
+                    'post_url': row[21],
+                    'publication_date': row[22],
+                    'download_date': row[23],
+                    'deleted_at': row[24],
+                    'is_carousel': row[25],
+                    'carousel_count': row[26],
+                    'subscription_id': row[27],
+                }
+
+                # Agregar información de suscripción si está disponible
+                if row[27]:  # subscription_id
+                    video['subscription_info'] = {
+                        'id': row[27],
+                        'name': row[28],
+                        'type': row[29]
+                    }
+
+                videos.append(video)
+
+            # Obtener total count
+            count_query = """
+                SELECT COUNT(DISTINCT m.id)
+                FROM media m
+                JOIN posts p ON m.post_id = p.id
+                LEFT JOIN creators c ON p.creator_id = c.id
+                LEFT JOIN platforms pl ON p.platform_id = pl.id
+                WHERE p.deleted_at IS NULL
+            """
+            count_params = []
+
+            if filters.get('search'):
+                count_query += " AND (p.title_post LIKE ? OR m.file_name LIKE ? OR c.name LIKE ?)"
+                count_params.extend([search_param, search_param, search_param])
+            if filters.get('creator_name') and filters['creator_name'] != 'All':
+                count_query += " AND c.name = ?"
+                count_params.append(filters['creator_name'])
+            if filters.get('platform') and filters['platform'] != 'All':
+                count_query += " AND pl.name = ?"
+                count_params.append(filters['platform'])
+            if filters.get('edit_status') and filters['edit_status'] != 'All':
+                count_query += " AND m.edit_status = ?"
+                count_params.append(filters['edit_status'])
+            if filters.get('processing_status') and filters['processing_status'] != 'All':
+                count_query += " AND m.processing_status = ?"
+                count_params.append(filters['processing_status'])
+            if filters.get('difficulty_level') and filters['difficulty_level'] != 'All':
+                count_query += " AND m.difficulty_level = ?"
+                count_params.append(filters['difficulty_level'])
+
+            cursor = conn.execute(count_query, count_params)
+            total_videos = cursor.fetchone()[0]
         
         # Procesar cada video para la API
         for video in videos:
             process_video_data_for_api(video)
-            
-            # ✅ NUEVO: Agregar información real de suscripción desde la BD
-            if video.get('subscription_id'):
-                try:
-                    with db.get_connection() as conn:
-                        cursor = conn.execute('''
-                            SELECT s.name, s.type, s.platform, s.subscription_url 
-                            FROM subscriptions s 
-                            WHERE s.id = ?
-                        ''', (video['subscription_id'],))
-                        sub_row = cursor.fetchone()
-                        if sub_row:
-                            video['subscription_info'] = {
-                                'id': video['subscription_id'],
-                                'name': sub_row[0],
-                                'type': sub_row[1], 
-                                'platform': sub_row[2],
-                                'url': sub_row[3]
-                            }
-                except Exception as e:
-                    logger.warning(f"Error obteniendo subscription para video {video['id']}: {e}")
-            
-            # ✅ NUEVO: Agregar información real de listas desde la BD
-            try:
-                with db.get_connection() as conn:
-                    cursor = conn.execute('''
-                        SELECT vl.list_type 
-                        FROM video_lists vl 
-                        WHERE vl.video_id = ?
-                    ''', (video['id'],))
-                    list_rows = cursor.fetchall()
-                    if list_rows:
-                        video['video_lists'] = [
-                            {
-                                'type': row[0],
-                                'name': row[0].replace('_', ' ').title()
-                            } for row in list_rows
-                        ]
-            except Exception as e:
-                logger.warning(f"Error obteniendo listas para video {video['id']}: {e}")
-        
-        # ✅ NUEVO: Procesar carruseles de imágenes
-        processed_videos = process_image_carousels(db, videos, filters)
+
+        # Procesar carruseles de imágenes
+        try:
+            processed_videos = process_image_carousels(db, videos, filters)
+        except:
+            # Si falla el procesado de carruseles, usar videos sin procesar
+            processed_videos = videos
         
         # Calcular has_more correctamente considerando la consolidación de carruseles
         original_count = len(videos)

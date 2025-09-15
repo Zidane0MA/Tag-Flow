@@ -38,6 +38,11 @@ const getEditStatusIcon = (status: EditStatus) => {
             title = 'Completado';
             colorClass = 'text-green-400';
             break;
+        case EditStatus.DISCARDED:
+            icon = ICONS.close;
+            title = 'Descartado';
+            colorClass = 'text-red-400';
+            break;
         default:
             return null;
     }
@@ -60,12 +65,19 @@ const DifficultyIndicator: React.FC<{ difficulty: Difficulty }> = ({ difficulty 
     [Difficulty.MEDIUM]: 2,
     [Difficulty.HIGH]: 3,
   };
+
+  const difficultyDisplayMap = {
+    [Difficulty.LOW]: 'Bajo',
+    [Difficulty.MEDIUM]: 'Medio',
+    [Difficulty.HIGH]: 'Alto',
+  };
+
   const level = levelMap[difficulty] || 0;
   
   const dotClass = 'h-1.5 w-1.5 rounded-full'; // Make dots smaller
 
   return (
-    <div title={`Dificultad: ${difficulty}`} className="flex items-center gap-0.5">
+    <div title={`Dificultad: ${difficultyDisplayMap[difficulty] || difficulty}`} className="flex items-center gap-0.5">
       {[...Array(3)].map((_, i) => (
         <span
           key={i}
@@ -105,11 +117,18 @@ const StatusIndicator: React.FC<{ status: ProcessStatus, isAnalyzing: boolean }>
                 title: 'Estado: Pendiente'
             };
             break;
-        case ProcessStatus.ERROR:
+        case ProcessStatus.FAILED:
             indicator = {
                 icon: React.cloneElement(ICONS.close, { className: iconClass }),
                 className: 'bg-red-500/80',
                 title: 'Estado: Error'
+            };
+            break;
+        case ProcessStatus.SKIPPED:
+            indicator = {
+                icon: React.cloneElement(ICONS.close, { className: iconClass }),
+                className: 'bg-orange-500/80',
+                title: 'Estado: Omitido'
             };
             break;
         default:

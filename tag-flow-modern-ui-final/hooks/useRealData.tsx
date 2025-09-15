@@ -17,14 +17,14 @@ interface RealDataContextType extends DataContextType {
   loadMoreVideos: () => Promise<void>;
   loadTrashVideos: () => Promise<void>;
   restoreMultipleFromTrash: (ids: string[]) => Promise<void>;
-  getSubscriptionStats: (type: SubscriptionType, id: string) => Promise<any>;
+  getSubscriptionStats: (type: SubscriptionType, id: number) => Promise<any>;
   // Nuevas funciones para infinite scroll
   loadCreatorPosts: (creatorName: string, platform?: Platform, listId?: string) => Promise<Post[]>;
   loadMoreCreatorPosts: (creatorName: string, platform?: Platform, listId?: string) => Promise<void>;
   getCreatorScrollData: (creatorName: string, platform?: Platform, listId?: string) => {posts: Post[], offset: number, hasMore: boolean, loading: boolean, initialLoaded: boolean};
-  loadSubscriptionPosts: (type: SubscriptionType, id: string, list?: string) => Promise<Post[]>;
-  loadMoreSubscriptionPosts: (type: SubscriptionType, id: string, list?: string) => Promise<void>;
-  getSubscriptionScrollData: (type: SubscriptionType, id: string, list?: string) => {posts: Post[], offset: number, hasMore: boolean, loading: boolean, initialLoaded: boolean};
+  loadSubscriptionPosts: (type: SubscriptionType, id: number, list?: string) => Promise<Post[]>;
+  loadMoreSubscriptionPosts: (type: SubscriptionType, id: number, list?: string) => Promise<void>;
+  getSubscriptionScrollData: (type: SubscriptionType, id: number, list?: string) => {posts: Post[], offset: number, hasMore: boolean, loading: boolean, initialLoaded: boolean};
 }
 
 const RealDataContext = createContext<RealDataContextType | undefined>(undefined);
@@ -752,7 +752,7 @@ export const RealDataProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   /**
    * Obtener estadísticas de suscripción desde el backend
    */
-  const getSubscriptionStats = useCallback(async (type: SubscriptionType, id: string) => {
+  const getSubscriptionStats = useCallback(async (type: SubscriptionType, id: number) => {
     try {
       const stats = await apiService.getSubscriptionStats(type, id);
       return stats;
@@ -765,7 +765,7 @@ export const RealDataProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   /**
    * Cargar posts iniciales de suscripción con infinite scroll
    */
-  const loadSubscriptionPosts = useCallback(async (type: SubscriptionType, id: string, list?: string) => {
+  const loadSubscriptionPosts = useCallback(async (type: SubscriptionType, id: number, list?: string) => {
     const key = `${type}-${id}-${list || 'all'}`;
 
     if (subscriptionScrollData[key]?.loading) return subscriptionScrollData[key].posts;
@@ -787,7 +787,7 @@ export const RealDataProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   /**
    * Cargar más posts de suscripción (infinite scroll)
    */
-  const loadMoreSubscriptionPosts = useCallback(async (type: SubscriptionType, id: string, list?: string) => {
+  const loadMoreSubscriptionPosts = useCallback(async (type: SubscriptionType, id: number, list?: string) => {
     const key = `${type}-${id}-${list || 'all'}`;
     const currentData = subscriptionScrollData[key];
 
@@ -828,7 +828,7 @@ export const RealDataProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   /**
    * Obtener datos de scroll de suscripción
    */
-  const getSubscriptionScrollData = useCallback((type: SubscriptionType, id: string, list?: string) => {
+  const getSubscriptionScrollData = useCallback((type: SubscriptionType, id: number, list?: string) => {
     const key = `${type}-${id}-${list || 'all'}`;
     const currentData = subscriptionScrollData[key];
 

@@ -11,6 +11,47 @@ logger = logging.getLogger(__name__)
 stats_bp = Blueprint('stats', __name__, url_prefix='/api/stats')
 
 
+@stats_bp.route('/')
+def api_general_stats():
+    """API endpoint general para estadísticas básicas del sistema"""
+    try:
+        from src.service_factory import get_database
+        db = get_database()
+
+        with db.get_connection() as conn:
+            # Estadísticas básicas usando la nueva estructura de BD
+            cursor = conn.execute("""
+                SELECT
+                    COUNT(*) as total,
+                    COUNT(CASE WHEN p.deleted_at IS NULL THEN 1 END) as active,
+                    COUNT(CASE WHEN p.deleted_at IS NOT NULL THEN 1 END) as in_trash,
+                    COUNT(CASE WHEN p.deleted_at IS NULL AND (m.final_music IS NOT NULL AND m.final_music != '') THEN 1 END) as with_music,
+                    COUNT(CASE WHEN p.deleted_at IS NULL AND (m.final_characters IS NOT NULL AND m.final_characters != '' AND m.final_characters != '[]') THEN 1 END) as with_characters,
+                    COUNT(CASE WHEN p.deleted_at IS NULL AND m.processing_status = 'completed' THEN 1 END) as processed,
+                    COUNT(CASE WHEN p.deleted_at IS NULL AND m.processing_status = 'pending' THEN 1 END) as pending
+                FROM media m
+                JOIN posts p ON m.post_id = p.id
+            """)
+            stats = cursor.fetchone()
+
+            return jsonify({
+                'success': True,
+                'stats': {
+                    'total': stats[0] or 0,
+                    'total_in_db': stats[1] or 0,  # Para compatibilidad con el frontend
+                    'with_music': stats[3] or 0,
+                    'with_characters': stats[4] or 0,
+                    'processed': stats[5] or 0,
+                    'in_trash': stats[2] or 0,
+                    'pending': stats[6] or 0,
+                }
+            })
+
+    except Exception as e:
+        logger.error(f"Error obteniendo estadísticas generales: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @stats_bp.route('/videos')
 def api_videos_stats():
     """API para obtener estadísticas de videos"""

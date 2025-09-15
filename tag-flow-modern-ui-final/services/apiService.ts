@@ -37,7 +37,7 @@ export interface VideoFilters {
 
 export interface BackendVideo {
   id: number;
-  title: string;
+  title_post?: string; // New field name in schema
   file_path: string;
   file_name: string;
   thumbnail_path?: string;
@@ -45,6 +45,14 @@ export interface BackendVideo {
   duration_seconds?: number;
   creator_name: string;
   platform: string;
+  platform_post_id?: string;
+  post_url?: string;
+  publication_date?: number; // Unix timestamp
+  publication_date_source?: string;
+  publication_date_confidence?: number;
+  download_date?: number; // Unix timestamp
+  is_carousel?: boolean;
+  carousel_count?: number;
   detected_music?: string;
   detected_music_artist?: string;
   detected_characters?: string; // JSON string
@@ -57,7 +65,9 @@ export interface BackendVideo {
   notes?: string;
   created_at: string;
   last_updated: string;
-  post_url?: string;
+  deleted_at?: string;
+  deleted_by?: string;
+  deletion_reason?: string;
 }
 
 export interface BackendResponse<T> {
@@ -105,35 +115,33 @@ class ApiService {
 
     // Mapear estados
     const editStatusMap: { [key: string]: EditStatus } = {
-      'nulo': EditStatus.PENDING,
+      'pendiente': EditStatus.PENDING,
       'en_proceso': EditStatus.IN_PROGRESS,
-      'hecho': EditStatus.COMPLETED
+      'completado': EditStatus.COMPLETED,
+      'descartado': EditStatus.DISCARDED
     };
 
     const processStatusMap: { [key: string]: ProcessStatus } = {
-      'pendiente': ProcessStatus.PENDING,
-      'procesando': ProcessStatus.PROCESSING,
-      'completado': ProcessStatus.COMPLETED,
-      'error': ProcessStatus.ERROR
+      'pending': ProcessStatus.PENDING,
+      'processing': ProcessStatus.PROCESSING,
+      'completed': ProcessStatus.COMPLETED,
+      'failed': ProcessStatus.FAILED,
+      'skipped': ProcessStatus.SKIPPED
     };
 
     const difficultyMap: { [key: string]: Difficulty } = {
-      'bajo': Difficulty.LOW,
-      'medio': Difficulty.MEDIUM,
-      'alto': Difficulty.HIGH
+      'low': Difficulty.LOW,
+      'medium': Difficulty.MEDIUM,
+      'high': Difficulty.HIGH
     };
 
     const platformMap: { [key: string]: Platform } = {
       'youtube': Platform.YOUTUBE,
       'tiktok': Platform.TIKTOK,
       'instagram': Platform.INSTAGRAM,
-      'vimeo': Platform.VIMEO,
+      'bilibili': Platform.BILIBILI,
       'facebook': Platform.FACEBOOK,
-      'twitter': Platform.TWITTER,
-      'twitch': Platform.TWITCH,
-      'discord': Platform.DISCORD,
-      'bilibili/video': Platform.BILIBILI,
-      'bilibili/video/tv': Platform.BILIBILI_TV
+      'twitter': Platform.TWITTER
     };
 
     // ✅ USAR INFORMACIÓN REAL DE SUSCRIPCIONES Y LISTAS DESDE EL BACKEND
@@ -160,8 +168,7 @@ class ApiService {
 
     return {
       id: video.id.toString(),
-      title: video.title || video.file_name || 'Sin título',
-      description: video.title || video.file_name || '',
+      title: video.title_post || video.file_name || 'Sin título',
       thumbnailUrl: (() => {
         if (!video.thumbnail_path || !video.thumbnail_path.trim()) {
           return `${STREAM_BASE_URL}/static/img/no-thumbnail.svg`;
@@ -216,8 +223,10 @@ class ApiService {
       notes: video.notes,
       duration: video.duration_seconds || 0,
       size: video.file_size ? Math.round(video.file_size / (1024 * 1024)) : 0, // Convert to MB
-      downloadDate: video.created_at,
-      uploadDate: video.created_at,
+      downloadDate: video.download_date ? new Date(video.download_date * 1000).toISOString() : video.created_at,
+      publicationDate: video.publication_date ? new Date(video.publication_date * 1000).toISOString() : undefined,
+      isCarousel: video.is_carousel,
+      carouselCount: video.carousel_count,
       subscription,
       lists: lists.length > 0 ? lists : undefined,
     };
@@ -301,18 +310,19 @@ class ApiService {
       // Mapear estados de vuelta al backend
       if (updates.editStatus !== undefined) {
         const editStatusReverseMap = {
-          [EditStatus.PENDING]: 'nulo',
+          [EditStatus.PENDING]: 'pendiente',
           [EditStatus.IN_PROGRESS]: 'en_proceso',
-          [EditStatus.COMPLETED]: 'hecho'
+          [EditStatus.COMPLETED]: 'completado',
+          [EditStatus.DISCARDED]: 'descartado'
         };
         backendUpdates.edit_status = editStatusReverseMap[updates.editStatus];
       }
 
       if (updates.difficulty !== undefined) {
         const difficultyReverseMap = {
-          [Difficulty.LOW]: 'bajo',
-          [Difficulty.MEDIUM]: 'medio',
-          [Difficulty.HIGH]: 'alto'
+          [Difficulty.LOW]: 'low',
+          [Difficulty.MEDIUM]: 'medium',
+          [Difficulty.HIGH]: 'high'
         };
         backendUpdates.difficulty_level = difficultyReverseMap[updates.difficulty];
       }
@@ -407,7 +417,7 @@ class ApiService {
    */
   async getGlobalStats() {
     try {
-      const response = await fetch(`${API_BASE_URL}/stats`);
+      const response = await fetch(`${API_BASE_URL}/stats/`);
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -572,10 +582,10 @@ class ApiService {
   /**
    * Obtener información específica de una suscripción
    */
-  async getSubscriptionInfo(type: string, id: string): Promise<SubscriptionInfo | null> {
+  async getSubscriptionInfo(type: string, id: number): Promise<SubscriptionInfo | null> {
     try {
       const response = await fetch(`${API_BASE_URL}/subscription/${type}/${id}`);
-      
+
       if (!response.ok) {
         if (response.status === 404) {
           return null;
@@ -584,7 +594,7 @@ class ApiService {
       }
 
       const data = await response.json();
-      
+
       if (!data.success) {
         throw new Error(data.error || 'Error fetching subscription info');
       }
@@ -599,10 +609,10 @@ class ApiService {
   /**
    * Obtener estadísticas de una suscripción (conteos por tipo de lista)
    */
-  async getSubscriptionStats(type: string, id: string): Promise<{total: number, listCounts: {[key: string]: number}} | null> {
+  async getSubscriptionStats(type: string, id: number): Promise<{total: number, categoryCounts: {[key: string]: number}} | null> {
     try {
       const response = await fetch(`${API_BASE_URL}/subscription/${type}/${id}/stats`);
-      
+
       if (!response.ok) {
         if (response.status === 404) {
           return null;
@@ -611,14 +621,14 @@ class ApiService {
       }
 
       const data = await response.json();
-      
+
       if (!data.success) {
         throw new Error(data.error || 'Error fetching subscription stats');
       }
 
       return {
         total: data.total,
-        listCounts: data.list_counts
+        categoryCounts: data.category_counts || data.list_counts // Support both new and old field names
       };
     } catch (error) {
       console.error('Error fetching subscription stats:', error);
@@ -631,31 +641,31 @@ class ApiService {
    */
   async getSubscriptionVideos(
     type: string,
-    id: string,
-    listFilter?: string,
+    id: number,
+    categoryFilter?: string,
     limit: number = 0, // 0 = sin límite por defecto
     offset: number = 0
   ): Promise<{ posts: Post[], total: number, hasMore: boolean }> {
     try {
       const params = new URLSearchParams();
-      if (listFilter && listFilter !== 'all') params.append('list', listFilter);
+      if (categoryFilter && categoryFilter !== 'all') params.append('category', categoryFilter);
       if (limit > 0) params.append('limit', limit.toString());
       if (offset > 0) params.append('offset', offset.toString());
 
       const response = await fetch(`${API_BASE_URL}/subscription/${type}/${id}/videos?${params}`);
-      
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const data = await response.json();
-      
+
       if (!data.success) {
         throw new Error(data.error || 'Error fetching subscription videos');
       }
 
       const posts = data.videos.map((video: BackendVideo) => this.convertBackendVideoToPost(video));
-      
+
       return {
         posts,
         total: data.total || posts.length,

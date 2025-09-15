@@ -86,14 +86,27 @@ const EditModal: React.FC<EditModalProps> = ({ video: post, videoIds: postIds = 
                 <label className="block text-sm font-medium text-gray-300">Estado de Edición</label>
                 <select name="editStatus" value={formData.editStatus} onChange={handleChange} className="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm p-2 focus:ring-red-500 focus:border-red-500">
                     <option value="">{isBatchEdit ? 'No cambiar' : 'Seleccionar...'}</option>
-                    {Object.values(EditStatus).map(s => <option key={s} value={s}>{s}</option>)}
+                    {Object.values(EditStatus).map(s => (
+                        <option key={s} value={s}>
+                            {s === 'pendiente' ? 'Pendiente' :
+                             s === 'en_proceso' ? 'En Proceso' :
+                             s === 'completado' ? 'Completado' :
+                             s === 'descartado' ? 'Descartado' : s}
+                        </option>
+                    ))}
                 </select>
             </div>
              <div>
                 <label className="block text-sm font-medium text-gray-300">Dificultad de Edición</label>
                 <select name="difficulty" value={formData.difficulty} onChange={handleChange} className="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm p-2 focus:ring-red-500 focus:border-red-500">
                     <option value="">{isBatchEdit ? 'No cambiar' : 'Seleccionar...'}</option>
-                    {Object.values(Difficulty).map(d => <option key={d} value={d}>{d}</option>)}
+                    {Object.values(Difficulty).map(d => (
+                        <option key={d} value={d}>
+                            {d === 'low' ? 'Bajo' :
+                             d === 'medium' ? 'Medio' :
+                             d === 'high' ? 'Alto' : d}
+                        </option>
+                    ))}
                 </select>
             </div>
             <div>
