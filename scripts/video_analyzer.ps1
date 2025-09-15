@@ -504,35 +504,40 @@ if (-not (Test-Path $InputPath)) {
 Write-ColorOutput "📁 Directorio de análisis: $InputPath" "Cyan"
 Write-Host ""
 
-# Buscar archivos MP4
-Write-ColorOutput "🔍 Buscando archivos MP4..." "Yellow"
-$mp4Files = @()
+# Buscar archivos de video
+Write-ColorOutput "🔍 Buscando archivos de video (MP4, MKV, MOV)..." "Yellow"
+$videoFiles = @()
+$videoExtensions = @("*.mp4", "*.mkv", "*.mov")
 
 try {
-    # Método 1: Get-ChildItem estándar
-    $files1 = Get-ChildItem -Path $InputPath -Filter "*.mp4" -Recurse -ErrorAction SilentlyContinue
-    if ($files1) { $mp4Files += $files1 }
-    
+    # Método 1: Get-ChildItem estándar para cada extensión
+    foreach ($extension in $videoExtensions) {
+        $files1 = Get-ChildItem -Path $InputPath -Filter $extension -Recurse -ErrorAction SilentlyContinue
+        if ($files1) { $videoFiles += $files1 }
+    }
+
     # Método 2: System.IO para caracteres especiales
-    $allFiles = [System.IO.Directory]::GetFiles($InputPath, "*.mp4", [System.IO.SearchOption]::AllDirectories)
-    foreach ($file in $allFiles) {
-        $fileInfo = New-Object System.IO.FileInfo $file
-        if ($mp4Files.FullName -notcontains $fileInfo.FullName) {
-            $mp4Files += $fileInfo
+    foreach ($extension in $videoExtensions) {
+        $allFiles = [System.IO.Directory]::GetFiles($InputPath, $extension, [System.IO.SearchOption]::AllDirectories)
+        foreach ($file in $allFiles) {
+            $fileInfo = New-Object System.IO.FileInfo $file
+            if ($videoFiles.FullName -notcontains $fileInfo.FullName) {
+                $videoFiles += $fileInfo
+            }
         }
     }
-    
-    $mp4Files = $mp4Files | Sort-Object FullName
+
+    $videoFiles = $videoFiles | Sort-Object FullName
 }
 catch {
     Write-ColorOutput "❌ Error buscando archivos: $($_.Exception.Message)" "Red"
     exit 1
 }
 
-$totalFiles = $mp4Files.Count
+$totalFiles = $videoFiles.Count
 
 if ($totalFiles -eq 0) {
-    Write-ColorOutput "❌ No se encontraron archivos MP4" "Red"
+    Write-ColorOutput "❌ No se encontraron archivos de video" "Red"
     exit 0
 }
 
@@ -546,7 +551,7 @@ Write-ColorOutput "━━━━━━━━━━━━━━━━━━━━�
 $analysisResults = @()
 $processedFiles = 0
 
-foreach ($file in $mp4Files) {
+foreach ($file in $videoFiles) {
     $processedFiles++
     
     Write-ColorOutput "📹 [$processedFiles/$totalFiles] Analizando: $($file.Name)" "Cyan"

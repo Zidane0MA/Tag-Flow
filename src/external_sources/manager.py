@@ -439,7 +439,7 @@ class ExternalSourcesManager:
                 is_account=is_account,
                 creator_id=subscription_creator_id,
                 subscription_url=video_data.get('subscription_url'),
-                external_uuid=str(video_data.get('subscription_database_id')) if video_data.get('subscription_database_id') else None
+                external_uuid=self._format_external_uuid(video_data.get('subscription_database_id'))
             )
         
         # 3. Prepare post data with proper mapping
@@ -575,7 +575,7 @@ class ExternalSourcesManager:
                 is_account=video_data.get('subscription_type') in ['account', 'saved'],
                 creator_id=subscription_creator_id,
                 subscription_url=video_data.get('subscription_url'),
-                external_uuid=str(video_data.get('subscription_database_id')) if video_data.get('subscription_database_id') else None
+                external_uuid=self._format_external_uuid(video_data.get('subscription_database_id'))
             )
         
         # 3. Prepare post data - use correct Instagram field mapping
@@ -668,6 +668,22 @@ class ExternalSourcesManager:
             return 'music', False
         else:
             return 'account', True
+
+    def _format_external_uuid(self, subscription_database_id):
+        """Format external_uuid properly handling BLOB data"""
+        if subscription_database_id is None:
+            return None
+
+        # If it's bytes (BLOB), convert to hex string
+        if isinstance(subscription_database_id, bytes):
+            return subscription_database_id.hex()
+
+        # If it's already a string, return as-is
+        if isinstance(subscription_database_id, str):
+            return subscription_database_id
+
+        # For other types (int, etc.), convert to string
+        return str(subscription_database_id)
 
     def _build_tiktok_subscription_url(self, subscription_data):
         """Build TikTok subscription URL"""
