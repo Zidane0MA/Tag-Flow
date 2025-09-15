@@ -110,7 +110,7 @@ MediaItems
   - Links de los posts tipo video se arman como `https://www.tiktok.com/@authorName/video/MediaItems.id`
   - Links de los posts tipo imagen se arman como `https://www.tiktok.com/@authorName/photo/MediaItems.id(sin _index_n1_n2)`
 
-## CASO: 4k Strogram (Solo Instagram ver. gratuita)
+## CASO: 4k Strogram (Solo Instagram | ver. gratuita)
 ### Contexto
 La app agrupa los videos de diferentes maneras:
 - Publicaciones sueltas como: `\\Single media\\video.mp4|imagen.jpg`, vistas desde la db en la tabla `photos` y tienen `subscriptionId` como NULL. Descargados como publicaciones individuales
@@ -132,13 +132,14 @@ La app agrupa los videos de diferentes maneras:
     - web_url (url de la publicacion)
     - title (titulo/descripcion de la publicacion)
     - file (path relativo de la publicacion)
-    - is_video (65=video, [0,2]=imagen)
+    - is_video (65=video, [!65]=imagen)
     - state (4=descargado)
     - ownerName (Creador de la publicacion)
+    - ownerId (Identificador del creador)
     - created_time (INTEGER segundos Unix - fecha de creación del post original, coincide exactamente con fecha del archivo)
 
     Nota:
-    - Como no se puede asociar la publicaciones con el tipo directamente desde la bd, se tendra que usar el campo `file` que los agrupa correctamente y estas se usaran en list_type
+    - Como no se puede asociar la publicaciones con el tipo directamente desde la bd, se tendra que usar el campo `file` que los agrupa correctamente.
     - Como sabes instagram tambien maneja publicaciones tipo carrusel/múltiple, la unica forma de saber que imagenes son parte de una misma publicacion es con el campo `web_url`, para saber el orden solo tenemos photos.id de menor a mayor.
 
 ### TIMESTAMPS COMPARACIÓN

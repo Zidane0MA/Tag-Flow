@@ -80,7 +80,7 @@ class DatabaseCore(DatabaseBase):
                 profile_url TEXT,
                 
                 -- Metadata
-                creator_name_source TEXT CHECK(creator_name_source IN ('db', 'api', 'scraping', 'manual')),
+                creator_name_source TEXT CHECK(creator_name_source IN ('db', 'folder', 'api', 'scraping', 'manual')),
                 
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP

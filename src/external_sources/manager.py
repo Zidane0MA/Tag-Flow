@@ -539,7 +539,7 @@ class ExternalSourcesManager:
             logger.error(f"Error creating downloader mapping: {e}")
 
     def _process_4k_stogram_video(self, video_data):
-        """Process single video from 4K Stogram into new structure"""
+        """Process single video from 4K Stogram (Instagram) using correct data mapping"""
         
         from ..database.posts import PostOperations
         from ..database.creators import CreatorOperations
@@ -549,40 +549,60 @@ class ExternalSourcesManager:
         creator_ops = CreatorOperations()
         subscription_ops = SubscriptionOperations()
         
-        # 1. Create or get creator
-        creator_id = creator_ops.create_or_get_creator(
-            name=video_data['creator_name'],
-            platform_name='instagram',
-            creator_name_source='db',
-            profile_url=f"https://www.instagram.com/{video_data['creator_name']}"
-        )
+        # 1. Create or get creator - use data from Instagram handler
+        creator_name = video_data.get('creator_name')
+        creator_url = video_data.get('creator_url')
+        creator_id = None
         
-        # 2. Create or get subscription (Instagram usually account-based)
-        subscription_id = subscription_ops.create_or_get_subscription(
-            name=video_data['creator_name'],
-            platform_name='instagram',
-            subscription_type='account',
-            is_account=True,
-            creator_id=creator_id,
-            subscription_url=f"https://www.instagram.com/{video_data['creator_name']}",
-            external_uuid=video_data.get('subscription_uuid')
-        )
+        if creator_name:
+            creator_id = creator_ops.create_or_get_creator(
+                name=creator_name,
+                platform_name='instagram',
+                creator_name_source='db',
+                profile_url=creator_url,
+                platform_creator_id=creator_name  # Instagram username
+            )
         
-        # 3. Prepare post data
+        # 2. Create or get subscription - use proper Instagram data
+        subscription_id = None
+        subscription_creator_id = creator_id if video_data.get('subscription_type') in ['account', 'saved'] else None
+        
+        if video_data.get('subscription_name'):
+            subscription_id = subscription_ops.create_or_get_subscription(
+                name=video_data.get('subscription_name'),
+                platform_name='instagram',
+                subscription_type=video_data.get('subscription_type', 'account'),
+                is_account=video_data.get('subscription_type') in ['account', 'saved'],
+                creator_id=subscription_creator_id,
+                subscription_url=video_data.get('subscription_url'),
+                external_uuid=str(video_data.get('subscription_database_id')) if video_data.get('subscription_database_id') else None
+            )
+        
+        # 3. Prepare post data - use correct Instagram field mapping
+        title_from_content = video_data.get('title')
+        use_filename = video_data.get('title_is_filename', False)
+        
+        # Fallback logic for empty titles
+        if not title_from_content or title_from_content.strip() == '':
+            title_from_content = video_data.get('file_name', '').replace('.mp4', '').replace('.jpg', '').replace('.png', '')
+            use_filename = True
+        
         post_data = {
             'platform_id': subscription_ops.get_platform_id('instagram'),
-            'platform_post_id': video_data.get('post_id'),
-            'post_url': video_data.get('url'),
-            'title_post': video_data.get('title') or video_data.get('description'),
+            'platform_post_id': str(video_data.get('id')),  # Use 'id' field from handler
+            'post_url': video_data.get('post_url'),  # Use 'post_url' field from handler
+            'title_post': title_from_content,
+            'use_filename': use_filename,
             'creator_id': creator_id,
             'subscription_id': subscription_id,
-            'publication_date': video_data.get('publication_date'),
-            'publication_date_source': '4k_bd' if video_data.get('publication_date') else 'fallback',
-            'publication_date_confidence': 85 if video_data.get('publication_date') else 10,
-            'download_date': video_data.get('download_date')
+            'publication_date': None,  # Instagram doesn't provide publication_date
+            'publication_date_source': None,
+            'publication_date_confidence': None,
+            'download_date': video_data.get('created_time')  # Use 'created_time' field from handler
         }
         
-        # 4. Prepare media data - handle carousel
+        
+        # 4. Prepare media data - use correct content_type
         media_data = []
         if video_data.get('is_carousel'):
             # Multiple media items
@@ -590,28 +610,42 @@ class ExternalSourcesManager:
                 media_data.append({
                     'file_path': item['file_path'],
                     'file_name': item['file_name'],
-                    'media_type': item.get('media_type', 'image'),
-                    'file_size': item.get('file_size')
+                    'media_type': item.get('content_type', 'image'),  # Use content_type from handler
+                    'file_size': item.get('file_size', 0),
+                    'duration_seconds': item.get('duration_seconds'),
+                    'resolution_width': item.get('resolution_width'),
+                    'resolution_height': item.get('resolution_height'),
+                    'fps': None
                 })
         else:
             # Single media item
             media_data.append({
                 'file_path': video_data['file_path'],
                 'file_name': video_data['file_name'],
-                'media_type': video_data.get('media_type', 'image'),
-                'file_size': video_data.get('file_size')
+                'media_type': video_data.get('content_type', 'image'),  # Use content_type from handler
+                'file_size': video_data.get('file_size', 0),
+                'duration_seconds': video_data.get('duration_seconds'),
+                'resolution_width': video_data.get('resolution_width'),
+                'resolution_height': video_data.get('resolution_height'),
+                'fps': None
             })
         
-        # 5. Determine categories
-        category_types = self._categorize_instagram_content(video_data)
+        # 5. Determine categories - use list_types from Instagram handler
+        list_types = video_data.get('list_types', ['feed'])
+        category_types = list_types
         
         # 6. Create post with media
         post_id, media_ids = post_ops.create_post_with_media(post_data, media_data, category_types)
         
-        # 7. Create downloader mapping for each media
+        # 7. Create downloader mapping - use dynamic external_db_source
         if media_ids:
-            for media_id in media_ids:
-                post_ops.create_downloader_mapping(media_id, video_data.get('download_item_id'), '4k_stogram')
+            downloader_mapping = video_data.get('downloader_mapping', {})
+            download_item_id = downloader_mapping.get('download_item_id')
+            external_db_source = downloader_mapping.get('external_db_source', '4k_stogram')
+            
+            if download_item_id:
+                for media_id in media_ids:
+                    self._create_downloader_mapping(media_id, download_item_id, external_db_source)
         
         return post_id
 

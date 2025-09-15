@@ -113,7 +113,7 @@ class InstagramPopulator(BasePopulator):
         
         for video_data in videos:
             try:
-                # Process single Instagram item
+                # Process single Instagram item using updated stogram processing
                 post_id = self.external_sources._process_4k_stogram_video(video_data)
                 
                 if post_id:
