@@ -8,6 +8,7 @@ import os
 import subprocess
 import sys
 import threading
+from src.api.performance.pagination import smart_paginator
 import logging
 from pathlib import Path
 from flask import Blueprint, request, jsonify
@@ -22,220 +23,70 @@ videos_core_bp = Blueprint('videos_core', __name__, url_prefix='/api')
 
 @videos_core_bp.route('/videos')
 def api_videos():
-    """API endpoint para obtener videos (AJAX)"""
+    """API endpoint para obtener videos (AJAX) con paginación optimizada"""
     try:
         from src.service_factory import get_database
         db = get_database()
-        
-        # Obtener parámetros
+
+        # Obtener parámetros de filtros
         filters = {}
         for key in ['creator_name', 'platform', 'edit_status', 'processing_status', 'difficulty_level']:
             value = request.args.get(key)
             if value and value != 'All':  # Ignorar 'All' values
                 filters[key] = value
-        
+
         search_query = request.args.get('search')
         if search_query:
             filters['search'] = search_query
-        
-        limit = int(request.args.get('limit', 0))  # 0 = sin límite
-        offset = int(request.args.get('offset', 0))
-        
-        # Consulta directa usando el nuevo esquema
+
+        # Parámetros de paginación
+        page = int(request.args.get('page', 1))
+        cursor = request.args.get('cursor')  # Para cursor-based pagination
+
+        # Usar paginación inteligente
         with db.get_connection() as conn:
-            # Construir query con el nuevo esquema
-            query = """
-                SELECT
-                    m.id,
-                    p.title_post,
-                    m.file_path,
-                    m.file_name,
-                    m.thumbnail_path,
-                    m.file_size,
-                    m.duration_seconds,
-                    c.name as creator_name,
-                    pl.name as platform,
-                    m.detected_music,
-                    m.detected_music_artist,
-                    m.detected_characters,
-                    m.final_music,
-                    m.final_music_artist,
-                    m.final_characters,
-                    m.difficulty_level,
-                    m.edit_status,
-                    m.processing_status,
-                    m.notes,
-                    m.created_at,
-                    m.last_updated,
-                    p.post_url,
-                    p.publication_date,
-                    p.download_date,
-                    p.deleted_at,
-                    p.is_carousel,
-                    p.carousel_count,
-                    s.id as subscription_id,
-                    s.name as subscription_name,
-                    s.subscription_type
-                FROM media m
-                JOIN posts p ON m.post_id = p.id
-                LEFT JOIN creators c ON p.creator_id = c.id
-                LEFT JOIN platforms pl ON p.platform_id = pl.id
-                LEFT JOIN subscriptions s ON p.subscription_id = s.id
-                WHERE p.deleted_at IS NULL
-            """
+            result = smart_paginator.paginate_posts(conn, filters, page, cursor)
 
-            params = []
-
-            # Agregar filtros
-            if filters.get('search'):
-                query += " AND (p.title_post LIKE ? OR m.file_name LIKE ? OR c.name LIKE ?)"
-                search_param = f"%{filters['search']}%"
-                params.extend([search_param, search_param, search_param])
-
-            if filters.get('creator_name') and filters['creator_name'] != 'All':
-                query += " AND c.name = ?"
-                params.append(filters['creator_name'])
-
-            if filters.get('platform') and filters['platform'] != 'All':
-                query += " AND pl.name = ?"
-                params.append(filters['platform'])
-
-            if filters.get('edit_status') and filters['edit_status'] != 'All':
-                query += " AND m.edit_status = ?"
-                params.append(filters['edit_status'])
-
-            if filters.get('processing_status') and filters['processing_status'] != 'All':
-                query += " AND m.processing_status = ?"
-                params.append(filters['processing_status'])
-
-            if filters.get('difficulty_level') and filters['difficulty_level'] != 'All':
-                query += " AND m.difficulty_level = ?"
-                params.append(filters['difficulty_level'])
-
-            # Orden y límite
-            query += " ORDER BY m.created_at DESC"
-            if limit > 0:
-                query += " LIMIT ? OFFSET ?"
-                params.extend([limit, offset])
-
-            # Obtener videos
-            cursor = conn.execute(query, params)
-            rows = cursor.fetchall()
-
-            # Convertir a formato de videos
-            videos = []
-            for row in rows:
-                video = {
-                    'id': row[0],
-                    'title_post': row[1],
-                    'file_path': row[2],
-                    'file_name': row[3],
-                    'thumbnail_path': row[4],
-                    'file_size': row[5],
-                    'duration_seconds': row[6],
-                    'creator_name': row[7] or 'Unknown',
-                    'platform': row[8] or 'unknown',
-                    'detected_music': row[9],
-                    'detected_music_artist': row[10],
-                    'detected_characters': row[11],
-                    'final_music': row[12],
-                    'final_music_artist': row[13],
-                    'final_characters': row[14],
-                    'difficulty_level': row[15] or 'low',
-                    'edit_status': row[16] or 'pendiente',
-                    'processing_status': row[17] or 'pending',
-                    'notes': row[18],
-                    'created_at': row[19],
-                    'last_updated': row[20],
-                    'post_url': row[21],
-                    'publication_date': row[22],
-                    'download_date': row[23],
-                    'deleted_at': row[24],
-                    'is_carousel': row[25],
-                    'carousel_count': row[26],
-                    'subscription_id': row[27],
-                }
-
-                # Agregar información de suscripción si está disponible
-                if row[27]:  # subscription_id
-                    video['subscription_info'] = {
-                        'id': row[27],
-                        'name': row[28],
-                        'type': row[29]
-                    }
-
-                videos.append(video)
-
-            # Obtener total count
-            count_query = """
-                SELECT COUNT(DISTINCT m.id)
-                FROM media m
-                JOIN posts p ON m.post_id = p.id
-                LEFT JOIN creators c ON p.creator_id = c.id
-                LEFT JOIN platforms pl ON p.platform_id = pl.id
-                WHERE p.deleted_at IS NULL
-            """
-            count_params = []
-
-            if filters.get('search'):
-                count_query += " AND (p.title_post LIKE ? OR m.file_name LIKE ? OR c.name LIKE ?)"
-                count_params.extend([search_param, search_param, search_param])
-            if filters.get('creator_name') and filters['creator_name'] != 'All':
-                count_query += " AND c.name = ?"
-                count_params.append(filters['creator_name'])
-            if filters.get('platform') and filters['platform'] != 'All':
-                count_query += " AND pl.name = ?"
-                count_params.append(filters['platform'])
-            if filters.get('edit_status') and filters['edit_status'] != 'All':
-                count_query += " AND m.edit_status = ?"
-                count_params.append(filters['edit_status'])
-            if filters.get('processing_status') and filters['processing_status'] != 'All':
-                count_query += " AND m.processing_status = ?"
-                count_params.append(filters['processing_status'])
-            if filters.get('difficulty_level') and filters['difficulty_level'] != 'All':
-                count_query += " AND m.difficulty_level = ?"
-                count_params.append(filters['difficulty_level'])
-
-            cursor = conn.execute(count_query, count_params)
-            total_videos = cursor.fetchone()[0]
-        
-        # Procesar cada video para la API
-        for video in videos:
+        # Procesar cada video para la API usando función helper
+        for video in result.data:
             process_video_data_for_api(video)
 
         # Procesar carruseles de imágenes
         try:
-            processed_videos = process_image_carousels(db, videos, filters)
-        except:
+            processed_videos = process_image_carousels(db, result.data, filters)
+        except Exception as e:
+            logger.warning(f"Error procesando carruseles: {e}")
             # Si falla el procesado de carruseles, usar videos sin procesar
-            processed_videos = videos
-        
-        # Calcular has_more correctamente considerando la consolidación de carruseles
-        original_count = len(videos)
-        processed_count = len(processed_videos)
-        
-        # Cálculo simple y directo de has_more
-        if limit > 0:
-            # Verificar si hay más contenido en el siguiente offset normal
-            next_offset = offset + original_count
-            has_more = next_offset < total_videos
-            logger.info(f"📊 HAS_MORE - offset:{offset}, original_count:{original_count}, next_offset:{next_offset}, total:{total_videos}, has_more:{has_more}")
-        else:
-            # Sin límite, no hay más
-            has_more = False
-        
-        return jsonify({
+            processed_videos = result.data
+
+        # Crear respuesta optimizada con información de performance
+        response = {
             'success': True,
             'videos': processed_videos,
-            'total': total_videos,  # Mantener total original de la BD
-            'total_videos': total_videos,  # Para compatibilidad con frontend
-            'limit': limit,
-            'offset': offset,
-            'has_more': has_more,
-            'returned_count': len(processed_videos),  # Para debugging
-            'original_count': original_count,  # Para debugging
-            'reduction_factor': processed_count / original_count if original_count > 0 else 1  # Para debugging
+            'pagination': {
+                'current_page': result.meta.current_page,
+                'per_page': result.meta.per_page,
+                'total_items': result.meta.total_items,
+                'total_pages': result.meta.total_pages,
+                'has_next': result.meta.has_next,
+                'has_prev': result.meta.has_prev,
+                'next_page': result.meta.next_page,
+                'prev_page': result.meta.prev_page
+            },
+            'performance': result.performance_info,
+            'returned_count': len(processed_videos)
+        }
+
+        # Mantener compatibilidad con frontend existente
+        response.update({
+            'total': result.meta.total_items,
+            'total_videos': result.meta.total_items,
+            'has_more': result.meta.has_next,
+            'limit': result.meta.per_page,
+            'offset': (result.meta.current_page - 1) * result.meta.per_page
         })
+
+        return jsonify(response)
         
     except Exception as e:
         logger.error(f"Error en API videos: {e}")
@@ -340,26 +191,116 @@ def api_update_video(video_id):
         
         from src.service_factory import get_database
         db = get_database()
-        
-        # Verificar que el video existe
-        video = db.get_video(video_id)
-        if not video:
-            return jsonify({'success': False, 'error': 'Video not found'}), 404
-        
-        # Actualizar video
-        success = db.update_video(video_id, update_data)
-        
+
+        # Verificar que el video existe usando el nuevo esquema
+        with db.get_connection() as conn:
+            cursor = conn.execute("""
+                SELECT m.id FROM media m
+                JOIN posts p ON m.post_id = p.id
+                WHERE m.id = ? AND p.deleted_at IS NULL
+            """, (video_id,))
+
+            if not cursor.fetchone():
+                return jsonify({'success': False, 'error': 'Video not found'}), 404
+
+            # Actualizar media table directamente
+            set_clauses = []
+            params = []
+            for key, value in update_data.items():
+                set_clauses.append(f"{key} = ?")
+                params.append(value)
+
+            if set_clauses:
+                update_query = f"UPDATE media SET {', '.join(set_clauses)} WHERE id = ?"
+                params.append(video_id)
+
+                cursor = conn.execute(update_query, params)
+                success = cursor.rowcount > 0
+            else:
+                success = False
+
         if success:
             logger.info(f"Video {video_id} actualizado exitosamente")
-            # Obtener video actualizado
-            updated_video = db.get_video(video_id)
-            process_video_data_for_api(updated_video)
-            
-            return jsonify({
-                'success': True,
-                'message': 'Video updated successfully',
-                'video': updated_video
-            })
+
+            # Obtener video actualizado usando nuevo esquema
+            with db.get_connection() as conn:
+                cursor = conn.execute("""
+                    SELECT
+                        m.id,
+                        p.title_post,
+                        m.file_path,
+                        m.file_name,
+                        m.thumbnail_path,
+                        m.file_size,
+                        m.duration_seconds,
+                        c.name as creator_name,
+                        pl.name as platform,
+                        m.detected_music,
+                        m.detected_music_artist,
+                        m.detected_characters,
+                        m.final_music,
+                        m.final_music_artist,
+                        m.final_characters,
+                        m.difficulty_level,
+                        m.edit_status,
+                        m.processing_status,
+                        m.notes,
+                        m.created_at,
+                        m.last_updated,
+                        p.post_url,
+                        p.publication_date,
+                        p.download_date,
+                        p.deleted_at,
+                        p.is_carousel,
+                        p.carousel_count
+                    FROM media m
+                    JOIN posts p ON m.post_id = p.id
+                    LEFT JOIN creators c ON p.creator_id = c.id
+                    LEFT JOIN platforms pl ON p.platform_id = pl.id
+                    WHERE m.id = ?
+                """, (video_id,))
+
+                row = cursor.fetchone()
+                if row:
+                    updated_video = {
+                        'id': row[0],
+                        'title_post': row[1],
+                        'file_path': row[2],
+                        'file_name': row[3],
+                        'thumbnail_path': row[4],
+                        'file_size': row[5],
+                        'duration_seconds': row[6],
+                        'creator_name': row[7] or 'Unknown',
+                        'platform': row[8] or 'unknown',
+                        'detected_music': row[9],
+                        'detected_music_artist': row[10],
+                        'detected_characters': row[11],
+                        'final_music': row[12],
+                        'final_music_artist': row[13],
+                        'final_characters': row[14],
+                        'difficulty_level': row[15] or 'low',
+                        'edit_status': row[16] or 'pendiente',
+                        'processing_status': row[17] or 'pending',
+                        'notes': row[18],
+                        'created_at': row[19],
+                        'last_updated': row[20],
+                        'post_url': row[21],
+                        'publication_date': row[22],
+                        'download_date': row[23],
+                        'deleted_at': row[24],
+                        'is_carousel': row[25],
+                        'carousel_count': row[26],
+                    }
+                    process_video_data_for_api(updated_video)
+
+                    return jsonify({
+                        'success': True,
+                        'message': 'Video updated successfully',
+                        'video': updated_video
+                    })
+                else:
+                    logger.error(f"No se pudo recuperar video actualizado {video_id}")
+                    return jsonify({'success': False, 'error': 'Update failed - could not retrieve updated video'}), 500
         else:
             logger.error(f"Error actualizando video {video_id}")
             return jsonify({'success': False, 'error': 'Update failed'}), 500

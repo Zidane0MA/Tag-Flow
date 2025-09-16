@@ -8,7 +8,7 @@ import platform
 import subprocess
 import logging
 from pathlib import Path
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, Response, send_file
 
 logger = logging.getLogger(__name__)
 
@@ -21,17 +21,34 @@ def api_play_video(video_id):
     try:
         from src.service_factory import get_database
         db = get_database()
-        video = db.get_video(video_id)
-        if not video:
-            return jsonify({'success': False, 'error': 'Video not found'}), 404
-        
+
+        # Consultar usando el nuevo esquema (media table)
+        with db.get_connection() as conn:
+            cursor = conn.execute("""
+                SELECT m.file_path, m.file_name, m.file_size, m.duration_seconds
+                FROM media m
+                JOIN posts p ON m.post_id = p.id
+                WHERE m.id = ? AND p.deleted_at IS NULL
+            """, (video_id,))
+
+            row = cursor.fetchone()
+            if not row:
+                return jsonify({'success': False, 'error': 'Video not found'}), 404
+
+            video = {
+                'file_path': row[0],
+                'file_name': row[1],
+                'file_size': row[2],
+                'duration_seconds': row[3]
+            }
+
         video_path = Path(video['file_path'])
         if not video_path.exists():
             return jsonify({'success': False, 'error': 'Video file not found'}), 404
-        
+
         # Verificar que el archivo sea accesible
         mime_type, _ = mimetypes.guess_type(str(video_path))
-        
+
         return jsonify({
             'success': True,
             'video_path': str(video_path),
@@ -52,10 +69,22 @@ def api_open_folder(video_id):
     try:
         from src.service_factory import get_database
         db = get_database()
-        video = db.get_video(video_id)
-        if not video:
-            return jsonify({'success': False, 'error': 'Video not found'}), 404
-        
+
+        # Consultar usando el nuevo esquema (media table)
+        with db.get_connection() as conn:
+            cursor = conn.execute("""
+                SELECT m.file_path
+                FROM media m
+                JOIN posts p ON m.post_id = p.id
+                WHERE m.id = ? AND p.deleted_at IS NULL
+            """, (video_id,))
+
+            row = cursor.fetchone()
+            if not row:
+                return jsonify({'success': False, 'error': 'Video not found'}), 404
+
+            video = {'file_path': row[0]}
+
         video_path = Path(video['file_path'])
         if not video_path.exists():
             return jsonify({'success': False, 'error': 'Video file not found'}), 404
@@ -177,3 +206,61 @@ def api_open_folder(video_id):
     except Exception as e:
         logger.error(f"Error abriendo carpeta para video {video_id}: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@videos_streaming_bp.route('/video-stream/<int:video_id>')
+def api_stream_video(video_id):
+    """Stream video file directly using new schema"""
+    try:
+        from src.service_factory import get_database
+        import os
+
+        db = get_database()
+
+        with db.get_connection() as conn:
+            cursor = conn.execute("""
+                SELECT m.file_path, m.media_type, m.file_name
+                FROM media m
+                JOIN posts p ON m.post_id = p.id
+                WHERE m.id = ? AND p.deleted_at IS NULL
+            """, (video_id,))
+
+            row = cursor.fetchone()
+            if not row:
+                return jsonify({'error': 'Video not found'}), 404
+
+            file_path = row[0]
+            media_type = row[1]
+            file_name = row[2]
+
+            if not os.path.exists(file_path):
+                return jsonify({'error': 'File not found on disk'}), 404
+
+            # Determinar content type
+            content_type = 'video/mp4'
+            if media_type == 'image':
+                if file_path.lower().endswith('.jpg') or file_path.lower().endswith('.jpeg'):
+                    content_type = 'image/jpeg'
+                elif file_path.lower().endswith('.png'):
+                    content_type = 'image/png'
+                elif file_path.lower().endswith('.gif'):
+                    content_type = 'image/gif'
+            elif media_type == 'video':
+                if file_path.lower().endswith('.mp4'):
+                    content_type = 'video/mp4'
+                elif file_path.lower().endswith('.webm'):
+                    content_type = 'video/webm'
+                elif file_path.lower().endswith('.mov'):
+                    content_type = 'video/quicktime'
+
+            # Usar send_file para streaming eficiente
+            return send_file(
+                file_path,
+                mimetype=content_type,
+                as_attachment=False,
+                download_name=file_name
+            )
+
+    except Exception as e:
+        logger.error(f"Error streaming video {video_id}: {e}")
+        return jsonify({'error': str(e)}), 500

@@ -313,25 +313,28 @@ class ThumbnailOperations:
         """
         logger.info("📊 Obteniendo estadísticas de thumbnails...")
         
-        # Construir consulta según parámetros
+        # Construir consulta según parámetros usando nuevo esquema
         if video_ids:
             placeholders = ','.join(['?' for _ in video_ids])
             query = f"""
-            SELECT 
+            SELECT
                 COUNT(*) as total,
-                COUNT(thumbnail_path) as with_thumbnails,
-                COUNT(*) - COUNT(thumbnail_path) as without_thumbnails
-            FROM videos 
-            WHERE id IN ({placeholders})
+                COUNT(m.thumbnail_path) as with_thumbnails,
+                COUNT(*) - COUNT(m.thumbnail_path) as without_thumbnails
+            FROM media m
+            JOIN posts p ON m.post_id = p.id
+            WHERE p.deleted_at IS NULL AND m.media_type = 'video' AND m.id IN ({placeholders})
             """
             params = video_ids
         else:
             query = """
-            SELECT 
+            SELECT
                 COUNT(*) as total,
-                COUNT(thumbnail_path) as with_thumbnails,
-                COUNT(*) - COUNT(thumbnail_path) as without_thumbnails
-            FROM videos
+                COUNT(m.thumbnail_path) as with_thumbnails,
+                COUNT(*) - COUNT(m.thumbnail_path) as without_thumbnails
+            FROM media m
+            JOIN posts p ON m.post_id = p.id
+            WHERE p.deleted_at IS NULL AND m.media_type = 'video'
             """
             params = []
         
@@ -500,14 +503,25 @@ class ThumbnailOperations:
         """
         logger.info(f"🗑️ Limpiando thumbnails de plataforma: {platform or 'todas'}")
         
-        # Obtener videos de la plataforma
+        # Obtener videos de la plataforma usando nuevo esquema
         if platform:
             with self.db.get_connection() as conn:
-                cursor = conn.execute("SELECT id, thumbnail_path FROM videos WHERE platform = ?", (platform,))
+                cursor = conn.execute("""
+                    SELECT m.id, m.thumbnail_path
+                    FROM media m
+                    JOIN posts p ON m.post_id = p.id
+                    LEFT JOIN platforms pl ON p.platform_id = pl.id
+                    WHERE p.deleted_at IS NULL AND m.media_type = 'video' AND pl.name = ?
+                """, (platform,))
                 videos = [dict(row) for row in cursor.fetchall()]
         else:
             with self.db.get_connection() as conn:
-                cursor = conn.execute("SELECT id, thumbnail_path FROM videos")
+                cursor = conn.execute("""
+                    SELECT m.id, m.thumbnail_path
+                    FROM media m
+                    JOIN posts p ON m.post_id = p.id
+                    WHERE p.deleted_at IS NULL AND m.media_type = 'video'
+                """)
                 videos = [dict(row) for row in cursor.fetchall()]
         
         # Contar thumbnails a eliminar
@@ -538,9 +552,9 @@ class ThumbnailOperations:
         for video_id, thumb_path in thumbnails_to_delete:
             try:
                 thumb_path.unlink()
-                # Limpiar referencia en BD
+                # Limpiar referencia en BD usando nuevo esquema
                 with self.db.get_connection() as conn:
-                    conn.execute("UPDATE videos SET thumbnail_path = NULL WHERE id = ?", (video_id,))
+                    conn.execute("UPDATE media SET thumbnail_path = NULL WHERE id = ?", (video_id,))
                 deleted += 1
             except Exception as e:
                 logger.warning(f"Error eliminando thumbnail {thumb_path}: {e}")
@@ -557,52 +571,79 @@ class ThumbnailOperations:
     # Métodos privados auxiliares
     
     def _get_videos_by_ids(self, video_ids: List[int]) -> List[Dict]:
-        """Obtener información de videos por IDs"""
+        """Obtener información de videos por IDs usando nuevo esquema"""
         if not video_ids:
             return []
-        
+
         placeholders = ','.join(['?' for _ in video_ids])
         query = f"""
-        SELECT id, file_path, file_name, thumbnail_path, detected_characters, platform
-        FROM videos 
-        WHERE id IN ({placeholders})
-        AND file_path IS NOT NULL
+        SELECT
+            m.id,
+            m.file_path,
+            m.file_name,
+            m.thumbnail_path,
+            m.detected_characters,
+            pl.name as platform
+        FROM media m
+        JOIN posts p ON m.post_id = p.id
+        LEFT JOIN platforms pl ON p.platform_id = pl.id
+        WHERE p.deleted_at IS NULL AND m.media_type = 'video'
+        AND m.id IN ({placeholders})
+        AND m.file_path IS NOT NULL
         """
-        
+
         with self.db.get_connection() as conn:
             cursor = conn.execute(query, video_ids)
             return [dict(row) for row in cursor.fetchall()]
     
     def _get_videos_for_regeneration_optimized(self, force: bool = False) -> List[Dict]:
-        """🚀 OPTIMIZADO: Obtener videos que necesitan regeneración con consulta SQL eficiente"""
-        # Construir consulta SQL optimizada
+        """🚀 OPTIMIZADO: Obtener videos que necesitan regeneración con consulta SQL eficiente - NUEVO ESQUEMA"""
+        # Construir consulta SQL optimizada usando nuevo esquema
         if force:
             # Si force=True, regenerar todos los videos
             query = """
-            SELECT id, file_path, file_name, thumbnail_path, detected_characters, platform
-            FROM videos 
-            WHERE file_path IS NOT NULL
-            ORDER BY 
-                CASE 
-                    WHEN detected_characters IS NOT NULL AND detected_characters != '[]' 
-                    THEN 0 ELSE 1 
+            SELECT
+                m.id,
+                m.file_path,
+                m.file_name,
+                m.thumbnail_path,
+                m.detected_characters,
+                pl.name as platform
+            FROM media m
+            JOIN posts p ON m.post_id = p.id
+            LEFT JOIN platforms pl ON p.platform_id = pl.id
+            WHERE p.deleted_at IS NULL AND m.media_type = 'video'
+            AND m.file_path IS NOT NULL
+            ORDER BY
+                CASE
+                    WHEN m.detected_characters IS NOT NULL AND m.detected_characters != '[]'
+                    THEN 0 ELSE 1
                 END,
-                id
+                m.id
             """
             params = []
         else:
             # Solo videos sin thumbnails o con thumbnails inválidos
             query = """
-            SELECT id, file_path, file_name, thumbnail_path, detected_characters, platform
-            FROM videos 
-            WHERE file_path IS NOT NULL 
-            AND (thumbnail_path IS NULL OR thumbnail_path = '')
-            ORDER BY 
-                CASE 
-                    WHEN detected_characters IS NOT NULL AND detected_characters != '[]' 
-                    THEN 0 ELSE 1 
+            SELECT
+                m.id,
+                m.file_path,
+                m.file_name,
+                m.thumbnail_path,
+                m.detected_characters,
+                pl.name as platform
+            FROM media m
+            JOIN posts p ON m.post_id = p.id
+            LEFT JOIN platforms pl ON p.platform_id = pl.id
+            WHERE p.deleted_at IS NULL AND m.media_type = 'video'
+            AND m.file_path IS NOT NULL
+            AND (m.thumbnail_path IS NULL OR m.thumbnail_path = '')
+            ORDER BY
+                CASE
+                    WHEN m.detected_characters IS NOT NULL AND m.detected_characters != '[]'
+                    THEN 0 ELSE 1
                 END,
-                id
+                m.id
             """
             params = []
         
@@ -647,24 +688,32 @@ class ThumbnailOperations:
         return valid_videos
     
     def _get_videos_needing_thumbnails_optimized(self, platform: Optional[str] = None, limit: Optional[int] = None, force: bool = False) -> List[Dict]:
-        """🚀 OPTIMIZADO: Obtener videos que necesitan thumbnails con consulta SQL eficiente"""
-        # Construir consulta SQL optimizada
+        """🚀 OPTIMIZADO: Obtener videos que necesitan thumbnails con consulta SQL eficiente - NUEVO ESQUEMA"""
+        # Construir consulta SQL optimizada usando nuevo esquema
         query = """
-        SELECT id, file_path, file_name, thumbnail_path, detected_characters, platform
-        FROM videos 
-        WHERE 1=1
+        SELECT
+            m.id,
+            m.file_path,
+            m.file_name,
+            m.thumbnail_path,
+            m.detected_characters,
+            pl.name as platform
+        FROM media m
+        JOIN posts p ON m.post_id = p.id
+        LEFT JOIN platforms pl ON p.platform_id = pl.id
+        WHERE p.deleted_at IS NULL AND m.media_type = 'video'
         """
         params = []
-        
+
         # Filtrar por plataforma si se especifica
         if platform:
-            query += " AND platform = ?"
+            query += " AND pl.name = ?"
             params.append(platform)
-        
+
         # Filtrar por videos que necesitan thumbnails
         if not force:
-            query += " AND (thumbnail_path IS NULL OR thumbnail_path = '')"
-        
+            query += " AND (m.thumbnail_path IS NULL OR m.thumbnail_path = '')"
+
         # Aplicar límite
         if limit:
             query += " LIMIT ?"
@@ -823,10 +872,10 @@ class ThumbnailOperations:
                         success += 1
                         logger.info(f"✓ {result['video_name']}")
                         
-                        # Acumular update para batch
+                        # Acumular update para batch (formato correcto para batch_update_videos)
                         batch_updates.append({
-                            'video_id': result['video_id'],
-                            'updates': {'thumbnail_path': result['thumbnail_path']}
+                            'id': result['video_id'],
+                            'thumbnail_path': result['thumbnail_path']
                         })
                         
                     else:
@@ -919,10 +968,10 @@ class ThumbnailOperations:
                         success += 1
                         logger.info(f"✓ {result['video_name']}")
                         
-                        # Acumular update para batch
+                        # Acumular update para batch (formato correcto para batch_update_videos)
                         batch_updates.append({
-                            'video_id': result['video_id'],
-                            'updates': {'thumbnail_path': result['thumbnail_path']}
+                            'id': result['video_id'],
+                            'thumbnail_path': result['thumbnail_path']
                         })
                         
                     else:
@@ -974,7 +1023,13 @@ class ThumbnailOperations:
                 cursor = conn.execute("SELECT page_count * page_size as size FROM pragma_page_count(), pragma_page_size()")
                 db_size = cursor.fetchone()[0]
                 
-                cursor = conn.execute("SELECT COUNT(*) FROM videos")
+                # Contar media de tipo video usando nuevo esquema
+                cursor = conn.execute("""
+                    SELECT COUNT(*)
+                    FROM media m
+                    JOIN posts p ON m.post_id = p.id
+                    WHERE p.deleted_at IS NULL AND m.media_type = 'video'
+                """)
                 video_count = cursor.fetchone()[0]
             
             logger.info(f"✅ Base de datos optimizada")

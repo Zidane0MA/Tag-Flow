@@ -74,48 +74,46 @@ const GalleryPage: React.FC = () => {
             apiFilters.creator_name = localFilters.creator_name.join(',');
         }
         if (localFilters.platform && localFilters.platform !== 'All') {
-            // Mapear plataformas del frontend al backend
+            // Mapear plataformas del frontend al backend (nuevo esquema)
             const platformMap: { [key: string]: string } = {
                 'YouTube': 'youtube',
                 'TikTok': 'tiktok',
                 'Instagram': 'instagram',
-                'Vimeo': 'vimeo',
+                'Bilibili': 'bilibili',
                 'Facebook': 'facebook',
-                'Twitter': 'twitter',
-                'Twitch': 'twitch',
-                'Discord': 'discord',
-                'bilibili': 'bilibili',
-                'bilibili.tv': 'bilibili/video/tv'
+                'Twitter': 'twitter'
             };
             apiFilters.platform = platformMap[localFilters.platform] || localFilters.platform.toLowerCase();
         }
         if (localFilters.edit_status && localFilters.edit_status !== 'All') {
-            // Mapear estados de edición del frontend al backend
-            const statusMap: { [key: string]: string } = {
-                'Pendiente': 'nulo',
-                'En Progreso': 'en_proceso',
-                'Completado': 'hecho'
-            };
-            apiFilters.edit_status = statusMap[localFilters.edit_status] || localFilters.edit_status;
-        }
-        if (localFilters.processing_status && localFilters.processing_status !== 'All') {
-            // Mapear estados de procesamiento del frontend al backend
+            // Mapear estados de edición del frontend al backend (nuevo esquema)
             const statusMap: { [key: string]: string } = {
                 'Pendiente': 'pendiente',
-                'Procesando': 'procesando',
+                'En Progreso': 'en_proceso',
                 'Completado': 'completado',
-                'Error': 'error'
+                'Descartado': 'descartado'
             };
-            apiFilters.processing_status = statusMap[localFilters.processing_status] || localFilters.processing_status;
+            apiFilters.edit_status = statusMap[localFilters.edit_status] || localFilters.edit_status.toLowerCase();
+        }
+        if (localFilters.processing_status && localFilters.processing_status !== 'All') {
+            // Mapear estados de procesamiento del frontend al backend (nuevo esquema)
+            const statusMap: { [key: string]: string } = {
+                'Pendiente': 'pending',
+                'Procesando': 'processing',
+                'Completado': 'completed',
+                'Error': 'failed',
+                'Omitido': 'skipped'
+            };
+            apiFilters.processing_status = statusMap[localFilters.processing_status] || localFilters.processing_status.toLowerCase();
         }
         if (localFilters.difficulty_level && localFilters.difficulty_level !== 'All') {
-            // Mapear dificultad del frontend al backend
+            // Mapear dificultad del frontend al backend (nuevo esquema)
             const difficultyMap: { [key: string]: string } = {
-                'Bajo': 'bajo',
-                'Medio': 'medio',
-                'Alto': 'alto'
+                'Bajo': 'low',
+                'Medio': 'medium',
+                'Alto': 'high'
             };
-            apiFilters.difficulty_level = difficultyMap[localFilters.difficulty_level] || localFilters.difficulty_level;
+            apiFilters.difficulty_level = difficultyMap[localFilters.difficulty_level] || localFilters.difficulty_level.toLowerCase();
         }
 
         return apiFilters;
@@ -437,22 +435,52 @@ const GalleryPage: React.FC = () => {
                     <select name="platform" value={filters.platform} onChange={handleFilterChange} className="bg-gray-700 text-white rounded p-2 focus:ring-2 focus:ring-red-500 focus:outline-none">
                         <option value="">Todas las Plataformas</option>
                         <option value="All">Todas las Plataformas</option>
-                        {Object.values(Platform).map(p => <option key={p} value={p}>{p}</option>)}
+                        {Object.values(Platform).map(p => (
+                            <option key={p} value={p}>
+                                {p === 'youtube' ? 'YouTube' :
+                                 p === 'tiktok' ? 'TikTok' :
+                                 p === 'instagram' ? 'Instagram' :
+                                 p === 'bilibili' ? 'Bilibili' :
+                                 p === 'facebook' ? 'Facebook' :
+                                 p === 'twitter' ? 'Twitter' : p}
+                            </option>
+                        ))}
                     </select>
                     <select name="edit_status" value={filters.edit_status} onChange={handleFilterChange} className="bg-gray-700 text-white rounded p-2 focus:ring-2 focus:ring-red-500 focus:outline-none">
                         <option value="">Todos los Estados</option>
                         <option value="All">Todos los Estados</option>
-                        {Object.values(EditStatus).map(s => <option key={s} value={s}>{s}</option>)}
+                        {Object.values(EditStatus).map(s => (
+                            <option key={s} value={s}>
+                                {s === 'pendiente' ? 'Pendiente' :
+                                 s === 'en_proceso' ? 'En Proceso' :
+                                 s === 'completado' ? 'Completado' :
+                                 s === 'descartado' ? 'Descartado' : s}
+                            </option>
+                        ))}
                     </select>
                      <select name="difficulty_level" value={filters.difficulty_level} onChange={handleFilterChange} className="bg-gray-700 text-white rounded p-2 focus:ring-2 focus:ring-red-500 focus:outline-none">
                         <option value="">Toda la Dificultad</option>
                         <option value="All">Toda la Dificultad</option>
-                        {Object.values(Difficulty).map(d => <option key={d} value={d}>{d}</option>)}
+                        {Object.values(Difficulty).map(d => (
+                            <option key={d} value={d}>
+                                {d === 'low' ? 'Bajo' :
+                                 d === 'medium' ? 'Medio' :
+                                 d === 'high' ? 'Alto' : d}
+                            </option>
+                        ))}
                     </select>
                     <select name="processing_status" value={filters.processing_status} onChange={handleFilterChange} className="bg-gray-700 text-white rounded p-2 focus:ring-2 focus:ring-red-500 focus:outline-none">
                         <option value="">Todos los Procesos</option>
                         <option value="All">Todos los Procesos</option>
-                        {Object.values(ProcessStatus).map(p => <option key={p} value={p}>{p}</option>)}
+                        {Object.values(ProcessStatus).map(p => (
+                            <option key={p} value={p}>
+                                {p === 'pending' ? 'Pendiente' :
+                                 p === 'processing' ? 'Procesando' :
+                                 p === 'completed' ? 'Completado' :
+                                 p === 'failed' ? 'Error' :
+                                 p === 'skipped' ? 'Omitido' : p}
+                            </option>
+                        ))}
                     </select>
                     <div className="flex gap-2">
                         <select name="by" value={sort.by} onChange={handleSortChange} className="bg-gray-700 text-white rounded p-2 w-full focus:ring-2 focus:ring-red-500 focus:outline-none">

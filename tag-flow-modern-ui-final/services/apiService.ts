@@ -205,6 +205,7 @@ class ApiService {
         // Si es un carrusel de imágenes, usar carousel_items
         if ((video as any).is_carousel && (video as any).carousel_items) {
           return (video as any).carousel_items
+            .filter((item: any) => item && item.id) // Filtrar items válidos
             .sort((a: any, b: any) => a.order - b.order)
             .map((item: any) => `${STREAM_BASE_URL}/video-stream/${item.id}`);
         }

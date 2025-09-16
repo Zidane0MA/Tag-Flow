@@ -6,6 +6,7 @@ API endpoints para gestión de creadores y suscripciones
 import json
 from flask import Blueprint, request, jsonify
 import logging
+from src.api.performance.cache import cached, CacheManager
 
 # Import carousel processing function
 from .videos import process_image_carousels, process_video_data_for_api
@@ -14,30 +15,39 @@ logger = logging.getLogger(__name__)
 
 creators_bp = Blueprint('creators', __name__, url_prefix='/api')
 
+@cached(ttl=300, key_func=lambda limit=None: f"top_creators:{limit}")  # Cache por 5 minutos
+def get_top_creators_cached(limit=None):
+    """Obtener top creadores cacheados"""
+    from src.service_factory import get_database
+    db = get_database()
+
+    with db.get_connection() as conn:
+        query = """
+            SELECT
+                c.id,
+                c.name,
+                pl.name as platform,
+                COUNT(DISTINCT p.id) as post_count
+            FROM creators c
+            LEFT JOIN posts p ON c.id = p.creator_id AND p.deleted_at IS NULL
+            LEFT JOIN platforms pl ON c.platform_id = pl.id
+            GROUP BY c.id, c.name, pl.name
+            HAVING post_count > 0
+            ORDER BY post_count DESC, c.name, pl.name
+        """
+
+        if limit:
+            query += f" LIMIT {limit}"
+
+        cursor = conn.execute(query)
+        return cursor.fetchall()
+
 @creators_bp.route('/creators')
 def api_get_creators():
     """API endpoint para obtener lista de creadores con sus plataformas y suscripciones"""
     try:
-        from src.service_factory import get_database
-        db = get_database()
-
-        # Consulta directa usando el nuevo esquema
-        with db.get_connection() as conn:
-            # Obtener creadores con sus plataformas y conteos usando el nuevo esquema
-            cursor = conn.execute("""
-                SELECT
-                    c.id,
-                    c.name,
-                    pl.name as platform,
-                    COUNT(DISTINCT p.id) as post_count
-                FROM creators c
-                LEFT JOIN posts p ON c.id = p.creator_id AND p.deleted_at IS NULL
-                LEFT JOIN platforms pl ON c.platform_id = pl.id
-                GROUP BY c.id, c.name, pl.name
-                HAVING post_count > 0
-                ORDER BY c.name, pl.name
-            """)
-            rows = cursor.fetchall()
+        # Usar datos cacheados
+        rows = get_top_creators_cached()
 
         # Agrupar por creador
         creators_dict = {}
@@ -367,15 +377,16 @@ def api_get_subscriptions():
         from src.service_factory import get_database
         db = get_database()
         
-        # Obtener todas las suscripciones reales de la BD
+        # Obtener todas las suscripciones reales de la BD usando nuevo esquema
         with db.get_connection() as conn:
             cursor = conn.execute('''
-                SELECT s.id, s.name, s.type, s.platform, s.subscription_url,
-                       COUNT(v.id) as video_count
+                SELECT s.id, s.name, s.subscription_type, pl.name as platform, s.subscription_url,
+                       COUNT(DISTINCT p.id) as post_count
                 FROM subscriptions s
-                LEFT JOIN videos v ON v.subscription_id = s.id AND v.deleted_at IS NULL
-                GROUP BY s.id, s.name, s.type, s.platform, s.subscription_url
-                ORDER BY video_count DESC, s.name
+                LEFT JOIN posts p ON p.subscription_id = s.id AND p.deleted_at IS NULL
+                LEFT JOIN platforms pl ON s.platform_id = pl.id
+                GROUP BY s.id, s.name, s.subscription_type, pl.name, s.subscription_url
+                ORDER BY post_count DESC, s.name
             ''')
             subscriptions_data = []
             for row in cursor.fetchall():
@@ -404,15 +415,16 @@ def api_get_subscription_info(subscription_type, subscription_id):
         from src.service_factory import get_database
         db = get_database()
         
-        # Obtener información de la suscripción
+        # Obtener información de la suscripción usando nuevo esquema
         with db.get_connection() as conn:
             cursor = conn.execute('''
-                SELECT s.id, s.name, s.type, s.platform, s.subscription_url, s.creator_id,
-                       COUNT(v.id) as video_count
+                SELECT s.id, s.name, s.subscription_type, pl.name as platform, s.subscription_url, s.creator_id,
+                       COUNT(DISTINCT p.id) as post_count
                 FROM subscriptions s
-                LEFT JOIN videos v ON v.subscription_id = s.id AND v.deleted_at IS NULL
-                WHERE s.id = ? AND s.type = ?
-                GROUP BY s.id, s.name, s.type, s.platform, s.subscription_url, s.creator_id
+                LEFT JOIN platforms pl ON s.platform_id = pl.id
+                LEFT JOIN posts p ON p.subscription_id = s.id AND p.deleted_at IS NULL
+                WHERE s.id = ? AND s.subscription_type = ?
+                GROUP BY s.id, s.name, s.subscription_type, pl.name, s.subscription_url, s.creator_id
             ''', (subscription_id, subscription_type))
             row = cursor.fetchone()
             
@@ -453,40 +465,40 @@ def api_get_subscription_stats(subscription_type, subscription_id):
         from src.service_factory import get_database
         db = get_database()
         
-        # Obtener conteo total de videos de la suscripción
+        # Obtener conteo total de posts/media de la suscripción usando nuevo esquema
         with db.get_connection() as conn:
             # Conteo total
             cursor = conn.execute('''
-                SELECT COUNT(*) as total
-                FROM videos v
-                JOIN subscriptions s ON v.subscription_id = s.id
-                WHERE s.id = ? AND s.type = ? AND v.deleted_at IS NULL
+                SELECT COUNT(DISTINCT p.id) as total
+                FROM posts p
+                JOIN subscriptions s ON p.subscription_id = s.id
+                WHERE s.id = ? AND s.subscription_type = ? AND p.deleted_at IS NULL
             ''', (subscription_id, subscription_type))
             total_count = cursor.fetchone()[0]
-            
-            # Conteo por tipo de lista
+
+            # Conteo por tipo de categoría (usando post_categories)
             cursor = conn.execute('''
-                SELECT vl.list_type, COUNT(*) as count
-                FROM videos v
-                JOIN subscriptions s ON v.subscription_id = s.id
-                LEFT JOIN video_lists vl ON vl.video_id = v.id
-                WHERE s.id = ? AND s.type = ? AND v.deleted_at IS NULL
-                GROUP BY vl.list_type
+                SELECT pc.category_type, COUNT(DISTINCT p.id) as count
+                FROM posts p
+                JOIN subscriptions s ON p.subscription_id = s.id
+                LEFT JOIN post_categories pc ON pc.post_id = p.id
+                WHERE s.id = ? AND s.subscription_type = ? AND p.deleted_at IS NULL
+                GROUP BY pc.category_type
             ''', (subscription_id, subscription_type))
-            
-            list_counts = {}
+
+            category_counts = {}
             for row in cursor.fetchall():
-                list_type = row[0] or 'feed'  # Si no hay tipo, asumir 'feed'
-                list_counts[list_type] = row[1]
-            
-            # Si no hay conteos específicos, todo va a 'feed'
-            if not list_counts and total_count > 0:
-                list_counts['feed'] = total_count
+                category_type = row[0] or 'videos'  # Si no hay tipo, asumir 'videos'
+                category_counts[category_type] = row[1]
+
+            # Si no hay conteos específicos, todo va a 'videos'
+            if not category_counts and total_count > 0:
+                category_counts['videos'] = total_count
         
         return jsonify({
             'success': True,
             'total': total_count,
-            'list_counts': list_counts
+            'category_counts': category_counts
         })
         
     except Exception as e:
@@ -505,93 +517,129 @@ def api_get_subscription_videos(subscription_type, subscription_id):
         limit = int(request.args.get('limit', 50))
         offset = int(request.args.get('offset', 0))
         
-        # Construir filtros para videos de la suscripción
+        # Construir filtros para videos de la suscripción usando nuevo esquema
         query = '''
-            SELECT v.*, c.name as creator_name FROM videos v
-            JOIN subscriptions s ON v.subscription_id = s.id
-            LEFT JOIN creators c ON v.creator_id = c.id
-            WHERE s.id = ? AND s.type = ? AND v.deleted_at IS NULL
+            SELECT
+                m.id,
+                p.title_post,
+                m.file_path,
+                m.file_name,
+                m.thumbnail_path,
+                m.file_size,
+                m.duration_seconds,
+                c.name as creator_name,
+                pl.name as platform,
+                m.detected_music,
+                m.detected_music_artist,
+                m.detected_characters,
+                m.final_music,
+                m.final_music_artist,
+                m.final_characters,
+                m.difficulty_level,
+                m.edit_status,
+                m.processing_status,
+                m.notes,
+                m.created_at,
+                m.last_updated,
+                p.post_url,
+                p.publication_date,
+                p.download_date,
+                p.deleted_at,
+                p.is_carousel,
+                p.carousel_count,
+                s.id as subscription_id,
+                s.name as subscription_name,
+                s.subscription_type
+            FROM media m
+            JOIN posts p ON m.post_id = p.id
+            JOIN subscriptions s ON p.subscription_id = s.id
+            LEFT JOIN creators c ON p.creator_id = c.id
+            LEFT JOIN platforms pl ON p.platform_id = pl.id
+            WHERE s.id = ? AND s.subscription_type = ? AND p.deleted_at IS NULL
         '''
         params = [subscription_id, subscription_type]
-        
-        # Filtrar por lista específica si se proporciona
+
+        # Filtrar por categoría específica si se proporciona
         if list_filter and list_filter != 'all':
             query += '''
                 AND EXISTS (
-                    SELECT 1 FROM video_lists vl 
-                    WHERE vl.video_id = v.id AND vl.list_type = ?
+                    SELECT 1 FROM post_categories pc
+                    WHERE pc.post_id = p.id AND pc.category_type = ?
                 )
             '''
             params.append(list_filter)
         
-        query += ' ORDER BY v.created_at DESC'
-        
+        query += ' ORDER BY m.created_at DESC'
+
         if limit > 0:
             query += ' LIMIT ? OFFSET ?'
             params.extend([limit, offset])
-        
+
         with db.get_connection() as conn:
             cursor = conn.execute(query, params)
             videos = [dict(row) for row in cursor.fetchall()]
-            
+
             # Contar total
-            count_query = query.replace('SELECT v.*, c.name as creator_name', 'SELECT COUNT(*)').split(' ORDER BY')[0]
-            count_params = params[:-2] if limit > 0 else params
+            count_query = '''
+                SELECT COUNT(DISTINCT m.id)
+                FROM media m
+                JOIN posts p ON m.post_id = p.id
+                JOIN subscriptions s ON p.subscription_id = s.id
+                LEFT JOIN creators c ON p.creator_id = c.id
+                LEFT JOIN platforms pl ON p.platform_id = pl.id
+                WHERE s.id = ? AND s.subscription_type = ? AND p.deleted_at IS NULL
+            '''
+            count_params = [subscription_id, subscription_type]
+
+            if list_filter and list_filter != 'all':
+                count_query += '''
+                    AND EXISTS (
+                        SELECT 1 FROM post_categories pc
+                        WHERE pc.post_id = p.id AND pc.category_type = ?
+                    )
+                '''
+                count_params.append(list_filter)
+
             cursor = conn.execute(count_query, count_params)
             total_videos = cursor.fetchone()[0]
         
-        # Procesar videos (similar al endpoint principal)
+        # Procesar cada video para la API usando función helper
         for video in videos:
-            # Procesar characters
-            if video.get('detected_characters'):
-                try:
-                    video['detected_characters'] = json.loads(video['detected_characters'])
-                except:
-                    video['detected_characters'] = []
+            process_video_data_for_api(video)
             
-            if video.get('final_characters'):
-                try:
-                    video['final_characters'] = json.loads(video['final_characters'])
-                except:
-                    video['final_characters'] = []
-            
-            # Agregar subscription_info
+            # Agregar subscription_info (ya disponible en los datos)
             if video.get('subscription_id'):
-                try:
-                    cursor = conn.execute('''
-                        SELECT s.name, s.type, s.platform, s.subscription_url 
-                        FROM subscriptions s 
-                        WHERE s.id = ?
-                    ''', (video['subscription_id'],))
-                    sub_row = cursor.fetchone()
-                    if sub_row:
-                        video['subscription_info'] = {
-                            'id': video['subscription_id'],
-                            'name': sub_row[0],
-                            'type': sub_row[1], 
-                            'platform': sub_row[2],
-                            'url': sub_row[3]
-                        }
-                except Exception as e:
-                    logger.warning(f"Error obteniendo subscription para video {video['id']}: {e}")
-            
-            # Agregar video_lists
+                video['subscription_info'] = {
+                    'id': video['subscription_id'],
+                    'name': video.get('subscription_name'),
+                    'type': video.get('subscription_type'),
+                    'platform': video.get('platform'),
+                    'url': None  # URL no está disponible en esta consulta
+                }
+
+            # Agregar post_categories (reemplazo de video_lists)
             try:
                 cursor = conn.execute('''
-                    SELECT vl.list_type 
-                    FROM video_lists vl 
-                    WHERE vl.video_id = ?
+                    SELECT pc.category_type
+                    FROM post_categories pc
+                    WHERE pc.post_id = (
+                        SELECT m2.post_id FROM media m2 WHERE m2.id = ?
+                    )
                 ''', (video['id'],))
-                list_rows = cursor.fetchall()
-                if list_rows:
-                    video['video_lists'] = [
+                category_rows = cursor.fetchall()
+                if category_rows:
+                    video['post_categories'] = [
                         {
                             'type': row[0],
                             'name': row[0].replace('_', ' ').title()
-                        } for row in list_rows
+                        } for row in category_rows
                     ]
+                # Mantener compatibilidad con frontend existente
+                video['video_lists'] = video.get('post_categories', [])
             except Exception as e:
-                logger.warning(f"Error obteniendo listas para video {video['id']}: {e}")
+                logger.warning(f"Error obteniendo categorías para media {video['id']}: {e}")
+                video['post_categories'] = []
+                video['video_lists'] = []
             
             # Procesar thumbnail_path
             if video.get('thumbnail_path'):

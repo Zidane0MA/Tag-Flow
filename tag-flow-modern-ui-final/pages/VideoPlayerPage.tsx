@@ -8,7 +8,11 @@ import { ICONS } from '../constants';
 
 const ImageCarousel: React.FC<{ post: Post, isActive: boolean }> = ({ post, isActive }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const imageUrls = post.imageUrls && post.imageUrls.length > 0 ? post.imageUrls : [post.postUrl];
+  // Filtrar URLs válidas y eliminar duplicados
+  const validUrls = post.imageUrls && post.imageUrls.length > 0
+    ? post.imageUrls.filter(url => url && !url.includes('undefined'))
+    : [post.postUrl].filter(url => url && !url.includes('undefined'));
+  const imageUrls = [...new Set(validUrls)]; // Eliminar duplicados
   
   useEffect(() => {
     if (isActive) {
@@ -24,7 +28,7 @@ const ImageCarousel: React.FC<{ post: Post, isActive: boolean }> = ({ post, isAc
       <div className="w-full h-full relative">
         {imageUrls.map((url, index) => (
           <img
-            key={url}
+            key={`${post.id}-img-${index}`}
             src={url}
             className={`absolute inset-0 w-full h-full object-contain transition-opacity duration-300 ease-in-out ${currentIndex === index ? 'opacity-100' : 'opacity-0'}`}
             alt={`Image ${index + 1} for post ${post.title}`}

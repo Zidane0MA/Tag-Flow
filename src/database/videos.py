@@ -294,17 +294,17 @@ class VideoOperations(DatabaseBase):
             return count
 
     def update_video(self, video_id: int, updates: Dict) -> bool:
-        """Update video with provided data"""
+        """Update video with provided data - NUEVO ESQUEMA"""
         if not updates:
             return False
-            
+
         self._ensure_initialized()
         start_time = time.time()
-        
+
         # Build dynamic update query
         set_clauses = []
         params = []
-        
+
         for field, value in updates.items():
             if field in ['detected_characters', 'final_characters']:
                 # JSON fields need special handling
@@ -313,15 +313,15 @@ class VideoOperations(DatabaseBase):
             elif field not in ['id', 'created_at']:  # Don't allow updating these fields
                 set_clauses.append(f"{field} = ?")
                 params.append(value)
-        
+
         if not set_clauses:
             return False
-        
+
         # Add last_updated
         set_clauses.append("last_updated = CURRENT_TIMESTAMP")
         params.append(video_id)
-        
-        query = f"UPDATE videos SET {', '.join(set_clauses)} WHERE id = ?"
+
+        query = f"UPDATE media SET {', '.join(set_clauses)} WHERE id = ?"
         
         with self.get_connection() as conn:
             cursor = conn.execute(query, params)
@@ -370,13 +370,13 @@ class VideoOperations(DatabaseBase):
         return successful, failed
     
     def _update_single_video(self, conn, video_id: int, updates: Dict) -> bool:
-        """Update single video within existing transaction"""
+        """Update single video within existing transaction - NUEVO ESQUEMA"""
         if not updates:
             return False
-        
+
         set_clauses = []
         params = []
-        
+
         for field, value in updates.items():
             if field in ['detected_characters', 'final_characters']:
                 set_clauses.append(f"{field} = ?")
@@ -384,14 +384,14 @@ class VideoOperations(DatabaseBase):
             elif field not in ['id', 'created_at']:
                 set_clauses.append(f"{field} = ?")
                 params.append(value)
-        
+
         if not set_clauses:
             return False
-        
+
         set_clauses.append("last_updated = CURRENT_TIMESTAMP")
         params.append(video_id)
-        
-        query = f"UPDATE videos SET {', '.join(set_clauses)} WHERE id = ?"
+
+        query = f"UPDATE media SET {', '.join(set_clauses)} WHERE id = ?"
         cursor = conn.execute(query, params)
         return cursor.rowcount > 0
 

@@ -15,6 +15,7 @@ sys.path.append(str(Path(__file__).parent / 'src'))
 from config import config
 # Database will be imported lazily within functions
 from src.api import gallery_bp, videos_core_bp, videos_streaming_bp, videos_bulk_bp, stats_bp, admin_bp, maintenance_bp, creators_bp
+from src.api.performance import performance_bp
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
@@ -30,7 +31,18 @@ def create_app():
     
     # Asegurar que los directorios existen
     config.ensure_directories()
-    
+
+    # Aplicar migraciones y optimizaciones de base de datos automáticamente
+    try:
+        from src.database.migrations import ensure_database_optimized
+        db_path = str(config.DATABASE_PATH)
+        if ensure_database_optimized(db_path):
+            logger.info("✅ Base de datos optimizada automáticamente al iniciar")
+        else:
+            logger.warning("⚠️ Algunas optimizaciones de BD no se pudieron aplicar")
+    except Exception as e:
+        logger.error(f"❌ Error aplicando optimizaciones de BD: {e}")
+
     # Registrar blueprints
     app.register_blueprint(gallery_bp)
     app.register_blueprint(videos_core_bp)
@@ -40,6 +52,7 @@ def create_app():
     app.register_blueprint(admin_bp)
     app.register_blueprint(maintenance_bp)
     app.register_blueprint(creators_bp)
+    app.register_blueprint(performance_bp)
     
     # Rutas estáticas y archivos
     @app.route('/thumbnail/<path:filename>')
@@ -71,36 +84,39 @@ def create_app():
                     if clean_filename.endswith('_thumb.jpg'):
                         base_filename = clean_filename[:-10]  # Remover '_thumb.jpg'
                         
-                        # Buscar video por file_name
+                        # Buscar video por file_name usando nuevo esquema
                         db = get_database()
                         with db.get_connection() as conn:
                             cursor = conn.execute('''
-                                SELECT v.id, v.file_path, dm.is_carousel_item, dm.carousel_base_id, dm.carousel_order
-                                FROM videos v
-                                LEFT JOIN downloader_mapping dm ON v.id = dm.video_id  
-                                WHERE v.file_name = ? OR v.file_path LIKE ?
+                                SELECT m.id, m.file_path, p.is_carousel, p.carousel_count
+                                FROM media m
+                                JOIN posts p ON m.post_id = p.id
+                                WHERE m.file_name = ? OR m.file_path LIKE ?
+                                AND p.deleted_at IS NULL
                             ''', (base_filename, f'%{base_filename}%'))
-                            
+
                             video_row = cursor.fetchone()
                             if video_row:
-                                video_id, file_path, is_carousel_item, carousel_base_id, carousel_order = video_row
-                                
-                                # Si es parte de un carrusel, buscar la primera imagen del carrusel
-                                if is_carousel_item and carousel_base_id:
+                                video_id, file_path, is_carousel, carousel_count = video_row
+
+                                # Si es parte de un carrusel, usar el archivo encontrado directamente
+                                if is_carousel and carousel_count > 1:
+                                    # Para carruseles, buscar la primera imagen del mismo post
                                     cursor = conn.execute('''
-                                        SELECT v.file_path 
-                                        FROM videos v
-                                        JOIN downloader_mapping dm ON v.id = dm.video_id
-                                        WHERE dm.carousel_base_id = ? AND dm.is_carousel_item = TRUE
-                                        ORDER BY dm.carousel_order ASC
+                                        SELECT m.file_path
+                                        FROM media m
+                                        JOIN posts p ON m.post_id = p.id
+                                        WHERE p.id = (SELECT p2.id FROM media m2 JOIN posts p2 ON m2.post_id = p2.id WHERE m2.id = ?)
+                                        AND m.media_type = 'image'
+                                        ORDER BY m.carousel_order ASC
                                         LIMIT 1
-                                    ''', (carousel_base_id,))
-                                    
+                                    ''', (video_id,))
+
                                     first_image_row = cursor.fetchone()
                                     if first_image_row:
                                         first_image_path = Path(first_image_row[0])
                                         # Verificar si es imagen y existe
-                                        if (first_image_path.exists() and 
+                                        if (first_image_path.exists() and
                                             any(first_image_path.suffix.lower().endswith(ext) for ext in ['.jpg', '.jpeg', '.png', '.gif', '.webp'])):
                                             logger.info(f"🖼️ CAROUSEL FALLBACK - Serving first image: {first_image_path}")
                                             return send_file(first_image_path)
@@ -129,11 +145,23 @@ def create_app():
         try:
             from src.service_factory import get_database
             db = get_database()
-            video = db.get_video(video_id)
-            if not video:
-                abort(404)
-            
-            video_path = Path(video['file_path'])
+
+            # Consultar usando el nuevo esquema (media table)
+            with db.get_connection() as conn:
+                cursor = conn.execute("""
+                    SELECT m.file_path, m.file_name
+                    FROM media m
+                    JOIN posts p ON m.post_id = p.id
+                    WHERE m.id = ? AND p.deleted_at IS NULL
+                """, (video_id,))
+
+                row = cursor.fetchone()
+                if not row:
+                    abort(404)
+
+                file_path, file_name = row
+
+            video_path = Path(file_path)
             if not video_path.exists():
                 abort(404)
             
