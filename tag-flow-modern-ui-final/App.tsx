@@ -10,6 +10,7 @@ import { AdminProvider } from './hooks/useAdminData';
 import VideoPlayerPage from './pages/VideoPlayerPage';
 import CreatorPage from './pages/CreatorPage';
 import SubscriptionPage from './pages/SubscriptionPage';
+import IconsShowcase from './pages/IconsShowcase';
 
 
 const App: React.FC = () => {
@@ -37,6 +38,8 @@ const App: React.FC = () => {
                   <Route path="/subscription/:type/:id" element={<SubscriptionPage />} />
                   <Route path="/subscription/:type/:id/:list" element={<SubscriptionPage />} />
 
+                  {/* Icons Showcase */}
+                  <Route path="/icons" element={<IconsShowcase />} />
 
                   {/* Fallback for any other route to redirect to gallery */}
                   <Route path="*" element={<Navigate to="/gallery" replace />} />

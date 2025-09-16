@@ -105,7 +105,7 @@ class DatabaseCore(DatabaseBase):
                 -- Subscription types
                 subscription_type TEXT CHECK(subscription_type IN (
                     'account', 'playlist', 'hashtag', 'location', 'music', 
-                    'search', 'liked', 'saved', 'folder'
+                    'search', 'liked', 'saved', 'folder', 'watch_later'
                 )) NOT NULL,
                 is_account BOOLEAN DEFAULT FALSE,
                 
