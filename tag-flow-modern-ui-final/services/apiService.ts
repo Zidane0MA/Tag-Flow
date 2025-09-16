@@ -431,22 +431,18 @@ class ApiService {
       }
 
       return {
-        total: data.stats.total,
-        withMusic: data.stats.with_music,
-        withCharacters: data.stats.with_characters,
+        totalPosts: data.stats.total_posts || 0,
+        totalMedia: data.stats.total_media || 0,
         processed: data.stats.processed,
         inTrash: data.stats.in_trash,
-        pending: data.stats.pending,
       };
     } catch (error) {
       console.error('Error fetching global stats:', error);
       return {
-        total: 0,
-        withMusic: 0,
-        withCharacters: 0,
+        totalPosts: 0,
+        totalMedia: 0,
         processed: 0,
         inTrash: 0,
-        pending: 0,
       };
     }
   }

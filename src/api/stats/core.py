@@ -19,11 +19,12 @@ def get_global_stats_cached():
     db = get_database()
 
     with db.get_connection() as conn:
+        # Estadísticas de media (videos/archivos individuales)
         cursor = conn.execute("""
             SELECT
-                COUNT(*) as total,
-                COUNT(CASE WHEN p.deleted_at IS NULL THEN 1 END) as active,
-                COUNT(CASE WHEN p.deleted_at IS NOT NULL THEN 1 END) as in_trash,
+                COUNT(*) as total_media,
+                COUNT(CASE WHEN p.deleted_at IS NULL THEN 1 END) as active_media,
+                COUNT(CASE WHEN p.deleted_at IS NOT NULL THEN 1 END) as media_in_trash,
                 COUNT(CASE WHEN p.deleted_at IS NULL AND (m.final_music IS NOT NULL AND m.final_music != '') THEN 1 END) as with_music,
                 COUNT(CASE WHEN p.deleted_at IS NULL AND (m.final_characters IS NOT NULL AND m.final_characters != '' AND m.final_characters != '[]') THEN 1 END) as with_characters,
                 COUNT(CASE WHEN p.deleted_at IS NULL AND m.processing_status = 'completed' THEN 1 END) as processed,
@@ -31,16 +32,28 @@ def get_global_stats_cached():
             FROM media m
             JOIN posts p ON m.post_id = p.id
         """)
-        stats = cursor.fetchone()
+        media_stats = cursor.fetchone()
+
+        # Estadísticas de posts (publicaciones individuales)
+        cursor = conn.execute("""
+            SELECT
+                COUNT(*) as total_posts,
+                COUNT(CASE WHEN deleted_at IS NULL THEN 1 END) as active_posts,
+                COUNT(CASE WHEN deleted_at IS NOT NULL THEN 1 END) as posts_in_trash
+            FROM posts
+        """)
+        post_stats = cursor.fetchone()
 
         return {
-            'total': stats[0] or 0,
-            'total_in_db': stats[1] or 0,  # Para compatibilidad con el frontend
-            'with_music': stats[3] or 0,
-            'with_characters': stats[4] or 0,
-            'processed': stats[5] or 0,
-            'in_trash': stats[2] or 0,
-            'pending': stats[6] or 0,
+            'total': media_stats[0] or 0,  # Mantener compatibilidad (total de media)
+            'total_posts': post_stats[0] or 0,  # Total de posts/publicaciones
+            'total_media': media_stats[0] or 0,  # Total de archivos de media
+            'total_in_db': media_stats[1] or 0,  # Para compatibilidad con el frontend
+            'with_music': media_stats[3] or 0,
+            'with_characters': media_stats[4] or 0,
+            'processed': media_stats[5] or 0,
+            'in_trash': media_stats[2] or 0,
+            'pending': media_stats[6] or 0,
         }
 
 @stats_bp.route('/')

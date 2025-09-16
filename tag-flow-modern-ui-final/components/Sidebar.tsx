@@ -13,12 +13,10 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
   const { posts } = useRealData();
   const location = useLocation();
   const [globalStats, setGlobalStats] = useState({
-    total: 0,
-    withMusic: 0,
-    withCharacters: 0,
+    totalPosts: 0,
+    totalMedia: 0,
     processed: 0,
     inTrash: 0,
-    pending: 0,
   });
 
   // Cargar estadísticas globales
@@ -128,24 +126,16 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
             
             {/* Estadísticas globales */}
             <div className="flex justify-between text-gray-300">
-              <span>Total Sistema</span>
-              <span className="font-medium text-white">{globalStats.total}</span>
+              <span>Total Posts</span>
+              <span className="font-medium text-white">{globalStats.totalPosts}</span>
+            </div>
+            <div className="flex justify-between text-gray-300">
+              <span>Total Media</span>
+              <span className="font-medium text-white">{globalStats.totalMedia}</span>
             </div>
             <div className="flex justify-between text-gray-300">
               <span>Procesados</span>
               <span className="font-medium text-white">{globalStats.processed}</span>
-            </div>
-            <div className="flex justify-between text-gray-300">
-              <span>Pendientes</span>
-              <span className="font-medium text-white">{globalStats.pending}</span>
-            </div>
-            <div className="flex justify-between text-gray-300">
-              <span>Con Música</span>
-              <span className="font-medium text-white">{globalStats.withMusic}</span>
-            </div>
-            <div className="flex justify-between text-gray-300">
-              <span>Con Personajes</span>
-              <span className="font-medium text-white">{globalStats.withCharacters}</span>
             </div>
             <div className="flex justify-between text-gray-300">
               <span>En Papelera</span>
