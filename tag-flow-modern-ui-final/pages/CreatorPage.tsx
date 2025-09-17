@@ -6,7 +6,7 @@ import { Platform, CreatorPlatformInfo } from '../types';
 import PostCard from '../components/VideoCard';
 import Breadcrumbs, { Crumb } from '../components/Breadcrumbs';
 import PlatformTabs, { Tab } from '../components/PlatformTabs';
-import { ICONS, getSubscriptionIcon, getListIcon } from '../constants';
+import { ICONS, getSubscriptionIcon, getCategoryIcon } from '../constants';
 import useInfiniteScroll from '../hooks/useInfiniteScroll';
 
 const CreatorPage: React.FC = () => {
@@ -271,7 +271,7 @@ const CreatorPage: React.FC = () => {
                                 <span className="text-gray-400 text-xs">Listas:</span>
                                 <div className="flex items-center gap-1">
                                     {creator?.platforms[activePlatform]?.lists?.map((listType, idx) => {
-                                        const listIcon = getListIcon(listType);
+                                        const listIcon = getCategoryIcon(listType);
                                         return (
                                             <div key={idx} className="p-1 rounded bg-green-800/30 border border-green-600/50" title={`Lista: ${listType}`}>
                                                 {React.cloneElement(listIcon, { className: 'h-3 w-3 text-green-400' })}

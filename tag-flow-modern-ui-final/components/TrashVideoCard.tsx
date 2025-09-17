@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Post } from '../types';
-import { ICONS, getSubscriptionIcon, getListIcon } from '../constants';
+import { ICONS, getSubscriptionIcon, getCategoryIcon } from '../constants';
 
 interface TrashPostCardProps {
     video: Post; // Renamed to video for less refactoring, but it's a Post
@@ -134,7 +134,7 @@ const TrashPostCard: React.FC<TrashPostCardProps> = ({ video: post, timeAgo, isS
                                 <>
                                     {post.lists.slice(0, 2).map((list, idx) => (
                                         <div key={idx} className="p-0.5 rounded bg-green-800/20 border border-green-600/30" title={list.name}>
-                                            {React.cloneElement(getListIcon(list.type), {className: "h-2.5 w-2.5 text-green-400"})}
+                                            {React.cloneElement(getCategoryIcon(list.type), {className: "h-2.5 w-2.5 text-green-400"})}
                                         </div>
                                     ))}
                                     {post.lists.length > 2 && (

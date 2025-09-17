@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { Post, EditStatus, ProcessStatus, Difficulty, PostType, SubscriptionType } from '../types';
-import { ICONS, getSubscriptionIcon, getListIcon } from '../constants';
+import { ICONS, getSubscriptionIcon, getCategoryIcon } from '../constants';
 import { useRealData } from '../hooks/useRealData';
 import { apiService } from '../services/apiService';
 
@@ -334,7 +334,7 @@ const PostCard: React.FC<PostCardProps> = ({ video: post, videos: posts, isSelec
                             <div className="flex items-center gap-0.5" title={`Listas: ${post.lists.map(list => list.name).join(', ')}`}>
                                 {post.lists.slice(0, 3).map((list, idx) => (
                                     <div key={idx} className="p-0.5 rounded bg-green-800/30 border border-green-600/50">
-                                        {React.cloneElement(getListIcon(list.type), {className: "h-3 w-3 text-green-400"})}
+                                        {React.cloneElement(getCategoryIcon(list.type), {className: "h-3 w-3 text-green-400"})}
                                     </div>
                                 ))}
                                 {post.lists.length > 3 && (

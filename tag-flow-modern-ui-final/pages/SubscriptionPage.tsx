@@ -4,7 +4,7 @@ import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useRealData } from '../hooks/useRealData';
 import { SubscriptionType, SubscriptionInfo } from '../types';
 import Breadcrumbs, { Crumb } from '../components/Breadcrumbs';
-import { ICONS, getSubscriptionIcon, getListIcon } from '../constants';
+import { ICONS, getSubscriptionIcon, getCategoryIcon } from '../constants';
 import PostCard from '../components/VideoCard';
 import PlatformTabs, { Tab } from '../components/PlatformTabs';
 import useInfiniteScroll from '../hooks/useInfiniteScroll';
@@ -48,26 +48,26 @@ const SubscriptionPage: React.FC = () => {
             // Definir subtabs por plataforma
             const platformSubtabs: { [key: string]: Array<{id: string, label: string, icon?: React.ReactElement}> } = {
                 'tiktok': [
-                    { id: 'feed', label: 'Videos', icon: getListIcon('feed') },
-                    { id: 'liked', label: 'Liked', icon: getListIcon('liked') },
-                    { id: 'favorites', label: 'Favorites', icon: getListIcon('favorites') }
+                    { id: 'feed', label: 'Videos', icon: getCategoryIcon('feed') },
+                    { id: 'liked', label: 'Liked', icon: getCategoryIcon('liked') },
+                    { id: 'favorites', label: 'Favorites', icon: getCategoryIcon('favorites') }
                 ],
                 'youtube': [
-                    { id: 'feed', label: 'Videos', icon: getListIcon('feed') },
-                    { id: 'shorts', label: 'Shorts', icon: getListIcon('reels') },
-                    { id: 'playlist', label: 'Playlists', icon: getListIcon('playlist') }
+                    { id: 'feed', label: 'Videos', icon: getCategoryIcon('feed') },
+                    { id: 'shorts', label: 'Shorts', icon: getCategoryIcon('reels') },
+                    { id: 'playlist', label: 'Playlists', icon: getCategoryIcon('playlist') }
                 ],
                 'instagram': [
-                    { id: 'feed', label: 'Posts', icon: getListIcon('feed') },
-                    { id: 'reels', label: 'Reels', icon: getListIcon('reels') },
-                    { id: 'stories', label: 'Stories', icon: getListIcon('stories') },
-                    { id: 'highlights', label: 'Highlights', icon: getListIcon('highlights') },
-                    { id: 'tagged', label: 'Tagged', icon: getListIcon('tagged') }
+                    { id: 'feed', label: 'Posts', icon: getCategoryIcon('feed') },
+                    { id: 'reels', label: 'Reels', icon: getCategoryIcon('reels') },
+                    { id: 'stories', label: 'Stories', icon: getCategoryIcon('stories') },
+                    { id: 'highlights', label: 'Highlights', icon: getCategoryIcon('highlights') },
+                    { id: 'tagged', label: 'Tagged', icon: getCategoryIcon('tagged') }
                 ]
             };
             
             const subtabs = platformSubtabs[subscriptionInfo.platform] || [
-                { id: 'feed', label: 'Feed', icon: getListIcon('feed') }
+                { id: 'feed', label: 'Feed', icon: getCategoryIcon('feed') }
             ];
             
             return [

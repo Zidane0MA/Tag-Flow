@@ -15,7 +15,7 @@ export const SIDEBAR_NAVIGATION_ICONS = {
 
 // Indicadores de Tipo de Contenido
 export const CONTENT_TYPE_INDICATORS = {
-    image: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" /></svg>
+    image: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" /></svg>,
 };
 
 // Indicadores de Estado de Edición
@@ -57,26 +57,35 @@ export const CREATOR_ICONS = {
     user: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" /></svg>,
 };
 
-// Suscripciones y Listas - Referencias dinámicas
-export const SUBSCRIPTION_LIST_ICONS = {
-    // Account Types
+// Iconos para Tipos de Suscripción (subscription_type)
+export const SUBSCRIPTION_TYPE_ICONS = {
+    // Database subscription types: account, playlist, hashtag, location, music, search, liked, saved, folder, watch_later
     user: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" /></svg>,
-    // Content Types
     list: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" /></svg>,
-    music: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M18 3a1 1 0 00-1.196-.98l-10 2A1 1 0 006 5v9.114A4.369 4.369 0 005 14c-1.657 0-3 1.343-3 3s1.343 3 3 3 3-1.343 3-3V7.82l8-1.6v5.894A4.369 4.369 0 0015 12c-1.657 0-3 1.343-3 3s1.343 3 3 3 3-1.343 3-3V3z" /></svg>,
     hashtag: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M9.243 3.03a1 1 0 01.727 1.213L9.53 6h2.94l.26-1.757a1 1 0 111.959-.292L14.47 6H17a1 1 0 110 2h-2.18l-.26 1.757a1 1 0 11-1.96.292l.26-1.757H10.47l-.26 1.757a1 1 0 11-1.96.292l.26-1.757H6a1 1 0 110-2h2.18l.26-1.757a1 1 0 011.213-.727zM10.47 8l.26-1.757H7.79l-.26 1.757h2.94zm-1.177 4h2.94l.26-1.757H9.55l-.26 1.757z" clipRule="evenodd" /></svg>,
     location_marker: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 20l-4.95-6.05a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" /></svg>,
-    bookmark: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M5 4a2 2 0 012-2h6a2 2 0 012 2v14l-5-2.5L5 18V4z" /></svg>,
+    music: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M18 3a1 1 0 00-1.196-.98l-10 2A1 1 0 006 5v9.114A4.369 4.369 0 005 14c-1.657 0-3 1.343-3 3s1.343 3 3 3 3-1.343 3-3V7.82l8-1.6v5.894A4.369 4.369 0 0015 12c-1.657 0-3 1.343-3 3s1.343 3 3 3 3-1.343 3-3V3z" /></svg>,
     heart: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clipRule="evenodd" /></svg>,
+    bookmark: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M5 4a2 2 0 012-2h6a2 2 0 012 2v14l-5-2.5L5 18V4z" /></svg>,
     clock: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.414-1.415L11 9.586V6z" clipRule="evenodd" /></svg>,
-    star: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>,
-    film: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm3 2.5a.5.5 0 01.5-.5h1a.5.5 0 01.5.5v1a.5.5 0 01-.5.5h-1a.5.5 0 01-.5-.5v-1zM7.5 9a.5.5 0 00-.5.5v1a.5.5 0 00.5.5h1a.5.5 0 00.5-.5v-1a.5.5 0 00-.5-.5h-1zm-.5 3.5a.5.5 0 01.5-.5h1a.5.5 0 01.5.5v1a.5.5 0 01-.5.5h-1a.5.5 0 01-.5-.5v-1zM11.5 5a.5.5 0 00-.5.5v1a.5.5 0 00.5.5h1a.5.5 0 00.5-.5v-1a.5.5 0 00-.5-.5h-1zm-.5 3.5a.5.5 0 01.5-.5h1a.5.5 0 01.5.5v1a.5.5 0 01-.5.5h-1a.5.5 0 01-.5-.5v-1zM11.5 13a.5.5 0 00-.5.5v1a.5.5 0 00.5.5h1a.5.5 0 00.5-.5v-1a.5.5 0 00-.5-.5h-1z" clipRule="evenodd" /></svg>,
+    search: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" /></svg>,
+    liked: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z" /></svg>,
+    saved: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M5 4a2 2 0 012-2h6a2 2 0 012 2v14l-5-2.5L5 18V4z" /></svg>,
+    folder: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" /></svg>,
+    watch_later: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.414-1.415L11 9.586V6z" clipRule="evenodd" /></svg>,
+};
+
+// Iconos para Tipos de Categoría (category_type)
+export const CATEGORY_TYPE_ICONS = {
+    // Database category types: videos, shorts, feed, reels, stories, highlights, tagged
+    video: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm3 2.5a.5.5 0 01.5-.5h1a.5.5 0 01.5.5v1a.5.5 0 01-.5.5h-1a.5.5 0 01-.5-.5v-1zM7.5 9a.5.5 0 00-.5.5v1a.5.5 0 00.5.5h1a.5.5 0 00.5-.5v-1a.5.5 0 00-.5-.5h-1zm-.5 3.5a.5.5 0 01.5-.5h1a.5.5 0 01.5.5v1a.5.5 0 01-.5.5h-1a.5.5 0 01-.5-.5v-1zM11.5 5a.5.5 0 00-.5.5v1a.5.5 0 00.5.5h1a.5.5 0 00.5-.5v-1a.5.5 0 00-.5-.5h-1zm-.5 3.5a.5.5 0 01.5-.5h1a.5.5 0 01.5.5v1a.5.5 0 01-.5.5h-1a.5.5 0 01-.5-.5v-1zM11.5 13a.5.5 0 00-.5.5v1a.5.5 0 00.5.5h1a.5.5 0 00.5-.5v-1a.5.5 0 00-.5-.5h-1z" clipRule="evenodd" /></svg>,
+    rack: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" /></svg>,
+    shorts: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M7 2a2 2 0 00-2 2v12a2 2 0 002 2h6a2 2 0 002-2V4a2 2 0 00-2-2H7zM8 16a1 1 0 100 2h4a1 1 0 100-2H8z" clipRule="evenodd" /></svg>,
+    grid: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" clipRule="evenodd" /></svg>,
     reels: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm3 2h6v4H7V5zm0 6h6v2H7v-2z" clipRule="evenodd" /></svg>,
     stories: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5 2a3 3 0 00-3 3v10a3 3 0 003 3h10a3 3 0 003-3V5a3 3 0 00-3-3H5zm0 2h10a1 1 0 011 1v10a1 1 0 01-1 1H5a1 1 0 01-1-1V5a1 1 0 011-1zm4 1a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" /></svg>,
     highlights: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm-1.06-5.06a.75.75 0 01-1.062-1.062l3.5-3.5a.75.75 0 111.062 1.062l-3.5 3.5zm3.122-4.438a.75.75 0 10-1.06-1.06l-3.5 3.5a.75.75 0 101.06 1.06l3.5-3.5z" clipRule="evenodd" /></svg>,
     tag: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M17.707 9.293l-5-5a1 1 0 00-.707-.293H4a1 1 0 00-1 1v8a1 1 0 001 1h8c.265 0 .52-.105.707-.293l5-5a1 1 0 000-1.414zM7 9a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" /></svg>,
-    // Fallback
-    folder: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" /></svg>,
 };
 
 // Información Adicional
@@ -122,7 +131,8 @@ export const ICONS = {
     // Information Area
     ...HEADER_ICONS,
     ...CREATOR_ICONS,
-    ...SUBSCRIPTION_LIST_ICONS,
+    ...SUBSCRIPTION_TYPE_ICONS,
+    ...CATEGORY_TYPE_ICONS,
     ...ADDITIONAL_INFO_ICONS,
     ...METADATA_ICONS,
     // Utilities
@@ -139,50 +149,66 @@ export const NAV_LINKS = [
 ];
 
 // ==========================================
-// SUBSCRIPTION ICON MAPPINGS - Based on database context
+// SUBSCRIPTION ICON MAPPINGS - Based on database subscription_type
 // ==========================================
 export const SUBSCRIPTION_ICONS = {
-    'account': SUBSCRIPTION_LIST_ICONS.user,      // 👤
-    'playlist': SUBSCRIPTION_LIST_ICONS.list,     // 📋
-    'music': SUBSCRIPTION_LIST_ICONS.music,       // 🎵
-    'hashtag': SUBSCRIPTION_LIST_ICONS.hashtag,   // #️⃣
-    'location': SUBSCRIPTION_LIST_ICONS.location_marker, // 📍
-    'saved': SUBSCRIPTION_LIST_ICONS.bookmark,    // 💾
-    'channel': SUBSCRIPTION_LIST_ICONS.user,      // 👤
-    'watch_later': SUBSCRIPTION_LIST_ICONS.clock, // ⏰
-    'favorites': SUBSCRIPTION_LIST_ICONS.star,    // 💝
-    'single': SUBSCRIPTION_LIST_ICONS.film,       // 🎬 Para publicaciones sueltas
+    'account': SUBSCRIPTION_TYPE_ICONS.user,      // 👤
+    'playlist': SUBSCRIPTION_TYPE_ICONS.list,     // 📋
+    'music': SUBSCRIPTION_TYPE_ICONS.music,       // 🎵
+    'hashtag': SUBSCRIPTION_TYPE_ICONS.hashtag,   // #️⃣
+    'location': SUBSCRIPTION_TYPE_ICONS.location_marker, // 📍
+    'saved': SUBSCRIPTION_TYPE_ICONS.saved,       // 💾
+    'search': SUBSCRIPTION_TYPE_ICONS.search,     // 🔍
+    'liked': SUBSCRIPTION_TYPE_ICONS.liked,       // 👍 (Default: YouTube thumbs up, use getSubscriptionIcon(type, platform) for platform-specific)
+    'watch_later': SUBSCRIPTION_TYPE_ICONS.watch_later, // ⏰
+    'folder': SUBSCRIPTION_TYPE_ICONS.folder,     // 📁
 };
 
 // ==========================================
-// LIST ICON MAPPINGS - Content list types
+// CATEGORY ICON MAPPINGS - Based on database category_type
 // ==========================================
-export const LIST_ICONS = {
-    'feed': SUBSCRIPTION_LIST_ICONS.film,         // 🎬 Icono de videos para TikTok feed
-    'liked': SUBSCRIPTION_LIST_ICONS.heart,       // ❤️
-    'reels': SUBSCRIPTION_LIST_ICONS.film,        // 🎬
-    'stories': SUBSCRIPTION_LIST_ICONS.stories,   // 📖
-    'highlights': SUBSCRIPTION_LIST_ICONS.highlights, // ⭐
-    'tagged': SUBSCRIPTION_LIST_ICONS.tag,        // 🏷️
-    'favorites': SUBSCRIPTION_LIST_ICONS.bookmark, // 🔖 Icono marcapáginas para TikTok favorites
-    'playlist': SUBSCRIPTION_LIST_ICONS.list,     // 📋
-    'single': SUBSCRIPTION_LIST_ICONS.film,       // 🎬 Para videos sueltos
-    'hashtag': SUBSCRIPTION_LIST_ICONS.hashtag,   // #️⃣ Para suscripciones hashtag
-    'music': SUBSCRIPTION_LIST_ICONS.music,       // 🎵 Para suscripciones música
+export const CATEGORY_ICONS = {
+    'videos': CATEGORY_TYPE_ICONS.video,          // 🎬 Videos regulares (Default: standard video, use getCategoryIcon(type, platform) for TikTok rack)
+    'shorts': CATEGORY_TYPE_ICONS.shorts,         // 📱 Videos cortos/verticales
+    'feed': CATEGORY_TYPE_ICONS.grid,             // 🗂️ Instagram feed (rejilla)
+    'reels': CATEGORY_TYPE_ICONS.reels,           // 🎞️ Instagram reels
+    'stories': CATEGORY_TYPE_ICONS.stories,       // 📖 Instagram stories
+    'highlights': CATEGORY_TYPE_ICONS.highlights, // ⭐ Instagram highlights
+    'tagged': CATEGORY_TYPE_ICONS.tag,            // 🏷️ Instagram tagged
 };
 
 // ==========================================
 // HELPER FUNCTIONS - Icon retrieval utilities
 // ==========================================
 
-// Function to get subscription icon
-export const getSubscriptionIcon = (type: string) => {
-    return SUBSCRIPTION_ICONS[type as keyof typeof SUBSCRIPTION_ICONS] || SUBSCRIPTION_LIST_ICONS.folder;
+// Function to get subscription icon with platform-specific handling
+export const getSubscriptionIcon = (type: string, platform?: string) => {
+    // Handle special case for 'liked' based on platform
+    if (type === 'liked') {
+        if (platform === 'youtube') {
+            return SUBSCRIPTION_TYPE_ICONS.liked; // 👍 Thumbs up for YouTube
+        } else if (platform === 'tiktok' || platform === 'instagram') {
+            return SUBSCRIPTION_TYPE_ICONS.heart; // ❤️ Heart for TikTok/Instagram
+        }
+        // Default to liked (thumbs up) if no platform specified
+        return SUBSCRIPTION_TYPE_ICONS.liked;
+    }
+
+    return SUBSCRIPTION_ICONS[type as keyof typeof SUBSCRIPTION_ICONS] || SUBSCRIPTION_TYPE_ICONS.folder;
 };
 
-// Function to get list icon
-export const getListIcon = (type: string) => {
-    return LIST_ICONS[type as keyof typeof LIST_ICONS] || SUBSCRIPTION_LIST_ICONS.folder;
+// Function to get category icon with platform-specific handling
+export const getCategoryIcon = (type: string, platform?: string) => {
+    // Handle special case for 'videos' based on platform
+    if (type === 'videos') {
+        if (platform === 'tiktok') {
+            return CATEGORY_TYPE_ICONS.rack; // 📊 Rack for TikTok videos
+        }
+        // Default to video icon for all other platforms
+        return CATEGORY_TYPE_ICONS.video;
+    }
+
+    return CATEGORY_ICONS[type as keyof typeof CATEGORY_ICONS] || CATEGORY_TYPE_ICONS.video;
 };
 
 // ==========================================
@@ -196,7 +222,8 @@ export const FRONTEND_ICON_CATEGORIES = {
     '🎬 Thumbnail - Botones de Acción (Hover)': HOVER_ACTION_BUTTONS,
     '🔗 Información - Cabecera': HEADER_ICONS,
     '👤 Información - Creador': CREATOR_ICONS,
-    '📋 Información - Suscripciones y Listas': SUBSCRIPTION_LIST_ICONS,
+    '📋 Información - Tipos de Suscripción': SUBSCRIPTION_TYPE_ICONS,
+    '🎞️ Información - Tipos de Categoría': CATEGORY_TYPE_ICONS,
     '🎵 Información - Adicional': ADDITIONAL_INFO_ICONS,
     '📊 Información - Metadatos': METADATA_ICONS,
     '🔧 Utilidades y Sistema': UTILITY_ICONS,

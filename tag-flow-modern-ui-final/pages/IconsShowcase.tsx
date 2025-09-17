@@ -1,5 +1,5 @@
 import React from 'react';
-import { FRONTEND_ICON_CATEGORIES, ICONS } from '../constants';
+import { FRONTEND_ICON_CATEGORIES, ICONS, SUBSCRIPTION_ICONS, CATEGORY_ICONS, getSubscriptionIcon, getCategoryIcon } from '../constants';
 
 const IconsShowcase: React.FC = () => {
   // Use the organized categories by frontend sections from constants.tsx
@@ -61,6 +61,87 @@ const IconsShowcase: React.FC = () => {
           </div>
         </div>
 
+        {/* Mapeos de Database Schema */}
+        <div className="grid md:grid-cols-2 gap-8 mt-12">
+          {/* Subscription Types */}
+          <div className="bg-purple-50 border border-purple-200 rounded-lg p-6">
+            <h3 className="text-lg font-semibold text-purple-900 mb-4">
+              📋 Mapeo Subscription Types (Database)
+            </h3>
+            <div className="space-y-3">
+              {Object.entries(SUBSCRIPTION_ICONS).map(([dbValue, iconElement]) => (
+                <div key={dbValue} className="flex items-center gap-3 p-2 bg-white rounded border">
+                  <div className="text-purple-700">
+                    {iconElement}
+                  </div>
+                  <span className="text-sm font-mono text-purple-800">
+                    '{dbValue}'
+                  </span>
+                  <span className="text-xs text-purple-600">
+                    → getSubscriptionIcon('{dbValue}')
+                  </span>
+                </div>
+              ))}
+
+              {/* Special cases with platform logic */}
+              <div className="mt-4 p-3 bg-purple-100 rounded border-2 border-purple-300">
+                <h4 className="text-sm font-semibold text-purple-900 mb-2">🎯 Casos Especiales por Plataforma:</h4>
+                <div className="space-y-2 text-xs">
+                  <div className="flex items-center gap-2">
+                    <div className="text-purple-700">{getSubscriptionIcon('liked', 'youtube')}</div>
+                    <span className="font-mono">getSubscriptionIcon('liked', 'youtube')</span>
+                    <span className="text-purple-600">→ Thumbs up (YouTube)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="text-purple-700">{getSubscriptionIcon('liked', 'tiktok')}</div>
+                    <span className="font-mono">getSubscriptionIcon('liked', 'tiktok')</span>
+                    <span className="text-purple-600">→ Heart (TikTok/Instagram)</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Category Types */}
+          <div className="bg-green-50 border border-green-200 rounded-lg p-6">
+            <h3 className="text-lg font-semibold text-green-900 mb-4">
+              🎞️ Mapeo Category Types (Database)
+            </h3>
+            <div className="space-y-3">
+              {Object.entries(CATEGORY_ICONS).map(([dbValue, iconElement]) => (
+                <div key={dbValue} className="flex items-center gap-3 p-2 bg-white rounded border">
+                  <div className="text-green-700">
+                    {iconElement}
+                  </div>
+                  <span className="text-sm font-mono text-green-800">
+                    '{dbValue}'
+                  </span>
+                  <span className="text-xs text-green-600">
+                    → getCategoryIcon('{dbValue}')
+                  </span>
+                </div>
+              ))}
+
+              {/* Special cases with platform logic */}
+              <div className="mt-4 p-3 bg-green-100 rounded border-2 border-green-300">
+                <h4 className="text-sm font-semibold text-green-900 mb-2">🎯 Casos Especiales por Plataforma:</h4>
+                <div className="space-y-2 text-xs">
+                  <div className="flex items-center gap-2">
+                    <div className="text-green-700">{getCategoryIcon('videos')}</div>
+                    <span className="font-mono">getCategoryIcon('videos')</span>
+                    <span className="text-green-600">→ Video icon (All platforms)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="text-green-700">{getCategoryIcon('videos', 'tiktok')}</div>
+                    <span className="font-mono">getCategoryIcon('videos', 'tiktok')</span>
+                    <span className="text-green-600">→ Rack icon (TikTok only)</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Información técnica */}
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mt-8">
           <h3 className="text-lg font-semibold text-blue-900 mb-3">
@@ -78,6 +159,15 @@ const IconsShowcase: React.FC = () => {
             </div>
             <div>
               <strong>Uso:</strong> {`{ICONS.iconName}`} o React.cloneElement
+            </div>
+            <div className="md:col-span-2 mt-2">
+              <strong>Helper Functions:</strong> getSubscriptionIcon(type, platform?) y getCategoryIcon(type, platform?) para mapeos de database con lógica específica de plataforma
+            </div>
+            <div className="md:col-span-2 mt-2 text-xs">
+              <strong>Nuevos iconos agregados:</strong> liked (👍), saved (💾), watch_later (⏰) para subscription types
+            </div>
+            <div className="md:col-span-2 mt-2 text-xs">
+              <strong>Casos especiales:</strong> liked (YouTube vs TikTok/Instagram), videos (All vs TikTok)
             </div>
           </div>
         </div>
