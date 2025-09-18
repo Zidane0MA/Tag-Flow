@@ -151,7 +151,7 @@ class DatabaseMigration:
 
             cursor.execute("""
                 CREATE INDEX IF NOT EXISTS idx_subscriptions_type_platform
-                ON subscriptions(subscription_type, platform_id, is_account)
+                ON subscriptions(subscription_type, platform_id, have_account)
             """)
 
             # Índices compuestos para consultas complejas

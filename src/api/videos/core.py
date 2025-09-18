@@ -14,7 +14,7 @@ from pathlib import Path
 from flask import Blueprint, request, jsonify
 
 # Import carousel processing functions
-from .carousels import process_video_data_for_api, process_image_carousels
+from .carousels import process_video_data_for_api, process_image_carousels, add_video_categories
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +43,14 @@ def api_videos():
         page = int(request.args.get('page', 1))
         cursor = request.args.get('cursor')  # Para cursor-based pagination
 
+        # ✅ CORREGIDO: Soportar offset del frontend
+        offset = request.args.get('offset')
+        if offset is not None:
+            # Convertir offset a página para el paginador
+            offset_int = int(offset)
+            per_page = int(request.args.get('limit', 50))
+            page = (offset_int // per_page) + 1
+
         # Usar paginación inteligente
         with db.get_connection() as conn:
             result = smart_paginator.paginate_posts(conn, filters, page, cursor)
@@ -50,6 +58,12 @@ def api_videos():
         # Procesar cada video para la API usando función helper
         for video in result.data:
             process_video_data_for_api(video)
+
+        # ✅ AGREGAR CATEGORÍAS DE POST
+        try:
+            add_video_categories(db, result.data)
+        except Exception as e:
+            logger.warning(f"Error agregando categorías: {e}")
 
         # Procesar carruseles de imágenes
         try:

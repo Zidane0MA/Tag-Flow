@@ -551,10 +551,7 @@ const GalleryPage: React.FC = () => {
                         {/* Mensaje de final de contenido */}
                         {!hasMore && posts.length > 0 && (
                             <div className="text-center py-8 text-gray-400">
-                                <p>Has visto todos los videos disponibles ({posts.length} de {totalVideos} videos mostrados)</p>
-                                <p className="text-sm text-gray-500 mt-1">
-                                    Algunos carruseles de imágenes se muestran como un solo video
-                                </p>
+                                <p>Has visto todos los Post disponibles ({posts.length} de {totalVideos} Posts mostrados)</p>
                             </div>
                         )}
                     </>

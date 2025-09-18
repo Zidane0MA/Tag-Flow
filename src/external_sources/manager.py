@@ -123,7 +123,7 @@ class ExternalSourcesManager:
         
         # 2. Create or get subscription
         subscription_id = None
-        subscription_type, is_account = self._determine_subscription_type_4k_youtube(video_data)
+        subscription_type, have_account = self._determine_subscription_type_4k_youtube(video_data)
         
         if subscription_type:
             subscription_name = video_data.get('playlist_name') or video_data.get('creator_name', 'Unknown')
@@ -162,7 +162,7 @@ class ExternalSourcesManager:
                 name=subscription_name,
                 platform_name=video_data['platform'],
                 subscription_type=subscription_type,
-                is_account=is_account,
+                have_account=have_account,
                 creator_id=subscription_creator_id,
                 subscription_url=subscription_url,
                 external_uuid=video_data.get('downloader_subscription_uuid')
@@ -276,8 +276,8 @@ class ExternalSourcesManager:
         """Determine subscription type from 4K Video Downloader metadata
         
         Mapping based on 4K Apps to Subscriptions table:
-        - type=5: account, is_account=TRUE (Creator's own content)
-        - type=3: playlist, is_account=TRUE (Creator's playlists like Liked videos)
+        - type=5: account, have_account=TRUE (Creator's own content)
+        - type=3: playlist, have_account=TRUE (Creator's playlists like Liked videos)
         """
         metadata_types = video_data.get('metadata_types', {})
         
@@ -413,11 +413,11 @@ class ExternalSourcesManager:
             # Map subscription type according to 4K Apps mapping specification
             # TRUE: account, liked, saved (all belong to accounts)
             # FALSE: hashtag, music (not associated with accounts)
-            is_account = subscription_type in ['account', 'liked', 'saved']
+            have_account = subscription_type in ['account', 'liked', 'saved']
             
             # For liked/saved subscriptions, create the account owner creator
             subscription_creator_id = None
-            if is_account:
+            if have_account:
                 if subscription_type in ['liked', 'saved']:
                     # For liked/saved, subscription_name is the account name (without suffix)
                     # Create creator for the account that owns the liked/saved list
@@ -436,7 +436,7 @@ class ExternalSourcesManager:
                 name=subscription_name,
                 platform_name='tiktok',
                 subscription_type=subscription_type,
-                is_account=is_account,
+                have_account=have_account,
                 creator_id=subscription_creator_id,
                 subscription_url=video_data.get('subscription_url'),
                 external_uuid=self._format_external_uuid(video_data.get('subscription_database_id'))
@@ -572,7 +572,7 @@ class ExternalSourcesManager:
                 name=video_data.get('subscription_name'),
                 platform_name='instagram',
                 subscription_type=video_data.get('subscription_type', 'account'),
-                is_account=video_data.get('subscription_type') in ['account', 'saved'],
+                have_account=video_data.get('subscription_type') in ['account', 'saved'],
                 creator_id=subscription_creator_id,
                 subscription_url=video_data.get('subscription_url'),
                 external_uuid=self._format_external_uuid(video_data.get('subscription_database_id'))

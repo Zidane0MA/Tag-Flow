@@ -107,7 +107,7 @@ class DatabaseCore(DatabaseBase):
                     'account', 'playlist', 'hashtag', 'location', 'music', 
                     'search', 'liked', 'saved', 'folder', 'watch_later'
                 )) NOT NULL,
-                is_account BOOLEAN DEFAULT FALSE,
+                have_account BOOLEAN DEFAULT FALSE,
                 
                 -- References
                 creator_id INTEGER REFERENCES creators(id),
@@ -123,7 +123,7 @@ class DatabaseCore(DatabaseBase):
         conn.execute('CREATE INDEX IF NOT EXISTS idx_subscriptions_platform ON subscriptions(platform_id)')
         conn.execute('CREATE INDEX IF NOT EXISTS idx_subscriptions_creator ON subscriptions(creator_id)')
         conn.execute('CREATE INDEX IF NOT EXISTS idx_subscriptions_type ON subscriptions(subscription_type)')
-        conn.execute('CREATE INDEX IF NOT EXISTS idx_subscriptions_account ON subscriptions(is_account)')
+        conn.execute('CREATE INDEX IF NOT EXISTS idx_subscriptions_account ON subscriptions(have_account)')
 
     def _create_posts_table(self, conn):
         """Create posts table - main content concept"""

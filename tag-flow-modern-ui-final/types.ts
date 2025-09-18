@@ -35,7 +35,7 @@ export enum Difficulty {
   HIGH = 'high'
 }
 
-export type SubscriptionType = 'account' | 'playlist' | 'hashtag' | 'location' | 'music' | 'search' | 'liked' | 'saved' | 'folder';
+export type SubscriptionType = 'account' | 'playlist' | 'hashtag' | 'location' | 'music' | 'search' | 'liked' | 'saved' | 'folder' | 'watch_later';
 
 export interface Subscription {
   type: SubscriptionType;
@@ -48,6 +48,12 @@ export type CategoryType = 'videos' | 'shorts' | 'feed' | 'reels' | 'stories' | 
 export interface PostCategory {
   type: CategoryType;
   name: string;
+}
+
+export interface PostList {
+  type: CategoryType;
+  name: string;
+  subscriptionId?: string;
 }
 
 export interface Post {
@@ -73,7 +79,8 @@ export interface Post {
   publicationDate?: string;
   deletedAt?: string;
   subscription?: Subscription;
-  categories?: PostCategory[]; // Array de categorías del post
+  categories?: PostCategory[]; // Array de categorías del post (videos, shorts, feed, etc.)
+  lists?: PostList[]; // Array de listas/categorías de suscripción que contiene este post
   isCarousel?: boolean;
   carouselCount?: number;
 }

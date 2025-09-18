@@ -243,7 +243,7 @@ class PostOperations(DatabaseBase):
                 c.name as creator_name,
                 s.name as subscription_name,
                 s.subscription_type,
-                s.is_account,
+                s.have_account,
                 m.id as media_id,
                 m.file_path,
                 m.file_name,
@@ -318,7 +318,7 @@ class PostOperations(DatabaseBase):
                         'creator_name': row[19],
                         'subscription_name': row[20],
                         'subscription_type': row[21],
-                        'is_account': row[22],
+                        'have_account': row[22],
                         'media': [],
                         'categories': set()
                     }

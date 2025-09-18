@@ -100,7 +100,7 @@ class CursorPaginator(BasePaginator):
         start_time = time.time()
 
         # Construir WHERE clause
-        where_conditions = ["p.deleted_at IS NULL"]
+        where_conditions = ["p.deleted_at IS NULL", "m.is_primary = TRUE"]
         params = []
 
         # Filtros comunes
@@ -163,11 +163,15 @@ class CursorPaginator(BasePaginator):
                 p.publication_date,
                 p.download_date,
                 p.is_carousel,
-                p.carousel_count
+                p.carousel_count,
+                s.id as subscription_id,
+                s.name as subscription_name,
+                s.subscription_type
             FROM media m
             JOIN posts p ON m.post_id = p.id
             LEFT JOIN creators c ON p.creator_id = c.id
             LEFT JOIN platforms pl ON p.platform_id = pl.id
+            LEFT JOIN subscriptions s ON p.subscription_id = s.id
             WHERE {where_clause}
             ORDER BY m.{self.cursor_field} DESC
             LIMIT ?
@@ -201,6 +205,7 @@ class CursorPaginator(BasePaginator):
                 JOIN posts p ON m.post_id = p.id
                 LEFT JOIN creators c ON p.creator_id = c.id
                 LEFT JOIN platforms pl ON p.platform_id = pl.id
+                LEFT JOIN subscriptions s ON p.subscription_id = s.id
                 WHERE {where_clause.replace(f"m.{self.cursor_field} < ?", "1=1")}
             """
             count_params = [p for p in params if p != cursor][:-1]  # Remover cursor y limit
@@ -254,7 +259,7 @@ class OffsetPaginator(BasePaginator):
         offset = (page - 1) * self.per_page
 
         # Construir WHERE clause (similar al cursor paginator)
-        where_conditions = ["p.deleted_at IS NULL"]
+        where_conditions = ["p.deleted_at IS NULL", "m.is_primary = TRUE"]
         params = []
 
         # Aplicar filtros
@@ -309,11 +314,15 @@ class OffsetPaginator(BasePaginator):
                 p.publication_date,
                 p.download_date,
                 p.is_carousel,
-                p.carousel_count
+                p.carousel_count,
+                s.id as subscription_id,
+                s.name as subscription_name,
+                s.subscription_type
             FROM media m
             JOIN posts p ON m.post_id = p.id
             LEFT JOIN creators c ON p.creator_id = c.id
             LEFT JOIN platforms pl ON p.platform_id = pl.id
+            LEFT JOIN subscriptions s ON p.subscription_id = s.id
             WHERE {where_clause}
             ORDER BY m.created_at DESC
             LIMIT ? OFFSET ?
@@ -326,6 +335,7 @@ class OffsetPaginator(BasePaginator):
             JOIN posts p ON m.post_id = p.id
             LEFT JOIN creators c ON p.creator_id = c.id
             LEFT JOIN platforms pl ON p.platform_id = pl.id
+            LEFT JOIN subscriptions s ON p.subscription_id = s.id
             WHERE {where_clause}
         """
 

@@ -15,7 +15,7 @@ class SubscriptionOperations(DatabaseBase):
     """Subscription and video list management"""
     
     def create_subscription(self, name: str, platform_id: int, subscription_type: str, 
-                          is_account: bool = False, creator_id: int = None, 
+                          have_account: bool = False, creator_id: int = None, 
                           subscription_url: str = None, external_uuid: str = None) -> int:
         """Create new subscription"""
         self._ensure_initialized()
@@ -23,10 +23,10 @@ class SubscriptionOperations(DatabaseBase):
         
         with self.get_connection() as conn:
             cursor = conn.execute('''
-                INSERT INTO subscriptions (name, platform_id, subscription_type, is_account, 
+                INSERT INTO subscriptions (name, platform_id, subscription_type, have_account, 
                                          creator_id, subscription_url, external_uuid)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
-            ''', (name, platform_id, subscription_type, is_account, creator_id, subscription_url, external_uuid))
+            ''', (name, platform_id, subscription_type, have_account, creator_id, subscription_url, external_uuid))
             subscription_id = cursor.lastrowid
             
             self._track_query('create_subscription', time.time() - start_time)
@@ -381,7 +381,7 @@ class SubscriptionOperations(DatabaseBase):
                 name=name,
                 platform_id=platform_id,
                 subscription_type=subscription_type,
-                is_account=kwargs.get('is_account', False),
+                have_account=kwargs.get('have_account', False),
                 creator_id=kwargs.get('creator_id'),
                 subscription_url=kwargs.get('subscription_url'),
                 external_uuid=kwargs.get('external_uuid')

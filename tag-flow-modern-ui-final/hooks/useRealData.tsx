@@ -187,27 +187,28 @@ export const RealDataProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     if (loadingMore || !hasMore) {
       return;
     }
-    
+
     setLoadingMore(true);
     setError(null);
-    
+
     try {
       const PAGE_SIZE = 50;
+
       const filtersWithPagination = {
         ...currentFilters,
         limit: PAGE_SIZE,
-        offset: currentOffset
+        offset: currentOffset  // ✅ Usar currentOffset (actual)
       };
-      
+
       const { posts: newPosts, total, hasMore: backendHasMore } = await apiService.getVideos(filtersWithPagination);
-      
+
       setPosts(prevPosts => {
         // Evitar duplicados basándose en el ID
         const existingIds = new Set(prevPosts.map(p => p.id));
         const uniqueNewPosts = newPosts.filter(p => !existingIds.has(p.id));
         return [...prevPosts, ...uniqueNewPosts];
       });
-      
+
       const newOffset = currentOffset + PAGE_SIZE;
       setCurrentOffset(newOffset);
       setTotalVideos(total);

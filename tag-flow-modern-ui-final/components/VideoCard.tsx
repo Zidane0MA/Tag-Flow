@@ -325,7 +325,7 @@ const PostCard: React.FC<PostCardProps> = ({ video: post, videos: posts, isSelec
                     <div className="flex items-center gap-1 flex-shrink-0">
                         {post.subscription && (
                             <Link to={`/subscription/${post.subscription.type}/${post.subscription.id}`} onClick={e => e.stopPropagation()} title={`${post.subscription.name} (${post.subscription.type})`} className="flex items-center gap-1 text-gray-400 hover:text-white transition-colors">
-                               {React.cloneElement(getSubscriptionIcon(post.subscription.type), {className: "h-4 w-4 text-blue-400"})}
+                               {React.cloneElement(getSubscriptionIcon(post.subscription.type, post.platform), {className: "h-4 w-4 text-blue-400"})}
                                <span className="text-xs font-medium hidden sm:inline truncate max-w-[80px]">{post.subscription.name}</span>
                             </Link>
                         )}
@@ -334,7 +334,7 @@ const PostCard: React.FC<PostCardProps> = ({ video: post, videos: posts, isSelec
                             <div className="flex items-center gap-0.5" title={`Listas: ${post.lists.map(list => list.name).join(', ')}`}>
                                 {post.lists.slice(0, 3).map((list, idx) => (
                                     <div key={idx} className="p-0.5 rounded bg-green-800/30 border border-green-600/50">
-                                        {React.cloneElement(getCategoryIcon(list.type), {className: "h-3 w-3 text-green-400"})}
+                                        {React.cloneElement(getCategoryIcon(list.type, post.platform), {className: "h-3 w-3 text-green-400"})}
                                     </div>
                                 ))}
                                 {post.lists.length > 3 && (
@@ -342,13 +342,6 @@ const PostCard: React.FC<PostCardProps> = ({ video: post, videos: posts, isSelec
                                         <span className="text-xs text-green-400 font-bold">+{post.lists.length - 3}</span>
                                     </div>
                                 )}
-                            </div>
-                        )}
-                        
-                        {/* Fallback icon for videos sin subscription ni lists */}
-                        {!post.subscription && (!post.lists || post.lists.length === 0) && (
-                            <div className="p-0.5 rounded bg-gray-800/30 border border-gray-600/50" title="Video individual">
-                                {React.cloneElement(ICONS.folder, {className: "h-3 w-3 text-gray-400"})}
                             </div>
                         )}
                     </div>

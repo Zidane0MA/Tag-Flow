@@ -58,7 +58,7 @@ CREATE TABLE subscriptions (
 
     -- Tipo de suscripción (basado en 4K apps)
     subscription_type TEXT CHECK(subscription_type IN ('account', 'playlist', 'hashtag', 'location', 'music', 'search', 'liked', 'saved', 'folder')) NOT NULL,
-    is_account BOOLEAN DEFAULT FALSE, -- TRUE para cuentas (contenido propio del creador)
+    have_account BOOLEAN DEFAULT FALSE, -- TRUE para cuentas (contenido propio del creador)
     
     -- Referencias
     creator_id INTEGER REFERENCES creators(id), -- Para suscripciones de cuenta
@@ -71,7 +71,7 @@ CREATE TABLE subscriptions (
 CREATE INDEX idx_subscriptions_platform ON subscriptions(platform_id);
 CREATE INDEX idx_subscriptions_creator ON subscriptions(creator_id);
 CREATE INDEX idx_subscriptions_type ON subscriptions(subscription_type);
-CREATE INDEX idx_subscriptions_account ON subscriptions(is_account);
+CREATE INDEX idx_subscriptions_account ON subscriptions(have_account);
 ```
 
 #### **Mapeo Correcto de 4K Apps a Subscriptions**
@@ -397,7 +397,7 @@ const creatorTabs = {
 #### **Páginas de Suscripción (`/subscription/:type/:id`)**
 La vista depende del tipo de suscripción:
 
-1.  **Suscripciones de Cuenta (`is_account: true`)**: Replican la experiencia de la app original (ej. 4K Tokkit) y tienen tabs para filtrar contenido.
+1.  **Suscripciones de Cuenta (`have_account: true`)**: Replican la experiencia de la app original (ej. 4K Tokkit) y tienen tabs para filtrar contenido.
     ```typescript
     // URL: /subscription/account/mrbeast-youtube
     const accountSubscriptionTabs = {
@@ -407,7 +407,7 @@ La vista depende del tipo de suscripción:
     };
     ```
 
-2.  **Suscripciones de Lista/Tema (`is_account: false`)**: Son listas simples de contenido (ej. por hashtag, música) y no tienen tabs.
+2.  **Suscripciones de Lista/Tema (`have_account: false`)**: Son listas simples de contenido (ej. por hashtag, música) y no tienen tabs.
     ```typescript
     // URL: /subscription/hashtag/dance-tiktok
     // URL: /subscription/music/phonk-tiktok
