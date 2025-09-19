@@ -11,6 +11,7 @@ import VideoPlayerPage from './pages/VideoPlayerPage';
 import CreatorPage from './pages/CreatorPage';
 import SubscriptionPage from './pages/SubscriptionPage';
 import IconsShowcase from './pages/IconsShowcase';
+import { CursorTestPage } from './pages/CursorTestPage';
 
 
 const App: React.FC = () => {
@@ -40,6 +41,9 @@ const App: React.FC = () => {
 
                   {/* Icons Showcase */}
                   <Route path="/icons" element={<IconsShowcase />} />
+
+                  {/* Cursor Test Page */}
+                  <Route path="/cursor-test" element={<CursorTestPage />} />
 
                   {/* Fallback for any other route to redirect to gallery */}
                   <Route path="*" element={<Navigate to="/gallery" replace />} />
