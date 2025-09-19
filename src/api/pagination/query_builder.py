@@ -166,10 +166,10 @@ class OptimizedQueryBuilder:
         direction: str = 'next'
     ) -> Tuple[str, List[str]]:
         """
-        Construir condición de cursor optimizada
+        Construir condición de cursor optimizada (soporta cursor compuesto timestamp|id)
 
         Args:
-            cursor: Timestamp del cursor
+            cursor: Cursor simple o compuesto (timestamp o timestamp|id)
             direction: 'next' o 'prev'
 
         Returns:
@@ -178,23 +178,45 @@ class OptimizedQueryBuilder:
         if not cursor:
             return "", []
 
+
         try:
-            # Normalizar cursor a formato compatible con DB
-            normalized_cursor = cursor
+            # Separar cursor compuesto si existe (formato: timestamp|id)
+            cursor_parts = cursor.split('|', 1)
+            timestamp_part = cursor_parts[0]
+
+            # Normalizar timestamp a formato compatible con DB
+            normalized_timestamp = timestamp_part
 
             # Si es formato ISO, convertir a formato estándar de SQLite
             try:
                 from datetime import datetime
-                if 'T' in cursor:  # Formato ISO
-                    dt = datetime.fromisoformat(cursor.replace('Z', '+00:00'))
-                    normalized_cursor = dt.strftime('%Y-%m-%d %H:%M:%S')
+                if 'T' in timestamp_part:  # Formato ISO
+                    dt = datetime.fromisoformat(timestamp_part.replace('Z', '+00:00'))
+                    normalized_timestamp = dt.strftime('%Y-%m-%d %H:%M:%S')
             except:
                 # Si falla, usar cursor original
                 pass
 
-            operator = "<" if direction == "next" else ">"
-            condition = f"m.{self.cursor_field} {operator} ?"
-            return condition, [normalized_cursor]
+            # Si es cursor compuesto (timestamp:id), usar condición más sofisticada
+            if len(cursor_parts) == 2:
+                cursor_id = int(cursor_parts[1])
+
+                if direction == "next":
+                    # Para siguiente: (timestamp < cursor_timestamp) OR (timestamp = cursor_timestamp AND id < cursor_id)
+                    condition = f"(m.{self.cursor_field} < ? OR (m.{self.cursor_field} = ? AND m.id < ?))"
+                    params = [normalized_timestamp, normalized_timestamp, cursor_id]
+                else:
+                    # Para anterior: (timestamp > cursor_timestamp) OR (timestamp = cursor_timestamp AND id > cursor_id)
+                    condition = f"(m.{self.cursor_field} > ? OR (m.{self.cursor_field} = ? AND m.id > ?))"
+                    params = [normalized_timestamp, normalized_timestamp, cursor_id]
+
+                return condition, params
+            else:
+                # Cursor simple (solo timestamp) - comportamiento original
+                operator = "<" if direction == "next" else ">"
+                condition = f"m.{self.cursor_field} {operator} ?"
+                return condition, [normalized_timestamp]
+
         except Exception as e:
             logger.warning(f"Error building cursor condition: {e}")
             return "", []

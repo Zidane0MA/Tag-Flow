@@ -34,32 +34,47 @@ class CursorPaginationService:
         self.max_page_size = 100
 
     def validate_cursor(self, cursor: str) -> bool:
-        """Validar formato y rango de cursor"""
+        """Validar formato y rango de cursor (soporta cursor compuesto timestamp|id)"""
         if not cursor:
             return True
 
         try:
-            # Intentar formatos múltiples
+            # Separar cursor compuesto si existe (formato: timestamp|id)
+            cursor_parts = cursor.split('|', 1)
+            timestamp_part = cursor_parts[0]
+
+            # Si hay ID, validarlo
+            if len(cursor_parts) == 2:
+                try:
+                    id_part = int(cursor_parts[1])
+                    if id_part <= 0:
+                        logger.warning(f"Invalid cursor ID: {id_part}")
+                        return False
+                except ValueError:
+                    logger.warning(f"Invalid cursor ID format: {cursor_parts[1]}")
+                    return False
+
+            # Validar timestamp
             timestamp = None
 
             # Formato ISO
             try:
-                timestamp = datetime.fromisoformat(cursor.replace('Z', '+00:00'))
+                timestamp = datetime.fromisoformat(timestamp_part.replace('Z', '+00:00'))
             except ValueError:
                 # Formato alternativo: YYYY-MM-DD HH:MM:SS
                 try:
-                    timestamp = datetime.strptime(cursor, '%Y-%m-%d %H:%M:%S')
+                    timestamp = datetime.strptime(timestamp_part, '%Y-%m-%d %H:%M:%S')
                 except ValueError:
                     pass
 
             if timestamp is None:
-                logger.warning(f"Invalid cursor format: {cursor}")
+                logger.warning(f"Invalid cursor timestamp format: {timestamp_part}")
                 return False
 
             # Validar rango razonable (último año)
             one_year_ago = datetime.now() - timedelta(days=365)
             if timestamp < one_year_ago:
-                logger.warning(f"Cursor timestamp too old: {cursor}")
+                logger.warning(f"Cursor timestamp too old: {timestamp_part}")
                 return False
 
             return True
@@ -107,13 +122,13 @@ class CursorPaginationService:
 
             where_clause = " AND ".join(where_conditions)
 
-            # Query principal optimizada
+            # Query principal optimizada con ORDER BY único
             order_direction = "DESC" if direction == "next" else "ASC"
             query = f"""
                 SELECT {', '.join(select_fields)}
                 {from_clause}
                 WHERE {where_clause}
-                ORDER BY m.{self.cursor_field} {order_direction}
+                ORDER BY m.{self.cursor_field} {order_direction}, m.id {order_direction}
                 LIMIT ?
             """
 
@@ -138,17 +153,23 @@ class CursorPaginationService:
 
             if data:
                 if direction == "next" and has_more:
-                    # Asegurar formato ISO para cursor
-                    cursor_value = data[-1][self.cursor_field]
+                    # Crear cursor compuesto (timestamp:id) para manejar empates
+                    last_item = data[-1]
+                    cursor_value = last_item[self.cursor_field]
+                    last_id = last_item['id']
+
                     if isinstance(cursor_value, str):
                         # Convertir a datetime y luego a ISO
                         try:
                             dt = datetime.strptime(cursor_value, '%Y-%m-%d %H:%M:%S')
-                            next_cursor = dt.isoformat()
+                            timestamp_iso = dt.isoformat()
                         except ValueError:
-                            next_cursor = cursor_value  # Fallback si ya está en formato correcto
+                            timestamp_iso = cursor_value  # Fallback si ya está en formato correcto
                     else:
-                        next_cursor = str(cursor_value)
+                        timestamp_iso = str(cursor_value)
+
+                    # Cursor compuesto: timestamp|id (usando | para evitar conflicto con :)
+                    next_cursor = f"{timestamp_iso}|{last_id}"
 
                 if direction == "next" and cursor:
                     prev_cursor = cursor

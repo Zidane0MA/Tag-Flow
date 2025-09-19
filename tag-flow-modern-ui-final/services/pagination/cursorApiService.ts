@@ -175,7 +175,7 @@ class CursorApiService {
       title: video.title_post || video.file_name || 'Sin título',
       creator: video.creator_name || 'Desconocido',
       platform: this.mapPlatform(video.platform),
-      thumbnailUrl: video.thumbnail_path ? `${API_BASE_URL}/thumbnail/${video.thumbnail_path}` : `${API_BASE_URL}/static/img/no-thumbnail.svg`,
+      thumbnailUrl: video.thumbnail_path ? `${API_BASE_URL}/thumbnail/${encodeURIComponent(video.thumbnail_path)}` : `${API_BASE_URL}/static/img/no-thumbnail.svg`,
       postUrl: `${API_BASE_URL}/api/video/${video.id}/stream`,
       type: video.duration_seconds > 60 ? 'Video' as any : 'Video' as any, // Default to Video
       editStatus: this.mapEditStatus(video.edit_status),

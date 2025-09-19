@@ -47,6 +47,7 @@ export interface FilterParams {
   platform?: string;
   edit_status?: string;
   processing_status?: string;
+  difficulty_level?: string;
   search?: string;
   has_music?: boolean;
   has_characters?: boolean;

@@ -6,6 +6,7 @@ import GalleryPage from './pages/GalleryPage';
 import AdminPage from './pages/AdminPage';
 import TrashPage from './pages/TrashPage';
 import { RealDataProvider } from './hooks/useRealData';
+import { CursorDataProvider } from './hooks/useCursorData';
 import { AdminProvider } from './hooks/useAdminData';
 import VideoPlayerPage from './pages/VideoPlayerPage';
 import CreatorPage from './pages/CreatorPage';
@@ -28,7 +29,11 @@ const App: React.FC = () => {
               <Layout>
                 <Routes>
                   <Route path="/" element={<Navigate to="/gallery" replace />} />
-                  <Route path="/gallery" element={<GalleryPage />} />
+                  <Route path="/gallery" element={
+                    <CursorDataProvider>
+                      <GalleryPage />
+                    </CursorDataProvider>
+                  } />
                   <Route path="/admin/*" element={<AdminPage />} />
                   <Route path="/trash" element={<TrashPage />} />
                   

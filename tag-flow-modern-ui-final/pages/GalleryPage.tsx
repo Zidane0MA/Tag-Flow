@@ -1,12 +1,12 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useRealData } from '../hooks/useRealData';
-import useInfiniteScroll from '../hooks/useInfiniteScroll';
+import { useCursorData } from '../hooks/useCursorData';
 import { Post, EditStatus, Difficulty, Platform, ProcessStatus } from '../types';
 import PostCard from '../components/VideoCard';
 import EditModal from '../components/EditModal';
 import BulkActionBar from '../components/BulkActionBar';
-import { VideoFilters } from '../services/apiService';
+import { FilterParams } from '../services/pagination/types';
+import { apiService } from '../services/apiService';
 
 const initialFilters = {
   search: '',
@@ -29,19 +29,23 @@ const filterLabels: { [key: string]: string } = {
 const GalleryPage: React.FC = () => {
     const location = useLocation();
     const navigate = useNavigate();
-    const { 
-        posts, 
-        moveMultipleToTrash, 
-        reanalyzePosts, 
-        loading, 
+    const {
+        posts,
+        creators,
+        loading,
         loadingMore,
-        hasMore,
-        error, 
+        error,
+        scrollState,
         loadVideos,
         loadMoreVideos,
-        creators,
+        refreshData,
+        setFilters: setCursorFilters,
+        clearFilters: clearCursorFilters,
         getStats
-    } = useRealData();
+    } = useCursorData();
+
+    // Obtenemos hasMore del scrollState del cursor system
+    const hasMore = scrollState.hasMore;
     
     // Navigation state for video highlighting and scrolling
     const highlightVideoId = location.state?.highlightVideoId;
@@ -51,7 +55,32 @@ const GalleryPage: React.FC = () => {
     
     // Obtener estadísticas para mostrar total de videos
     const stats = getStats();
-    const totalVideos = stats.totalInDB; // Usar total de la BD, no los cargados actualmente
+    const totalVideos = stats.loaded; // En cursor pagination, mostramos los cargados hasta ahora
+
+    // Funciones de bulk actions que no están en useCursorData
+    const moveMultipleToTrash = useCallback(async (ids: string[]) => {
+        try {
+            const success = await apiService.moveToTrash(ids);
+            if (success) {
+                // Refresh data para actualizar la lista
+                await refreshData();
+            }
+        } catch (error) {
+            console.error('Error moving videos to trash:', error);
+        }
+    }, [refreshData]);
+
+    const reanalyzePosts = useCallback(async (ids: string[]) => {
+        try {
+            const success = await apiService.reanalyzeVideos(ids);
+            if (success) {
+                // Refresh data para mostrar los cambios
+                await refreshData();
+            }
+        } catch (error) {
+            console.error('Error reanalyzing videos:', error);
+        }
+    }, [refreshData]);
 
     const [selectedPosts, setSelectedPosts] = useState<string[]>([]);
     const [editingPost, setEditingPost] = useState<Post | null>(null);
@@ -59,14 +88,33 @@ const GalleryPage: React.FC = () => {
     const [isCreatorDropdownOpen, setIsCreatorDropdownOpen] = useState(false);
     const [creatorSearchTerm, setCreatorSearchTerm] = useState('');
     const creatorDropdownRef = useRef<HTMLDivElement>(null);
+    const mainContainerRef = useRef<HTMLElement>(null);
+
+    // Refs para acceder a valores actuales en el scroll handler
+    const loadingMoreRef = useRef(loadingMore);
+    const hasMoreRef = useRef(scrollState.hasMore);
+    const loadMoreVideosRef = useRef(loadMoreVideos);
+
+    // Actualizar refs cuando cambien los valores
+    useEffect(() => {
+        loadingMoreRef.current = loadingMore;
+    }, [loadingMore]);
+
+    useEffect(() => {
+        hasMoreRef.current = scrollState.hasMore;
+    }, [scrollState.hasMore]);
+
+    useEffect(() => {
+        loadMoreVideosRef.current = loadMoreVideos;
+    }, [loadMoreVideos]);
     
     const [filters, setFilters] = useState(initialFilters);
     const [sort, setSort] = useState({ by: 'downloadDate', order: 'desc' });
-    const [appliedFilters, setAppliedFilters] = useState<VideoFilters>({});
+    const [appliedFilters, setAppliedFilters] = useState<FilterParams>({});
 
     // Convertir filtros locales a formato del API
-    const buildApiFilters = useCallback((localFilters: typeof initialFilters): VideoFilters => {
-        const apiFilters: VideoFilters = {};
+    const buildApiFilters = useCallback((localFilters: typeof initialFilters): FilterParams => {
+        const apiFilters: FilterParams = {};
         
         if (localFilters.search) apiFilters.search = localFilters.search;
         if (localFilters.creator_name && Array.isArray(localFilters.creator_name) && localFilters.creator_name.length > 0) {
@@ -161,40 +209,83 @@ const GalleryPage: React.FC = () => {
         }
     }, [isCreatorDropdownOpen]);
 
-    // Aplicar filtros (llamar al backend)
+    // Aplicar filtros (llamar al backend con cursor system)
     const applyFilters = useCallback(async () => {
+        console.log('📋 APPLY FILTERS CALLED with:', filters);
         const apiFilters = buildApiFilters(filters);
         setAppliedFilters(apiFilters);
-        await loadVideos(apiFilters);
-    }, [filters, buildApiFilters, loadVideos]);
+        // Usar setCursorFilters que automáticamente recargar los datos
+        console.log('🔄 CALLING setCursorFilters with:', apiFilters);
+        await setCursorFilters(apiFilters);
+        console.log('✅ setCursorFilters COMPLETED');
+    }, [filters, buildApiFilters, setCursorFilters]);
 
-    // Memoizar el callback para evitar recreaciones constantes
-    const infiniteScrollCallback = useCallback(() => {
-        if (!loadingMore && hasMore) {
-            loadMoreVideos();
+    // Infinite scroll handler para cursor pagination (usando refs)
+    const handleScroll = useCallback(() => {
+        if (loadingMoreRef.current || !hasMoreRef.current) return;
+
+        const container = mainContainerRef.current;
+        if (!container) return;
+
+        const { scrollTop, scrollHeight, clientHeight } = container;
+        const scrollPercentage = scrollTop / (scrollHeight - clientHeight);
+
+        // Load more when 80% scrolled
+        if (scrollPercentage > 0.8) {
+            loadMoreVideosRef.current();
         }
-    }, [loadingMore, hasMore, loadMoreVideos]);
+    }, []); // Sin dependencias!
 
-    // Simplificar enabled - solo usar hasMore ya que es el más estable
-    const infiniteScrollEnabled = hasMore && posts.length > 0;
-    
-    // Memoizar las opciones para evitar recreaciones constantes
-    const infiniteScrollOptions = useMemo(() => ({
-        threshold: 400,
-        enabled: infiniteScrollEnabled
-    }), [infiniteScrollEnabled]);
-
-    // Hook para scroll infinito
-    useInfiniteScroll(infiniteScrollCallback, infiniteScrollOptions);
-
-    // Aplicar filtros cuando cambien
+    // Find and attach scroll listener to main container (solo una vez)
     useEffect(() => {
-        const timeoutId = setTimeout(() => {
-            applyFilters();
-        }, 1500); // Debounce de 1500ms para dar tiempo a selecciones múltiples
+        // Find the main container (Layout's main element)
+        const mainElement = document.querySelector('main');
+        mainContainerRef.current = mainElement;
 
-        return () => clearTimeout(timeoutId);
-    }, [applyFilters]);
+        if (!mainElement) {
+            console.warn('Main container not found');
+            return;
+        }
+
+        let timeoutId: NodeJS.Timeout;
+
+        const throttledHandleScroll = () => {
+            if (timeoutId) clearTimeout(timeoutId);
+            timeoutId = setTimeout(handleScroll, 100); // Throttle to 100ms
+        };
+
+        // console.log('✅ Scroll listener attached to main container');
+        mainElement.addEventListener('scroll', throttledHandleScroll);
+
+        return () => {
+            // console.log('🧹 Cleaning up scroll listener');
+            mainElement.removeEventListener('scroll', throttledHandleScroll);
+            if (timeoutId) clearTimeout(timeoutId);
+        };
+    }, []); // Dependencias vacías para que solo se ejecute una vez
+
+    // Aplicar filtros cuando cambien (usando dependencia estable)
+    useEffect(() => {
+        // Solo aplicar si no son los filtros iniciales
+        const isInitialFilters = Object.keys(filters).every(key => {
+            const value = filters[key as keyof typeof filters];
+            const initialValue = initialFilters[key as keyof typeof initialFilters];
+            return JSON.stringify(value) === JSON.stringify(initialValue);
+        });
+
+        if (!isInitialFilters) {
+            console.log('🔄 FILTERS CHANGED - Will apply in 1500ms:', filters);
+            const timeoutId = setTimeout(() => {
+                console.log('⏰ APPLYING FILTERS NOW:', filters);
+                applyFilters();
+            }, 1500);
+
+            return () => {
+                console.log('🚫 FILTERS TIMEOUT CANCELLED');
+                clearTimeout(timeoutId);
+            };
+        }
+    }, [JSON.stringify(filters)]); // Usar JSON.stringify para dependencia estable
 
     // Ordenación local (ya que los posts vienen del backend)
     const sortedPosts = useMemo(() => {
@@ -247,8 +338,11 @@ const GalleryPage: React.FC = () => {
         }));
     };
 
-    const handleResetFilters = () => {
+    const handleResetFilters = async () => {
         setFilters(initialFilters);
+        setAppliedFilters({});
+        // Limpiar filtros en el cursor system también
+        await clearCursorFilters();
     };
     
     const handleSortChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -537,7 +631,7 @@ const GalleryPage: React.FC = () => {
                                     key={post.id}
                                     video={post}
                                     videos={sortedPosts}
-                                    isSelected={selectedPosts.includes(post.id)} 
+                                    isSelected={selectedPosts.includes(post.id)}
                                     onSelect={handleSelectPost}
                                     onEdit={setEditingPost}
                                     isHighlighted={highlightedVideoId === post.id}
@@ -547,11 +641,11 @@ const GalleryPage: React.FC = () => {
 
                         {/* Indicador de carga para más contenido */}
                         {loadingMore && <LoadingMoreIndicator />}
-                        
+
                         {/* Mensaje de final de contenido */}
                         {!hasMore && posts.length > 0 && (
                             <div className="text-center py-8 text-gray-400">
-                                <p>Has visto todos los Post disponibles ({posts.length} de {totalVideos} Posts mostrados)</p>
+                                <p>✅ Todos los videos cargados ({posts.length} total)</p>
                             </div>
                         )}
                     </>
