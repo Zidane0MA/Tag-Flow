@@ -14,7 +14,7 @@ sys.path.append(str(Path(__file__).parent / 'src'))
 
 from config import config
 # Database will be imported lazily within functions
-from src.api import gallery_bp, videos_core_bp, videos_streaming_bp, videos_bulk_bp, stats_bp, admin_bp, maintenance_bp, creators_bp
+from src.api import gallery_bp, videos_core_bp, videos_streaming_bp, videos_bulk_bp, stats_bp, admin_bp, maintenance_bp, creators_bp, cursor_pagination_bp
 from src.api.performance import performance_bp
 
 # Configurar logging
@@ -53,6 +53,7 @@ def create_app():
     app.register_blueprint(maintenance_bp)
     app.register_blueprint(creators_bp)
     app.register_blueprint(performance_bp)
+    app.register_blueprint(cursor_pagination_bp)  # ⚡ NEW - Cursor pagination endpoints
     
     # Rutas estáticas y archivos
     @app.route('/thumbnail/<path:filename>')
