@@ -5,12 +5,11 @@
 
 import { Post } from '../../types';
 import { CursorPaginationParams, CursorPaginationResult, FilterParams } from './types';
+import { cacheManager } from '../unifiedCacheManager';
 
 const API_BASE_URL = 'http://localhost:5000';
 
 class CursorApiService {
-  private cache = new Map<string, any>();
-  private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
   /**
    * Get videos with cursor pagination
@@ -21,6 +20,10 @@ class CursorApiService {
     if (params.cursor) searchParams.append('cursor', params.cursor);
     if (params.direction) searchParams.append('direction', params.direction);
     if (params.limit) searchParams.append('limit', params.limit.toString());
+
+    // Add sorting parameters
+    if (params.sort_by) searchParams.append('sort_by', params.sort_by);
+    if (params.sort_order) searchParams.append('sort_order', params.sort_order);
 
     // Add filters
     if (params.filters) {
@@ -33,10 +36,10 @@ class CursorApiService {
 
     const url = `${API_BASE_URL}/api/cursor/videos?${searchParams.toString()}`;
 
-    // Check cache
-    const cacheKey = url;
-    const cached = this.getFromCache(cacheKey);
+    // Check unified cache
+    const cached = cacheManager.getCursorResult(params.filters || {}, params.cursor);
     if (cached) {
+      console.log('🚀 Using cached cursor result');
       return cached;
     }
 
@@ -63,13 +66,72 @@ class CursorApiService {
         success: result.success
       };
 
-      // Cache result
-      this.setCache(cacheKey, transformedResult);
+      // Cache result using unified cache manager
+      cacheManager.cacheCursorResult(params.filters || {}, params.cursor, transformedResult);
 
       return transformedResult;
 
     } catch (error) {
       console.error('Error fetching videos with cursor:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get subscription videos with cursor pagination
+   */
+  async getSubscriptionVideosCursor(
+    subscriptionType: string,
+    subscriptionId: number,
+    params: CursorPaginationParams = {}
+  ): Promise<CursorPaginationResult<Post>> {
+    const searchParams = new URLSearchParams();
+
+    if (params.cursor) searchParams.append('cursor', params.cursor);
+    if (params.limit) searchParams.append('limit', params.limit.toString());
+
+    const url = `${API_BASE_URL}/api/cursor/subscriptions/${encodeURIComponent(subscriptionType)}/${subscriptionId}/videos?${searchParams.toString()}`;
+
+    // Check cache
+    const cacheKey = cacheManager.buildKey('subscription:videos', {
+      type: subscriptionType,
+      id: subscriptionId,
+      cursor: params.cursor,
+      limit: params.limit
+    });
+
+    const cached = this.getCachedApiResult(cacheKey);
+    if (cached) {
+      console.log('🚀 Using cached subscription result');
+      return cached;
+    }
+
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.error || 'API request failed');
+      }
+
+      const transformedResult = {
+        data: result.data.map((video: any) => this.transformVideoToPost(video)),
+        pagination: result.pagination,
+        performance: result.performance,
+        success: result.success
+      };
+
+      // Cache the result
+      this.cacheApiResult(cacheKey, transformedResult, 'subscription');
+
+      return transformedResult;
+
+    } catch (error) {
+      console.error('Error fetching subscription videos with cursor:', error);
       throw error;
     }
   }
@@ -88,6 +150,63 @@ class CursorApiService {
     if (params.filters?.platform) searchParams.append('platform', params.filters.platform);
 
     const url = `${API_BASE_URL}/api/cursor/creators/${encodeURIComponent(creatorName)}/videos?${searchParams.toString()}`;
+
+    // Check cache
+    const cacheKey = cacheManager.buildKey('creator:videos', {
+      creator: creatorName,
+      cursor: params.cursor,
+      limit: params.limit,
+      platform: params.filters?.platform
+    });
+
+    const cached = this.getCachedApiResult(cacheKey);
+    if (cached) {
+      console.log('🚀 Using cached creator result');
+      return cached;
+    }
+
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.error || 'API request failed');
+      }
+
+      const transformedResult = {
+        data: result.data.map((video: any) => this.transformVideoToPost(video)),
+        pagination: result.pagination,
+        performance: result.performance,
+        success: result.success
+      };
+
+      // Cache the result
+      this.cacheApiResult(cacheKey, transformedResult, 'creators');
+
+      return transformedResult;
+
+    } catch (error) {
+      console.error('Error fetching creator videos with cursor:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get trash videos with cursor pagination
+   */
+  async getTrashVideosCursor(
+    params: CursorPaginationParams = {}
+  ): Promise<CursorPaginationResult<Post>> {
+    const searchParams = new URLSearchParams();
+
+    if (params.cursor) searchParams.append('cursor', params.cursor);
+    if (params.limit) searchParams.append('limit', params.limit.toString());
+
+    const url = `${API_BASE_URL}/api/cursor/trash/videos?${searchParams.toString()}`;
 
     try {
       const response = await fetch(url);
@@ -109,7 +228,7 @@ class CursorApiService {
       };
 
     } catch (error) {
-      console.error('Error fetching creator videos with cursor:', error);
+      console.error('Error fetching trash videos with cursor:', error);
       throw error;
     }
   }
@@ -155,8 +274,8 @@ class CursorApiService {
 
       const result = await response.json();
 
-      // Clear local cache too
-      this.cache.clear();
+      // Clear unified cache too
+      cacheManager.clear();
 
       return result;
 
@@ -192,10 +311,11 @@ class CursorApiService {
       characters: this.parseCharacters(video.final_characters || video.detected_characters),
 
       // Dates
-      downloadDate: video.download_date || video.created_at || new Date().toISOString(),
+      downloadDate: video.download_date ? new Date(video.download_date * 1000).toISOString() : undefined,
       publicationDate: video.publication_date || video.created_at || new Date().toISOString(),
 
       // Additional fields
+      originalUrl: video.post_url || '',
       notes: video.notes || '',
       isCarousel: video.is_carousel || false,
       carouselCount: video.carousel_count || 1,
@@ -206,7 +326,7 @@ class CursorApiService {
         name: 'Individual',
         type: 'individual' as any
       },
-      lists: video.video_lists || []
+      lists: (video.categories || []).map((cat: any) => ({ type: cat.type }))
     };
   }
 
@@ -225,15 +345,21 @@ class CursorApiService {
   }
 
   private mapEditStatus(status: string | null | undefined) {
-    if (!status || typeof status !== 'string') return 'pending';
+    if (!status || typeof status !== 'string') return 'pendiente';
 
     const statusMap: Record<string, any> = {
-      'pending': 'pending',
-      'in_progress': 'in_progress',
-      'completed': 'completed',
-      'cancelled': 'cancelled'
+      // Valores en español desde la BD → tipos TypeScript
+      'pendiente': 'pendiente',
+      'en_proceso': 'en_proceso',
+      'completado': 'completado',
+      'descartado': 'descartado',
+      // Valores en inglés (fallback) → tipos TypeScript
+      'pending': 'pendiente',
+      'in_progress': 'en_proceso',
+      'completed': 'completado',
+      'cancelled': 'descartado'
     };
-    return statusMap[status.toLowerCase()] || 'pending';
+    return statusMap[status.toLowerCase()] || 'pendiente';
   }
 
   private mapProcessStatus(status: string | null | undefined) {
@@ -248,13 +374,30 @@ class CursorApiService {
     return statusMap[status.toLowerCase()] || 'pending';
   }
 
-  private mapDifficulty(difficulty: string | number) {
-    if (typeof difficulty === 'number') {
-      if (difficulty <= 1) return 'easy';
-      if (difficulty <= 2) return 'medium';
-      return 'hard';
+  private mapDifficulty(difficulty: string | number | null | undefined) {
+    // Si es null o undefined, mantener como null
+    if (difficulty === null || difficulty === undefined) {
+      return null;
     }
-    return difficulty?.toLowerCase() || 'unknown';
+
+    if (typeof difficulty === 'number') {
+      if (difficulty <= 1) return 'low';
+      if (difficulty <= 2) return 'medium';
+      return 'high';
+    }
+
+    const difficultyMap: Record<string, any> = {
+      'low': 'low',
+      'medium': 'medium',
+      'high': 'high',
+      'bajo': 'low',
+      'medio': 'medium',
+      'alto': 'high',
+      'easy': 'low',
+      'hard': 'high'
+    };
+
+    return difficultyMap[difficulty?.toLowerCase()] || null;
   }
 
   private parseCharacters(characters: string | null | any): string[] {
@@ -281,30 +424,13 @@ class CursorApiService {
     }
   }
 
-  private getFromCache(key: string): any {
-    const cached = this.cache.get(key);
-    if (!cached) return null;
-
-    const { data, timestamp } = cached;
-    if (Date.now() - timestamp > this.CACHE_TTL) {
-      this.cache.delete(key);
-      return null;
-    }
-
-    return data;
+  // Funciones de conveniencia para cache unificado
+  private cacheApiResult(key: string, data: any, category: string = 'cursor-results'): void {
+    cacheManager.set(key, data, { category, source: 'api' });
   }
 
-  private setCache(key: string, data: any): void {
-    this.cache.set(key, {
-      data,
-      timestamp: Date.now()
-    });
-
-    // Simple cache size management
-    if (this.cache.size > 50) {
-      const firstKey = this.cache.keys().next().value;
-      this.cache.delete(firstKey);
-    }
+  private getCachedApiResult(key: string): any | null {
+    return cacheManager.get(key);
   }
 }
 

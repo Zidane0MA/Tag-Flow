@@ -23,7 +23,12 @@ videos_core_bp = Blueprint('videos_core', __name__, url_prefix='/api')
 
 @videos_core_bp.route('/videos')
 def api_videos():
-    """API endpoint para obtener videos (AJAX) con paginación optimizada"""
+    """
+    API endpoint para obtener videos (AJAX) con paginación optimizada
+
+    @deprecated: El sistema OFFSET está marcado para obsolescencia.
+    Use /api/cursor/videos para mejor rendimiento y escalabilidad.
+    """
     try:
         from src.service_factory import get_database
         db = get_database()
@@ -151,10 +156,9 @@ def api_get_video(video_id):
                 ''', (video_id,))
                 list_rows = cursor.fetchall()
                 if list_rows:
-                    video['video_lists'] = [
+                    video['categories'] = [
                         {
-                            'type': row[0],
-                            'name': row[0].replace('_', ' ').title()
+                            'type': row[0]
                         } for row in list_rows
                     ]
         except Exception as e:
@@ -480,7 +484,12 @@ def api_reanalyze_video(video_id):
 
 @videos_core_bp.route('/search')
 def api_search():
-    """API para búsqueda de videos"""
+    """
+    API para búsqueda de videos
+
+    @deprecated: El sistema OFFSET está marcado para obsolescencia.
+    Use /api/cursor/videos con parámetro 'search' para mejor rendimiento.
+    """
     try:
         from src.service_factory import get_database
         db = get_database()

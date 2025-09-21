@@ -35,18 +35,7 @@ def process_video_data_for_api(video):
             'type': video['subscription_type']
         }
 
-    # Preparar título apropiado para el frontend usando nuevo esquema
-    if video.get('platform') in ['tiktok', 'instagram'] and video.get('title_post'):
-        if (video.get('platform') == 'instagram' and
-            video.get('title_post') and
-            video.get('title_post') != video.get('file_name', '').replace('.mp4', '')):
-            video['display_title'] = video['title_post']
-        elif video.get('platform') == 'tiktok':
-            video['display_title'] = video['title_post']
-        else:
-            video['display_title'] = video['file_name']
-    else:
-        video['display_title'] = video.get('title_post') or video['file_name']
+    # El frontend usa directamente title_post - no necesita display_title duplicado
 
     # Procesar thumbnail_path para usar solo el nombre del archivo
     if video.get('thumbnail_path'):
@@ -85,15 +74,14 @@ def add_video_categories(db, videos):
             if media_id not in categories_by_video:
                 categories_by_video[media_id] = []
             categories_by_video[media_id].append({
-                'type': category_type,
-                'name': category_type.title()  # Capitalizar el nombre
+                'type': category_type
             })
 
         # Agregar categorías a cada video
         for video in videos:
             video_id = video.get('id')
             if video_id and video_id in categories_by_video:
-                video['video_lists'] = categories_by_video[video_id]
+                video['categories'] = categories_by_video[video_id]
 
         return videos
 

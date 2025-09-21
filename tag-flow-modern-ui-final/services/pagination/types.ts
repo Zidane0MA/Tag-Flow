@@ -8,6 +8,8 @@ export interface CursorPaginationParams {
   direction?: 'next' | 'prev';
   limit?: number;
   filters?: Record<string, any>;
+  sort_by?: string;
+  sort_order?: 'asc' | 'desc';
 }
 
 export interface CursorPaginationResult<T> {
@@ -55,6 +57,8 @@ export interface FilterParams {
   max_duration?: number;
   date_from?: string;
   date_to?: string;
+  sort_by?: string;
+  sort_order?: 'asc' | 'desc';
 }
 
 export interface CursorDataState<T> {

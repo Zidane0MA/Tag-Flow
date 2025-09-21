@@ -1,13 +1,13 @@
 
 import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
+import { useCursorSubscriptionData } from '../hooks/useCursorSubscriptionData';
 import { useRealData } from '../hooks/useRealData';
 import { SubscriptionType, SubscriptionInfo } from '../types';
 import Breadcrumbs, { Crumb } from '../components/Breadcrumbs';
 import { ICONS, getSubscriptionIcon, getCategoryIcon } from '../constants';
 import PostCard from '../components/VideoCard';
 import PlatformTabs, { Tab } from '../components/PlatformTabs';
-import useInfiniteScroll from '../hooks/useInfiniteScroll';
 
 
 const SubscriptionPage: React.FC = () => {
@@ -15,14 +15,23 @@ const SubscriptionPage: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();
     
-    const { 
-        getSubscriptionInfo, 
-        getSubscriptionStats, 
-        getPostsBySubscription, 
-        getCreatorByName,
-        loadSubscriptionPosts,
-        loadMoreSubscriptionPosts,
-        getSubscriptionScrollData
+    // Cursor pagination for subscription videos
+    const {
+        posts: displayedPosts,
+        loading: postsLoading,
+        loadingMore,
+        error: videosError,
+        scrollState,
+        loadSubscriptionVideos,
+        loadMoreVideos,
+        refreshData,
+        clearData
+    } = useCursorSubscriptionData();
+
+    // Keep useRealData for subscription metadata only
+    const {
+        getSubscriptionInfo,
+        getCreatorByName
     } = useRealData();
 
     // Navigation state for video highlighting and scrolling
@@ -33,55 +42,23 @@ const SubscriptionPage: React.FC = () => {
 
     // ⚠️ IMPORTANTE: Mantener todos los hooks en el mismo orden siempre
     const [subscriptionInfo, setSubscriptionInfo] = useState<SubscriptionInfo | undefined>(undefined);
-    const [subscriptionStats, setSubscriptionStats] = useState<{total: number, listCounts: {[key: string]: number}} | null>(null);
     const [subscriptionInfoLoading, setSubscriptionInfoLoading] = useState(true);
     
-    // Usar infinite scroll data en lugar de estado local
-    const scrollData = getSubscriptionScrollData(type || 'account', id || '', list);
-    const displayedPosts = scrollData.posts;
-    const postsLoading = scrollData.loading;
-    
 
-    // Generar subtabs dinámicos por plataforma para suscripciones tipo account
+    // Simplified total post count based on displayed posts
+    const totalPostCount = useMemo(() => {
+        return displayedPosts.length;
+    }, [displayedPosts.length]);
+
+    // Simplified: No dynamic subscription tabs for now (would require additional endpoints)
     const accountSubscriptionTabs: Tab[] | undefined = useMemo(() => {
-        if (type === 'account' && subscriptionInfo && subscriptionStats) {
-            // Definir subtabs por plataforma
-            const platformSubtabs: { [key: string]: Array<{id: string, label: string, icon?: React.ReactElement}> } = {
-                'tiktok': [
-                    { id: 'feed', label: 'Videos', icon: getCategoryIcon('feed') },
-                    { id: 'liked', label: 'Liked', icon: getCategoryIcon('liked') },
-                    { id: 'favorites', label: 'Favorites', icon: getCategoryIcon('favorites') }
-                ],
-                'youtube': [
-                    { id: 'feed', label: 'Videos', icon: getCategoryIcon('feed') },
-                    { id: 'shorts', label: 'Shorts', icon: getCategoryIcon('reels') },
-                    { id: 'playlist', label: 'Playlists', icon: getCategoryIcon('playlist') }
-                ],
-                'instagram': [
-                    { id: 'feed', label: 'Posts', icon: getCategoryIcon('feed') },
-                    { id: 'reels', label: 'Reels', icon: getCategoryIcon('reels') },
-                    { id: 'stories', label: 'Stories', icon: getCategoryIcon('stories') },
-                    { id: 'highlights', label: 'Highlights', icon: getCategoryIcon('highlights') },
-                    { id: 'tagged', label: 'Tagged', icon: getCategoryIcon('tagged') }
-                ]
-            };
-            
-            const subtabs = platformSubtabs[subscriptionInfo.platform] || [
-                { id: 'feed', label: 'Feed', icon: getCategoryIcon('feed') }
-            ];
-            
+        if (type === 'account' && subscriptionInfo) {
             return [
-                { id: 'all', label: 'Todos', count: subscriptionStats.total, icon: ICONS.gallery },
-                ...subtabs.map(subtab => ({
-                    id: subtab.id,
-                    label: subtab.label,
-                    count: subscriptionStats.listCounts[subtab.id] || 0, // Usar conteos reales
-                    icon: subtab.icon
-                }))
+                { id: 'all', label: 'Todos', count: totalPostCount, icon: ICONS.gallery }
             ];
         }
         return undefined;
-    }, [type, subscriptionInfo, subscriptionStats]);
+    }, [type, subscriptionInfo, totalPostCount]);
 
     // Cargar información de la suscripción
     useEffect(() => {
@@ -113,12 +90,8 @@ const SubscriptionPage: React.FC = () => {
                 }
                 
                 // Para otros tipos, usar el backend
-                const [info, stats] = await Promise.all([
-                    getSubscriptionInfo(type, id),
-                    getSubscriptionStats(type, id)
-                ]);
+                const info = await getSubscriptionInfo(type, id);
                 setSubscriptionInfo(info);
-                setSubscriptionStats(stats);
             } catch (error) {
                 console.error('Error loading subscription info:', error);
                 setSubscriptionInfo(undefined);
@@ -128,13 +101,26 @@ const SubscriptionPage: React.FC = () => {
         };
 
         loadSubscriptionInfo();
-    }, [type, id, getSubscriptionInfo, getSubscriptionStats, getCreatorByName]);
+    }, [type, id, getSubscriptionInfo, getCreatorByName]);
 
+    // Load subscription videos when params change (with ref to prevent duplicates)
+    const lastLoadParamsRef = useRef<string>('');
     useEffect(() => {
         if (type && id) {
-            loadSubscriptionPosts(type, id, list);
+            const loadKey = `${type}|${id}|${list || 'all'}`;
+            if (lastLoadParamsRef.current !== loadKey) {
+                lastLoadParamsRef.current = loadKey;
+                // Convert string ID to number for API call
+                const numericId = parseInt(id, 10);
+                if (!isNaN(numericId)) {
+                    loadSubscriptionVideos(type, numericId);
+                }
+            }
+        } else {
+            lastLoadParamsRef.current = '';
+            clearData();
         }
-    }, [type, id, list]);
+    }, [type, id, list, loadSubscriptionVideos, clearData]);
 
     // Handle navigation from video player - scroll to video and highlight
     useEffect(() => {
@@ -163,27 +149,52 @@ const SubscriptionPage: React.FC = () => {
         }
     }, [scrollToVideoId, highlightedVideoId, displayedPosts, navigate, location.pathname, location.search]);
 
-    // Infinite scroll callback - SIMPLIFICADO COMO GALLERY
-    const infiniteScrollCallback = useCallback(() => {
-        if (type && id && !postsLoading && scrollData.hasMore) {
-            loadMoreSubscriptionPosts(type, id, list);
+    // Infinite scroll implementation using refs to prevent re-renders (IGUAL QUE GALLERY)
+    const loadingMoreRef = useRef(false);
+    const hasMoreRef = useRef(true);
+    const loadMoreVideosRef = useRef(loadMoreVideos);
+    const mainContainerRef = useRef<HTMLElement | null>(null);
+
+    // Update refs when state changes
+    useEffect(() => {
+        loadingMoreRef.current = loadingMore;
+        hasMoreRef.current = scrollState.hasMore;
+        loadMoreVideosRef.current = loadMoreVideos;
+    }, [loadingMore, scrollState.hasMore, loadMoreVideos]);
+
+    // Infinite scroll handler usando refs
+    const handleScroll = useCallback(() => {
+        if (loadingMoreRef.current || !hasMoreRef.current) return;
+
+        const container = mainContainerRef.current;
+        if (!container) return;
+
+        const { scrollTop, scrollHeight, clientHeight } = container;
+        const scrollPercentage = scrollTop / (scrollHeight - clientHeight);
+
+        // Load more when 80% scrolled
+        if (scrollPercentage > 0.8) {
+            loadMoreVideosRef.current();
         }
-    }, [postsLoading, scrollData.hasMore, loadMoreSubscriptionPosts]); // Dependencias mínimas
+    }, []); // Sin dependencias!
 
-    // Simplificar enabled - solo usar condiciones estables como Gallery
-    const infiniteScrollEnabled = scrollData.hasMore && displayedPosts.length > 0;
-    
-    // Memoizar las opciones para evitar recreaciones constantes
-    const infiniteScrollOptions = useMemo(() => ({
-        threshold: 400, // Mismo threshold que Gallery
-        enabled: infiniteScrollEnabled
-    }), [infiniteScrollEnabled]);
+    // Find and attach scroll listener to main container (solo una vez)
+    useEffect(() => {
+        // Find the main container (Layout's main element)
+        const mainElement = document.querySelector('main');
+        mainContainerRef.current = mainElement;
 
-    // Hook para scroll infinito
-    useInfiniteScroll(infiniteScrollCallback, infiniteScrollOptions);
+        if (!mainElement) {
+            console.warn('Main container not found');
+            return;
+        }
+
+        mainElement.addEventListener('scroll', handleScroll, { passive: true });
+        return () => mainElement.removeEventListener('scroll', handleScroll);
+    }, [handleScroll]);
 
     // Early returns después de todos los hooks
-    if (postsLoading && !scrollData.initialLoaded) {
+    if (postsLoading && !scrollState.initialLoaded) {
         return (
             <div className="text-center py-16">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mx-auto"></div>
@@ -262,20 +273,21 @@ const SubscriptionPage: React.FC = () => {
                     <>
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
                             {displayedPosts.map(post => (
-                                <PostCard 
-                                    key={post.id} 
+                                <PostCard
+                                    key={post.id}
                                     video={post}
                                     videos={displayedPosts} // IGUAL QUE GALLERY - pasar array completo
-                                    isSelected={false} 
+                                    isSelected={false}
                                     onSelect={() => {}}
                                     onEdit={() => {}}
                                     isHighlighted={highlightedVideoId === post.id}
+                                    onRefresh={refreshData}
                                 />
                             ))}
                         </div>
                         
-                        {/* Indicador de carga para más contenido - IGUAL QUE GALLERY */}
-                        {postsLoading && (
+                        {/* Indicador de carga para más contenido */}
+                        {loadingMore && (
                             <div className="flex items-center justify-center py-8">
                                 <div className="flex items-center space-x-2 text-gray-400">
                                     <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-red-500"></div>
@@ -283,15 +295,15 @@ const SubscriptionPage: React.FC = () => {
                                 </div>
                             </div>
                         )}
-                        
+
                         {/* Mensaje de final de contenido */}
-                        {!scrollData.hasMore && displayedPosts.length > 0 && (
+                        {!scrollState.hasMore && displayedPosts.length > 0 && (
                             <div className="text-center py-8 text-gray-400">
                                 <p>Has visto todos los videos disponibles de la suscripción ({displayedPosts.length} videos)</p>
                             </div>
                         )}
                     </>
-                ) : postsLoading && !scrollData.initialLoaded ? (
+                ) : postsLoading && !scrollState.initialLoaded ? (
                     <div className="flex items-center justify-center min-h-[400px]">
                         <div className="text-center">
                             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-500 mx-auto mb-4"></div>

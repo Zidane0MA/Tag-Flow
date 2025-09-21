@@ -43,7 +43,7 @@ class OptimizedQueryBuilder:
             "m.edit_status",
             "m.processing_status",
             "m.notes",
-            f"m.{self.cursor_field}",
+            self.cursor_field,
             "m.last_updated",
             "p.post_url",
             "p.publication_date",
@@ -197,25 +197,44 @@ class OptimizedQueryBuilder:
                 # Si falla, usar cursor original
                 pass
 
+            # Normalizar cursor_field (evitar duplicar prefijo m.)
+            cursor_field_normalized = self.cursor_field
+            if not self.cursor_field.startswith('m.'):
+                cursor_field_normalized = f"m.{self.cursor_field}"
+
             # Si es cursor compuesto (timestamp:id), usar condición más sofisticada
             if len(cursor_parts) == 2:
                 cursor_id = int(cursor_parts[1])
 
                 if direction == "next":
                     # Para siguiente: (timestamp < cursor_timestamp) OR (timestamp = cursor_timestamp AND id < cursor_id)
-                    condition = f"(m.{self.cursor_field} < ? OR (m.{self.cursor_field} = ? AND m.id < ?))"
+                    condition = f"({cursor_field_normalized} < ? OR ({cursor_field_normalized} = ? AND m.id < ?))"
                     params = [normalized_timestamp, normalized_timestamp, cursor_id]
                 else:
                     # Para anterior: (timestamp > cursor_timestamp) OR (timestamp = cursor_timestamp AND id > cursor_id)
-                    condition = f"(m.{self.cursor_field} > ? OR (m.{self.cursor_field} = ? AND m.id > ?))"
+                    condition = f"({cursor_field_normalized} > ? OR ({cursor_field_normalized} = ? AND m.id > ?))"
                     params = [normalized_timestamp, normalized_timestamp, cursor_id]
 
                 return condition, params
             else:
-                # Cursor simple (solo timestamp) - comportamiento original
-                operator = "<" if direction == "next" else ">"
-                condition = f"m.{self.cursor_field} {operator} ?"
-                return condition, [normalized_timestamp]
+                # Cursor simple - puede ser timestamp o ID
+                cursor_column_name = self.cursor_field.split('.')[-1]
+
+                if cursor_column_name == 'id':
+                    # Para cursor de ID, usar valor como entero
+                    try:
+                        cursor_id = int(timestamp_part)
+                        operator = "<" if direction == "next" else ">"
+                        condition = f"{cursor_field_normalized} {operator} ?"
+                        return condition, [cursor_id]
+                    except ValueError:
+                        logger.warning(f"Invalid ID cursor value: {timestamp_part}")
+                        return "", []
+                else:
+                    # Para cursor de timestamp
+                    operator = "<" if direction == "next" else ">"
+                    condition = f"{cursor_field_normalized} {operator} ?"
+                    return condition, [normalized_timestamp]
 
         except Exception as e:
             logger.warning(f"Error building cursor condition: {e}")

@@ -1,13 +1,13 @@
 
 import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
-import { useRealData } from '../hooks/useRealData';
+import { useCursorCreatorData } from '../hooks/useCursorCreatorData';
+import { useCursorData } from '../hooks/useCursorData';
 import { Platform, CreatorPlatformInfo } from '../types';
 import PostCard from '../components/VideoCard';
 import Breadcrumbs, { Crumb } from '../components/Breadcrumbs';
 import PlatformTabs, { Tab } from '../components/PlatformTabs';
 import { ICONS, getSubscriptionIcon, getCategoryIcon } from '../constants';
-import useInfiniteScroll from '../hooks/useInfiniteScroll';
 
 const CreatorPage: React.FC = () => {
     const { creatorName, platform: platformParam, subscriptionId } = useParams<{ creatorName: string, platform?: string, subscriptionId?: string }>();
@@ -15,14 +15,18 @@ const CreatorPage: React.FC = () => {
     
     // Decode URL-encoded platform parameter
     const decodedPlatform = platformParam ? decodeURIComponent(platformParam) : undefined;
-    const { 
-        getCreatorByName, 
-        getPostsByCreator, 
-        loading,
-        loadCreatorPosts,
-        loadMoreCreatorPosts,
-        getCreatorScrollData
-    } = useRealData();
+    // Cursor pagination for creator videos
+    const {
+        posts: displayedPosts,
+        loading: postsLoading,
+        loadingMore,
+        error: videosError,
+        scrollState,
+        loadCreatorVideos,
+        loadMoreVideos,
+        refreshData,
+        clearData
+    } = useCursorCreatorData();
     const navigate = useNavigate();
     
     // Navigation state for video highlighting and scrolling
@@ -31,23 +35,37 @@ const CreatorPage: React.FC = () => {
     const [highlightedVideoId, setHighlightedVideoId] = useState<string | null>(highlightVideoId || null);
     const scrolledToVideoRef = useRef(false);
     
-    const creator = useMemo(() => creatorName ? getCreatorByName(creatorName) : undefined, [creatorName, getCreatorByName]);
     
     const activePlatform = useMemo(() => {
         return decodedPlatform as Platform | undefined;
     }, [decodedPlatform]);
 
-    // Usar infinite scroll data en lugar de estado local (después de definir activePlatform)
-    const scrollData = getCreatorScrollData(creatorName || '', activePlatform, subscriptionId);
-    const displayedPosts = scrollData.posts;
-    const postsLoading = scrollData.loading;
+    // Temporary: Creator metadata will be minimal for now
+    // TODO: Add proper creator metadata endpoint or integrate with cursor system
+    const creator = useMemo(() => {
+        if (!creatorName) return undefined;
+        // Basic creator object for display purposes
+        return {
+            displayName: creatorName,
+            platforms: {} // Empty for now, will be populated later
+        };
+    }, [creatorName]);
     
 
+    // Load creator videos when params change (with ref to prevent duplicates)
+    const lastLoadParamsRef = useRef<string>('');
     useEffect(() => {
         if (creatorName) {
-            loadCreatorPosts(creatorName, activePlatform, subscriptionId);
+            const loadKey = `${creatorName}|${activePlatform || 'all'}`;
+            if (lastLoadParamsRef.current !== loadKey) {
+                lastLoadParamsRef.current = loadKey;
+                loadCreatorVideos(creatorName, activePlatform);
+            }
+        } else {
+            lastLoadParamsRef.current = '';
+            clearData();
         }
-    }, [creatorName, activePlatform, subscriptionId]);
+    }, [creatorName, activePlatform, loadCreatorVideos, clearData]);
 
     // Handle navigation from video player - scroll to video and highlight
     useEffect(() => {
@@ -76,65 +94,60 @@ const CreatorPage: React.FC = () => {
         }
     }, [scrollToVideoId, highlightedVideoId, displayedPosts, navigate, location.pathname, location.search]);
 
-    // Infinite scroll callback - EXACTAMENTE IGUAL QUE GALLERY
-    const infiniteScrollCallback = useCallback(() => {
-        if (creatorName && !postsLoading && scrollData.hasMore) {
-            loadMoreCreatorPosts(creatorName, activePlatform, subscriptionId);
+    // Infinite scroll implementation using refs to prevent re-renders
+    const loadingMoreRef = useRef(false);
+    const hasMoreRef = useRef(true);
+    const loadMoreVideosRef = useRef(loadMoreVideos);
+    const mainContainerRef = useRef<HTMLElement | null>(null);
+
+    // Update refs when state changes
+    useEffect(() => {
+        loadingMoreRef.current = loadingMore;
+        hasMoreRef.current = scrollState.hasMore;
+        loadMoreVideosRef.current = loadMoreVideos;
+    }, [loadingMore, scrollState.hasMore, loadMoreVideos]);
+
+    // Infinite scroll handler usando refs
+    const handleScroll = useCallback(() => {
+        if (loadingMoreRef.current || !hasMoreRef.current) return;
+
+        const container = mainContainerRef.current;
+        if (!container) return;
+
+        const { scrollTop, scrollHeight, clientHeight } = container;
+        const scrollPercentage = scrollTop / (scrollHeight - clientHeight);
+
+        // Load more when 80% scrolled
+        if (scrollPercentage > 0.8) {
+            loadMoreVideosRef.current();
         }
-    }, [postsLoading, scrollData.hasMore, loadMoreCreatorPosts]);
+    }, []); // Sin dependencias!
 
-    // Exactamente igual que Gallery - solo condiciones estables
-    const infiniteScrollEnabled = scrollData.hasMore && displayedPosts.length > 0;
-    
-    // Memoizar las opciones para evitar recreaciones constantes
-    const infiniteScrollOptions = useMemo(() => ({
-        threshold: 400, // Mismo threshold que Gallery
-        enabled: infiniteScrollEnabled
-    }), [infiniteScrollEnabled]);
+    // Find and attach scroll listener to main container (solo una vez)
+    useEffect(() => {
+        // Find the main container (Layout's main element)
+        const mainElement = document.querySelector('main');
+        mainContainerRef.current = mainElement;
 
-    // Hook para scroll infinito
-    useInfiniteScroll(infiniteScrollCallback, infiniteScrollOptions);
+        if (!mainElement) {
+            console.warn('Main container not found');
+            return;
+        }
+
+        mainElement.addEventListener('scroll', handleScroll, { passive: true });
+        return () => mainElement.removeEventListener('scroll', handleScroll);
+    }, [handleScroll]);
     
-    // Calculate total post count based on current view - USAR SIEMPRE DATOS DEL BACKEND
+    // Simplified total post count based on displayed posts
     const totalPostCount = useMemo(() => {
-        if (activePlatform === undefined) {
-            // When showing "All", use sum of all platform counts from backend
-            if (creator) {
-                return Object.values(creator?.platforms || {}).reduce((acc: number, p) => {
-                    const postCount = (p as CreatorPlatformInfo | undefined)?.postCount || 0;
-                    return acc + postCount;
-                }, 0);
-            }
-            return displayedPosts.length;
-        } else {
-            // For specific platforms, use backend count if available, fallback to displayed count
-            if (creator && creator.platforms[activePlatform]) {
-                return (creator.platforms[activePlatform] as CreatorPlatformInfo)?.postCount || 0;
-            }
-            return displayedPosts.length;
-        }
-    }, [creator, displayedPosts, activePlatform]);
+        return displayedPosts.length;
+    }, [displayedPosts.length]);
 
-    const subscriptionTabs: Tab[] | undefined = useMemo(() => {
-        if (activePlatform && creator?.platforms[activePlatform]) {
-            const platformSubscriptions = creator?.platforms[activePlatform]?.subscriptions || [];
-            if (platformSubscriptions.length > 1) { // Only show sub-tabs if there's more than one list
-                return [
-                    { id: 'sub-all', label: 'All', count: (creator?.platforms[activePlatform] as CreatorPlatformInfo)?.postCount || 0, icon: undefined },
-                    ...platformSubscriptions.map((sub, index) => ({
-                        id: `sub-${index}-${sub.type}-${sub.name.replace(/[^a-zA-Z0-9]/g, '-')}`, // ID único
-                        label: sub.name,
-                        count: 0, // Por ahora 0, se podría calcular después de forma asíncrona
-                        subscriptionId: sub.id || sub.name // Mantener ID original para navegación
-                    }))
-                ];
-            }
-        }
-        return undefined;
-    }, [creator, activePlatform]);
+    // Simplified: No subscription tabs for now
+    const subscriptionTabs: Tab[] | undefined = undefined;
 
     // Early returns after all hooks
-    if (postsLoading && !scrollData.initialLoaded) {
+    if (postsLoading && !scrollState.initialLoaded) {
         return (
             <div className="text-center py-16">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mx-auto"></div>
@@ -157,7 +170,7 @@ const CreatorPage: React.FC = () => {
     }
     
     // Only show error if we have no creator AND have finished loading with no results
-    if (!creator && scrollData.initialLoaded && displayedPosts.length === 0) {
+    if (!creator && scrollState.initialLoaded && displayedPosts.length === 0) {
         return (
             <div className="text-center py-16">
                 <h3 className="text-2xl font-semibold text-white">Creador no encontrado</h3>
@@ -169,14 +182,10 @@ const CreatorPage: React.FC = () => {
         );
     }
     
+    // Simplified platform tabs
     const platformTabs: Tab[] = [
-        { id: 'all', label: 'All', count: totalPostCount },
-        ...(creator ? Object.entries(creator.platforms).map(([p, data], index) => ({
-            id: `platform-${index}-${p.replace(/[^a-zA-Z0-9]/g, '-')}`, // Generar ID único y seguro
-            label: p,
-            count: (data as CreatorPlatformInfo)?.postCount || 0,
-            platformName: p // Mantener el nombre original de plataforma para navegación
-        })) : [])
+        { id: 'all', label: 'All', count: totalPostCount }
+        // TODO: Add platform-specific tabs when metadata is available
     ];
 
     const handlePlatformTabClick = (platformId: string) => {
@@ -225,60 +234,15 @@ const CreatorPage: React.FC = () => {
                 <div className="flex flex-wrap justify-between items-start gap-4">
                     <div>
                         <h1 className="text-3xl font-bold text-white">{creator?.displayName || creatorName}</h1>
-                        <p className="text-gray-400 mt-1">{totalPostCount} videos{creator ? ` • ${Object.keys(creator.platforms).length} plataformas` : ''}</p>
+                        <p className="text-gray-400 mt-1">{totalPostCount} videos{activePlatform ? ` • ${activePlatform}` : ' • Todas las plataformas'}</p>
                     </div>
                     
-                    {/* Creator and Subscription Icons Section */}
+                    {/* Simplified metadata section */}
                     <div className="flex flex-col items-end gap-4">
-                        {/* Platform Links */}
-                        <div className="flex items-center gap-2">
-                            <span className="text-gray-400 text-sm">Plataformas:</span>
-                            {creator && Object.entries(creator.platforms).map(([p, data]) => (data as CreatorPlatformInfo)?.url && (
-                                 <a key={p} href={(data as CreatorPlatformInfo).url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 p-1.5 rounded-md bg-[#212121]/50 border border-gray-700/50 hover:bg-red-500/20 text-gray-300 hover:text-white transition-colors" title={`Ver en ${p}`}>
-                                    <span className="text-xs font-medium">{p}</span>
-                                    {React.cloneElement(ICONS.external_link, { className: 'h-3 w-3' })}
-                                 </a>
-                            ))}
-                        </div>
-                        
-                        {/* Subscriptions and Lists */}
-                        <div className="flex flex-col gap-2">
-                            {creator && Object.entries(creator.platforms).map(([platform, data]) => {
-                                if (!(data as CreatorPlatformInfo)?.subscriptions || (data as CreatorPlatformInfo).subscriptions.length === 0) return null;
-                                
-                                return (
-                                    <div key={platform} className="flex items-center gap-2">
-                                        <span className="text-gray-400 text-xs">{platform}:</span>
-                                        <div className="flex items-center gap-1">
-                                            {(data as CreatorPlatformInfo).subscriptions.map((subscription, idx) => {
-                                                const subscriptionIcon = getSubscriptionIcon(subscription.type || 'account');
-                                                return (
-                                                    <div key={idx} className="flex items-center gap-1 p-1 rounded bg-gray-800/50 border border-gray-600/50" title={`${subscription.name} (${subscription.type})`}>
-                                                        {React.cloneElement(subscriptionIcon, { className: 'h-3 w-3 text-blue-400' })}
-                                                        <span className="text-xs text-gray-300 max-w-16 truncate">{subscription.name}</span>
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                        
-                        {/* Available Lists */}
-                        {activePlatform && creator?.platforms[activePlatform]?.lists && (
+                        {activePlatform && (
                             <div className="flex items-center gap-2">
-                                <span className="text-gray-400 text-xs">Listas:</span>
-                                <div className="flex items-center gap-1">
-                                    {creator?.platforms[activePlatform]?.lists?.map((listType, idx) => {
-                                        const listIcon = getCategoryIcon(listType);
-                                        return (
-                                            <div key={idx} className="p-1 rounded bg-green-800/30 border border-green-600/50" title={`Lista: ${listType}`}>
-                                                {React.cloneElement(listIcon, { className: 'h-3 w-3 text-green-400' })}
-                                            </div>
-                                        );
-                                    })}
-                                </div>
+                                <span className="text-gray-400 text-sm">Plataforma:</span>
+                                <span className="text-white text-sm">{activePlatform}</span>
                             </div>
                         )}
                     </div>
@@ -316,20 +280,21 @@ const CreatorPage: React.FC = () => {
                     <>
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
                             {displayedPosts.map(post => (
-                                <PostCard 
-                                    key={post.id} 
+                                <PostCard
+                                    key={post.id}
                                     video={post}
                                     videos={displayedPosts} // IGUAL QUE GALLERY - pasar array completo
-                                    isSelected={false} 
+                                    isSelected={false}
                                     onSelect={() => {}}
                                     onEdit={() => {}}
                                     isHighlighted={highlightedVideoId === post.id}
+                                    onRefresh={refreshData}
                                 />
                             ))}
                         </div>
                         
-                        {/* Indicador de carga para más contenido - IGUAL QUE GALLERY */}
-                        {postsLoading && (
+                        {/* Indicador de carga para más contenido */}
+                        {loadingMore && (
                             <div className="flex items-center justify-center py-8">
                                 <div className="flex items-center space-x-2 text-gray-400">
                                     <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-red-500"></div>
@@ -337,15 +302,15 @@ const CreatorPage: React.FC = () => {
                                 </div>
                             </div>
                         )}
-                        
+
                         {/* Mensaje de final de contenido */}
-                        {!scrollData.hasMore && displayedPosts.length > 0 && (
+                        {!scrollState.hasMore && displayedPosts.length > 0 && (
                             <div className="text-center py-8 text-gray-400">
                                 <p>Has visto todos los videos disponibles del creador ({displayedPosts.length} videos)</p>
                             </div>
                         )}
                     </>
-                ) : postsLoading && !scrollData.initialLoaded ? (
+                ) : postsLoading && !scrollState.initialLoaded ? (
                     <div className="flex items-center justify-center min-h-[400px]">
                         <div className="text-center">
                             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-500 mx-auto mb-4"></div>

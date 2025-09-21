@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { Post, EditStatus, ProcessStatus, Difficulty, PostType, SubscriptionType } from '../types';
 import { ICONS, getSubscriptionIcon, getCategoryIcon } from '../constants';
-import { useRealData } from '../hooks/useRealData';
+import { useCursorCRUD } from '../hooks/useCursorCRUD';
 import { apiService } from '../services/apiService';
 
 interface PostCardProps {
@@ -14,6 +14,7 @@ interface PostCardProps {
     onSelect: (id: string, isSelected: boolean) => void;
     onEdit: (video: Post) => void;
     isHighlighted?: boolean;
+    onRefresh?: () => Promise<void>; // Optional refresh callback for cursor data
 }
 
 const getEditStatusIcon = (status: EditStatus) => {
@@ -21,32 +22,40 @@ const getEditStatusIcon = (status: EditStatus) => {
     let icon;
     let title;
     let colorClass;
-    
+
     switch (status) {
         case EditStatus.PENDING:
+        case 'pendiente': // Fallback for string values
             icon = ICONS.status_pending;
             title = 'Pendiente';
             colorClass = 'text-gray-300';
             break;
         case EditStatus.IN_PROGRESS:
+        case 'en_proceso': // Fallback for string values
             icon = ICONS.status_in_progress;
             title = 'En Progreso';
             colorClass = 'text-yellow-400';
             break;
         case EditStatus.COMPLETED:
+        case 'completado': // Fallback for string values
             icon = ICONS.status_completed;
             title = 'Completado';
             colorClass = 'text-green-400';
             break;
         case EditStatus.DISCARDED:
+        case 'descartado': // Fallback for string values
             icon = ICONS.close;
             title = 'Descartado';
             colorClass = 'text-red-400';
             break;
         default:
-            return null;
+            // Show default pending icon for unknown statuses
+            icon = ICONS.status_pending;
+            title = `Estado: ${status || 'Desconocido'}`;
+            colorClass = 'text-gray-400';
+            break;
     }
-    // By wrapping the icon in a fixed-size flex container, we can guarantee centering.
+
     return (
       <span title={title} className={`${colorClass} flex h-5 w-5 items-center justify-center`}>
         {React.cloneElement(icon, iconProps)}
@@ -146,8 +155,8 @@ const StatusIndicator: React.FC<{ status: ProcessStatus, isAnalyzing: boolean }>
 
 
 
-const PostCard: React.FC<PostCardProps> = ({ video: post, videos: posts, isSelected, onSelect, onEdit, isHighlighted = false }) => {
-    const { moveToTrash, analyzePost } = useRealData();
+const PostCard: React.FC<PostCardProps> = ({ video: post, videos: posts, isSelected, onSelect, onEdit, isHighlighted = false, onRefresh }) => {
+    const { moveToTrash, analyzePost } = useCursorCRUD(onRefresh);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [imageLoaded, setImageLoaded] = useState(false);
     const [imageError, setImageError] = useState(false);
@@ -157,7 +166,10 @@ const PostCard: React.FC<PostCardProps> = ({ video: post, videos: posts, isSelec
     const handleAnalyze = async (e: React.MouseEvent) => {
         e.stopPropagation();
         setIsAnalyzing(true);
-        await analyzePost(post.id);
+        const result = await analyzePost(post.id);
+        if (!result.success) {
+            console.error('Analysis failed:', result.message);
+        }
         setIsAnalyzing(false);
     }
     
@@ -199,8 +211,9 @@ const PostCard: React.FC<PostCardProps> = ({ video: post, videos: posts, isSelec
         : '';
 
     return (
-        <div 
+        <div
             id={`video-card-${post.id}`}
+            data-cursor={post.createdAt || post.downloadDate}
             className={`${baseClasses} ${animationClasses} ${durationClass} ${highlightClasses}`}>
             {/* === Thumbnail Area === */}
             <div className="relative">
@@ -289,7 +302,13 @@ const PostCard: React.FC<PostCardProps> = ({ video: post, videos: posts, isSelec
                        {isAnalyzing || post.processStatus === 'Procesando' ? ICONS.spinner : ICONS.analyze}
                     </button>
                     <button onClick={handleOpenFolder} title="Mostrar Archivo" className="p-3 bg-black/50 backdrop-blur-sm rounded-full text-white hover:bg-red-600 transition-colors">{ICONS.folder}</button>
-                    <button onClick={(e) => { e.stopPropagation(); moveToTrash(post.id); }} title="Eliminar" className="p-3 bg-black/50 backdrop-blur-sm rounded-full text-white hover:bg-red-500 transition-colors">{ICONS.delete}</button>
+                    <button onClick={async (e) => {
+                        e.stopPropagation();
+                        const result = await moveToTrash(post.id);
+                        if (!result.success) {
+                            console.error('Move to trash failed:', result.message);
+                        }
+                    }} title="Eliminar" className="p-3 bg-black/50 backdrop-blur-sm rounded-full text-white hover:bg-red-500 transition-colors">{ICONS.delete}</button>
                 </div>
             </div>
 
@@ -300,14 +319,14 @@ const PostCard: React.FC<PostCardProps> = ({ video: post, videos: posts, isSelec
                     <h3 className="font-bold text-base text-white leading-tight truncate flex-1" title={post.description || post.title}>
                         {post.description || post.title}
                     </h3>
-                    {post.originalUrl && (
+                    {post.originalUrl && post.originalUrl.trim() && (
                         <button
                             onClick={(e) => {
                                 e.stopPropagation();
                                 window.open(post.originalUrl, '_blank', 'noopener,noreferrer');
                             }}
                             className="flex-shrink-0 text-gray-400 hover:text-white transition-colors rounded hover:bg-gray-700/50"
-                            title="Abrir enlace original"
+                            title={`Abrir enlace original: ${post.originalUrl}`}
                         >
                             {React.cloneElement(ICONS.external_link, { className: 'h-4 w-4' })}
                         </button>
@@ -323,17 +342,20 @@ const PostCard: React.FC<PostCardProps> = ({ video: post, videos: posts, isSelec
                     
                     {/* Subscriptions and Lists Icons */}
                     <div className="flex items-center gap-1 flex-shrink-0">
-                        {post.subscription && (
-                            <Link to={`/subscription/${post.subscription.type}/${post.subscription.id}`} onClick={e => e.stopPropagation()} title={`${post.subscription.name} (${post.subscription.type})`} className="flex items-center gap-1 text-gray-400 hover:text-white transition-colors">
-                               {React.cloneElement(getSubscriptionIcon(post.subscription.type, post.platform), {className: "h-4 w-4 text-blue-400"})}
-                               <span className="text-xs font-medium hidden sm:inline truncate max-w-[80px]">{post.subscription.name}</span>
-                            </Link>
-                        )}
+                        {post.subscription && post.subscription.type && (() => {
+                            const icon = getSubscriptionIcon(post.subscription.type, post.platform);
+                            return icon ? (
+                                <Link to={`/subscription/${post.subscription.type}/${post.subscription.id}`} onClick={e => e.stopPropagation()} title={`${post.subscription.name} (${post.subscription.type})`} className="flex items-center gap-1 text-gray-400 hover:text-white transition-colors">
+                                   {React.cloneElement(icon, {className: "h-4 w-4 text-blue-400"})}
+                                   <span className="text-xs font-medium hidden sm:inline truncate max-w-[80px]">{post.subscription.name}</span>
+                                </Link>
+                            ) : null;
+                        })()}
                         
                         {post.lists && post.lists.length > 0 && (
-                            <div className="flex items-center gap-0.5" title={`Listas: ${post.lists.map(list => list.name).join(', ')}`}>
+                            <div className="flex items-center gap-0.5" title={`${post.lists.map(list => list.type).join(', ')}`}>
                                 {post.lists.slice(0, 3).map((list, idx) => (
-                                    <div key={idx} className="p-0.5 rounded bg-green-800/30 border border-green-600/50">
+                                    <div key={idx} className="p-0.5 rounded bg-green-800/30 border border-green-900/50">
                                         {React.cloneElement(getCategoryIcon(list.type, post.platform), {className: "h-3 w-3 text-green-400"})}
                                     </div>
                                 ))}
@@ -381,7 +403,7 @@ const PostCard: React.FC<PostCardProps> = ({ video: post, videos: posts, isSelec
                     </div>
                     <div className="flex items-center gap-1" title="Fecha de descarga">
                         {React.cloneElement(ICONS.calendar, { className: 'h-4 w-4' })}
-                        <span>{new Date(post.downloadDate).toLocaleDateString()}</span>
+                        <span>{post.downloadDate ? new Date(post.downloadDate).toLocaleDateString() : 'Sin fecha'}</span>
                     </div>
                 </div>
             </div>

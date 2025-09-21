@@ -2,24 +2,33 @@
 import React from 'react';
 import Modal from './Modal';
 import { Post, Difficulty } from '../types';
-import { useRealData } from '../hooks/useRealData';
+import { useCursorCRUD } from '../hooks/useCursorCRUD';
 import { ICONS } from '../constants';
 
 interface PlayerModalProps {
   video: Post;
   onClose: () => void;
+  onRefresh?: () => Promise<void>; // Optional refresh callback for cursor data
 }
 
-const PlayerModal: React.FC<PlayerModalProps> = ({ video: post, onClose }) => {
-  const { updatePost, moveToTrash } = useRealData();
+const PlayerModal: React.FC<PlayerModalProps> = ({ video: post, onClose, onRefresh }) => {
+  const { updatePost, moveToTrash } = useCursorCRUD(onRefresh);
 
-  const handleDifficultyChange = (newDifficulty: Difficulty) => {
-    updatePost(post.id, { difficulty: newDifficulty });
+  const handleDifficultyChange = async (newDifficulty: Difficulty) => {
+    try {
+      await updatePost(post.id, { difficulty: newDifficulty });
+    } catch (error) {
+      console.error('Error updating difficulty:', error);
+    }
   };
   
-  const handleDelete = () => {
-    moveToTrash(post.id);
-    onClose();
+  const handleDelete = async () => {
+    try {
+      await moveToTrash(post.id);
+      onClose();
+    } catch (error) {
+      console.error('Error moving to trash:', error);
+    }
   };
 
   return (

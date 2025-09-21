@@ -34,12 +34,27 @@ class CursorPaginationService:
         self.max_page_size = 100
 
     def validate_cursor(self, cursor: str) -> bool:
-        """Validar formato y rango de cursor (soporta cursor compuesto timestamp|id)"""
+        """Validar formato y rango de cursor (soporta cursor compuesto timestamp|id y cursor simple de ID)"""
         if not cursor:
             return True
 
         try:
-            # Separar cursor compuesto si existe (formato: timestamp|id)
+            # Determinar si cursor field es ID
+            cursor_column_name = self.cursor_field.split('.')[-1]
+
+            # Si el cursor field es ID, validar como ID simple
+            if cursor_column_name == 'id':
+                try:
+                    cursor_id = int(cursor)
+                    if cursor_id <= 0:
+                        logger.warning(f"Invalid cursor ID: {cursor_id}")
+                        return False
+                    return True
+                except ValueError:
+                    logger.warning(f"Invalid cursor ID format: {cursor}")
+                    return False
+
+            # Para timestamps: Separar cursor compuesto si existe (formato: timestamp|id)
             cursor_parts = cursor.split('|', 1)
             timestamp_part = cursor_parts[0]
 
@@ -87,7 +102,8 @@ class CursorPaginationService:
         filters: Dict[str, Any] = None,
         cursor: Optional[str] = None,
         direction: str = 'next',
-        limit: Optional[int] = None
+        limit: Optional[int] = None,
+        sort_order: str = 'desc'
     ) -> CursorResult:
         """
         Obtener videos con cursor pagination optimizada
@@ -122,13 +138,19 @@ class CursorPaginationService:
 
             where_clause = " AND ".join(where_conditions)
 
-            # Query principal optimizada con ORDER BY único
-            order_direction = "DESC" if direction == "next" else "ASC"
+            # Query principal optimizada con ORDER BY configurable
+            # Para direction=next: usar sort_order tal como viene
+            # Para direction=prev: invertir la dirección
+            if direction == "next":
+                order_direction = sort_order.upper()
+            else:
+                order_direction = "ASC" if sort_order.lower() == "desc" else "DESC"
+
             query = f"""
                 SELECT {', '.join(select_fields)}
                 {from_clause}
                 WHERE {where_clause}
-                ORDER BY m.{self.cursor_field} {order_direction}, m.id {order_direction}
+                ORDER BY {self.cursor_field} {order_direction}, m.id {order_direction}
                 LIMIT ?
             """
 
@@ -152,31 +174,47 @@ class CursorPaginationService:
             prev_cursor = None
 
             if data:
-                if direction == "next" and has_more:
-                    # Crear cursor compuesto (timestamp:id) para manejar empates
+                if direction == "next":
                     last_item = data[-1]
-                    cursor_value = last_item[self.cursor_field]
-                    last_id = last_item['id']
+                    # Extraer nombre de columna sin alias (e.g., "m.id" -> "id")
+                    cursor_column_name = self.cursor_field.split('.')[-1]
+                    cursor_value = last_item[cursor_column_name]
 
-                    if isinstance(cursor_value, str):
-                        # Convertir a datetime y luego a ISO
-                        try:
-                            dt = datetime.strptime(cursor_value, '%Y-%m-%d %H:%M:%S')
-                            timestamp_iso = dt.isoformat()
-                        except ValueError:
-                            timestamp_iso = cursor_value  # Fallback si ya está en formato correcto
+                    # Si el cursor field es ID, usar solo el ID (no compuesto)
+                    if cursor_column_name == 'id':
+                        # SOLO generar next_cursor si realmente HAY más datos
+                        if has_more:
+                            next_cursor = str(cursor_value)
+                        else:
+                            next_cursor = None
                     else:
-                        timestamp_iso = str(cursor_value)
+                        # Para timestamps, crear cursor compuesto con ID para manejar empates
+                        # SOLO generar next_cursor si realmente HAY más datos
+                        if has_more:
+                            last_id = last_item['id']
 
-                    # Cursor compuesto: timestamp|id (usando | para evitar conflicto con :)
-                    next_cursor = f"{timestamp_iso}|{last_id}"
+                            if isinstance(cursor_value, str):
+                                # Convertir a datetime y luego a ISO
+                                try:
+                                    dt = datetime.strptime(cursor_value, '%Y-%m-%d %H:%M:%S')
+                                    timestamp_iso = dt.isoformat()
+                                except ValueError:
+                                    timestamp_iso = cursor_value  # Fallback si ya está en formato correcto
+                            else:
+                                timestamp_iso = str(cursor_value)
+
+                            # Cursor compuesto: timestamp|id
+                            next_cursor = f"{timestamp_iso}|{last_id}"
+                        else:
+                            next_cursor = None
 
                 if direction == "next" and cursor:
                     prev_cursor = cursor
                 elif direction == "prev" and data:
                     next_cursor = cursor
                     if len(data) == effective_limit:  # Puede haber más hacia atrás
-                        cursor_value = data[-1][self.cursor_field]
+                        cursor_column_name = self.cursor_field.split('.')[-1]
+                        cursor_value = data[-1][cursor_column_name]
                         if isinstance(cursor_value, str):
                             try:
                                 dt = datetime.strptime(cursor_value, '%Y-%m-%d %H:%M:%S')
@@ -213,8 +251,7 @@ class CursorPaginationService:
 
         except Exception as e:
             logger.error(f"Error in cursor pagination: {e}")
-            # Fallback a query simple
-            return self._fallback_query(filters, effective_limit, start_time)
+            raise e
 
     def get_creator_videos(
         self,
@@ -245,6 +282,136 @@ class CursorPaginationService:
 
         return self.get_videos(filters, cursor, 'next', limit)
 
+    def get_trash_videos(
+        self,
+        cursor: Optional[str] = None,
+        limit: Optional[int] = None
+    ) -> CursorResult:
+        """Videos eliminados (papelera) con cursor pagination"""
+        start_time = time.time()
+
+        # Validar parámetros
+        if not self.validate_cursor(cursor):
+            cursor = None  # Reset invalid cursor
+
+        effective_limit = min(limit or self.page_size, self.max_page_size)
+
+        try:
+            # Construir query optimizada para trash (solo videos eliminados)
+            from .query_builder import OptimizedQueryBuilder
+            builder = OptimizedQueryBuilder(self.cursor_field)
+
+            select_fields, from_clause, where_conditions, params = builder.build_base_query({})
+
+            # Modificar condiciones para solo videos eliminados
+            where_conditions = [
+                "m.is_primary = TRUE",
+                "p.deleted_at IS NOT NULL"  # Solo videos eliminados
+            ]
+            params = []
+
+            # Añadir condición de cursor
+            if cursor:
+                cursor_condition, cursor_params = builder.build_cursor_condition(cursor, 'next')
+                if cursor_condition:
+                    where_conditions.append(cursor_condition)
+                    params.extend(cursor_params)
+
+            where_clause = " AND ".join(where_conditions)
+
+            # Query principal optimizada - ordenar por deleted_at DESC, luego por id
+            query = f"""
+                SELECT {', '.join(select_fields)}, p.deleted_at
+                {from_clause}
+                WHERE {where_clause}
+                ORDER BY p.deleted_at DESC, m.id DESC
+                LIMIT ?
+            """
+
+            params.append(effective_limit + 1)  # +1 para detectar has_more
+
+            # Ejecutar query
+            cursor_obj = self.db.execute(query, params)
+            rows = cursor_obj.fetchall()
+
+            # Convertir a diccionarios
+            columns = [description[0] for description in cursor_obj.description]
+            data = [dict(zip(columns, row)) for row in rows]
+
+            # Detectar si hay más datos
+            has_more = len(data) > effective_limit
+            if has_more:
+                data = data[:effective_limit]
+
+            # Calcular cursors para trash (usar deleted_at como cursor field)
+            next_cursor = None
+            prev_cursor = None
+
+            if data and has_more:
+                # Crear cursor compuesto (deleted_at|id)
+                last_item = data[-1]
+                deleted_at_value = last_item['deleted_at']
+                last_id = last_item['id']
+
+                if isinstance(deleted_at_value, str):
+                    # Convertir a datetime y luego a ISO
+                    try:
+                        dt = datetime.strptime(deleted_at_value, '%Y-%m-%d %H:%M:%S')
+                        timestamp_iso = dt.isoformat()
+                    except ValueError:
+                        timestamp_iso = deleted_at_value  # Fallback
+                else:
+                    timestamp_iso = str(deleted_at_value)
+
+                # Cursor compuesto: deleted_at|id
+                next_cursor = f"{timestamp_iso}|{last_id}"
+
+            # Total estimado para trash
+            total_estimated = None
+            if not cursor:
+                total_estimated = self._estimate_trash_total()
+
+            query_time = time.time() - start_time
+
+            performance_info = {
+                'query_time_ms': round(query_time * 1000, 2),
+                'pagination_type': 'cursor_trash',
+                'cursor_field': 'deleted_at',
+                'items_returned': len(data),
+                'direction': 'next',
+                'has_more': has_more
+            }
+
+            return CursorResult(
+                data=data,
+                next_cursor=next_cursor,
+                prev_cursor=prev_cursor,
+                has_more=has_more,
+                total_estimated=total_estimated,
+                performance_info=performance_info
+            )
+
+        except Exception as e:
+            logger.error(f"Error in trash cursor pagination: {e}")
+            raise e
+
+    def _estimate_trash_total(self) -> int:
+        """Estimar total de videos eliminados"""
+        try:
+            count_query = """
+                SELECT COUNT(DISTINCT m.id)
+                FROM media m
+                JOIN posts p ON m.post_id = p.id
+                WHERE m.is_primary = TRUE AND p.deleted_at IS NOT NULL
+            """
+
+            cursor_obj = self.db.execute(count_query)
+            return cursor_obj.fetchone()[0]
+        except Exception as e:
+            logger.warning(f"Could not estimate trash total: {e}")
+            return None
+
+
     def _estimate_total(self, builder, filters: Dict[str, Any]) -> int:
         """Estimar total de registros (solo para primera página)"""
         try:
@@ -263,51 +430,3 @@ class CursorPaginationService:
             logger.warning(f"Could not estimate total: {e}")
             return None
 
-    def _fallback_query(self, filters, limit, start_time):
-        """Query de fallback en caso de error"""
-        try:
-            query = """
-                SELECT m.id, m.file_name, m.created_at, p.title_post, c.name as creator_name
-                FROM media m
-                JOIN posts p ON m.post_id = p.id
-                LEFT JOIN creators c ON p.creator_id = c.id
-                WHERE m.is_primary = TRUE AND p.deleted_at IS NULL
-                ORDER BY m.created_at DESC
-                LIMIT ?
-            """
-
-            cursor_obj = self.db.execute(query, [limit])
-            rows = cursor_obj.fetchall()
-            columns = [description[0] for description in cursor_obj.description]
-            data = [dict(zip(columns, row)) for row in rows]
-
-            query_time = time.time() - start_time
-
-            return CursorResult(
-                data=data,
-                next_cursor=None,
-                prev_cursor=None,
-                has_more=False,
-                total_estimated=len(data),
-                performance_info={
-                    'query_time_ms': round(query_time * 1000, 2),
-                    'pagination_type': 'fallback',
-                    'items_returned': len(data),
-                    'error': 'Used fallback query'
-                }
-            )
-        except Exception as e:
-            logger.error(f"Fallback query failed: {e}")
-            return CursorResult(
-                data=[],
-                next_cursor=None,
-                prev_cursor=None,
-                has_more=False,
-                total_estimated=0,
-                performance_info={
-                    'query_time_ms': round((time.time() - start_time) * 1000, 2),
-                    'pagination_type': 'error',
-                    'items_returned': 0,
-                    'error': str(e)
-                }
-            )

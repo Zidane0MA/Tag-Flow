@@ -158,11 +158,10 @@ class ApiService {
       };
     }
     
-    // Usar información real de listas si está disponible
-    if ((video as any).video_lists && Array.isArray((video as any).video_lists)) {
-      lists = (video as any).video_lists.map((list: any) => ({
-        type: list.type,
-        name: list.name
+    // Usar información real de categorías si está disponible
+    if ((video as any).categories && Array.isArray((video as any).categories)) {
+      lists = (video as any).categories.map((list: any) => ({
+        type: list.type
       }));
     }
 
@@ -224,7 +223,7 @@ class ApiService {
       notes: video.notes,
       duration: video.duration_seconds || 0,
       size: video.file_size ? Math.round(video.file_size / (1024 * 1024)) : 0, // Convert to MB
-      downloadDate: video.download_date ? new Date(video.download_date * 1000).toISOString() : video.created_at,
+      downloadDate: video.download_date ? new Date(video.download_date * 1000).toISOString() : undefined,
       publicationDate: video.publication_date ? new Date(video.publication_date * 1000).toISOString() : undefined,
       isCarousel: video.is_carousel,
       carouselCount: video.carousel_count,

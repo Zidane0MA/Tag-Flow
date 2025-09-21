@@ -42,6 +42,8 @@ def get_videos_cursor():
         cursor (str): Cursor de paginación (timestamp)
         direction (str): 'next' o 'prev' (default: 'next')
         limit (int): Número de resultados (1-100, default: 50)
+        sort_by (str): Campo de ordenamiento (default: 'created_at')
+        sort_order (str): Orden 'asc' o 'desc' (default: 'desc')
         creator_name (str): Filtrar por creador
         platform (str): Filtrar por plataforma
         edit_status (str): Filtrar por estado de edición
@@ -60,6 +62,31 @@ def get_videos_cursor():
         direction = request.args.get('direction', 'next')
         limit = min(int(request.args.get('limit', 50)), 100)
 
+        # Parámetros de ordenamiento - DEFECTO: ID DESC
+        sort_by = request.args.get('sort_by', 'id')
+        sort_order = request.args.get('sort_order', 'desc')
+
+        # Validar campos de ordenamiento permitidos
+        allowed_sort_fields = {
+            'created_at': 'm.created_at',  # Para filtro frontend por ID/creación
+            'download_date': 'p.download_date',  # ✅ Usar campo correcto de posts
+            'id': 'm.id',
+            'title': 'p.title_post',
+            'file_name': 'm.file_name',
+            'duration': 'm.duration_seconds',
+            'size': 'm.file_size_mb'
+        }
+
+        if sort_by not in allowed_sort_fields:
+            sort_by = 'id'
+
+        # Validar orden
+        if sort_order not in ['asc', 'desc']:
+            sort_order = 'desc'
+
+        # Inicializar cursor service con campo de ordenamiento configurado
+        cursor_service = CursorPaginationService(conn, cursor_field=allowed_sort_fields[sort_by])
+
         # Filtros
         filters = {}
         for param in ['creator_name', 'platform', 'edit_status', 'processing_status', 'search']:
@@ -75,6 +102,10 @@ def get_videos_cursor():
         has_characters = request.args.get('has_characters')
         if has_characters is not None:
             filters['has_characters'] = has_characters.lower() == 'true'
+
+        # Agregar parámetros de ordenamiento a filters para cache
+        filters['sort_by'] = sort_by
+        filters['sort_order'] = sort_order
 
         # Verificar cache
         cached_result = cache_coordinator.get_cursor_result(filters, cursor)
@@ -101,8 +132,8 @@ def get_videos_cursor():
                 'cache_hit': True
             })
 
-        # Ejecutar query
-        result = cursor_service.get_videos(filters, cursor, direction, limit)
+        # Ejecutar query con ordenamiento
+        result = cursor_service.get_videos(filters, cursor, direction, limit, sort_order=sort_order)
 
         # Procesar datos para API (aplicar transformaciones de carousels)
         from src.api.videos.carousels import process_video_data_for_api, add_video_categories
@@ -231,6 +262,142 @@ def get_creator_videos_cursor(creator_name: str):
 
     except Exception as e:
         logger.error(f"Error in cursor creator videos endpoint: {e}")
+        return jsonify({
+            'success': False,
+            'error': 'Internal server error'
+        }), 500
+
+    finally:
+        # Cerrar conexión si existe
+        if 'conn' in locals():
+            conn.close()
+
+@cursor_pagination_bp.route('/subscriptions/<subscription_type>/<int:subscription_id>/videos', methods=['GET'])
+def get_subscription_videos_cursor(subscription_type: str, subscription_id: int):
+    """Endpoint optimizado para videos de suscripción con cursor pagination"""
+    try:
+        # Inicializar cursor_service con conexión DB
+        db_manager = DatabaseManager()
+        conn = db_manager.get_connection()
+        cursor_service = CursorPaginationService(conn)
+
+        cursor = request.args.get('cursor')
+        limit = min(int(request.args.get('limit', 50)), 100)
+
+        result = cursor_service.get_subscription_videos(subscription_type, subscription_id, cursor, limit)
+
+        # Procesar datos
+        from src.api.videos.carousels import process_video_data_for_api, add_video_categories
+
+        processed_data = []
+        for video in result.data:
+            processed_video = process_video_data_for_api(video)
+            processed_data.append(processed_video)
+
+        db_manager = DatabaseManager()
+        with db_manager.get_connection() as conn:
+            processed_data = add_video_categories(db_manager, processed_data)
+
+        result.data = processed_data
+
+        # Cache resultado
+        filters = {
+            'subscription_type': subscription_type,
+            'subscription_id': subscription_id
+        }
+        cache_coordinator.cache_cursor_result(filters, cursor, result)
+
+        # Registrar métrica
+        performance_monitor.record_query(
+            query_type='cursor_subscription_videos',
+            execution_time_ms=result.performance_info.get('query_time_ms', 0),
+            items_returned=len(result.data),
+            cache_hit=False,
+            filters_count=len(filters),
+            cursor_used=cursor is not None
+        )
+
+        return jsonify({
+            'success': True,
+            'data': result.data,
+            'pagination': {
+                'next_cursor': result.next_cursor,
+                'prev_cursor': result.prev_cursor,
+                'has_more': result.has_more,
+                'total_estimated': result.total_estimated
+            },
+            'performance': result.performance_info
+        })
+
+    except Exception as e:
+        logger.error(f"Error in cursor subscription videos endpoint: {e}")
+        return jsonify({
+            'success': False,
+            'error': 'Internal server error'
+        }), 500
+
+    finally:
+        # Cerrar conexión si existe
+        if 'conn' in locals():
+            conn.close()
+
+@cursor_pagination_bp.route('/trash/videos', methods=['GET'])
+def get_trash_videos_cursor():
+    """Endpoint optimizado para videos eliminados (papelera) con cursor pagination"""
+    try:
+        # Inicializar cursor_service con conexión DB
+        db_manager = DatabaseManager()
+        conn = db_manager.get_connection()
+        cursor_service = CursorPaginationService(conn)
+
+        cursor = request.args.get('cursor')
+        limit = min(int(request.args.get('limit', 50)), 100)
+
+        result = cursor_service.get_trash_videos(cursor, limit)
+
+        # Procesar datos
+        from src.api.videos.carousels import process_video_data_for_api, add_video_categories
+
+        processed_data = []
+        for video in result.data:
+            processed_video = process_video_data_for_api(video)
+            # Agregar deleted_at para trash
+            processed_video['deletedAt'] = video.get('deleted_at')
+            processed_data.append(processed_video)
+
+        db_manager = DatabaseManager()
+        with db_manager.get_connection() as conn:
+            processed_data = add_video_categories(db_manager, processed_data)
+
+        result.data = processed_data
+
+        # Cache resultado
+        cache_coordinator.cache_cursor_result({'trash': True}, cursor, result)
+
+        # Registrar métrica
+        performance_monitor.record_query(
+            query_type='cursor_trash_videos',
+            execution_time_ms=result.performance_info.get('query_time_ms', 0),
+            items_returned=len(result.data),
+            cache_hit=False,
+            filters_count=1,  # trash filter
+            cursor_used=cursor is not None
+        )
+
+        return jsonify({
+            'success': True,
+            'data': result.data,
+            'pagination': {
+                'next_cursor': result.next_cursor,
+                'prev_cursor': result.prev_cursor,
+                'has_more': result.has_more,
+                'total_estimated': result.total_estimated
+            },
+            'performance': result.performance_info
+        })
+
+    except Exception as e:
+        logger.error(f"Error in cursor trash videos endpoint: {e}")
         return jsonify({
             'success': False,
             'error': 'Internal server error'

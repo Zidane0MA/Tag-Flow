@@ -189,7 +189,12 @@ def api_get_creator(creator_name):
 
 @creators_bp.route('/creator/<creator_name>/videos')
 def api_get_creator_videos(creator_name):
-    """API endpoint para obtener videos de un creador específico"""
+    """
+    API endpoint para obtener videos de un creador específico
+
+    @deprecated: El sistema OFFSET está marcado para obsolescencia.
+    Use /api/cursor/creators/<name>/videos para mejor rendimiento.
+    """
     try:
         from src.service_factory import get_database
         db = get_database()
@@ -507,7 +512,12 @@ def api_get_subscription_stats(subscription_type, subscription_id):
 
 @creators_bp.route('/subscription/<subscription_type>/<subscription_id>/videos')
 def api_get_subscription_videos(subscription_type, subscription_id):
-    """API endpoint para obtener videos de una suscripción específica"""
+    """
+    API endpoint para obtener videos de una suscripción específica
+
+    @deprecated: El sistema OFFSET está marcado para obsolescencia.
+    Use /api/cursor/subscriptions/<type>/<id>/videos para mejor rendimiento.
+    """
     try:
         from src.service_factory import get_database
         db = get_database()
@@ -630,16 +640,15 @@ def api_get_subscription_videos(subscription_type, subscription_id):
                 if category_rows:
                     video['post_categories'] = [
                         {
-                            'type': row[0],
-                            'name': row[0].replace('_', ' ').title()
+                            'type': row[0]
                         } for row in category_rows
                     ]
-                # Mantener compatibilidad con frontend existente
-                video['video_lists'] = video.get('post_categories', [])
+                # Usar nuevo nombre categories
+                video['categories'] = video.get('post_categories', [])
             except Exception as e:
                 logger.warning(f"Error obteniendo categorías para media {video['id']}: {e}")
                 video['post_categories'] = []
-                video['video_lists'] = []
+                video['categories'] = []
             
             # Procesar thumbnail_path
             if video.get('thumbnail_path'):

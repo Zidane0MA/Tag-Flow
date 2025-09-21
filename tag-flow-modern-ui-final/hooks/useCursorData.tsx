@@ -12,6 +12,9 @@ import {
   ScrollState,
   CursorDataState
 } from '../services/pagination/types';
+import { useCursorWebSocketSync } from './useWebSocketUpdates';
+import { useCursorWithPrefetch } from './usePrefetch';
+import { cacheManager } from '../services/unifiedCacheManager';
 
 interface CursorDataContextType {
   // Data
@@ -32,7 +35,7 @@ interface CursorDataContextType {
   clearData: () => void;
 
   // Filter management
-  setFilters: (filters: FilterParams) => void;
+  setFilters: (filters: FilterParams, sortBy?: string, sortOrder?: 'asc' | 'desc') => Promise<void>;
   clearFilters: () => void;
 
   // Performance & cache
@@ -82,6 +85,38 @@ export const CursorDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const currentFiltersRef = useRef<FilterParams>({});
   const abortControllerRef = useRef<AbortController | null>(null);
 
+  // Create data loader for prefetching
+  const cursorDataLoader = useCallback(async (cursor?: string) => {
+    const result = await cursorApiService.getVideosCursor({
+      filters: currentFiltersRef.current,
+      cursor,
+      limit: 50
+    });
+
+    // Update performance stats
+    setPerformanceStats(prev => ({
+      avgQueryTime: (prev.avgQueryTime + result.performance.query_time_ms) / 2,
+      cacheHitRate: result.performance.cache_hit ? 100 : prev.cacheHitRate,
+      totalQueries: prev.totalQueries + 1
+    }));
+
+    return {
+      data: result.data,
+      cursor: result.pagination.next_cursor,
+      hasMore: result.pagination.has_more,
+      cached: false,
+      timestamp: Date.now()
+    };
+  }, []);
+
+  // Initialize prefetching - Configuración más agresiva
+  const prefetch = useCursorWithPrefetch(cursorDataLoader, 'gallery-container', {
+    threshold: 0.6,        // Activar prefetch al 60% del scroll (antes 80%)
+    maxPrefetchPages: 5,   // Prefetch hasta 5 páginas (antes 3)
+    enablePredictive: true,
+    debounceMs: 100        // Reducir debounce para respuesta más rápida
+  });
+
   /**
    * Load initial videos with filters
    */
@@ -102,7 +137,10 @@ export const CursorDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         cursor: undefined, // Primera carga sin cursor
         direction: 'next',
         limit: 50,
-        filters: effectiveFilters
+        filters: effectiveFilters,
+        // Configurar ordenamiento por defecto: ID DESC
+        sort_by: effectiveFilters.sort_by || 'id',
+        sort_order: effectiveFilters.sort_order || 'desc'
       };
 
       const result = await cursorApiService.getVideosCursor(params);
@@ -141,7 +179,8 @@ export const CursorDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
    * Load more videos (infinite scroll)
    */
   const loadMoreVideos = useCallback(async () => {
-    if (loadingMore || !scrollState.hasMore || !scrollState.cursor) {
+    if (loadingMore || !scrollState.hasMore) {
+      console.log(`🛑 LoadMore blocked: loading=${loadingMore}, hasMore=${scrollState.hasMore}, cursor=${scrollState.cursor}`);
       return;
     }
 
@@ -149,19 +188,76 @@ export const CursorDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setError(null);
 
     try {
-      const params: CursorPaginationParams = {
+      // Check unified cache first, then prefetch
+      const cacheKey = cacheManager.buildKey('cursor:videos', {
         cursor: scrollState.cursor,
-        direction: 'next',
-        limit: 50,
-        filters: currentFiltersRef.current
-      };
+        ...currentFiltersRef.current
+      });
 
-      const result = await cursorApiService.getVideosCursor(params);
+      console.log(`🔑 Cache key: ${cacheKey}, cursor: ${scrollState.cursor}`);
+
+      let result: any;
+      const cachedResult = cacheManager.get(cacheKey);
+
+      if (cachedResult) {
+        console.log('🚀 Using unified cache for loadMore');
+        console.log(`📊 Cached data preview: ${cachedResult.data?.length} items, next_cursor: ${cachedResult.pagination?.next_cursor}`);
+
+        // ⚠️ DETECCIÓN DE BUCLE INFINITO
+        if (cachedResult.pagination?.next_cursor === scrollState.cursor) {
+          console.error(`🚨 INFINITE LOOP DETECTED: next_cursor (${cachedResult.pagination?.next_cursor}) equals current cursor (${scrollState.cursor})`);
+          console.log('🔄 Bypassing cache and fetching fresh data...');
+          // Invalidar cache problemático
+          cacheManager.invalidate(cacheKey);
+        } else {
+          result = cachedResult;
+        }
+      }
+
+      // Si no hay resultado válido del cache, continuar con API/prefetch
+      if (!result) {
+        // Check if data is prefetched
+        const prefetched = prefetch.getPrefetchedData(scrollState.cursor);
+
+        if (prefetched) {
+          console.log('🚀 Using prefetched data for loadMore');
+          // Convert prefetched data to expected format
+          result = {
+            data: prefetched.data,
+            pagination: {
+              next_cursor: prefetched.cursor,
+              has_more: prefetched.hasMore
+            },
+            performance: {
+              query_time_ms: 0, // Instant from cache
+              cache_hit_rate: 100
+            }
+          };
+
+          // Store in unified cache too
+          cacheManager.set(cacheKey, result, { category: 'cursor-results', source: 'prefetch' });
+        } else {
+          console.log('🚀 Loading more data from API');
+          const params: CursorPaginationParams = {
+            cursor: scrollState.cursor,
+            direction: 'next',
+            limit: 50,
+            filters: currentFiltersRef.current,
+            // Mantener ordenamiento consistente: ID DESC por defecto
+            sort_by: currentFiltersRef.current.sort_by || 'id',
+            sort_order: currentFiltersRef.current.sort_order || 'desc'
+          };
+
+          result = await cursorApiService.getVideosCursor(params);
+        }
+      }
 
       // Agregar nuevos posts (evitar duplicados)
+      let uniqueNewPosts: any[] = [];
       setPosts(prevPosts => {
         const existingIds = new Set(prevPosts.map(p => p.id));
-        const uniqueNewPosts = result.data.filter(p => !existingIds.has(p.id));
+        uniqueNewPosts = result.data.filter(p => !existingIds.has(p.id));
+        console.log(`🔍 Deduplication: ${result.data.length} received, ${uniqueNewPosts.length} unique, ${result.data.length - uniqueNewPosts.length} duplicates`);
         return [...prevPosts, ...uniqueNewPosts];
       });
 
@@ -173,16 +269,19 @@ export const CursorDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         loading: false
       }));
 
+      console.log(`📊 Pagination state updated: cursor=${result.pagination.next_cursor}, hasMore=${result.pagination.has_more}`);
+
       // Actualizar stats
       setPerformanceStats(prev => ({
         avgQueryTime: (prev.avgQueryTime + result.performance.query_time_ms) / 2,
-        cacheHitRate: result.performance.cache_hit ?
-          (prev.cacheHitRate + 100) / 2 :
-          prev.cacheHitRate / 2,
+        cacheHitRate: result.performance.cache_hit ? 100 : prev.cacheHitRate,
         totalQueries: prev.totalQueries + 1
       }));
 
-      console.log(`✅ Loaded ${result.data.length} more videos, total: ${posts.length + result.data.length}`);
+      // Update prefetch cursor for intelligent prefetching
+      prefetch.updateCursor(result.pagination.next_cursor);
+
+      console.log(`✅ Loaded ${uniqueNewPosts.length} NEW videos (${result.data.length} total received)`);
 
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Error loading more videos';
@@ -191,7 +290,7 @@ export const CursorDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     } finally {
       setLoadingMore(false);
     }
-  }, [loadingMore, scrollState, posts.length]);
+  }, [loadingMore, scrollState, posts.length, prefetch]);
 
   /**
    * Refresh data (reload from beginning)
@@ -200,6 +299,9 @@ export const CursorDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setScrollState(prev => ({ ...prev, cursor: undefined, hasMore: true }));
     await loadVideos(currentFiltersRef.current);
   }, [loadVideos]);
+
+  // WebSocket integration for real-time updates (after refreshData is defined)
+  useCursorWebSocketSync(refreshData);
 
   /**
    * Clear all data
@@ -218,10 +320,17 @@ export const CursorDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   /**
    * Set filters and reload
    */
-  const setFilters = useCallback(async (newFilters: FilterParams) => {
-    setFiltersState(newFilters);
-    currentFiltersRef.current = newFilters;
-    await loadVideos(newFilters);
+  const setFilters = useCallback(async (newFilters: FilterParams, sortBy?: string, sortOrder?: 'asc' | 'desc') => {
+    // Agregar parámetros de ordenamiento si se proporcionan
+    const filtersWithSort = {
+      ...newFilters,
+      ...(sortBy && { sort_by: sortBy }),
+      ...(sortOrder && { sort_order: sortOrder })
+    };
+
+    setFiltersState(filtersWithSort);
+    currentFiltersRef.current = filtersWithSort;
+    await loadVideos(filtersWithSort);
   }, [loadVideos]);
 
   /**
@@ -262,11 +371,20 @@ export const CursorDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
    * Get current statistics
    */
   const getStats = useCallback(() => {
+    // Include cache stats from unified cache manager
+    const cacheStats = cacheManager.getStats();
+
     return {
       total: scrollState.initialLoaded ? posts.length : 0,
       loaded: posts.length,
       hasMore: scrollState.hasMore,
-      performance: performanceStats
+      performance: performanceStats,
+      cache: {
+        hitRate: cacheStats.hitRate,
+        totalEntries: cacheStats.totalEntries,
+        totalSizeBytes: cacheStats.totalSizeBytes,
+        mostAccessed: cacheStats.mostAccessed
+      }
     };
   }, [posts.length, scrollState, performanceStats]);
 

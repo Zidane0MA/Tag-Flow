@@ -2,16 +2,19 @@
 import React, { useState, useEffect } from 'react';
 import Modal from './Modal';
 import { Post, EditStatus, Difficulty } from '../types';
+import { useCursorCRUD } from '../hooks/useCursorCRUD';
 import { useRealData } from '../hooks/useRealData';
 
 interface EditModalProps {
   video?: Post | null; // Renamed to video for less refactoring, but it's a Post
   videoIds?: string[]; // Renamed to videoIds for less refactoring
   onClose: () => void;
+  onRefresh?: () => Promise<void>; // Optional refresh callback for cursor data
 }
 
-const EditModal: React.FC<EditModalProps> = ({ video: post, videoIds: postIds = [], onClose }) => {
-  const { posts, updatePost, updateMultiplePosts } = useRealData();
+const EditModal: React.FC<EditModalProps> = ({ video: post, videoIds: postIds = [], onClose, onRefresh }) => {
+  const { posts } = useRealData(); // Keep posts for data access
+  const { updatePost, updateMultiplePosts } = useCursorCRUD(onRefresh); // Use cursor CRUD for operations
   const [formData, setFormData] = useState({
     editStatus: '',
     difficulty: '',
@@ -53,7 +56,7 @@ const EditModal: React.FC<EditModalProps> = ({ video: post, videoIds: postIds = 
     setClearData({...clearData, [e.target.name]: e.target.checked });
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const updates: Partial<Post> = {};
     if(formData.editStatus) updates.editStatus = formData.editStatus as EditStatus;
@@ -68,12 +71,16 @@ const EditModal: React.FC<EditModalProps> = ({ video: post, videoIds: postIds = 
     if(clearData.characters) updates.characters = undefined;
     if(clearData.notes) updates.notes = undefined;
 
-    if(isBatchEdit) {
-        updateMultiplePosts(postIds, updates);
-    } else if (post) {
-        updatePost(post.id, updates);
+    try {
+      if(isBatchEdit) {
+          await updateMultiplePosts(postIds, updates);
+      } else if (post) {
+          await updatePost(post.id, updates);
+      }
+      onClose();
+    } catch (error) {
+      console.error('Error updating post(s):', error);
     }
-    onClose();
   };
   
   const title = isBatchEdit ? `Editar ${postIds.length} Posts` : 'Editar Post';

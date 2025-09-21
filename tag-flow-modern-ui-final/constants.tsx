@@ -190,7 +190,7 @@ export const getSubscriptionIcon = (type: string, platform?: string) => {
         return SUBSCRIPTION_TYPE_ICONS.heart;
     }
 
-    return SUBSCRIPTION_ICONS[type as keyof typeof SUBSCRIPTION_ICONS] || SUBSCRIPTION_TYPE_ICONS.folder;
+    return SUBSCRIPTION_ICONS[type as keyof typeof SUBSCRIPTION_ICONS];
 };
 
 // Function to get category icon with platform-specific handling

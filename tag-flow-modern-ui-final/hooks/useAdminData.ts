@@ -1,7 +1,7 @@
 
 import React, { createContext, useState, useContext, useCallback, useMemo, useEffect } from 'react';
 import { AdminContextType, Operation, OperationStatus, OperationType, Character, AdminStats, AdminConfig } from '../types/admin';
-import { useRealData } from './useRealData';
+import { apiService } from '../services/apiService';
 
 const AdminContext = createContext<AdminContextType | null>(null);
 
@@ -52,7 +52,7 @@ const buildCommandString = (type: OperationType, params: Record<string, any>): s
 };
 
 export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const { getStats: getMainStats } = useRealData();
+    const [mainStats, setMainStats] = useState({ total: 0, pending: 0 });
     const [operations, setOperations] = useState<Operation[]>([]);
     const [characters, setCharacters] = useState<Character[]>(MOCK_CHARACTERS);
     const [games, setGames] = useState<string[]>(MOCK_GAMES);
@@ -103,7 +103,23 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const cancelOperation = useCallback((id: string) => {
         setOperations(prev => prev.map(op => op.id === id ? { ...op, status: OperationStatus.CANCELLED, endTime: new Date().toISOString(), message: 'Cancelado por el usuario' } : op));
     }, []);
-    
+
+    // Load main stats from API
+    useEffect(() => {
+        const loadStats = async () => {
+            try {
+                const stats = await apiService.getGlobalStats();
+                setMainStats({
+                    total: stats.totalPosts || 0,
+                    pending: stats.processed || 0
+                });
+            } catch (error) {
+                console.error('Error loading admin stats:', error);
+            }
+        };
+        loadStats();
+    }, []);
+
     useEffect(() => {
         const interval = setInterval(() => {
             setOperations(prevOps => {
@@ -164,7 +180,6 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
 
     const stats: AdminStats = useMemo(() => {
-        const mainStats = getMainStats();
         return {
             totalPosts: mainStats.total,
             pendingVideos: mainStats.pending,
@@ -177,7 +192,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             configuredApis: Object.values(config.apiKeys).filter(k => k && k !== '...').length,
             configuredPaths: Object.values(config.paths).filter(p => p).length,
         };
-    }, [getMainStats, operations, characters, config]);
+    }, [mainStats, operations, characters, config]);
     
     const distinctGames = useMemo(() => [...new Set([...games, ...characters.map(c => c.game)])], [characters, games]);
 

@@ -27,7 +27,7 @@ except ImportError:
     ConnectionClosed = Exception
 
 # Configurar logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 
@@ -78,7 +78,7 @@ class WebSocketManager:
     - Reconexión automática
     """
     
-    def __init__(self, host: str = "localhost", port: int = 8765):
+    def __init__(self, host: str = "localhost", port: int = 8766):
         self.host = host
         self.port = port
         self.clients: Dict[str, Any] = {}
@@ -108,10 +108,14 @@ class WebSocketManager:
         if not WEBSOCKETS_AVAILABLE:
             logger.warning("⚠️ WebSockets no disponible. Servidor no iniciado.")
             return
-        
+
         try:
+            # Usar wrapper para compatibilidad de versiones
+            async def handler(websocket, path=None):
+                await self.handle_client(websocket, path or "/")
+
             self.server = await websockets.serve(
-                self.handle_client,
+                handler,
                 self.host,
                 self.port,
                 ping_interval=20,
@@ -164,16 +168,16 @@ class WebSocketManager:
     async def handle_client(self, websocket, path):
         """Manejar conexión de cliente"""
         client_id = str(uuid.uuid4())
-        
+
         try:
             # Registrar cliente
             self.clients[client_id] = websocket
             self.subscriptions[client_id] = set()
             self.stats['total_connections'] += 1
             self.stats['active_connections'] += 1
-            
-            logger.info(f"🔗 Cliente conectado: {client_id}")
-            
+
+            logger.info(f"🔗 Cliente conectado: {client_id} desde {websocket.remote_address}")
+
             # Enviar mensaje de bienvenida
             welcome_message = WebSocketMessage(
                 type=MessageType.NOTIFICATION,
@@ -183,16 +187,25 @@ class WebSocketManager:
                     'server_time': datetime.now().isoformat()
                 }
             )
-            await websocket.send(welcome_message.to_json())
-            
+
+            try:
+                await websocket.send(welcome_message.to_json())
+                logger.debug(f"🔗 Mensaje de bienvenida enviado a {client_id}")
+            except Exception as e:
+                logger.error(f"🔗 Error enviando bienvenida a {client_id}: {e}")
+                return
+
             # Escuchar mensajes del cliente
             async for message in websocket:
+                logger.debug(f"🔗 Mensaje recibido de {client_id}: {message}")
                 await self._handle_client_message(client_id, message)
-                
-        except ConnectionClosed:
-            logger.info(f"🔗 Cliente desconectado: {client_id}")
+
+        except ConnectionClosed as e:
+            logger.info(f"🔗 Cliente desconectado: {client_id} - Código: {e.code}, Razón: {e.reason}")
         except Exception as e:
-            logger.error(f"Error manejando cliente {client_id}: {e}")
+            logger.error(f"🔗 Error manejando cliente {client_id}: {e}")
+            import traceback
+            logger.error(f"🔗 Traceback: {traceback.format_exc()}")
         finally:
             # Limpiar cliente
             await self._cleanup_client(client_id)
@@ -444,7 +457,7 @@ class WebSocketClient:
     🔗 Cliente WebSocket para testing y uso programático
     """
     
-    def __init__(self, uri: str = "ws://localhost:8765"):
+    def __init__(self, uri: str = "ws://localhost:8766"):
         self.uri = uri
         self.websocket = None
         self.connected = False

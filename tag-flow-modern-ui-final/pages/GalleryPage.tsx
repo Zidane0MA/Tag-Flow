@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useCursorData } from '../hooks/useCursorData';
 import { Post, EditStatus, Difficulty, Platform, ProcessStatus } from '../types';
 import PostCard from '../components/VideoCard';
+import VirtualizedGallery from '../components/VirtualizedGallery';
 import EditModal from '../components/EditModal';
 import BulkActionBar from '../components/BulkActionBar';
 import { FilterParams } from '../services/pagination/types';
@@ -90,6 +91,9 @@ const GalleryPage: React.FC = () => {
     const creatorDropdownRef = useRef<HTMLDivElement>(null);
     const mainContainerRef = useRef<HTMLElement>(null);
 
+    // Virtualización state (inicializar después de calcular sortedPosts)
+    const [useVirtualization, setUseVirtualization] = useState(false);
+
     // Refs para acceder a valores actuales en el scroll handler
     const loadingMoreRef = useRef(loadingMore);
     const hasMoreRef = useRef(scrollState.hasMore);
@@ -109,7 +113,7 @@ const GalleryPage: React.FC = () => {
     }, [loadMoreVideos]);
     
     const [filters, setFilters] = useState(initialFilters);
-    const [sort, setSort] = useState({ by: 'downloadDate', order: 'desc' });
+    const [sort, setSort] = useState({ by: 'id', order: 'desc' });
     const [appliedFilters, setAppliedFilters] = useState<FilterParams>({});
 
     // Convertir filtros locales a formato del API
@@ -211,14 +215,18 @@ const GalleryPage: React.FC = () => {
 
     // Aplicar filtros (llamar al backend con cursor system)
     const applyFilters = useCallback(async () => {
-        console.log('📋 APPLY FILTERS CALLED with:', filters);
+        console.log('📋 APPLY FILTERS CALLED with:', filters, 'sort:', sort);
         const apiFilters = buildApiFilters(filters);
         setAppliedFilters(apiFilters);
-        // Usar setCursorFilters que automáticamente recargar los datos
-        console.log('🔄 CALLING setCursorFilters with:', apiFilters);
-        await setCursorFilters(apiFilters);
+
+        // Mapear sort.by del frontend al backend
+        const backendSortField = sort.by === 'downloadDate' ? 'download_date' : sort.by;
+
+        // Usar setCursorFilters que automáticamente recarga los datos CON ordenamiento
+        console.log('🔄 CALLING setCursorFilters with:', apiFilters, 'sort:', backendSortField, sort.order);
+        await setCursorFilters(apiFilters, backendSortField, sort.order as 'asc' | 'desc');
         console.log('✅ setCursorFilters COMPLETED');
-    }, [filters, buildApiFilters, setCursorFilters]);
+    }, [filters, sort, buildApiFilters, setCursorFilters]);
 
     // Infinite scroll handler para cursor pagination (usando refs)
     const handleScroll = useCallback(() => {
@@ -287,16 +295,24 @@ const GalleryPage: React.FC = () => {
         }
     }, [JSON.stringify(filters)]); // Usar JSON.stringify para dependencia estable
 
-    // Ordenación local (ya que los posts vienen del backend)
-    const sortedPosts = useMemo(() => {
-        return [...posts].sort((a, b) => {
-            const aVal = a[sort.by as keyof Post];
-            const bVal = b[sort.by as keyof Post];
-            if (aVal < bVal) return sort.order === 'asc' ? -1 : 1;
-            if (aVal > bVal) return sort.order === 'asc' ? 1 : -1;
-            return 0;
-        });
-    }, [posts, sort]);
+    // Aplicar cambios de ordenamiento inmediatamente
+    useEffect(() => {
+        // Aplicar solo si hay posts cargados (evitar aplicar en el primer render)
+        if (posts.length > 0) {
+            console.log('📊 SORT CHANGED - Applying immediately:', sort);
+            applyFilters();
+        }
+    }, [sort.by, sort.order]); // Dependencies separadas para detectar cambios específicos
+
+    // Los posts ya vienen ordenados del backend via cursor pagination
+    // ✅ ELIMINAMOS ordenamiento local redundante para mejor performance
+    const sortedPosts = posts;
+
+    // Virtualización automática para performance (después de sortedPosts)
+    const shouldUseVirtualization = sortedPosts.length > 100;
+    useEffect(() => {
+        setUseVirtualization(shouldUseVirtualization);
+    }, [shouldUseVirtualization]);
 
     const handleSelectPost = (id: string, isSelected: boolean) => {
         if (isSelected) {
@@ -578,8 +594,8 @@ const GalleryPage: React.FC = () => {
                     </select>
                     <div className="flex gap-2">
                         <select name="by" value={sort.by} onChange={handleSortChange} className="bg-gray-700 text-white rounded p-2 w-full focus:ring-2 focus:ring-red-500 focus:outline-none">
-                            <option value="downloadDate">Fecha Descarga</option>
                             <option value="id">ID</option>
+                            <option value="downloadDate">Fecha Descarga</option>
                             <option value="title">Nombre</option>
                         </select>
                          <select name="order" value={sort.order} onChange={handleSortChange} className="bg-gray-700 text-white rounded p-2 w-full focus:ring-2 focus:ring-red-500 focus:outline-none">
@@ -621,31 +637,80 @@ const GalleryPage: React.FC = () => {
                     </button>
                 </div>
             )}
+
+            {/* Notificación flotante de virtualización */}
+            {sortedPosts.length > 50 && (
+                <div className="fixed bottom-4 right-4 z-50 max-w-xs">
+                    <div className="bg-[#1a1a1a] border border-gray-600 rounded-lg shadow-2xl p-3">
+                        <div className="flex items-center justify-between mb-2">
+                            <div className="text-sm font-medium text-white">
+                                🚀 Performance
+                            </div>
+                            <button
+                                onClick={() => setUseVirtualization(!useVirtualization)}
+                                className={`ml-3 px-2 py-1 text-xs font-medium rounded transition-colors ${
+                                    useVirtualization
+                                        ? 'bg-green-600 text-white hover:bg-green-500'
+                                        : 'bg-blue-600 text-white hover:bg-blue-500'
+                                }`}
+                            >
+                                {useVirtualization ? '✅' : '⚡'}
+                            </button>
+                        </div>
+                        <div className="text-xs text-gray-300">
+                            {sortedPosts.length} posts cargados
+                        </div>
+                        <div className="text-xs text-gray-400 mt-1">
+                            {useVirtualization ? 'Virtualizado' : 'Recomendado: virtualizaón'}
+                        </div>
+                    </div>
+                </div>
+            )}
             
             <div className={selectedPosts.length > 0 ? 'pb-24' : ''}>
                 {sortedPosts.length > 0 ? (
                     <>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-                            {sortedPosts.map(post => (
-                                <PostCard
-                                    key={post.id}
-                                    video={post}
-                                    videos={sortedPosts}
-                                    isSelected={selectedPosts.includes(post.id)}
-                                    onSelect={handleSelectPost}
-                                    onEdit={setEditingPost}
-                                    isHighlighted={highlightedVideoId === post.id}
-                                />
-                            ))}
-                        </div>
+                        {useVirtualization ? (
+                            /* Galería virtualizada simplificada */
+                            <VirtualizedGallery
+                                posts={sortedPosts}
+                                loading={loading}
+                                loadingMore={loadingMore}
+                                onLoadMore={loadMoreVideos}
+                                hasMore={scrollState.hasMore}
+                                selectedPosts={selectedPosts}
+                                onSelectPost={(id: string) => handleSelectPost(id, !selectedPosts.includes(id))}
+                                onEditPost={setEditingPost}
+                                onRefreshData={refreshData}
+                                highlightedVideoId={highlightedVideoId}
+                            />
+                        ) : (
+                            /* Galería normal para funcionalidad completa */
+                            <>
+                                <div id="gallery-container" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+                                    {sortedPosts.map(post => (
+                                        <PostCard
+                                            key={post.id}
+                                            video={post}
+                                            videos={sortedPosts}
+                                            isSelected={selectedPosts.includes(post.id)}
+                                            onSelect={handleSelectPost}
+                                            onEdit={setEditingPost}
+                                            isHighlighted={highlightedVideoId === post.id}
+                                            onRefresh={refreshData}
+                                        />
+                                    ))}
+                                </div>
 
-                        {/* Indicador de carga para más contenido */}
-                        {loadingMore && <LoadingMoreIndicator />}
+                                {/* Indicador de carga para más contenido */}
+                                {loadingMore && <LoadingMoreIndicator />}
+                            </>
+                        )}
 
                         {/* Mensaje de final de contenido */}
                         {!hasMore && posts.length > 0 && (
                             <div className="text-center py-8 text-gray-400">
-                                <p>✅ Todos los videos cargados ({posts.length} total)</p>
+                                <p>Todos los videos cargados ({posts.length} total)</p>
                             </div>
                         )}
                     </>

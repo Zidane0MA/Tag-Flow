@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useRealData } from '../hooks/useRealData';
+import { useCursorCRUD } from '../hooks/useCursorCRUD';
 import { Post, Difficulty, PostType } from '../types';
 import { ICONS } from '../constants';
 
@@ -361,9 +362,10 @@ const PostPlayerPage: React.FC = () => {
     const { postId } = useParams<{ postId: string }>();
     const navigate = useNavigate();
     const location = useLocation();
-    const { posts: allPosts, updatePost, moveToTrash } = useRealData();
+    const { posts: allPosts } = useRealData(); // Keep posts for initial data
+    const { updatePost, moveToTrash } = useCursorCRUD(); // Use cursor CRUD for operations
 
-    const [postsToDisplay, setPostsToDisplay] = useState<Post[]>(location.state?.posts || allPosts);
+    const [postsToDisplay, setPostsToDisplay] = useState<Post[]>(location.state?.posts || []);
     const [activePostId, setActivePostId] = useState(postId);
     const [preloadedVideos, setPreloadedVideos] = useState<Set<string>>(new Set());
     const [globalAudioEnabled, setGlobalAudioEnabled] = useState(false);
@@ -385,7 +387,12 @@ const PostPlayerPage: React.FC = () => {
 
 
     useEffect(() => {
-        setPostsToDisplay(location.state?.posts || allPosts);
+        if (location.state?.posts) {
+            setPostsToDisplay(location.state.posts);
+        } else if (allPosts && allPosts.length > 0) {
+            // Fallback to useRealData if no posts in state
+            setPostsToDisplay(allPosts);
+        }
     }, [location.state, allPosts]);
     
     useEffect(() => {
@@ -535,33 +542,41 @@ const PostPlayerPage: React.FC = () => {
     }, [postsToDisplay]);
 
 
-    const handleDelete = (idToDelete: string) => {
+    const handleDelete = async (idToDelete: string) => {
         const currentIndex = postsToDisplay.findIndex(p => p.id === idToDelete);
         if (currentIndex === -1) return;
 
-        moveToTrash(idToDelete);
-        const nextPosts = postsToDisplay.filter(p => p.id !== idToDelete);
-        
-        if (nextPosts.length > 0) {
-            const nextIndex = Math.min(currentIndex, nextPosts.length - 1);
-            const nextPostId = nextPosts[nextIndex].id;
-            setActivePostId(nextPostId);
-            navigate(`/post/${nextPostId}/player`, { 
-                replace: true, 
-                state: { 
-                    posts: nextPosts,
-                    returnTo: returnPath, // Preserve the original return path
-                    currentVideoId: originalVideoId // Preserve the original video ID
-                } 
-            });
-        } else {
-            navigate(returnPath, { replace: true });
+        try {
+            await moveToTrash(idToDelete);
+            const nextPosts = postsToDisplay.filter(p => p.id !== idToDelete);
+
+            if (nextPosts.length > 0) {
+                const nextIndex = Math.min(currentIndex, nextPosts.length - 1);
+                const nextPostId = nextPosts[nextIndex].id;
+                setActivePostId(nextPostId);
+                navigate(`/post/${nextPostId}/player`, {
+                    replace: true,
+                    state: {
+                        posts: nextPosts,
+                        returnTo: returnPath, // Preserve the original return path
+                        currentVideoId: originalVideoId // Preserve the original video ID
+                    }
+                });
+            } else {
+                navigate(returnPath, { replace: true });
+            }
+        } catch (error) {
+            console.error('Error deleting post:', error);
         }
     };
     
-    const handleDifficultyChange = (id: string, newDifficulty: Difficulty) => {
-        updatePost(id, { difficulty: newDifficulty });
-        setPostsToDisplay(prev => prev.map(p => p.id === id ? {...p, difficulty: newDifficulty} : p));
+    const handleDifficultyChange = async (id: string, newDifficulty: Difficulty) => {
+        try {
+            await updatePost(id, { difficulty: newDifficulty });
+            setPostsToDisplay(prev => prev.map(p => p.id === id ? {...p, difficulty: newDifficulty} : p));
+        } catch (error) {
+            console.error('Error updating difficulty:', error);
+        }
     };
 
     if (!postsToDisplay || postsToDisplay.length === 0) {

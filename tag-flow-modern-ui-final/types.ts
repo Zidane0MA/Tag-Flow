@@ -52,8 +52,6 @@ export interface PostCategory {
 
 export interface PostList {
   type: CategoryType;
-  name: string;
-  subscriptionId?: string;
 }
 
 export interface Post {
@@ -75,7 +73,7 @@ export interface Post {
   notes?: string;
   duration: number; // in seconds. 0 for images.
   size: number; // in MB
-  downloadDate: string;
+  downloadDate?: string;
   publicationDate?: string;
   deletedAt?: string;
   subscription?: Subscription;

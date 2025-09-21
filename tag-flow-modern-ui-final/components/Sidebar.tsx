@@ -1,16 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { NAV_LINKS, ICONS } from '../constants';
-import { useRealData } from '../hooks/useRealData';
 import { apiService } from '../services/apiService';
 
 interface SidebarProps {
   isOpen: boolean;
   setIsOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  localStats?: {
+    loaded?: number;
+    [key: string]: any;
+  }; // Optional local stats from cursor hooks
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
-  const { posts } = useRealData();
+const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen, localStats }) => {
   const location = useLocation();
   const [globalStats, setGlobalStats] = useState({
     totalPosts: 0,
@@ -43,11 +45,9 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
     }
   };
 
-  // Determinar si mostrar estadísticas locales (solo en GalleryPage)
-  const showLocalStats = location.pathname === '/';
-  const localStats = {
-    loaded: posts.length
-  };
+  // Determinar si mostrar estadísticas locales
+  const showLocalStats = localStats && Object.keys(localStats).length > 0;
+  const localStatsData = localStats || { loaded: 0 };
 
   const sidebarClasses = `
     lg:relative lg:h-full fixed top-0 left-0 h-full 
@@ -119,7 +119,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
               <div className="mb-4 pb-3 border-b border-gray-700">
                 <div className="flex justify-between text-gray-300">
                   <span>Cargados</span>
-                  <span className="font-medium text-green-400">{localStats.loaded}</span>
+                  <span className="font-medium text-green-400">{localStatsData.loaded}</span>
                 </div>
               </div>
             )}

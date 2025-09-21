@@ -16,6 +16,7 @@ from config import config
 # Database will be imported lazily within functions
 from src.api import gallery_bp, videos_core_bp, videos_streaming_bp, videos_bulk_bp, stats_bp, admin_bp, maintenance_bp, creators_bp, cursor_pagination_bp
 from src.api.performance import performance_bp
+from src.api.websocket_api import websocket_bp
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
@@ -54,6 +55,7 @@ def create_app():
     app.register_blueprint(creators_bp)
     app.register_blueprint(performance_bp)
     app.register_blueprint(cursor_pagination_bp)  # ⚡ NEW - Cursor pagination endpoints
+    app.register_blueprint(websocket_bp)  # 🔗 WebSocket real-time updates
     
     # Rutas estáticas y archivos
     @app.route('/thumbnail/<path:filename>')

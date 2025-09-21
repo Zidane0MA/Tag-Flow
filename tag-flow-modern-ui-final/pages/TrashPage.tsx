@@ -1,12 +1,13 @@
 
-import React, { useState, useMemo, useEffect } from 'react';
-import { useRealData } from '../hooks/useRealData';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import { useCursorTrashData } from '../hooks/useCursorTrashData';
+import { useCursorCRUD } from '../hooks/useCursorCRUD';
+import { apiService } from '../services/apiService';
 import { Post } from '../types';
 import { ICONS } from '../constants';
 import TrashVideoCard from '../components/TrashVideoCard';
 import BulkActionBar from '../components/BulkActionBar';
 import Modal from '../components/Modal';
-import Pagination from '../components/Pagination';
 import PermanentDeleteModal from '../components/PermanentDeleteModal';
 import Toast from '../components/Toast';
 
@@ -26,7 +27,18 @@ const timeAgo = (date: string | Date): string => {
 };
 
 const TrashPage: React.FC = () => {
-    const { trash, restoreFromTrash, restoreMultipleFromTrash, deletePermanently, emptyTrash, loadTrashVideos } = useRealData();
+    const {
+        posts: trash,
+        loading: trashLoading,
+        loadingMore,
+        error,
+        scrollState,
+        loadTrashVideos,
+        loadMoreVideos,
+        refreshData,
+        clearData
+    } = useCursorTrashData();
+    const { restoreFromTrash, deletePermanently } = useCursorCRUD();
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [sort, setSort] = useState({ by: 'deletedAt', order: 'desc' });
@@ -85,7 +97,8 @@ const TrashPage: React.FC = () => {
     const handleRestoreSelected = async () => {
         setLoading(true);
         try {
-            await restoreMultipleFromTrash(selectedIds);
+            await apiService.restoreMultipleVideos(selectedIds);
+            await refreshData(); // Refresh the trash data
             setSelectedIds([]);
         } catch (error) {
             console.error('Error restoring selected videos:', error);
@@ -167,8 +180,14 @@ const TrashPage: React.FC = () => {
     const confirmEmptyTrash = async () => {
         setIsConfirmingEmpty(false);
         setLoading(true);
-        await new Promise(resolve => setTimeout(() => { emptyTrash(); resolve(true); }, 200));
-        setLoading(false);
+        try {
+            await apiService.emptyTrash();
+            await refreshData(); // Refresh the trash data
+        } catch (error) {
+            console.error('Error emptying trash:', error);
+        } finally {
+            setLoading(false);
+        }
     };
 
     // Load trash videos on mount
