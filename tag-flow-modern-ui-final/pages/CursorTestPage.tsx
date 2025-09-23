@@ -117,9 +117,17 @@ const CursorTestContent: React.FC = () => {
 export const CursorTestPage: React.FC = () => {
   return (
     <div className="container mx-auto px-4 py-6">
-      <CursorDataProvider>
-        <CursorTestContent />
-      </CursorDataProvider>
+      {/* TEMPORAL: Deshabilitado para debuggear peticiones duplicadas */}
+      {/* <CursorDataProvider> */}
+        <div className="text-center py-12">
+          <div className="text-red-500 text-lg font-semibold">
+            🚧 CursorTestPage temporalmente deshabilitada
+          </div>
+          <div className="text-gray-500 mt-2">
+            Debugging peticiones duplicadas de cursor pagination
+          </div>
+        </div>
+      {/* </CursorDataProvider> */}
     </div>
   );
 };

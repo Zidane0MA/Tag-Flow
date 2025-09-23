@@ -58,6 +58,9 @@ interface CursorDataContextType {
 const CursorDataContext = createContext<CursorDataContextType | undefined>(undefined);
 
 export const CursorDataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // 🔍 DEBUG: Identificador único para debuggear peticiones duplicadas
+  const instanceId = useRef(`CursorDataProvider-${Math.random().toString(36).substring(2)}`);
+
   // Core state
   const [posts, setPosts] = useState<Post[]>([]);
   const [creators, setCreators] = useState<Creator[]>([]);
@@ -121,6 +124,9 @@ export const CursorDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
    * Load initial videos with filters
    */
   const loadVideos = useCallback(async (newFilters: FilterParams = {}) => {
+    // 🔍 DEBUG: Log de petición para identificar instancia
+    console.log(`[${instanceId.current}] 🔄 loadVideos called with filters:`, newFilters);
+
     // Cancelar request anterior si existe
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -179,8 +185,11 @@ export const CursorDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
    * Load more videos (infinite scroll)
    */
   const loadMoreVideos = useCallback(async () => {
+    // 🔍 DEBUG: Log de petición para identificar instancia
+    console.log(`[${instanceId.current}] 🔄 loadMoreVideos called - cursor: ${scrollState.cursor}, hasMore: ${scrollState.hasMore}`);
+
     if (loadingMore || !scrollState.hasMore) {
-      console.log(`🛑 LoadMore blocked: loading=${loadingMore}, hasMore=${scrollState.hasMore}, cursor=${scrollState.cursor}`);
+      console.log(`[${instanceId.current}] 🛑 LoadMore blocked: loading=${loadingMore}, hasMore=${scrollState.hasMore}, cursor=${scrollState.cursor}`);
       return;
     }
 
@@ -435,6 +444,14 @@ export const CursorDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     // Statistics
     getStats
   };
+
+  // 🔍 DEBUG: Detectar mount/unmount de instancias
+  useEffect(() => {
+    console.log(`[${instanceId.current}] 🚀 CursorDataProvider MOUNTED`);
+    return () => {
+      console.log(`[${instanceId.current}] 💀 CursorDataProvider UNMOUNTED`);
+    };
+  }, []);
 
   return (
     <CursorDataContext.Provider value={contextValue}>

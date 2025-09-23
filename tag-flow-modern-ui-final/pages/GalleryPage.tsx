@@ -244,8 +244,13 @@ const GalleryPage: React.FC = () => {
         }
     }, []); // Sin dependencias!
 
-    // Find and attach scroll listener to main container (solo una vez)
+    // Find and attach scroll listener to main container (solo cuando NO está virtualizado)
     useEffect(() => {
+        // Si está en modo virtualizado, no activar el infinite scroll de GalleryPage
+        if (useVirtualization) {
+            return;
+        }
+
         // Find the main container (Layout's main element)
         const mainElement = document.querySelector('main');
         mainContainerRef.current = mainElement;
@@ -262,15 +267,15 @@ const GalleryPage: React.FC = () => {
             timeoutId = setTimeout(handleScroll, 100); // Throttle to 100ms
         };
 
-        // console.log('✅ Scroll listener attached to main container');
+        console.log('✅ Infinite scroll listener attached to main container (Normal mode)');
         mainElement.addEventListener('scroll', throttledHandleScroll);
 
         return () => {
-            // console.log('🧹 Cleaning up scroll listener');
+            console.log('🧹 Cleaning up infinite scroll listener (Normal mode)');
             mainElement.removeEventListener('scroll', throttledHandleScroll);
             if (timeoutId) clearTimeout(timeoutId);
         };
-    }, []); // Dependencias vacías para que solo se ejecute una vez
+    }, [useVirtualization]); // Dependencia en useVirtualization para activar/desactivar
 
     // Aplicar filtros cuando cambien (usando dependencia estable)
     useEffect(() => {

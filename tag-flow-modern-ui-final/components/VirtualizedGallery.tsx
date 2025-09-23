@@ -1,9 +1,9 @@
 /**
- * 🚀 Virtualized Gallery - Versión optimizada para GalleryPage
- * Virtualización que respeta el scroll principal y layout original
+ * 🚀 Simple Virtualized Gallery - Reescrito desde cero
+ * Basado en mejores prácticas de virtualización React 2024
  */
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Post } from '../types';
 import VideoCard from './VideoCard';
 
@@ -32,95 +32,113 @@ const VirtualizedGallery: React.FC<VirtualizedGalleryProps> = ({
   onRefreshData,
   highlightedVideoId
 }) => {
+  // Estados simples
   const [scrollTop, setScrollTop] = useState(0);
-  const [cardsPerRow, setCardsPerRow] = useState(4);
+  const [containerHeight, setContainerHeight] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Configuración adaptativa
-  const CARD_HEIGHT = 360; // Altura aproximada de VideoCard
-  const GAP = 32; // gap-8
-  const ROW_HEIGHT = CARD_HEIGHT + GAP;
-  const BUFFER_ROWS = 2; // Filas extra para renderizar
+  // Configuración fija (siguiendo mejores prácticas)
+  const ITEM_HEIGHT = 400; // Altura fija para evitar cálculos complejos
+  const ITEMS_PER_ROW = 4; // Fijo para simplificar
+  const OVERSCAN = 2; // Buffer de filas (overscan)
 
-  // Detectar cards per row basado en breakpoints de Tailwind
+  // Detectar dimensiones del viewport
   useEffect(() => {
-    const updateCardsPerRow = () => {
-      const width = window.innerWidth;
-      if (width < 640) setCardsPerRow(1);        // sm
-      else if (width < 1024) setCardsPerRow(2);  // lg
-      else if (width < 1280) setCardsPerRow(3);  // xl
-      else setCardsPerRow(4);                    // 2xl+
+    const updateDimensions = () => {
+      if (containerRef.current) {
+        setContainerHeight(window.innerHeight);
+      }
     };
 
-    updateCardsPerRow();
-    window.addEventListener('resize', updateCardsPerRow);
-    return () => window.removeEventListener('resize', updateCardsPerRow);
+    updateDimensions();
+    window.addEventListener('resize', updateDimensions);
+    return () => window.removeEventListener('resize', updateDimensions);
   }, []);
 
-  // Monitorear scroll del contenedor principal
+  // Scroll handler simple con throttling
   useEffect(() => {
     const mainElement = document.querySelector('main');
     if (!mainElement) return;
 
+    let ticking = false;
     const handleScroll = () => {
-      setScrollTop(mainElement.scrollTop);
+      if (!ticking) {
+        requestAnimationFrame(() => {
+          setScrollTop(mainElement.scrollTop);
+          ticking = false;
+        });
+        ticking = true;
+      }
     };
 
     mainElement.addEventListener('scroll', handleScroll, { passive: true });
     return () => mainElement.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Calcular qué items son visibles
-  const { visiblePosts, spacerHeight, offsetY } = useMemo(() => {
-    const totalRows = Math.ceil(posts.length / cardsPerRow);
+  // Cálculos de virtualización simples
+  const { visibleItems, totalHeight, offsetY } = useMemo(() => {
+    const totalItems = posts.length;
+    const totalRows = Math.ceil(totalItems / ITEMS_PER_ROW);
+    const total = totalRows * ITEM_HEIGHT;
+
     const containerTop = containerRef.current?.offsetTop || 0;
+    const relativeScroll = Math.max(0, scrollTop - containerTop);
 
-    // Calcular posición del scroll relativa al container
-    const relativeScrollTop = Math.max(0, scrollTop - containerTop);
+    const startRow = Math.floor(relativeScroll / ITEM_HEIGHT);
+    const endRow = startRow + Math.ceil(containerHeight / ITEM_HEIGHT) + OVERSCAN;
 
-    // Determinar filas visibles
-    const viewportHeight = window.innerHeight;
-    const startRow = Math.max(0, Math.floor(relativeScrollTop / ROW_HEIGHT) - BUFFER_ROWS);
-    const visibleRowCount = Math.ceil(viewportHeight / ROW_HEIGHT) + BUFFER_ROWS * 2;
-    const endRow = Math.min(totalRows, startRow + visibleRowCount);
+    const visibleStartRow = Math.max(0, startRow - OVERSCAN);
+    const visibleEndRow = Math.min(totalRows, endRow);
 
-    // Calcular indices de posts
-    const startIndex = startRow * cardsPerRow;
-    const endIndex = Math.min(posts.length, endRow * cardsPerRow);
+    const startIndex = visibleStartRow * ITEMS_PER_ROW;
+    const endIndex = Math.min(totalItems, visibleEndRow * ITEMS_PER_ROW);
 
     return {
-      visiblePosts: posts.slice(startIndex, endIndex),
-      spacerHeight: totalRows * ROW_HEIGHT,
-      offsetY: startRow * ROW_HEIGHT
+      visibleItems: posts.slice(startIndex, endIndex),
+      totalHeight: total,
+      offsetY: visibleStartRow * ITEM_HEIGHT
     };
-  }, [posts, scrollTop, cardsPerRow]);
+  }, [posts, scrollTop, containerHeight]);
+
+  // Infinite scroll simple
+  useEffect(() => {
+    if (!onLoadMore || !hasMore || loadingMore) return;
+
+    const containerTop = containerRef.current?.offsetTop || 0;
+    const relativeScroll = Math.max(0, scrollTop - containerTop);
+    const scrolledPercentage = relativeScroll / (totalHeight - containerHeight);
+
+    if (scrolledPercentage > 0.8) {
+      onLoadMore();
+    }
+  }, [scrollTop, totalHeight, containerHeight, onLoadMore, hasMore, loadingMore]);
 
   return (
-    <div ref={containerRef} id="gallery-container">
-      {/* Container con altura total para mantener el scroll */}
-      <div style={{ height: spacerHeight, position: 'relative' }}>
-        {/* Grid renderizado con offset */}
+    <div ref={containerRef} className="relative">
+      {/* Spacer para mantener altura total */}
+      <div style={{ height: totalHeight, position: 'relative' }}>
+        {/* Container de items visibles */}
         <div
           style={{
-            transform: `translateY(${offsetY}px)`,
             position: 'absolute',
-            top: 0,
+            top: offsetY,
             left: 0,
             right: 0
           }}
-          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8"
+          className="grid grid-cols-4 gap-8"
         >
-          {visiblePosts.map((post) => (
-            <VideoCard
-              key={post.id}
-              video={post}
-              videos={posts}
-              isSelected={selectedPosts.includes(post.id)}
-              onSelect={onSelectPost}
-              onEdit={onEditPost}
-              isHighlighted={highlightedVideoId === post.id}
-              onRefresh={onRefreshData}
-            />
+          {visibleItems.map((post) => (
+            <div key={post.id} style={{ height: ITEM_HEIGHT }}>
+              <VideoCard
+                video={post}
+                videos={posts}
+                isSelected={selectedPosts.includes(post.id)}
+                onSelect={onSelectPost}
+                onEdit={onEditPost}
+                isHighlighted={highlightedVideoId === post.id}
+                onRefresh={onRefreshData}
+              />
+            </div>
           ))}
         </div>
       </div>
@@ -134,6 +152,13 @@ const VirtualizedGallery: React.FC<VirtualizedGalleryProps> = ({
           </div>
         </div>
       )}
+
+      {/* Debug info (temporal) */}
+      <div className="fixed top-16 left-4 bg-black bg-opacity-80 text-white p-2 text-xs z-50 rounded">
+        <div>Visible: {visibleItems.length} | Total: {posts.length}</div>
+        <div>OffsetY: {offsetY} | TotalHeight: {totalHeight}</div>
+        <div>ScrollTop: {Math.round(scrollTop)}</div>
+      </div>
     </div>
   );
 };

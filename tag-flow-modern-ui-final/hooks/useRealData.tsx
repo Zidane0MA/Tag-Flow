@@ -894,14 +894,14 @@ export const RealDataProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   }, [posts]);
 
-  // Cargar datos iniciales
-  const initialLoadRef = useRef(false);
-  useEffect(() => {
-    if (!initialLoadRef.current) {
-      initialLoadRef.current = true;
-      refreshData();
-    }
-  }, []); // Solo cargar una vez al montar
+  // 🚫 TEMPORAL: Deshabilitada carga automática para evitar conflicto con cursor pagination
+  // const initialLoadRef = useRef(false);
+  // useEffect(() => {
+  //   if (!initialLoadRef.current) {
+  //     initialLoadRef.current = true;
+  //     refreshData();
+  //   }
+  // }, []); // Solo cargar una vez al montar
 
   const contextValue: RealDataContextType = useMemo(() => ({
     posts,
