@@ -3,7 +3,6 @@ import React, { useState, useEffect } from 'react';
 import Modal from './Modal';
 import { Post, EditStatus, Difficulty } from '../types';
 import { useCursorCRUD } from '../hooks/useCursorCRUD';
-import { useRealData } from '../hooks/useRealData';
 
 interface EditModalProps {
   video?: Post | null; // Renamed to video for less refactoring, but it's a Post
@@ -13,8 +12,7 @@ interface EditModalProps {
 }
 
 const EditModal: React.FC<EditModalProps> = ({ video: post, videoIds: postIds = [], onClose, onRefresh }) => {
-  const { posts } = useRealData(); // Keep posts for data access
-  const { updatePost, updateMultiplePosts } = useCursorCRUD(onRefresh); // Use cursor CRUD for operations
+  const { updatePost, updateMultiplePosts } = useCursorCRUD(onRefresh);
   const [formData, setFormData] = useState({
     editStatus: '',
     difficulty: '',

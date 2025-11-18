@@ -220,7 +220,9 @@ const GalleryPage: React.FC = () => {
         setAppliedFilters(apiFilters);
 
         // Mapear sort.by del frontend al backend
-        const backendSortField = sort.by === 'downloadDate' ? 'download_date' : sort.by;
+        const backendSortField = sort.by === 'downloadDate' ? 'download_date'
+            : sort.by === 'publicationDate' ? 'publication_date'
+            : sort.by;
 
         // Usar setCursorFilters que automáticamente recarga los datos CON ordenamiento
         console.log('🔄 CALLING setCursorFilters with:', apiFilters, 'sort:', backendSortField, sort.order);
@@ -601,6 +603,7 @@ const GalleryPage: React.FC = () => {
                         <select name="by" value={sort.by} onChange={handleSortChange} className="bg-gray-700 text-white rounded p-2 w-full focus:ring-2 focus:ring-red-500 focus:outline-none">
                             <option value="id">ID</option>
                             <option value="downloadDate">Fecha Descarga</option>
+                            <option value="publicationDate">Fecha Publicación</option>
                             <option value="title">Nombre</option>
                         </select>
                          <select name="order" value={sort.order} onChange={handleSortChange} className="bg-gray-700 text-white rounded p-2 w-full focus:ring-2 focus:ring-red-500 focus:outline-none">

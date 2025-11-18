@@ -5,7 +5,6 @@ import Layout from './components/Layout';
 import GalleryPage from './pages/GalleryPage';
 import AdminPage from './pages/AdminPage';
 import TrashPage from './pages/TrashPage';
-import { RealDataProvider } from './hooks/useRealData';
 import { CursorDataProvider } from './hooks/useCursorData';
 import { AdminProvider } from './hooks/useAdminData';
 import VideoPlayerPage from './pages/VideoPlayerPage';
@@ -17,23 +16,22 @@ import { CursorTestPage } from './pages/CursorTestPage';
 
 const App: React.FC = () => {
   return (
-    <RealDataProvider>
-      <AdminProvider>
-        <HashRouter>
-          <Routes>
-            {/* Player route does not use the main layout for a fullscreen experience */}
-            <Route path="/post/:postId/player" element={<VideoPlayerPage />} />
+    <AdminProvider>
+      <HashRouter>
+        <Routes>
+          {/* Player route does not use the main layout for a fullscreen experience */}
+          <Route path="/post/:postId/player" element={<VideoPlayerPage />} />
 
-            {/* All other routes use the main Layout component */}
-            <Route path="/*" element={
-              <Layout>
-                <Routes>
-                  <Route path="/" element={<Navigate to="/gallery" replace />} />
-                  <Route path="/gallery" element={
-                    <CursorDataProvider>
-                      <GalleryPage />
-                    </CursorDataProvider>
-                  } />
+          {/* All other routes use the main Layout component */}
+          <Route path="/*" element={
+            <Layout>
+              <Routes>
+                <Route path="/" element={<Navigate to="/gallery" replace />} />
+                <Route path="/gallery" element={
+                  <CursorDataProvider>
+                    <GalleryPage />
+                  </CursorDataProvider>
+                } />
                   <Route path="/admin/*" element={<AdminPage />} />
                   <Route path="/trash" element={<TrashPage />} />
                   
@@ -58,7 +56,6 @@ const App: React.FC = () => {
           </Routes>
         </HashRouter>
       </AdminProvider>
-    </RealDataProvider>
   );
 };
 

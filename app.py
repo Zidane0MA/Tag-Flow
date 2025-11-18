@@ -14,7 +14,7 @@ sys.path.append(str(Path(__file__).parent / 'src'))
 
 from config import config
 # Database will be imported lazily within functions
-from src.api import gallery_bp, videos_core_bp, videos_streaming_bp, videos_bulk_bp, stats_bp, admin_bp, maintenance_bp, creators_bp, cursor_pagination_bp
+from src.api import videos_core_bp, videos_streaming_bp, videos_bulk_bp, stats_bp, admin_bp, maintenance_bp, creators_bp, cursor_pagination_bp
 from src.api.performance import performance_bp
 from src.api.websocket_api import websocket_bp
 
@@ -45,7 +45,6 @@ def create_app():
         logger.error(f"❌ Error aplicando optimizaciones de BD: {e}")
 
     # Registrar blueprints
-    app.register_blueprint(gallery_bp)
     app.register_blueprint(videos_core_bp)
     app.register_blueprint(videos_streaming_bp)
     app.register_blueprint(videos_bulk_bp)

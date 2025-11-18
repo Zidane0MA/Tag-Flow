@@ -295,7 +295,7 @@ class CursorApiService {
       creator: video.creator_name || 'Desconocido',
       platform: this.mapPlatform(video.platform),
       thumbnailUrl: video.thumbnail_path ? `${API_BASE_URL}/thumbnail/${encodeURIComponent(video.thumbnail_path)}` : `${API_BASE_URL}/static/img/no-thumbnail.svg`,
-      postUrl: `${API_BASE_URL}/api/video/${video.id}/stream`,
+      postUrl: `${API_BASE_URL}/api/video-stream/${video.id}`,
       type: video.duration_seconds > 60 ? 'Video' as any : 'Video' as any, // Default to Video
       editStatus: this.mapEditStatus(video.edit_status),
       processStatus: this.mapProcessStatus(video.processing_status),

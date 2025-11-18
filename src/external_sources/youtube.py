@@ -111,6 +111,7 @@ class YouTube4KHandler(DatabaseExtractor):
                         ud.service_name as platform,
                         ud.url as video_url,
                         mid.duration as duration_ms,
+                        mid.publishing_timestamp as publishing_timestamp,
                         vi.dimension as dimension_code,
                         vi.resolution as resolution_code,
                         vi.fps as fps,
@@ -134,7 +135,7 @@ class YouTube4KHandler(DatabaseExtractor):
                     LEFT JOIN media_info mi ON di.id = mi.download_item_id
                     LEFT JOIN video_info vi ON mi.id = vi.media_info_id
                     WHERE di.filename IS NOT NULL
-                    GROUP BY di.id, di.filename, mid.title, ud.service_name, ud.url, mid.duration, vi.dimension, vi.resolution, vi.fps, di.timestampNs
+                    GROUP BY di.id, di.filename, mid.title, ud.service_name, ud.url, mid.duration, mid.publishing_timestamp, vi.dimension, vi.resolution, vi.fps, di.timestampNs
                     ORDER BY di.id ASC
                 '''
             
@@ -176,6 +177,7 @@ class YouTube4KHandler(DatabaseExtractor):
                         ud.service_name as platform,
                         ud.url as video_url,
                         mid.duration as duration_ms,
+                        mid.publishing_timestamp as publishing_timestamp,
                         vi.dimension as dimension_code,
                         vi.resolution as resolution_code,
                         vi.fps as fps,
@@ -201,7 +203,7 @@ class YouTube4KHandler(DatabaseExtractor):
                     WHERE di.filename IS NOT NULL
                         AND {platform_condition}
                         AND di.id > ?
-                    GROUP BY di.id, di.filename, mid.title, ud.service_name, ud.url, mid.duration, vi.dimension, vi.resolution, vi.fps, di.timestampNs
+                    GROUP BY di.id, di.filename, mid.title, ud.service_name, ud.url, mid.duration, mid.publishing_timestamp, vi.dimension, vi.resolution, vi.fps, di.timestampNs
                     ORDER BY di.id ASC
                 '''
             
@@ -385,8 +387,8 @@ class YouTube4KHandler(DatabaseExtractor):
                     
                     # 🚀 ULTRA-FAST: Acceso directo por índice (sin nombres de columna)
                     # Nueva estructura: 0=download_id, 1=file_path, 2=video_title, 3=platform, 4=video_url,
-                    #                  5=duration_ms, 6=dimension_code, 7=resolution_code, 8=fps, 9=timestamp_ns,
-                    #                  10=metadata_concat, 11=metadata_types_concat
+                    #                  5=duration_ms, 6=publishing_timestamp, 7=dimension_code, 8=resolution_code, 9=fps, 10=timestamp_ns,
+                    #                  11=metadata_concat, 12=metadata_types_concat
                     
                     try:
                         file_path = Path(file_path_str)
@@ -394,8 +396,8 @@ class YouTube4KHandler(DatabaseExtractor):
                         platform = self._normalize_platform_name(service_name or "")
                         
                         # 🚀 Parse metadata ultra-fast (solo si existe)
-                        metadata_concat = row[10] if len(row) > 10 else ""
-                        metadata_types_concat = row[11] if len(row) > 11 else ""
+                        metadata_concat = row[11] if len(row) > 11 else ""
+                        metadata_types_concat = row[12] if len(row) > 12 else ""
                         metadata = {}
                         creator_name = None
                         creator_url = None
@@ -450,9 +452,11 @@ class YouTube4KHandler(DatabaseExtractor):
                         
                         # 🚀 Procesar duración usando acceso directo
                         duration_ms = row[5] if len(row) > 5 else None
+                        publishing_ts_raw = row[6] if len(row) > 6 else None
+                        publishing_ts = int(publishing_ts_raw) if publishing_ts_raw and int(publishing_ts_raw) > 0 else None
                         
                         # 🚀 Procesar dimensiones usando cache pre-computado
-                        resolution_code = row[7] if len(row) > 7 else None
+                        resolution_code = row[8] if len(row) > 8 else None
                         dimensions = None
                         video_dimensions = None
                         if resolution_code is not None:
@@ -463,9 +467,9 @@ class YouTube4KHandler(DatabaseExtractor):
                                     'height': dimensions['height'], 
                                     'aspect_ratio': dimensions['aspect_ratio'],
                                     'is_vertical': dimensions['is_vertical'],
-                                    'fps': row[8] if len(row) > 8 else None,
+                                    'fps': row[9] if len(row) > 9 else None,
                                     'resolution_code': resolution_code,
-                                    'dimension_code': row[6] if len(row) > 6 else None
+                                    'dimension_code': row[7] if len(row) > 7 else None
                                 }
                         
                         # 🚀 Detectar tipo de video ultra-rápido (Shorts vs Videos)
@@ -513,8 +517,8 @@ class YouTube4KHandler(DatabaseExtractor):
                             # 🎯 Campos requeridos por manager
                             'video_id': str(row[0]),  # download_id como video_id
                             'download_item_id': row[0],  # para mapping
-                            'publishing_timestamp': None,  # 4K BD no tiene este dato
-                            'timestampNs': row[9] if len(row) > 9 else None,  # timestamp_ns from 4K BD
+                            'publishing_timestamp': publishing_ts,
+                            'timestampNs': row[10] if len(row) > 10 else None,  # timestamp_ns from 4K BD
                             'downloader_subscription_uuid': metadata.get('subscription_info'),
                             'metadata_types': metadata_types,  # Para lógica de suscripciones
                             
@@ -546,7 +550,7 @@ class YouTube4KHandler(DatabaseExtractor):
                                 'height': dimensions['height'],
                                 'resolution_width': dimensions['width'],  # para manager
                                 'resolution_height': dimensions['height'],  # para manager
-                                'fps': row[8] if len(row) > 8 else None
+                                'fps': row[9] if len(row) > 9 else None
                             })
                         
                         videos.append(video)

@@ -75,7 +75,7 @@ export interface Character {
 export interface AdminStats {
     totalPosts: number;
     activeOperations: number;
-    pendingVideos: number;
+    pendingMedia: number;
     diskUsage: number;
     diskTotal: number;
     systemHealth: SystemHealth;
@@ -83,6 +83,8 @@ export interface AdminStats {
     totalGames: number;
     configuredApis: number;
     configuredPaths: number;
+    withCharacters: number;
+    withMusic: number;
 }
 
 export interface AdminConfig {

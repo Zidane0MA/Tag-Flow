@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { useRealData } from '../hooks/useRealData';
 import { useCursorCRUD } from '../hooks/useCursorCRUD';
+import { cursorApiService } from '../services/pagination/cursorApiService';
 import { Post, Difficulty, PostType } from '../types';
 import { ICONS } from '../constants';
 
@@ -362,10 +362,10 @@ const PostPlayerPage: React.FC = () => {
     const { postId } = useParams<{ postId: string }>();
     const navigate = useNavigate();
     const location = useLocation();
-    const { posts: allPosts } = useRealData(); // Keep posts for initial data
-    const { updatePost, moveToTrash } = useCursorCRUD(); // Use cursor CRUD for operations
+    const { updatePost, moveToTrash } = useCursorCRUD();
 
     const [postsToDisplay, setPostsToDisplay] = useState<Post[]>(location.state?.posts || []);
+    const [loadingFallback, setLoadingFallback] = useState(false);
     const [activePostId, setActivePostId] = useState(postId);
     const [preloadedVideos, setPreloadedVideos] = useState<Set<string>>(new Set());
     const [globalAudioEnabled, setGlobalAudioEnabled] = useState(false);
@@ -387,13 +387,32 @@ const PostPlayerPage: React.FC = () => {
 
 
     useEffect(() => {
-        if (location.state?.posts) {
-            setPostsToDisplay(location.state.posts);
-        } else if (allPosts && allPosts.length > 0) {
-            // Fallback to useRealData if no posts in state
-            setPostsToDisplay(allPosts);
-        }
-    }, [location.state, allPosts]);
+        const loadFallbackData = async () => {
+            if (location.state?.posts) {
+                setPostsToDisplay(location.state.posts);
+            } else if (postId) {
+                // 🚀 Cursor fallback: Load initial data if no posts in navigation state
+                setLoadingFallback(true);
+                try {
+                    const response = await cursorApiService.getVideosCursor({
+                        limit: 50,
+                        direction: 'next',
+                        sort_by: 'id',
+                        sort_order: 'desc'
+                    });
+                    setPostsToDisplay(response.data);
+                } catch (error) {
+                    console.error('❌ Error loading fallback posts:', error);
+                    // Fallback: crear array con solo el post actual si tenemos su ID
+                    setPostsToDisplay([]);
+                } finally {
+                    setLoadingFallback(false);
+                }
+            }
+        };
+
+        loadFallbackData();
+    }, [location.state, postId]);
     
     useEffect(() => {
         if (postsToDisplay.length > 0 && postId && !initialScrollDone.current) {

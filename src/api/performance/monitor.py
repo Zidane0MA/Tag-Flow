@@ -406,64 +406,11 @@ class DatabaseMonitor:
         logger.info("Monitoreo de base de datos deshabilitado")
 
 # Instancia global del monitor
-db_monitor = None
-
-def get_database_monitor(db_path: str = None) -> DatabaseMonitor:
-    """Obtener instancia global del monitor de base de datos"""
-    global db_monitor
-
-    if db_monitor is None and db_path:
-        db_monitor = DatabaseMonitor(db_path)
+def get_database_monitor(db_path: str = None) -> Optional[DatabaseMonitor]:
+    """Obtener instancia del monitor de base de datos"""
+    if db_path:
+        monitor = DatabaseMonitor(db_path)
         logger.info(f"Monitor de base de datos inicializado para: {db_path}")
+        return monitor
+    return None
 
-    return db_monitor
-
-def monitored_query(query_type: str):
-    """
-    Decorador para monitorear automáticamente consultas a la base de datos
-
-    Usage:
-        @monitored_query("SELECT")
-        def get_videos():
-            # ejecutar consulta
-            pass
-    """
-    def decorator(func):
-        def wrapper(*args, **kwargs):
-            if db_monitor and db_monitor._monitoring_enabled:
-                start_time = time.time()
-                try:
-                    result = func(*args, **kwargs)
-                    execution_time = (time.time() - start_time) * 1000
-
-                    # Intentar determinar filas afectadas
-                    rows_affected = 0
-                    if hasattr(result, '__len__'):
-                        rows_affected = len(result)
-
-                    db_monitor.log_query_performance(
-                        query_type=query_type,
-                        execution_time_ms=execution_time,
-                        rows_affected=rows_affected,
-                        query=func.__name__,
-                        success=True
-                    )
-
-                    return result
-
-                except Exception as e:
-                    execution_time = (time.time() - start_time) * 1000
-                    db_monitor.log_query_performance(
-                        query_type=query_type,
-                        execution_time_ms=execution_time,
-                        rows_affected=0,
-                        query=func.__name__,
-                        success=False,
-                        error_message=str(e)
-                    )
-                    raise
-            else:
-                return func(*args, **kwargs)
-
-        return wrapper
-    return decorator

@@ -230,10 +230,6 @@ def get_system_overview():
             'cache': {
                 'enabled': True
             },
-            'pagination': {
-                'smart_pagination_enabled': True,
-                'cursor_pagination_available': True
-            }
         }
 
         if monitor:

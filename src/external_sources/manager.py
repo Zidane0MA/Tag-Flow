@@ -177,6 +177,10 @@ class ExternalSourcesManager:
             'use_filename': False,  # YouTube doesn't need filename-based titles
             'creator_id': creator_id,
             'subscription_id': subscription_id,
+            # publication_date: prefer publishing_timestamp from 4K DB when available
+            'publication_date': int(video_data.get('publishing_timestamp')) if video_data.get('publishing_timestamp') else None,
+            'publication_date_source': '4k_bd' if video_data.get('publishing_timestamp') else None,
+            'publication_date_confidence': None,
             'download_date': int(video_data.get('timestampNs', 0) / 1_000_000_000) if video_data.get('timestampNs') else None
         }
         

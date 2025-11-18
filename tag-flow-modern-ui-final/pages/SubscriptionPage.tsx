@@ -2,7 +2,8 @@
 import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useCursorSubscriptionData } from '../hooks/useCursorSubscriptionData';
-import { useRealData } from '../hooks/useRealData';
+import { useCursorData } from '../hooks/useCursorData';
+import { apiService } from '../services/apiService';
 import { SubscriptionType, SubscriptionInfo } from '../types';
 import Breadcrumbs, { Crumb } from '../components/Breadcrumbs';
 import { ICONS, getSubscriptionIcon, getCategoryIcon } from '../constants';
@@ -28,11 +29,22 @@ const SubscriptionPage: React.FC = () => {
         clearData
     } = useCursorSubscriptionData();
 
-    // Keep useRealData for subscription metadata only
-    const {
-        getSubscriptionInfo,
-        getCreatorByName
-    } = useRealData();
+    // 🚀 Cursor implementation: Get creators from cursor data
+    const { creators } = useCursorData();
+
+    // Helper functions (migrated from useRealData)
+    const getCreatorByName = useCallback((name: string) => {
+        return creators.find(c => c.name === name);
+    }, [creators]);
+
+    const getSubscriptionInfo = useCallback(async (type: SubscriptionType, id: string) => {
+        try {
+            return await apiService.getSubscriptionInfo(type, id);
+        } catch (error) {
+            console.error('Error getting subscription info:', error);
+            return undefined;
+        }
+    }, []);
 
     // Navigation state for video highlighting and scrolling
     const highlightVideoId = location.state?.highlightVideoId;

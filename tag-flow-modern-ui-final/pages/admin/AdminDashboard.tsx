@@ -60,9 +60,9 @@ const AdminDashboard: React.FC = () => {
         <div className="space-y-8">
             {/* Quick Stats */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <StatCard title="Posts Totales" value={stats.totalPosts} icon={ICONS.gallery} />
+                <StatCard title="Total Posts" value={stats.totalPosts} icon={ICONS.gallery} />
                 <StatCard title="Operaciones Activas" value={stats.activeOperations} icon={ICONS.terminal} />
-                <StatCard title="Videos Pendientes" value={stats.pendingVideos} icon={ICONS.status_pending} />
+                <StatCard title="Pendientes" value={stats.pendingMedia} icon={ICONS.status_pending} />
                 <StatCard title="Uso de Disco" value={`${diskUsagePercent}%`} icon={ICONS.hardDrive} />
             </div>
 

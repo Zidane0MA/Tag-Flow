@@ -108,14 +108,16 @@ class StatsOperations:
             }
     
     def _get_basic_table_stats(self, conn: sqlite3.Connection) -> Dict[str, int]:
-        """Estadísticas básicas de todas las tablas"""
+        """Estadísticas básicas de todas las tablas (esquema nuevo)"""
         tables = {
-            'videos': 'SELECT COUNT(*) FROM videos',
-            'video_metadata': 'SELECT COUNT(*) FROM video_metadata',
-            'face_data': 'SELECT COUNT(*) FROM face_data WHERE face_data IS NOT NULL',
-            'character_data': 'SELECT COUNT(*) FROM character_data WHERE character_data IS NOT NULL'
+            'posts': 'SELECT COUNT(*) FROM posts',
+            'media': 'SELECT COUNT(*) FROM media',
+            'creators': 'SELECT COUNT(*) FROM creators',
+            'subscriptions': 'SELECT COUNT(*) FROM subscriptions',
+            'platforms': 'SELECT COUNT(*) FROM platforms',
+            'post_categories': 'SELECT COUNT(*) FROM post_categories'
         }
-        
+
         stats = {}
         for table_name, query in tables.items():
             try:
@@ -124,80 +126,89 @@ class StatsOperations:
             except sqlite3.OperationalError:
                 # Tabla no existe
                 stats[table_name] = 0
-        
+
         return stats
     
     def _get_video_stats(self, conn: sqlite3.Connection) -> Dict[str, Any]:
-        """Estadísticas específicas de videos"""
+        """Estadísticas específicas de media (esquema nuevo)"""
         try:
             stats = {}
-            
-            # Videos por estado de procesamiento
+
+            # Media por estado de procesamiento
             status_query = """
-                SELECT 
+                SELECT
                     processing_status,
                     COUNT(*) as count
-                FROM videos 
+                FROM media
                 GROUP BY processing_status
             """
-            
+
             status_results = conn.execute(status_query).fetchall()
-            stats['by_status'] = {row['processing_status']: row['count'] 
+            stats['by_status'] = {row['processing_status']: row['count']
                                 for row in status_results}
-            
-            # Videos con diferentes tipos de datos
+
+            # Media con diferentes tipos de datos
             data_queries = {
-                'with_thumbnails': "SELECT COUNT(*) FROM videos WHERE thumbnail_path IS NOT NULL",
-                'with_music_data': "SELECT COUNT(*) FROM videos WHERE music_data IS NOT NULL",
-                'with_face_data': "SELECT COUNT(*) FROM videos WHERE EXISTS (SELECT 1 FROM face_data WHERE face_data.video_id = videos.id)",
-                'with_character_data': "SELECT COUNT(*) FROM videos WHERE EXISTS (SELECT 1 FROM character_data WHERE character_data.video_id = videos.id)"
+                'with_thumbnails': "SELECT COUNT(*) FROM media WHERE thumbnail_path IS NOT NULL",
+                'with_music_data': "SELECT COUNT(*) FROM media WHERE detected_music IS NOT NULL",
+                'with_character_data': "SELECT COUNT(*) FROM media WHERE detected_characters IS NOT NULL",
+                'by_media_type': """
+                    SELECT media_type, COUNT(*) as count
+                    FROM media
+                    GROUP BY media_type
+                """
             }
-            
+
             for key, query in data_queries.items():
                 try:
-                    result = conn.execute(query).fetchone()
-                    stats[key] = result[0] if result else 0
+                    if key == 'by_media_type':
+                        result = conn.execute(query).fetchall()
+                        stats[key] = {row[0]: row[1] for row in result}
+                    else:
+                        result = conn.execute(query).fetchone()
+                        stats[key] = result[0] if result else 0
                 except sqlite3.OperationalError:
-                    stats[key] = 0
-            
+                    stats[key] = 0 if key != 'by_media_type' else {}
+
             return stats
-            
+
         except Exception as e:
-            logger.error(f"Error en estadísticas de videos: {e}")
+            logger.error(f"Error en estadísticas de media: {e}")
             return {}
     
     def _get_platform_stats(self, conn: sqlite3.Connection) -> Dict[str, int]:
-        """Estadísticas por plataforma"""
+        """Estadísticas por plataforma (esquema nuevo)"""
         try:
             query = """
-                SELECT 
-                    platform,
-                    COUNT(*) as count
-                FROM videos 
-                GROUP BY platform
+                SELECT
+                    pl.name as platform,
+                    COUNT(DISTINCT p.id) as count
+                FROM posts p
+                JOIN platforms pl ON p.platform_id = pl.id
+                GROUP BY pl.name
                 ORDER BY count DESC
             """
-            
+
             results = conn.execute(query).fetchall()
             return {row['platform']: row['count'] for row in results}
-            
+
         except Exception as e:
             logger.error(f"Error en estadísticas por plataforma: {e}")
             return {}
     
     def _get_temporal_stats(self, conn: sqlite3.Connection) -> Dict[str, Any]:
-        """Estadísticas temporales (últimos 30 días, etc.)"""
+        """Estadísticas temporales (últimos 30 días, etc.) - esquema nuevo"""
         try:
-            thirty_days_ago = (datetime.now() - timedelta(days=30)).isoformat()
-            seven_days_ago = (datetime.now() - timedelta(days=7)).isoformat()
-            
+            thirty_days_ago = int((datetime.now() - timedelta(days=30)).timestamp())
+            seven_days_ago = int((datetime.now() - timedelta(days=7)).timestamp())
+
             temporal_queries = {
-                'added_last_30_days': f"SELECT COUNT(*) FROM videos WHERE added_date >= '{thirty_days_ago}'",
-                'added_last_7_days': f"SELECT COUNT(*) FROM videos WHERE added_date >= '{seven_days_ago}'",
-                'processed_last_30_days': f"SELECT COUNT(*) FROM videos WHERE last_analysis_date >= '{thirty_days_ago}'",
-                'processed_last_7_days': f"SELECT COUNT(*) FROM videos WHERE last_analysis_date >= '{seven_days_ago}'"
+                'posts_added_last_30_days': f"SELECT COUNT(*) FROM posts WHERE created_at >= datetime({thirty_days_ago}, 'unixepoch')",
+                'posts_added_last_7_days': f"SELECT COUNT(*) FROM posts WHERE created_at >= datetime({seven_days_ago}, 'unixepoch')",
+                'media_processed_last_30_days': f"SELECT COUNT(*) FROM media WHERE last_updated >= datetime({thirty_days_ago}, 'unixepoch')",
+                'media_processed_last_7_days': f"SELECT COUNT(*) FROM media WHERE last_updated >= datetime({seven_days_ago}, 'unixepoch')"
             }
-            
+
             stats = {}
             for key, query in temporal_queries.items():
                 try:
@@ -205,9 +216,9 @@ class StatsOperations:
                     stats[key] = result[0] if result else 0
                 except sqlite3.OperationalError:
                     stats[key] = 0
-            
+
             return stats
-            
+
         except Exception as e:
             logger.error(f"Error en estadísticas temporales: {e}")
             return {}
@@ -250,21 +261,23 @@ class StatsOperations:
             return {'error': str(e)}
     
     def get_quick_summary(self) -> Dict[str, Any]:
-        """Resumen ultra-rápido para debugging"""
+        """Resumen ultra-rápido para debugging (esquema nuevo)"""
         try:
             conn = self.get_connection()
-            
+
             # Solo las estadísticas más básicas
-            total_videos = conn.execute("SELECT COUNT(*) FROM videos").fetchone()[0]
+            total_posts = conn.execute("SELECT COUNT(*) FROM posts").fetchone()[0]
+            total_media = conn.execute("SELECT COUNT(*) FROM media").fetchone()[0]
             db_size = round(self.db_path.stat().st_size / (1024 * 1024), 2) if self.db_path.exists() else 0
-            
+
             return {
-                'total_videos': total_videos,
+                'total_posts': total_posts,
+                'total_media': total_media,
                 'database_size_mb': db_size,
                 'database_path': str(self.db_path),
                 'timestamp': datetime.now().isoformat()
             }
-            
+
         except Exception as e:
             return {
                 'error': str(e),
@@ -272,80 +285,73 @@ class StatsOperations:
             }
     
     def _get_new_structure_stats(self, conn: sqlite3.Connection) -> Dict[str, Any]:
-        """Estadísticas de la nueva estructura (creadores, suscripciones, listas)"""
+        """Estadísticas de la nueva estructura (creadores, suscripciones, posts/media)"""
         try:
             stats = {}
-            
+
             # Verificar si las nuevas tablas existen
             tables_check = conn.execute("""
-                SELECT name FROM sqlite_master 
-                WHERE type='table' AND name IN ('creators', 'subscriptions', 'creator_urls', 'video_lists')
+                SELECT name FROM sqlite_master
+                WHERE type='table' AND name IN ('creators', 'subscriptions', 'posts', 'media', 'platforms')
             """).fetchall()
-            
+
             existing_tables = [row[0] for row in tables_check]
             stats['tables_exist'] = existing_tables
-            
+
             if 'creators' in existing_tables:
                 # Estadísticas de creadores
                 creator_count = conn.execute("SELECT COUNT(*) FROM creators").fetchone()[0]
                 stats['total_creators'] = creator_count
-                
-                # Creadores con URLs por plataforma
-                if 'creator_urls' in existing_tables:
-                    platform_creators = conn.execute("""
-                        SELECT platform, COUNT(DISTINCT creator_id) as count
-                        FROM creator_urls
-                        GROUP BY platform
-                    """).fetchall()
-                    stats['creators_by_platform'] = {row[0]: row[1] for row in platform_creators}
-            
+
+                # Creadores por plataforma
+                platform_creators = conn.execute("""
+                    SELECT pl.name as platform, COUNT(DISTINCT c.id) as count
+                    FROM creators c
+                    JOIN platforms pl ON c.platform_id = pl.id
+                    GROUP BY pl.name
+                """).fetchall()
+                stats['creators_by_platform'] = {row[0]: row[1] for row in platform_creators}
+
             if 'subscriptions' in existing_tables:
                 # Estadísticas de suscripciones
                 subscription_count = conn.execute("SELECT COUNT(*) FROM subscriptions").fetchone()[0]
                 stats['total_subscriptions'] = subscription_count
-                
+
                 # Suscripciones por tipo y plataforma
                 sub_breakdown = conn.execute("""
-                    SELECT platform, type, COUNT(*) as count
-                    FROM subscriptions
-                    GROUP BY platform, type
+                    SELECT pl.name as platform, s.subscription_type, COUNT(*) as count
+                    FROM subscriptions s
+                    JOIN platforms pl ON s.platform_id = pl.id
+                    GROUP BY pl.name, s.subscription_type
                 """).fetchall()
-                
+
                 platform_subs = {}
                 for row in sub_breakdown:
                     platform = row[0]
                     sub_type = row[1]
                     count = row[2]
-                    
+
                     if platform not in platform_subs:
                         platform_subs[platform] = {}
                     platform_subs[platform][sub_type] = count
-                
+
                 stats['subscriptions_breakdown'] = platform_subs
-            
-            if 'video_lists' in existing_tables:
-                # Estadísticas de listas de videos
-                list_stats = conn.execute("""
-                    SELECT list_type, COUNT(*) as count
-                    FROM video_lists
-                    GROUP BY list_type
-                """).fetchall()
-                stats['video_lists'] = {row[0]: row[1] for row in list_stats}
-            
-            # Videos con nueva estructura
-            videos_with_creator = conn.execute("""
-                SELECT COUNT(*) FROM videos WHERE creator_id IS NOT NULL
-            """).fetchone()[0]
-            
-            videos_with_subscription = conn.execute("""
-                SELECT COUNT(*) FROM videos WHERE subscription_id IS NOT NULL
-            """).fetchone()[0]
-            
-            stats['videos_with_creator_id'] = videos_with_creator
-            stats['videos_with_subscription_id'] = videos_with_subscription
-            
+
+            # Posts con creator_id y subscription_id
+            if 'posts' in existing_tables:
+                posts_with_creator = conn.execute("""
+                    SELECT COUNT(*) FROM posts WHERE creator_id IS NOT NULL
+                """).fetchone()[0]
+
+                posts_with_subscription = conn.execute("""
+                    SELECT COUNT(*) FROM posts WHERE subscription_id IS NOT NULL
+                """).fetchone()[0]
+
+                stats['posts_with_creator_id'] = posts_with_creator
+                stats['posts_with_subscription_id'] = posts_with_subscription
+
             return stats
-            
+
         except Exception as e:
             logger.error(f"Error en estadísticas de nueva estructura: {e}")
             return {'error': str(e)}

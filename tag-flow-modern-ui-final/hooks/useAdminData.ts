@@ -52,7 +52,7 @@ const buildCommandString = (type: OperationType, params: Record<string, any>): s
 };
 
 export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const [mainStats, setMainStats] = useState({ total: 0, pending: 0 });
+    const [mainStats, setMainStats] = useState({ total: 0, pending: 0, withCharacters: 0, withMusic: 0 });
     const [operations, setOperations] = useState<Operation[]>([]);
     const [characters, setCharacters] = useState<Character[]>(MOCK_CHARACTERS);
     const [games, setGames] = useState<string[]>(MOCK_GAMES);
@@ -111,7 +111,9 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                 const stats = await apiService.getGlobalStats();
                 setMainStats({
                     total: stats.totalPosts || 0,
-                    pending: stats.processed || 0
+                    pending: stats.pending || 0,
+                    withCharacters: stats.withCharacters || 0,
+                    withMusic: stats.withMusic || 0
                 });
             } catch (error) {
                 console.error('Error loading admin stats:', error);
@@ -182,7 +184,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const stats: AdminStats = useMemo(() => {
         return {
             totalPosts: mainStats.total,
-            pendingVideos: mainStats.pending,
+            pendingMedia: mainStats.pending,
             activeOperations: operations.filter(op => op.status === OperationStatus.RUNNING).length,
             diskUsage: 78.5,
             diskTotal: 256,
@@ -191,6 +193,8 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             totalGames: new Set(characters.map(c => c.game)).size,
             configuredApis: Object.values(config.apiKeys).filter(k => k && k !== '...').length,
             configuredPaths: Object.values(config.paths).filter(p => p).length,
+            withCharacters: mainStats.withCharacters,
+            withMusic: mainStats.withMusic,
         };
     }, [mainStats, operations, characters, config]);
     

@@ -122,7 +122,7 @@ const CharactersPage: React.FC = () => {
                 <StatCard title="Total Personajes" value={stats.totalCharacters} icon={ICONS.users} />
                 <StatCard title="Juegos/Series" value={stats.totalGames} icon={ICONS.reels} />
                 <StatCard title="Precisión Detección" value="92.1%" icon={ICONS.analyze} />
-                <StatCard title="Videos con Personajes" value="257" icon={ICONS.gallery} />
+                <StatCard title="Videos con Personajes" value={stats.withCharacters} icon={ICONS.gallery} />
             </div>
             
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

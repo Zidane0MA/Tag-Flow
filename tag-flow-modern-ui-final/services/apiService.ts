@@ -270,29 +270,6 @@ class ApiService {
     }
   }
 
-  /**
-   * Obtener un video específico
-   */
-  async getVideo(id: string): Promise<Post> {
-    try {
-      const response = await fetch(`${API_BASE_URL}/video/${id}`);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      
-      if (!data.success) {
-        throw new Error(data.error || 'Error fetching video');
-      }
-
-      return this.convertBackendVideoToPost(data.video);
-    } catch (error) {
-      console.error('Error fetching video:', error);
-      throw error;
-    }
-  }
 
   /**
    * Actualizar un video
@@ -432,8 +409,11 @@ class ApiService {
       return {
         totalPosts: data.stats.total_posts || 0,
         totalMedia: data.stats.total_media || 0,
-        processed: data.stats.processed,
-        inTrash: data.stats.in_trash,
+        processed: data.stats.processed || 0,
+        pending: data.stats.pending || 0,
+        inTrash: data.stats.in_trash || 0,
+        withCharacters: data.stats.with_characters || 0,
+        withMusic: data.stats.with_music || 0,
       };
     } catch (error) {
       console.error('Error fetching global stats:', error);
@@ -441,7 +421,10 @@ class ApiService {
         totalPosts: 0,
         totalMedia: 0,
         processed: 0,
+        pending: 0,
         inTrash: 0,
+        withCharacters: 0,
+        withMusic: 0,
       };
     }
   }
@@ -471,9 +454,11 @@ class ApiService {
       }
 
       return data.creators.map((creator: any) => ({
+        id: creator.id,
         name: creator.name,
         displayName: creator.displayName,
-        platforms: creator.platforms
+        platforms: creator.platforms,
+        isPrimary: creator.isPrimary ?? false
       }));
     } catch (error) {
       console.error('Error fetching creators:', error);
@@ -499,9 +484,11 @@ class ApiService {
       }
 
       return {
+        id: data.creator.id,
         name: data.creator.name,
         displayName: data.creator.displayName,
-        platforms: data.creator.platforms
+        platforms: data.creator.platforms,
+        isPrimary: data.creator.isPrimary ?? false
       };
     } catch (error) {
       console.error('Error fetching creator:', error);

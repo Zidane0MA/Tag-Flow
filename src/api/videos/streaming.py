@@ -14,55 +14,6 @@ logger = logging.getLogger(__name__)
 
 videos_streaming_bp = Blueprint('videos_streaming', __name__, url_prefix='/api')
 
-
-@videos_streaming_bp.route('/video/<int:video_id>/play')
-def api_play_video(video_id):
-    """API para obtener información de reproducción del video"""
-    try:
-        from src.service_factory import get_database
-        db = get_database()
-
-        # Consultar usando el nuevo esquema (media table)
-        with db.get_connection() as conn:
-            cursor = conn.execute("""
-                SELECT m.file_path, m.file_name, m.file_size, m.duration_seconds
-                FROM media m
-                JOIN posts p ON m.post_id = p.id
-                WHERE m.id = ? AND p.deleted_at IS NULL
-            """, (video_id,))
-
-            row = cursor.fetchone()
-            if not row:
-                return jsonify({'success': False, 'error': 'Video not found'}), 404
-
-            video = {
-                'file_path': row[0],
-                'file_name': row[1],
-                'file_size': row[2],
-                'duration_seconds': row[3]
-            }
-
-        video_path = Path(video['file_path'])
-        if not video_path.exists():
-            return jsonify({'success': False, 'error': 'Video file not found'}), 404
-
-        # Verificar que el archivo sea accesible
-        mime_type, _ = mimetypes.guess_type(str(video_path))
-
-        return jsonify({
-            'success': True,
-            'video_path': str(video_path),
-            'file_name': video['file_name'],
-            'mime_type': mime_type,
-            'file_size': video.get('file_size', 0),
-            'duration': video.get('duration_seconds', 0)
-        })
-        
-    except Exception as e:
-        logger.error(f"Error obteniendo info de reproducción para video {video_id}: {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-
 @videos_streaming_bp.route('/video/<int:video_id>/open-folder', methods=['POST'])
 def api_open_folder(video_id):
     """API para mostrar y seleccionar el archivo de video en el explorador"""

@@ -69,7 +69,8 @@ def get_videos_cursor():
         # Validar campos de ordenamiento permitidos
         allowed_sort_fields = {
             'created_at': 'm.created_at',  # Para filtro frontend por ID/creación
-            'download_date': 'p.download_date',  # ✅ Usar campo correcto de posts
+            'download_date': 'p.download_date',
+            'publication_date': 'p.publication_date',
             'id': 'm.id',
             'title': 'p.title_post',
             'file_name': 'm.file_name',

@@ -27,15 +27,12 @@ def process_video_data_for_api(video):
     else:
         video['final_characters'] = []
 
-    # ✅ AGREGAR INFORMACIÓN DE SUSCRIPCIÓN
     if video.get('subscription_id') and video.get('subscription_name') and video.get('subscription_type'):
         video['subscription_info'] = {
             'id': video['subscription_id'],
             'name': video['subscription_name'],
             'type': video['subscription_type']
         }
-
-    # El frontend usa directamente title_post - no necesita display_title duplicado
 
     # Procesar thumbnail_path para usar solo el nombre del archivo
     if video.get('thumbnail_path'):
