@@ -33,36 +33,48 @@ class CursorPaginationService:
         self.page_size = page_size
         self.max_page_size = 100
 
+    def _get_cursor_field_type(self) -> str:
+        """Infiere el tipo de dato del campo del cursor para un parseo correcto."""
+        field_name = self.cursor_field.split('.')[-1]
+        
+        if field_name in ['title_post', 'file_name']:
+            return 'string'
+        
+        if field_name == 'id':
+            return 'id'
+            
+        # Por defecto, se asume numérico (timestamps, tamaños, duraciones)
+        return 'numeric'
+
     def validate_cursor(self, cursor: str) -> bool:
         """
-        Validar formato y rango de cursor.
-        Soporta:
-        - Cursor de ID simple (e.g., '123')
-        - Cursor compuesto con timestamp (e.g., '1672531200|123' o '2023-01-01T00:00:00|123')
-        - Cursor compuesto con NULL (e.g., 'NULL|123')
+        Valida el formato y rango del cursor de forma consciente del tipo de dato.
+        - 'id': simple (ej: '123')
+        - 'string': compuesto (ej: 'some_string|123')
+        - 'numeric': compuesto (ej: '1672531200|123' o 'NULL|123')
         """
         if not cursor:
             return True
 
         try:
-            cursor_column_name = self.cursor_field.split('.')[-1]
+            field_type = self._get_cursor_field_type()
 
-            if cursor_column_name == 'id':
+            if field_type == 'id':
                 try:
-                    cursor_id = int(cursor)
-                    return cursor_id > 0
+                    return int(cursor) > 0
                 except (ValueError, TypeError):
                     logger.warning(f"Invalid cursor ID format: {cursor}")
                     return False
 
+            # Para 'string' y 'numeric', el cursor debe ser compuesto.
             cursor_parts = cursor.split('|', 1)
             if len(cursor_parts) != 2:
-                logger.warning(f"Invalid composite cursor format: {cursor}")
+                logger.warning(f"Invalid composite cursor format for type '{field_type}': {cursor}")
                 return False
             
-            timestamp_part, id_part = cursor_parts
+            primary_part, id_part = cursor_parts
 
-            # Validar parte de ID
+            # El ID siempre debe ser un entero válido.
             try:
                 if int(id_part) <= 0:
                     logger.warning(f"Invalid cursor ID part: {id_part}")
@@ -71,32 +83,23 @@ class CursorPaginationService:
                 logger.warning(f"Invalid cursor ID part format: {id_part}")
                 return False
 
-            # Validar parte de timestamp
-            if timestamp_part == 'NULL':
+            # Para 'string', la validación del ID es suficiente.
+            if field_type == 'string':
                 return True
 
-            # Probar si es un integer timestamp
-            try:
-                ts_int = int(timestamp_part)
-                if 0 <= ts_int < 4102444800:  # Check if it's a reasonable Unix timestamp (until year 2100)
+            # Para 'numeric', validar la parte primaria (timestamp o número).
+            if field_type == 'numeric':
+                if primary_part == 'NULL':
                     return True
-            except (ValueError, TypeError):
-                pass  # Not an integer, try date formats
+                try:
+                    # Simplemente verificar que se pueda convertir a entero/flotante.
+                    float(primary_part)
+                    return True
+                except (ValueError, TypeError):
+                    logger.warning(f"Invalid numeric cursor primary part: {primary_part}")
+                    return False
 
-            # Probar si es un formato de fecha ISO o similar
-            try:
-                datetime.fromisoformat(timestamp_part.replace('Z', '+00:00'))
-                return True
-            except ValueError:
-                pass
-            
-            try:
-                datetime.strptime(timestamp_part, '%Y-%m-%d %H:%M:%S')
-                return True
-            except ValueError:
-                pass
-
-            logger.warning(f"Invalid cursor timestamp format: {timestamp_part}")
+            logger.warning(f"Unhandled field type in cursor validation: {field_type}")
             return False
 
         except Exception as e:
