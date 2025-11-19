@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Check last 300 URLs from subscription_entries.reference against url_description.url
+Check last 5000 URLs from subscription_entries.reference against url_description.url
 Print any missing URLs (one per line).
 Usage: python scripts/check_missing_urls_db.py <path_to_sqlite_db>
 """
@@ -9,14 +9,14 @@ import sys
 import os
 
 
-def find_last_300_references(cur):
+def find_last_5000_references(cur):
     # Try several timestamp-like columns for ordering, else fallback to ROWID
     candidates = [
         'created_at', 'created', 'inserted_at', 'timestamp', 'updated_at', 'updated'
     ]
     for col in candidates:
         try:
-            cur.execute(f"SELECT reference FROM subscription_entries WHERE reference IS NOT NULL ORDER BY {col} DESC LIMIT 300")
+            cur.execute(f"SELECT reference FROM subscription_entries WHERE reference IS NOT NULL ORDER BY {col} DESC LIMIT 5000")
             rows = [r[0] for r in cur.fetchall()]
             if rows:
                 return rows
@@ -24,7 +24,7 @@ def find_last_300_references(cur):
             # Column doesn't exist or query failed; try next
             continue
     # Fallback to ROWID ordering
-    cur.execute("SELECT reference FROM subscription_entries WHERE reference IS NOT NULL ORDER BY ROWID DESC LIMIT 300")
+    cur.execute("SELECT reference FROM subscription_entries WHERE reference IS NOT NULL ORDER BY ROWID DESC LIMIT 5000")
     return [r[0] for r in cur.fetchall()]
 
 
@@ -46,7 +46,7 @@ def main():
         sys.exit(4)
 
     try:
-        refs = find_last_300_references(cur)
+        refs = find_last_5000_references(cur)
     except Exception as e:
         print(f"ERROR while querying subscription_entries: {e}")
         conn.close()

@@ -6,6 +6,7 @@ import { Post, EditStatus, ProcessStatus, Difficulty, PostType, SubscriptionType
 import { ICONS, getSubscriptionIcon, getCategoryIcon } from '../constants';
 import { useCursorCRUD } from '../hooks/useCursorCRUD';
 import { apiService } from '../services/apiService';
+import { formatDuration, formatFileSize } from '../utils/formatters';
 
 interface PostCardProps {
     video: Post; // Renamed to video to avoid large-scale refactor in GalleryPage for now. It is a Post object.
@@ -122,7 +123,7 @@ const StatusIndicator: React.FC<{ status: ProcessStatus, isAnalyzing: boolean }>
         case ProcessStatus.PENDING:
             indicator = {
                 icon: React.cloneElement(ICONS.exclamation_simple, { className: iconClass }),
-                className: 'bg-gray-400/80',
+                className: 'bg-gray-700/80',
                 title: 'Estado: Pendiente'
             };
             break;
@@ -395,11 +396,11 @@ const PostCard: React.FC<PostCardProps> = ({ video: post, videos: posts, isSelec
                 <div className="flex justify-between items-center text-xs text-gray-500 pt-2 border-t border-gray-700/50">
                     <div className="flex items-center gap-1" title="Duración">
                         {React.cloneElement(ICONS.clock, { className: 'h-4 w-4' })}
-                        <span>{post.type === PostType.VIDEO ? `${(post.duration / 60).toFixed(1)} min` : '---'}</span>
+                        <span>{post.type === PostType.VIDEO ? formatDuration(post.duration) : '---'}</span>
                     </div>
                     <div className="flex items-center gap-1" title="Tamaño">
                         {React.cloneElement(ICONS.file_alt, { className: 'h-4 w-4' })}
-                        <span>{post.size.toFixed(1)} MB</span>
+                        <span>{formatFileSize(post.size)}</span>
                     </div>
                     <div className="flex items-center gap-1" title="Fecha de descarga">
                         {React.cloneElement(ICONS.calendar, { className: 'h-4 w-4' })}

@@ -27,7 +27,7 @@ class CursorPaginationService:
     Reemplaza el sistema OFFSET con performance O(1)
     """
 
-    def __init__(self, db_connection, cursor_field: str = 'created_at', page_size: int = 50):
+    def __init__(self, db_connection, cursor_field: str = 'p.id', page_size: int = 50):
         self.db = db_connection
         self.cursor_field = cursor_field
         self.page_size = page_size
