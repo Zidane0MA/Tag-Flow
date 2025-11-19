@@ -34,67 +34,73 @@ class CursorPaginationService:
         self.max_page_size = 100
 
     def validate_cursor(self, cursor: str) -> bool:
-        """Validar formato y rango de cursor (soporta cursor compuesto timestamp|id y cursor simple de ID)"""
+        """
+        Validar formato y rango de cursor.
+        Soporta:
+        - Cursor de ID simple (e.g., '123')
+        - Cursor compuesto con timestamp (e.g., '1672531200|123' o '2023-01-01T00:00:00|123')
+        - Cursor compuesto con NULL (e.g., 'NULL|123')
+        """
         if not cursor:
             return True
 
         try:
-            # Determinar si cursor field es ID
             cursor_column_name = self.cursor_field.split('.')[-1]
 
-            # Si el cursor field es ID, validar como ID simple
             if cursor_column_name == 'id':
                 try:
                     cursor_id = int(cursor)
-                    if cursor_id <= 0:
-                        logger.warning(f"Invalid cursor ID: {cursor_id}")
-                        return False
-                    return True
-                except ValueError:
+                    return cursor_id > 0
+                except (ValueError, TypeError):
                     logger.warning(f"Invalid cursor ID format: {cursor}")
                     return False
 
-            # Para timestamps: Separar cursor compuesto si existe (formato: timestamp|id)
             cursor_parts = cursor.split('|', 1)
-            timestamp_part = cursor_parts[0]
+            if len(cursor_parts) != 2:
+                logger.warning(f"Invalid composite cursor format: {cursor}")
+                return False
+            
+            timestamp_part, id_part = cursor_parts
 
-            # Si hay ID, validarlo
-            if len(cursor_parts) == 2:
-                try:
-                    id_part = int(cursor_parts[1])
-                    if id_part <= 0:
-                        logger.warning(f"Invalid cursor ID: {id_part}")
-                        return False
-                except ValueError:
-                    logger.warning(f"Invalid cursor ID format: {cursor_parts[1]}")
-                    return False
-
-            # Validar timestamp
-            timestamp = None
-
-            # Formato ISO
+            # Validar parte de ID
             try:
-                timestamp = datetime.fromisoformat(timestamp_part.replace('Z', '+00:00'))
+                if int(id_part) <= 0:
+                    logger.warning(f"Invalid cursor ID part: {id_part}")
+                    return False
+            except (ValueError, TypeError):
+                logger.warning(f"Invalid cursor ID part format: {id_part}")
+                return False
+
+            # Validar parte de timestamp
+            if timestamp_part == 'NULL':
+                return True
+
+            # Probar si es un integer timestamp
+            try:
+                ts_int = int(timestamp_part)
+                if 0 <= ts_int < 4102444800:  # Check if it's a reasonable Unix timestamp (until year 2100)
+                    return True
+            except (ValueError, TypeError):
+                pass  # Not an integer, try date formats
+
+            # Probar si es un formato de fecha ISO o similar
+            try:
+                datetime.fromisoformat(timestamp_part.replace('Z', '+00:00'))
+                return True
             except ValueError:
-                # Formato alternativo: YYYY-MM-DD HH:MM:SS
-                try:
-                    timestamp = datetime.strptime(timestamp_part, '%Y-%m-%d %H:%M:%S')
-                except ValueError:
-                    pass
+                pass
+            
+            try:
+                datetime.strptime(timestamp_part, '%Y-%m-%d %H:%M:%S')
+                return True
+            except ValueError:
+                pass
 
-            if timestamp is None:
-                logger.warning(f"Invalid cursor timestamp format: {timestamp_part}")
-                return False
+            logger.warning(f"Invalid cursor timestamp format: {timestamp_part}")
+            return False
 
-            # Validar rango razonable (último año)
-            one_year_ago = datetime.now() - timedelta(days=365)
-            if timestamp < one_year_ago:
-                logger.warning(f"Cursor timestamp too old: {timestamp_part}")
-                return False
-
-            return True
-        except (ValueError, TypeError) as e:
-            logger.warning(f"Invalid cursor format: {cursor}, error: {e}")
+        except Exception as e:
+            logger.warning(f"Error validating cursor '{cursor}': {e}", exc_info=True)
             return False
 
     def get_videos(
@@ -131,7 +137,7 @@ class CursorPaginationService:
 
             # Añadir condición de cursor
             if cursor:
-                cursor_condition, cursor_params = builder.build_cursor_condition(cursor, direction)
+                cursor_condition, cursor_params = builder.build_cursor_condition(cursor, direction, sort_order)
                 if cursor_condition:
                     where_conditions.append(cursor_condition)
                     params.extend(cursor_params)
@@ -193,18 +199,17 @@ class CursorPaginationService:
                         if has_more:
                             last_id = last_item['id']
 
-                            if isinstance(cursor_value, str):
-                                # Convertir a datetime y luego a ISO
-                                try:
-                                    dt = datetime.strptime(cursor_value, '%Y-%m-%d %H:%M:%S')
-                                    timestamp_iso = dt.isoformat()
-                                except ValueError:
-                                    timestamp_iso = cursor_value  # Fallback si ya está en formato correcto
+                            last_id = last_item['id']
+                            raw_cursor_value = cursor_value  # This is an int or None from the DB
+
+                            if raw_cursor_value is None:
+                                timestamp_part = "NULL"
                             else:
-                                timestamp_iso = str(cursor_value)
+                                # The value from DB is an integer (Unix timestamp)
+                                timestamp_part = str(raw_cursor_value)
 
                             # Cursor compuesto: timestamp|id
-                            next_cursor = f"{timestamp_iso}|{last_id}"
+                            next_cursor = f"{timestamp_part}|{last_id}"
                         else:
                             next_cursor = None
 

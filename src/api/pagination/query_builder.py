@@ -160,84 +160,60 @@ class OptimizedQueryBuilder:
 
         return where_conditions, params
 
-    def build_cursor_condition(
-        self,
-        cursor: str,
-        direction: str = 'next'
-    ) -> Tuple[str, List[str]]:
+    def build_cursor_condition(self, cursor: str, direction: str = 'next', sort_order: str = 'desc') -> Tuple[str, List[Any]]:
         """
-        Construir condición de cursor optimizada (soporta cursor compuesto timestamp|id)
-
-        Args:
-            cursor: Cursor simple o compuesto (timestamp o timestamp|id)
-            direction: 'next' o 'prev'
-
-        Returns:
-            (condition_string, params)
+        Construir condición de cursor optimizada usando comparación de tuplas (keyset pagination).
+        Soporta cursores compuestos (timestamp_int|id) y maneja correctamente los valores NULL.
         """
         if not cursor:
             return "", []
 
-
         try:
-            # Separar cursor compuesto si existe (formato: timestamp|id)
             cursor_parts = cursor.split('|', 1)
-            timestamp_part = cursor_parts[0]
+            if len(cursor_parts) != 2:
+                logger.warning(f"Invalid composite cursor format: {cursor}")
+                return "", []
 
-            # Normalizar timestamp a formato compatible con DB
-            normalized_timestamp = timestamp_part
+            timestamp_part, id_part = cursor_parts
+            cursor_id = int(id_part)
+            is_null_timestamp = timestamp_part == 'NULL'
 
-            # Si es formato ISO, convertir a formato estándar de SQLite
-            try:
-                from datetime import datetime
-                if 'T' in timestamp_part:  # Formato ISO
-                    dt = datetime.fromisoformat(timestamp_part.replace('Z', '+00:00'))
-                    normalized_timestamp = dt.strftime('%Y-%m-%d %H:%M:%S')
-            except:
-                # Si falla, usar cursor original
-                pass
+            # Determinar el orden final de la consulta para deducir el operador
+            final_query_order = sort_order if direction == 'next' else ('asc' if sort_order == 'desc' else 'desc')
+            op = '<' if final_query_order == 'desc' else '>'
 
-            # Normalizar cursor_field (evitar duplicar prefijo m.)
-            cursor_field_normalized = self.cursor_field
-            if not self.cursor_field.startswith('m.'):
-                cursor_field_normalized = f"m.{self.cursor_field}"
+            # --- Lógica de Paginación ---
+            # SQLite trata NULL como el valor más bajo.
+            # ASC: [NULLs..., Fechas Crecientes...]
+            # DESC: [Fechas Decrecientes..., NULLs...]
 
-            # Si es cursor compuesto (timestamp:id), usar condición más sofisticada
-            if len(cursor_parts) == 2:
-                cursor_id = int(cursor_parts[1])
-
-                if direction == "next":
-                    # Para siguiente: (timestamp < cursor_timestamp) OR (timestamp = cursor_timestamp AND id < cursor_id)
-                    condition = f"({cursor_field_normalized} < ? OR ({cursor_field_normalized} = ? AND m.id < ?))"
-                    params = [normalized_timestamp, normalized_timestamp, cursor_id]
+            if is_null_timestamp:
+                # El cursor actual es de un item con fecha NULL.
+                if sort_order == 'asc' and direction == 'next':
+                    # Transición: De NULLs a Fechas (hacia adelante)
+                    # Hemos terminado con los NULLs, ahora queremos los primeros items con fecha.
+                    condition = f"{self.cursor_field} IS NOT NULL"
+                    params = []
+                elif sort_order == 'desc' and direction == 'prev':
+                    # Transición: De NULLs a Fechas (hacia atrás)
+                    # Estábamos en el primer NULL, ahora queremos los últimos items con fecha.
+                    condition = f"{self.cursor_field} IS NOT NULL"
+                    params = []
                 else:
-                    # Para anterior: (timestamp > cursor_timestamp) OR (timestamp = cursor_timestamp AND id > cursor_id)
-                    condition = f"({cursor_field_normalized} > ? OR ({cursor_field_normalized} = ? AND m.id > ?))"
-                    params = [normalized_timestamp, normalized_timestamp, cursor_id]
-
-                return condition, params
+                    # Paginación DENTRO del bloque de NULLs. Solo comparamos por ID.
+                    condition = f"({self.cursor_field} IS NULL AND m.id {op} ?)"
+                    params = [cursor_id]
             else:
-                # Cursor simple - puede ser timestamp o ID
-                cursor_column_name = self.cursor_field.split('.')[-1]
+                # El cursor actual es de un item con fecha. Usamos comparación de tuplas.
+                # Esto maneja la paginación dentro de las fechas y la transición de Fechas a NULLs.
+                cursor_timestamp = int(timestamp_part)
+                condition = f"({self.cursor_field}, m.id) {op} (?, ?)"
+                params = [cursor_timestamp, cursor_id]
 
-                if cursor_column_name == 'id':
-                    # Para cursor de ID, usar valor como entero
-                    try:
-                        cursor_id = int(timestamp_part)
-                        operator = "<" if direction == "next" else ">"
-                        condition = f"{cursor_field_normalized} {operator} ?"
-                        return condition, [cursor_id]
-                    except ValueError:
-                        logger.warning(f"Invalid ID cursor value: {timestamp_part}")
-                        return "", []
-                else:
-                    # Para cursor de timestamp
-                    operator = "<" if direction == "next" else ">"
-                    condition = f"{cursor_field_normalized} {operator} ?"
-                    return condition, [normalized_timestamp]
+            return condition, params
 
         except Exception as e:
-            logger.warning(f"Error building cursor condition: {e}")
+            logger.warning(f"Error building cursor condition: {e}", exc_info=True)
             return "", []
 
     def build_count_query(self, filters: Dict[str, Any]) -> Tuple[str, List[Any]]:

@@ -17,6 +17,7 @@ config/tag-flow-0268193d12b4.json
 datos_videos.json
 videos.db
 *example*.md
+logs*.*
 
 # Thumbnails y archivos generados
 thumbnails/*

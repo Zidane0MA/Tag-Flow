@@ -270,12 +270,13 @@ class WebSocketManager:
     async def _send_server_status(self, client_id: str):
         """Enviar estado del servidor a cliente específico"""
         try:
+            server_stats = self.get_stats()
             status_message = WebSocketMessage(
                 type=MessageType.SYSTEM_STATUS,
                 data={
-                    'server_stats': self.stats,
-                    'active_clients': len(self.clients),
-                    'total_subscriptions': sum(len(subs) for subs in self.subscriptions.values())
+                    'server_stats': server_stats,
+                    'active_clients': server_stats['active_connections'],
+                    'total_subscriptions': server_stats['total_subscriptions']
                 }
             )
             
@@ -443,12 +444,20 @@ class WebSocketManager:
                 await asyncio.sleep(5)
     
     def get_stats(self) -> Dict[str, Any]:
-        """Obtener estadísticas del servidor"""
+        """Obtener estadísticas del servidor en un formato serializable."""
+        stats_copy = self.stats.copy()
+        if isinstance(stats_copy.get('start_time'), datetime):
+            stats_copy['start_time'] = stats_copy['start_time'].isoformat()
+
+        uptime_seconds = 0
+        if self.stats.get('start_time'):
+            uptime_seconds = (datetime.now() - self.stats['start_time']).total_seconds()
+
         return {
-            **self.stats,
+            **stats_copy,
             'active_connections': len(self.clients),
             'total_subscriptions': sum(len(subs) for subs in self.subscriptions.values()),
-            'uptime_seconds': (datetime.now() - self.stats['start_time']).total_seconds() if self.stats['start_time'] else 0
+            'uptime_seconds': uptime_seconds
         }
 
 

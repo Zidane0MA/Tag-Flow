@@ -89,7 +89,11 @@ const GalleryPage: React.FC = () => {
     const [isCreatorDropdownOpen, setIsCreatorDropdownOpen] = useState(false);
     const [creatorSearchTerm, setCreatorSearchTerm] = useState('');
     const creatorDropdownRef = useRef<HTMLDivElement>(null);
-    const mainContainerRef = useRef<HTMLElement>(null);
+    const mainContainerRef = useRef<HTMLElement | null>(null);
+
+    // UNIFIED SCROLL STATE
+    const [scrollTop, setScrollTop] = useState(0);
+    const [containerHeight, setContainerHeight] = useState(0);
 
     // Virtualización state (inicializar después de calcular sortedPosts)
     const [useVirtualization, setUseVirtualization] = useState(false);
@@ -215,69 +219,50 @@ const GalleryPage: React.FC = () => {
 
     // Aplicar filtros (llamar al backend con cursor system)
     const applyFilters = useCallback(async () => {
-        console.log('📋 APPLY FILTERS CALLED with:', filters, 'sort:', sort);
         const apiFilters = buildApiFilters(filters);
         setAppliedFilters(apiFilters);
-
-        // Mapear sort.by del frontend al backend
-        const backendSortField = sort.by === 'downloadDate' ? 'download_date'
-            : sort.by === 'publicationDate' ? 'publication_date'
-            : sort.by;
-
-        // Usar setCursorFilters que automáticamente recarga los datos CON ordenamiento
-        console.log('🔄 CALLING setCursorFilters with:', apiFilters, 'sort:', backendSortField, sort.order);
+        const backendSortField = sort.by === 'downloadDate' ? 'download_date' : sort.by === 'publicationDate' ? 'publication_date' : sort.by;
         await setCursorFilters(apiFilters, backendSortField, sort.order as 'asc' | 'desc');
-        console.log('✅ setCursorFilters COMPLETED');
     }, [filters, sort, buildApiFilters, setCursorFilters]);
 
-    // Infinite scroll handler para cursor pagination (usando refs)
-    const handleScroll = useCallback(() => {
-        if (loadingMoreRef.current || !hasMoreRef.current) return;
-
-        const container = mainContainerRef.current;
-        if (!container) return;
-
-        const { scrollTop, scrollHeight, clientHeight } = container;
-        const scrollPercentage = scrollTop / (scrollHeight - clientHeight);
-
-        // Load more when 80% scrolled
-        if (scrollPercentage > 0.8) {
-            loadMoreVideosRef.current();
-        }
-    }, []); // Sin dependencias!
-
-    // Find and attach scroll listener to main container (solo cuando NO está virtualizado)
+    // UNIFIED SCROLL HANDLER
     useEffect(() => {
-        // Si está en modo virtualizado, no activar el infinite scroll de GalleryPage
-        if (useVirtualization) {
-            return;
-        }
-
-        // Find the main container (Layout's main element)
         const mainElement = document.querySelector('main');
-        mainContainerRef.current = mainElement;
-
         if (!mainElement) {
             console.warn('Main container not found');
             return;
         }
+        mainContainerRef.current = mainElement;
 
-        let timeoutId: NodeJS.Timeout;
-
-        const throttledHandleScroll = () => {
-            if (timeoutId) clearTimeout(timeoutId);
-            timeoutId = setTimeout(handleScroll, 100); // Throttle to 100ms
+        const handleResize = () => {
+            setContainerHeight(mainElement.clientHeight);
         };
 
-        console.log('✅ Infinite scroll listener attached to main container (Normal mode)');
-        mainElement.addEventListener('scroll', throttledHandleScroll);
+        const handleScroll = () => {
+            if (!mainContainerRef.current) return;
+            const { scrollTop, scrollHeight, clientHeight } = mainContainerRef.current;
+            
+            // Update scroll position for virtualizer
+            setScrollTop(scrollTop);
+
+            // Infinite scroll logic
+            if (!loadingMoreRef.current && hasMoreRef.current) {
+                const scrollPercentage = scrollTop / (scrollHeight - clientHeight);
+                if (scrollPercentage > 0.8) {
+                    loadMoreVideosRef.current();
+                }
+            }
+        };
+
+        handleResize(); // Initial size
+        mainElement.addEventListener('scroll', handleScroll, { passive: true });
+        window.addEventListener('resize', handleResize);
 
         return () => {
-            console.log('🧹 Cleaning up infinite scroll listener (Normal mode)');
-            mainElement.removeEventListener('scroll', throttledHandleScroll);
-            if (timeoutId) clearTimeout(timeoutId);
+            mainElement.removeEventListener('scroll', handleScroll);
+            window.removeEventListener('resize', handleResize);
         };
-    }, [useVirtualization]); // Dependencia en useVirtualization para activar/desactivar
+    }, []); // Empty dependency array, runs once
 
     // Aplicar filtros cuando cambien (usando dependencia estable)
     useEffect(() => {
@@ -289,14 +274,9 @@ const GalleryPage: React.FC = () => {
         });
 
         if (!isInitialFilters) {
-            console.log('🔄 FILTERS CHANGED - Will apply in 1500ms:', filters);
-            const timeoutId = setTimeout(() => {
-                console.log('⏰ APPLYING FILTERS NOW:', filters);
-                applyFilters();
-            }, 1500);
+            const timeoutId = setTimeout(applyFilters, 1500);
 
             return () => {
-                console.log('🚫 FILTERS TIMEOUT CANCELLED');
                 clearTimeout(timeoutId);
             };
         }
@@ -682,15 +662,14 @@ const GalleryPage: React.FC = () => {
                             /* Galería virtualizada simplificada */
                             <VirtualizedGallery
                                 posts={sortedPosts}
-                                loading={loading}
                                 loadingMore={loadingMore}
-                                onLoadMore={loadMoreVideos}
-                                hasMore={scrollState.hasMore}
                                 selectedPosts={selectedPosts}
                                 onSelectPost={(id: string) => handleSelectPost(id, !selectedPosts.includes(id))}
                                 onEditPost={setEditingPost}
                                 onRefreshData={refreshData}
                                 highlightedVideoId={highlightedVideoId}
+                                scrollTop={scrollTop}
+                                containerHeight={containerHeight}
                             />
                         ) : (
                             /* Galería normal para funcionalidad completa */

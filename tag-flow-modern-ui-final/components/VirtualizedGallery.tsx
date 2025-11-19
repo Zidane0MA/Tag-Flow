@@ -1,40 +1,31 @@
-/**
- * 🚀 Simple Virtualized Gallery - Reescrito desde cero
- * Basado en mejores prácticas de virtualización React 2024
- */
-
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useMemo, useRef } from 'react';
 import { Post } from '../types';
 import VideoCard from './VideoCard';
 
 interface VirtualizedGalleryProps {
   posts: Post[];
-  loading?: boolean;
   loadingMore?: boolean;
-  onLoadMore?: () => void;
-  hasMore?: boolean;
   selectedPosts?: string[];
   onSelectPost?: (postId: string) => void;
   onEditPost?: (post: Post) => void;
   onRefreshData?: () => void;
   highlightedVideoId?: string;
+  // Nuevas props para controlar la virtualización desde el padre
+  scrollTop: number;
+  containerHeight: number;
 }
 
 const VirtualizedGallery: React.FC<VirtualizedGalleryProps> = ({
   posts,
-  loading,
   loadingMore,
-  onLoadMore,
-  hasMore,
   selectedPosts = [],
   onSelectPost,
   onEditPost,
   onRefreshData,
-  highlightedVideoId
+  highlightedVideoId,
+  scrollTop,
+  containerHeight
 }) => {
-  // Estados simples
-  const [scrollTop, setScrollTop] = useState(0);
-  const [containerHeight, setContainerHeight] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Configuración fija (siguiendo mejores prácticas)
@@ -42,40 +33,7 @@ const VirtualizedGallery: React.FC<VirtualizedGalleryProps> = ({
   const ITEMS_PER_ROW = 4; // Fijo para simplificar
   const OVERSCAN = 2; // Buffer de filas (overscan)
 
-  // Detectar dimensiones del viewport
-  useEffect(() => {
-    const updateDimensions = () => {
-      if (containerRef.current) {
-        setContainerHeight(window.innerHeight);
-      }
-    };
-
-    updateDimensions();
-    window.addEventListener('resize', updateDimensions);
-    return () => window.removeEventListener('resize', updateDimensions);
-  }, []);
-
-  // Scroll handler simple con throttling
-  useEffect(() => {
-    const mainElement = document.querySelector('main');
-    if (!mainElement) return;
-
-    let ticking = false;
-    const handleScroll = () => {
-      if (!ticking) {
-        requestAnimationFrame(() => {
-          setScrollTop(mainElement.scrollTop);
-          ticking = false;
-        });
-        ticking = true;
-      }
-    };
-
-    mainElement.addEventListener('scroll', handleScroll, { passive: true });
-    return () => mainElement.removeEventListener('scroll', handleScroll);
-  }, []);
-
-  // Cálculos de virtualización simples
+  // Cálculos de virtualización simples, ahora controlados por props
   const { visibleItems, totalHeight, offsetY } = useMemo(() => {
     const totalItems = posts.length;
     const totalRows = Math.ceil(totalItems / ITEMS_PER_ROW);
@@ -99,19 +57,6 @@ const VirtualizedGallery: React.FC<VirtualizedGalleryProps> = ({
       offsetY: visibleStartRow * ITEM_HEIGHT
     };
   }, [posts, scrollTop, containerHeight]);
-
-  // Infinite scroll simple
-  useEffect(() => {
-    if (!onLoadMore || !hasMore || loadingMore) return;
-
-    const containerTop = containerRef.current?.offsetTop || 0;
-    const relativeScroll = Math.max(0, scrollTop - containerTop);
-    const scrolledPercentage = relativeScroll / (totalHeight - containerHeight);
-
-    if (scrolledPercentage > 0.8) {
-      onLoadMore();
-    }
-  }, [scrollTop, totalHeight, containerHeight, onLoadMore, hasMore, loadingMore]);
 
   return (
     <div ref={containerRef} className="relative">
@@ -152,13 +97,6 @@ const VirtualizedGallery: React.FC<VirtualizedGalleryProps> = ({
           </div>
         </div>
       )}
-
-      {/* Debug info (temporal) */}
-      <div className="fixed top-16 left-4 bg-black bg-opacity-80 text-white p-2 text-xs z-50 rounded">
-        <div>Visible: {visibleItems.length} | Total: {posts.length}</div>
-        <div>OffsetY: {offsetY} | TotalHeight: {totalHeight}</div>
-        <div>ScrollTop: {Math.round(scrollTop)}</div>
-      </div>
     </div>
   );
 };
