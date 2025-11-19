@@ -11,8 +11,21 @@ logger = logging.getLogger(__name__)
 class OptimizedQueryBuilder:
     """Constructor de queries optimizado para cursor pagination"""
 
-    def __init__(self, cursor_field: str = 'created_at'):
+    def __init__(self, cursor_field: str):
         self.cursor_field = cursor_field
+
+    def _get_cursor_field_type(self) -> str:
+        """Infiere el tipo de dato del campo del cursor para un parseo correcto."""
+        field_name = self.cursor_field.split('.')[-1]
+        
+        if field_name in ['title_post', 'file_name']:
+            return 'string'
+        
+        if field_name == 'id':
+            return 'id'
+            
+        # Por defecto, se asume numérico (timestamps, tamaños, duraciones)
+        return 'numeric'
 
     def build_base_query(self, filters: Dict[str, Any]) -> Tuple[List[str], str, List[str], List[Any]]:
         """
@@ -162,58 +175,60 @@ class OptimizedQueryBuilder:
 
     def build_cursor_condition(self, cursor: str, direction: str = 'next', sort_order: str = 'desc') -> Tuple[str, List[Any]]:
         """
-        Construir condición de cursor optimizada usando comparación de tuplas (keyset pagination).
-        Soporta cursores compuestos (timestamp_int|id) y maneja correctamente los valores NULL.
+        Construye una condición de cursor de tipo 'keyset pagination' que es consciente del tipo de dato.
+        Maneja cursores simples (ID) y compuestos (valor|ID) para strings, números y NULLs.
         """
         if not cursor:
             return "", []
 
         try:
+            field_type = self._get_cursor_field_type()
+            
+            # Determinar el operador de comparación basado en la dirección y el orden
+            final_query_order = sort_order if direction == 'next' else ('asc' if sort_order == 'desc' else 'desc')
+            op = '<' if final_query_order == 'desc' else '>'
+
+            # --- Lógica de Paginación ---
+
+            # Caso 1: Ordenación por 'id'. El cursor es simple (ej: "12345").
+            if field_type == 'id':
+                cursor_id = int(cursor)
+                condition = f"m.id {op} ?"
+                params = [cursor_id]
+                return condition, params
+
+            # Caso 2: Ordenación por otros campos. El cursor es compuesto (ej: "valor|12345").
             cursor_parts = cursor.split('|', 1)
             if len(cursor_parts) != 2:
                 logger.warning(f"Invalid composite cursor format: {cursor}")
                 return "", []
 
-            timestamp_part, id_part = cursor_parts
+            primary_part, id_part = cursor_parts
             cursor_id = int(id_part)
-            is_null_timestamp = timestamp_part == 'NULL'
+            is_null_primary = primary_part == 'NULL'
 
-            # Determinar el orden final de la consulta para deducir el operador
-            final_query_order = sort_order if direction == 'next' else ('asc' if sort_order == 'desc' else 'desc')
-            op = '<' if final_query_order == 'desc' else '>'
-
-            # --- Lógica de Paginación ---
-            # SQLite trata NULL como el valor más bajo.
-            # ASC: [NULLs..., Fechas Crecientes...]
-            # DESC: [Fechas Decrecientes..., NULLs...]
-
-            if is_null_timestamp:
-                # El cursor actual es de un item con fecha NULL.
-                if sort_order == 'asc' and direction == 'next':
-                    # Transición: De NULLs a Fechas (hacia adelante)
-                    # Hemos terminado con los NULLs, ahora queremos los primeros items con fecha.
-                    condition = f"{self.cursor_field} IS NOT NULL"
-                    params = []
-                elif sort_order == 'desc' and direction == 'prev':
-                    # Transición: De NULLs a Fechas (hacia atrás)
-                    # Estábamos en el primer NULL, ahora queremos los últimos items con fecha.
-                    condition = f"{self.cursor_field} IS NOT NULL"
-                    params = []
-                else:
-                    # Paginación DENTRO del bloque de NULLs. Solo comparamos por ID.
-                    condition = f"({self.cursor_field} IS NULL AND m.id {op} ?)"
-                    params = [cursor_id]
+            if is_null_primary:
+                # Paginación dentro de un bloque de valores NULL. Solo se compara el ID.
+                # La lógica compleja de transición entre NULL y no-NULL se simplifica
+                # al depender del orden natural de SQL para los NULLs.
+                condition = f"({self.cursor_field} IS NULL AND m.id {op} ?)"
+                params = [cursor_id]
             else:
-                # El cursor actual es de un item con fecha. Usamos comparación de tuplas.
-                # Esto maneja la paginación dentro de las fechas y la transición de Fechas a NULLs.
-                cursor_timestamp = int(timestamp_part)
-                condition = f"({self.cursor_field}, m.id) {op} (?, ?)"
-                params = [cursor_timestamp, cursor_id]
+                # Paginación con valores no-NULL. Se usa comparación de tuplas.
+                if field_type == 'string':
+                    primary_value = primary_part
+                    # Añadir COLLATE NOCASE para ordenación de texto consistente y correcta para Unicode.
+                    condition = f"({self.cursor_field} COLLATE NOCASE, m.id) {op} (?, ?)"
+                else:  # 'numeric'
+                    primary_value = int(primary_part)
+                    condition = f"({self.cursor_field}, m.id) {op} (?, ?)"
+
+                params = [primary_value, cursor_id]
 
             return condition, params
 
         except Exception as e:
-            logger.warning(f"Error building cursor condition: {e}", exc_info=True)
+            logger.warning(f"Error building cursor condition for cursor '{cursor}': {e}", exc_info=True)
             return "", []
 
     def build_count_query(self, filters: Dict[str, Any]) -> Tuple[str, List[Any]]:

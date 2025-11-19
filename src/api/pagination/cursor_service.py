@@ -145,18 +145,23 @@ class CursorPaginationService:
             where_clause = " AND ".join(where_conditions)
 
             # Query principal optimizada con ORDER BY configurable
-            # Para direction=next: usar sort_order tal como viene
-            # Para direction=prev: invertir la dirección
             if direction == "next":
                 order_direction = sort_order.upper()
             else:
                 order_direction = "ASC" if sort_order.lower() == "desc" else "DESC"
 
+            # Añadir COLLATE NOCASE para campos de texto para asegurar consistencia
+            field_name = self.cursor_field.split('.')[-1]
+            if field_name in ['title_post', 'file_name']:
+                order_by_clause = f"ORDER BY {self.cursor_field} COLLATE NOCASE {order_direction}, m.id {order_direction}"
+            else:
+                order_by_clause = f"ORDER BY {self.cursor_field} {order_direction}, m.id {order_direction}"
+
             query = f"""
                 SELECT {', '.join(select_fields)}
                 {from_clause}
                 WHERE {where_clause}
-                ORDER BY {self.cursor_field} {order_direction}, m.id {order_direction}
+                {order_by_clause}
                 LIMIT ?
             """
 
@@ -180,54 +185,53 @@ class CursorPaginationService:
             prev_cursor = None
 
             if data:
-                if direction == "next":
+                # For 'next' direction, the next_cursor is based on the last item.
+                if direction == "next" and has_more:
                     last_item = data[-1]
-                    # Extraer nombre de columna sin alias (e.g., "m.id" -> "id")
                     cursor_column_name = self.cursor_field.split('.')[-1]
-                    cursor_value = last_item[cursor_column_name]
-
-                    # Si el cursor field es ID, usar solo el ID (no compuesto)
+                    
+                    # If sorting by 'id', the cursor is simple (just the ID).
                     if cursor_column_name == 'id':
-                        # SOLO generar next_cursor si realmente HAY más datos
-                        if has_more:
-                            next_cursor = str(cursor_value)
-                        else:
-                            next_cursor = None
+                        next_cursor = str(last_item['id'])
+                    # For all other fields, create a composite cursor (value|id).
                     else:
-                        # Para timestamps, crear cursor compuesto con ID para manejar empates
-                        # SOLO generar next_cursor si realmente HAY más datos
-                        if has_more:
-                            last_id = last_item['id']
-
-                            last_id = last_item['id']
-                            raw_cursor_value = cursor_value  # This is an int or None from the DB
-
-                            if raw_cursor_value is None:
-                                timestamp_part = "NULL"
-                            else:
-                                # The value from DB is an integer (Unix timestamp)
-                                timestamp_part = str(raw_cursor_value)
-
-                            # Cursor compuesto: timestamp|id
-                            next_cursor = f"{timestamp_part}|{last_id}"
+                        cursor_value = last_item.get(cursor_column_name)
+                        last_id = last_item['id']
+                        
+                        if cursor_value is None:
+                            primary_part = "NULL"
                         else:
-                            next_cursor = None
+                            # The primary part can be a string (title), int (date), or float.
+                            # str() handles all cases correctly for cursor creation.
+                            primary_part = str(cursor_value)
+                        
+                        next_cursor = f"{primary_part}|{last_id}"
 
+                # For 'prev' direction, the 'next_cursor' is the one we started with.
+                elif direction == "prev":
+                    next_cursor = cursor
+                
+                # The 'prev_cursor' is the current cursor when moving forward.
                 if direction == "next" and cursor:
                     prev_cursor = cursor
-                elif direction == "prev" and data:
-                    next_cursor = cursor
-                    if len(data) == effective_limit:  # Puede haber más hacia atrás
-                        cursor_column_name = self.cursor_field.split('.')[-1]
-                        cursor_value = data[-1][cursor_column_name]
-                        if isinstance(cursor_value, str):
-                            try:
-                                dt = datetime.strptime(cursor_value, '%Y-%m-%d %H:%M:%S')
-                                prev_cursor = dt.isoformat()
-                            except ValueError:
-                                prev_cursor = cursor_value
+                # For 'prev' direction, a new 'prev_cursor' is generated from the first item.
+                elif direction == "prev" and has_more:
+                    # Create a prev_cursor from the first item in the reversed result set.
+                    first_item = data[0]
+                    cursor_column_name = self.cursor_field.split('.')[-1]
+
+                    if cursor_column_name == 'id':
+                        prev_cursor = str(first_item['id'])
+                    else:
+                        cursor_value = first_item.get(cursor_column_name)
+                        first_id = first_item['id']
+
+                        if cursor_value is None:
+                            primary_part = "NULL"
                         else:
-                            prev_cursor = str(cursor_value)
+                            primary_part = str(cursor_value)
+                        
+                        prev_cursor = f"{primary_part}|{first_id}"
 
             # Total estimado (solo para primera página)
             total_estimated = None
