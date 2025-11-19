@@ -221,7 +221,7 @@ const GalleryPage: React.FC = () => {
     const applyFilters = useCallback(async () => {
         const apiFilters = buildApiFilters(filters);
         setAppliedFilters(apiFilters);
-        const backendSortField = sort.by === 'downloadDate' ? 'download_date' : sort.by === 'publicationDate' ? 'publication_date' : sort.by;
+        const backendSortField = sort.by === 'downloadDate' ? 'download_date' : sort.by === 'publicationDate' ? 'publication_date' : sort.by === 'fileName' ? 'file_name' : sort.by;
         await setCursorFilters(apiFilters, backendSortField, sort.order as 'asc' | 'desc');
     }, [filters, sort, buildApiFilters, setCursorFilters]);
 
@@ -582,9 +582,12 @@ const GalleryPage: React.FC = () => {
                     <div className="flex gap-2">
                         <select name="by" value={sort.by} onChange={handleSortChange} className="bg-gray-700 text-white rounded p-2 w-full focus:ring-2 focus:ring-red-500 focus:outline-none">
                             <option value="id">ID</option>
+                            <option value="title">Título</option>
+                            <option value="size">Tamaño</option>
+                            <option value="duration">Duración</option>
+                            <option value="fileName">Nombre Archivo</option>
                             <option value="downloadDate">Fecha Descarga</option>
                             <option value="publicationDate">Fecha Publicación</option>
-                            <option value="title">Nombre</option>
                         </select>
                          <select name="order" value={sort.order} onChange={handleSortChange} className="bg-gray-700 text-white rounded p-2 w-full focus:ring-2 focus:ring-red-500 focus:outline-none">
                             <option value="desc">Desc</option>

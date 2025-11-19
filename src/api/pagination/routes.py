@@ -74,7 +74,7 @@ def get_videos_cursor():
             'publication_date': 'p.publication_date',
             'file_name': 'm.file_name',
             'duration': 'm.duration_seconds',
-            'size': 'm.file_size_mb'
+            'size': 'm.file_size'
         }
 
         if sort_by not in allowed_sort_fields:
