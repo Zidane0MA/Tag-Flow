@@ -281,7 +281,7 @@ class CharacterOperations:
             }
             
             # Obtener videos con personajes detectados
-            videos_with_characters = self.db.get_videos({'detected_characters': {'$ne': None}})
+            videos_with_characters = self.db.query_videos({'detected_characters': {'$ne': None}})
             
             cleaned_videos = []
             total_cleaned = 0
@@ -374,7 +374,7 @@ class CharacterOperations:
         
         try:
             # Obtener videos con personajes detectados
-            videos_with_characters = self.db.get_videos({'detected_characters': {'$ne': None}})
+            videos_with_characters = self.db.query_videos({'detected_characters': {'$ne': None}})
             
             # Analizar patrones creador -> personaje
             creator_patterns = {}
@@ -485,7 +485,7 @@ class CharacterOperations:
         
         try:
             # Obtener videos
-            videos = self.db.get_videos({'title': {'$ne': None}})
+            videos = self.db.query_videos({'title': {'$ne': None}})
             
             if limit:
                 videos = videos[:limit]
@@ -698,7 +698,7 @@ class CharacterOperations:
                     if video:
                         videos.append(video)
             else:
-                videos = self.db.get_videos()
+                videos = self.db.query_videos()
             
             # Analizar detecciones
             detection_stats = {

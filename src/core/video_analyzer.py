@@ -117,7 +117,7 @@ class VideoAnalyzer:
             logger.error(f"❌ Error consultando BD: {e}")
             # Fallback al método original si falla
             try:
-                videos_in_db = self.db.get_videos()
+                videos_in_db = self.db.query_videos()
                 existing_videos = {video['file_path'] for video in videos_in_db}
                 logger.warning("⚠️ Usando método fallback para paths existentes")
             except Exception as e2:
@@ -445,7 +445,7 @@ class VideoAnalyzer:
             filters['platform'] = platform
         
         # Obtener videos pendientes de análisis o todos según filtros
-        existing_videos = self.db.get_videos(filters)
+        existing_videos = self.db.query_videos(filters)
         
         # Filtrar solo videos que necesitan análisis (sin personajes o música)
         videos_to_analyze = []
@@ -506,7 +506,7 @@ class VideoAnalyzer:
                 logger.info(f"✅ +{import_result['imported']} videos importados")
                 
                 # Actualizar lista de videos para analizar
-                new_existing = self.db.get_videos(filters)
+                new_existing = self.db.query_videos(filters)
                 for video in new_existing:
                     if video not in existing_videos:
                         needs_analysis = (

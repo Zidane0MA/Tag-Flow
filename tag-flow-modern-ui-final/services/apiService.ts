@@ -232,43 +232,7 @@ class ApiService {
     };
   }
 
-  /**
-   * Obtener videos con filtros
-   */
-  async getVideos(filters: VideoFilters = {}): Promise<{ posts: Post[], total: number, hasMore: boolean }> {
-    try {
-      const params = new URLSearchParams();
-      
-      Object.entries(filters).forEach(([key, value]) => {
-        if (value !== undefined && value !== null && value !== '' && value !== 'All') {
-          params.append(key, value.toString());
-        }
-      });
 
-      const response = await fetch(`${API_BASE_URL}/videos?${params}`);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      
-      if (!data.success) {
-        throw new Error(data.error || 'Error fetching videos');
-      }
-
-      const posts = data.videos.map((video: BackendVideo) => this.convertBackendVideoToPost(video));
-      
-      return {
-        posts,
-        total: data.total || data.total_videos || posts.length,
-        hasMore: data.has_more || false
-      };
-    } catch (error) {
-      console.error('Error fetching videos:', error);
-      throw error;
-    }
-  }
 
 
   /**
@@ -496,47 +460,7 @@ class ApiService {
     }
   }
 
-  /**
-   * Obtener videos de un creador específico
-   */
-  async getCreatorVideos(
-    creatorName: string, 
-    platform?: string, 
-    subscriptionId?: string,
-    limit: number = 0, // 0 = sin límite por defecto
-    offset: number = 0
-  ): Promise<{ posts: Post[], total: number, hasMore: boolean }> {
-    try {
-      const params = new URLSearchParams();
-      if (platform && platform !== 'all') params.append('platform', platform);
-      if (subscriptionId) params.append('subscription_id', subscriptionId);
-      if (limit > 0) params.append('limit', limit.toString());
-      if (offset > 0) params.append('offset', offset.toString());
 
-      const response = await fetch(`${API_BASE_URL}/creator/${encodeURIComponent(creatorName)}/videos?${params}`);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      
-      if (!data.success) {
-        throw new Error(data.error || 'Error fetching creator videos');
-      }
-
-      const posts = data.videos.map((video: BackendVideo) => this.convertBackendVideoToPost(video));
-      
-      return {
-        posts,
-        total: data.total || posts.length,
-        hasMore: data.has_more || false
-      };
-    } catch (error) {
-      console.error('Error fetching creator videos:', error);
-      throw error;
-    }
-  }
 
   /**
    * Obtener suscripciones especiales (hashtags, música, etc.)
@@ -619,46 +543,7 @@ class ApiService {
     }
   }
 
-  /**
-   * Obtener videos de una suscripción específica
-   */
-  async getSubscriptionVideos(
-    type: string,
-    id: number,
-    categoryFilter?: string,
-    limit: number = 0, // 0 = sin límite por defecto
-    offset: number = 0
-  ): Promise<{ posts: Post[], total: number, hasMore: boolean }> {
-    try {
-      const params = new URLSearchParams();
-      if (categoryFilter && categoryFilter !== 'all') params.append('category', categoryFilter);
-      if (limit > 0) params.append('limit', limit.toString());
-      if (offset > 0) params.append('offset', offset.toString());
 
-      const response = await fetch(`${API_BASE_URL}/subscription/${type}/${id}/videos?${params}`);
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-
-      if (!data.success) {
-        throw new Error(data.error || 'Error fetching subscription videos');
-      }
-
-      const posts = data.videos.map((video: BackendVideo) => this.convertBackendVideoToPost(video));
-
-      return {
-        posts,
-        total: data.total || posts.length,
-        hasMore: data.has_more || false
-      };
-    } catch (error) {
-      console.error('Error fetching subscription videos:', error);
-      throw error;
-    }
-  }
 
   /**
    * Obtener videos en la papelera

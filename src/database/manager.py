@@ -78,9 +78,9 @@ class DatabaseManager:
         """Get video by file path"""
         return self.videos.get_video_by_path(file_path, include_deleted)
     
-    def get_videos(self, filters: Dict = None, limit: int = None, offset: int = 0, include_deleted: bool = False) -> List[Dict]:
-        """Get videos with filters"""
-        return self.videos.get_videos(filters, limit, offset, include_deleted)
+    def query_videos(self, filters: Dict = None, include_deleted: bool = False) -> List[Dict]:
+        """Query videos with filters"""
+        return self.videos.query_videos(filters, include_deleted)
     
     def count_videos(self, filters: Dict = None, include_deleted: bool = False) -> int:
         """Count videos with filters"""

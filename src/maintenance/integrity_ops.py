@@ -137,7 +137,7 @@ class IntegrityOperations:
                 })
             
             # 2. Verificar registros de video
-            videos = self.db.get_videos()
+            videos = self.db.query_videos()
             integrity_report['video_records']['total_videos'] = len(videos)
             
             file_paths = {}
@@ -302,7 +302,7 @@ class IntegrityOperations:
                     if video:
                         videos.append(video)
             else:
-                videos = self.db.get_videos()
+                videos = self.db.query_videos()
             
             verification_results = {
                 'total_videos': len(videos),
@@ -431,7 +431,7 @@ class IntegrityOperations:
                 logger.info(f"📁 Creado directorio de thumbnails: {thumbnails_dir}")
             
             # Verificar thumbnails de videos
-            videos = self.db.get_videos()
+            videos = self.db.query_videos()
             verification_results['video_thumbnails']['total_videos'] = len(videos)
             
             video_thumbnail_names = set()

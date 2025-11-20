@@ -229,7 +229,7 @@ class DatabaseOperations:
         try:
             # Contar videos a eliminar
             filters = {'platform': platform} if platform else {}
-            videos_to_delete = self.db.get_videos(filters)
+            videos_to_delete = self.db.query_videos(filters)
             
             if not videos_to_delete:
                 logger.info("No hay videos para eliminar")

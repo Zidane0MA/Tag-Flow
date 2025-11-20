@@ -238,8 +238,8 @@ class VideoOperations(DatabaseBase):
             self._track_query('get_video_by_path', time.time() - start_time)
             return self._format_video_row(row) if row else None
 
-    def get_videos(self, filters: Dict = None, limit: int = None, offset: int = 0, include_deleted: bool = False) -> List[Dict]:
-        """Get list of videos with optional filters (with JOIN to creators)"""
+    def query_videos(self, filters: Dict = None, include_deleted: bool = False) -> List[Dict]:
+        """Query videos with optional filters (with JOIN to creators)"""
         self._ensure_initialized()
         start_time = time.time()
         
@@ -255,18 +255,14 @@ class VideoOperations(DatabaseBase):
             query += f" AND {where_clause}"
             params.extend(filter_params)
         
-        # Add ordering and pagination
+        # Add ordering (no pagination in this method)
         query += " ORDER BY v.created_at DESC"
-        if limit:
-            query += f" LIMIT {limit}"
-            if offset:
-                query += f" OFFSET {offset}"
         
         with self.get_connection() as conn:
             cursor = conn.execute(query, params)
             rows = cursor.fetchall()
             
-            self._track_query('get_videos', time.time() - start_time)
+            self._track_query('query_videos', time.time() - start_time)
             return [self._format_video_row(row) for row in rows]
 
     def count_videos(self, filters: Dict = None, include_deleted: bool = False) -> int:
@@ -294,7 +290,11 @@ class VideoOperations(DatabaseBase):
             return count
 
     def update_video(self, video_id: int, updates: Dict) -> bool:
-        """Update video with provided data - NUEVO ESQUEMA"""
+        """
+        Update video with provided data - NUEVO ESQUEMA
+        Note: This method currently updates the `videos` table.
+        It should ideally be updating the `media` table according to the new schema.
+        """
         if not updates:
             return False
 
@@ -370,7 +370,11 @@ class VideoOperations(DatabaseBase):
         return successful, failed
     
     def _update_single_video(self, conn, video_id: int, updates: Dict) -> bool:
-        """Update single video within existing transaction - NUEVO ESQUEMA"""
+        """
+        Update single video within existing transaction - NUEVO ESQUEMA
+        Note: This method currently updates the `videos` table.
+        It should ideally be updating the `media` table according to the new schema.
+        """
         if not updates:
             return False
 

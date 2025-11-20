@@ -232,7 +232,7 @@ class ThumbnailOperations:
         logger.info("🧹 Limpiando thumbnails huérfanos...")
         
         # Obtener videos en BD
-        videos = self.db.get_videos()
+        videos = self.db.query_videos()
         valid_thumbnails = set()
         
         for video in videos:
@@ -351,7 +351,7 @@ class ThumbnailOperations:
         if video_ids:
             videos_data = self._get_videos_by_ids(video_ids)
         else:
-            videos_data = self.db.get_videos()
+            videos_data = self.db.query_videos()
         
         for video in videos_data:
             thumbnail_path = video.get('thumbnail_path')
