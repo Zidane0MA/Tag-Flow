@@ -84,27 +84,27 @@ def _create_database_manager():
 
 def _create_character_intelligence():
     """Factory para CharacterIntelligence"""
-    from src.character_intelligence import CharacterIntelligence
+    from src.services.character_intelligence import CharacterIntelligence
     return CharacterIntelligence()
 
 def _create_thumbnail_generator():
     """Factory para ThumbnailGenerator"""
-    from src.thumbnail_generator import ThumbnailGenerator
+    from src.services.thumbnail_generator import ThumbnailGenerator
     return ThumbnailGenerator()
 
 def _create_face_recognizer():
     """Factory para FaceRecognizer"""
-    from src.face_recognition import FaceRecognizer
+    from src.services.face_recognition import FaceRecognizer
     return FaceRecognizer()
 
 def _create_music_recognizer():
     """Factory para MusicRecognizer"""
-    from src.music_recognition import MusicRecognizer
+    from src.services.music_recognition import MusicRecognizer
     return MusicRecognizer()
 
 def _create_video_processor():
     """Factory para VideoProcessor"""
-    from src.video_processor import VideoProcessor
+    from src.services.video_processor import VideoProcessor
     return VideoProcessor()
 
 def _create_external_sources():

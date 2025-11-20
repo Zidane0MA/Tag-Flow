@@ -109,7 +109,7 @@ class VideoAnalyzer:
         existing_videos = set()
         try:
             # Usar cache optimizado con TTL para paths existentes
-            from src.cache_manager import get_existing_paths_cached
+            from src.services.cache_manager import get_existing_paths_cached
             existing_videos = get_existing_paths_cached(self.db)
             paths_time = time.time() - start_time
             logger.info(f"📊 Videos ya en BD: {len(existing_videos)} paths en {paths_time:.3f}s (cached)")

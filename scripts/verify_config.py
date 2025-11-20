@@ -284,7 +284,7 @@ class ConfigVerifier:
         
         try:
             # Importar y verificar CharacterIntelligence
-            from src.character_intelligence import CharacterIntelligence
+            from src.services.character_intelligence import CharacterIntelligence
             
             ci = CharacterIntelligence()
             self._success("CharacterIntelligence inicializado correctamente")
@@ -343,12 +343,12 @@ class ConfigVerifier:
         self._section_header("Detector Optimizado")
         
         try:
-            from src.optimized_detector import OptimizedCharacterDetector
+            from src.services.optimized_detector import OptimizedCharacterDetector
             self._success("OptimizedCharacterDetector disponible")
             
             # Verificar si se puede instanciar
             try:
-                from src.character_intelligence import CharacterIntelligence
+                from src.services.character_intelligence import CharacterIntelligence
                 ci = CharacterIntelligence()
                 
                 if ci.optimized_detector:
@@ -394,7 +394,7 @@ class ConfigVerifier:
         self._section_header("Sistema de Cache LRU")
         
         try:
-            from src.pattern_cache import PatternCache, get_global_cache
+            from src.services.pattern_cache import PatternCache, get_global_cache
             self._success("PatternCache disponible")
             
             # Verificar cache global

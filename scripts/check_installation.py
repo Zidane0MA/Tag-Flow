@@ -228,13 +228,13 @@ def test_basic_functionality():
         db = get_database()
         print("   ✅ Base de datos")
         
-        from src.video_processor import video_processor
+        from src.services.video_processor import video_processor
         print("   ✅ Procesador de video")
         
-        from src.music_recognition import music_recognizer
+        from src.services.music_recognition import music_recognizer
         print("   ✅ Reconocimiento musical")
         
-        from src.face_recognition import face_recognizer
+        from src.services.face_recognition import face_recognizer
         print("   ✅ Reconocimiento facial")
         
         # Probar Flask
