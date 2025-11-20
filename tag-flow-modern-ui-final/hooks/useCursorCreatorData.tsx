@@ -78,14 +78,16 @@ export const useCursorCreatorData = (): UseCursorCreatorDataResult => {
 
       setScrollState({ cursor: undefined, hasMore: true, loading: true, initialLoaded: false });
 
-      const apiParams: FilterParams = {
+      const apiParams: CursorPaginationParams = {
         limit: 20,
-        sort_by: effectiveFilters.sort_by,
-        sort_order: effectiveFilters.sort_order,
-        search: effectiveFilters.search,
+        filters: { // All filter params go inside 'filters' object
+            sort_by: effectiveFilters.sort_by,
+            sort_order: effectiveFilters.sort_order,
+            search: effectiveFilters.search,
+        }
       };
       if (platform) {
-        apiParams.platform = platform;
+        apiParams.filters.platform = platform;
       }
 
       const result = await cursorApiService.getCreatorVideosCursor(creatorName, apiParams);
@@ -105,7 +107,7 @@ export const useCursorCreatorData = (): UseCursorCreatorDataResult => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [filtersRef, setLoading, setError, setPosts, setScrollState, currentCreatorRef, currentPlatformRef, cursorApiService]);
 
   const loadMoreVideos = useCallback(async () => {
     if (loadingMore || !scrollState.hasMore || !scrollState.cursor || !currentCreatorRef.current) {
@@ -116,15 +118,17 @@ export const useCursorCreatorData = (): UseCursorCreatorDataResult => {
       setLoadingMore(true);
       setError(null);
 
-      const apiParams: FilterParams = {
+      const apiParams: CursorPaginationParams = {
         cursor: scrollState.cursor,
         limit: 20,
-        sort_by: filtersRef.current.sort_by,
-        sort_order: filtersRef.current.sort_order,
-        search: filtersRef.current.search,
+        filters: {
+            sort_by: filtersRef.current.sort_by,
+            sort_order: filtersRef.current.sort_order,
+            search: filtersRef.current.search,
+        }
       };
       if (currentPlatformRef.current) {
-        apiParams.platform = currentPlatformRef.current;
+        apiParams.filters.platform = currentPlatformRef.current;
       }
 
       const result = await cursorApiService.getCreatorVideosCursor(currentCreatorRef.current, apiParams);
@@ -147,7 +151,7 @@ export const useCursorCreatorData = (): UseCursorCreatorDataResult => {
     } finally {
       setLoadingMore(false);
     }
-  }, [loadingMore, scrollState.cursor, scrollState.hasMore]);
+  }, [loadingMore, scrollState.cursor, scrollState.hasMore, filtersRef, currentCreatorRef, currentPlatformRef, cursorApiService, setPosts, setLoadingMore, setError, setScrollState]);
 
   const setAndReloadFilters = useCallback((newFilters: Partial<FilterParams>) => {
     const updatedFilters = { ...filtersRef.current, ...newFilters };

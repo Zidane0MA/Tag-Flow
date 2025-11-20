@@ -156,7 +156,7 @@ class CursorApiService {
       creator: creatorName,
       cursor: params.cursor,
       limit: params.limit,
-      platform: params.filters?.platform
+      ...params.filters // Spread all filters directly
     });
 
     const cached = this.getCachedApiResult(cacheKey);

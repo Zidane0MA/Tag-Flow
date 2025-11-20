@@ -246,6 +246,14 @@ def create_app():
 # Crear instancia de la aplicación
 app = create_app()
 
+# 📊 Eagerly load global stats cache at startup (as per user request)
+# La caché de estadísticas globales se carga una vez al inicio y se actualiza explícitamente.
+# En el futuro, `update_global_stats_cache()` se llamará tras operaciones que modifiquen contadores.
+with app.app_context():
+    from src.api.stats.core import update_global_stats_cache
+    update_global_stats_cache()
+    logger.info("✅ Estadísticas globales cargadas inicialmente en caché.")
+
 if __name__ == '__main__':
     logger.info("🚀 Iniciando Tag-Flow V2 (Refactorizado)")
     logger.info(f"📊 Puerto: {config.FLASK_PORT}")

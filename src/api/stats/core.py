@@ -11,8 +11,10 @@ logger = logging.getLogger(__name__)
 
 stats_bp = Blueprint('stats', __name__, url_prefix='/api/stats')
 
-
-@cached(ttl=180, key_func=lambda: "global_stats")  # Cache por 3 minutos
+# Cache persistente para las estadísticas globales.
+# Se inicializa al arrancar la app y se actualiza explícitamente.
+# En el futuro, se actualizará tras operaciones que modifiquen los contadores.
+@cached(key_func=lambda: "global_stats")
 def get_global_stats_cached():
     """Obtener estadísticas globales cacheadas"""
     from src.service_factory import get_database
@@ -54,9 +56,20 @@ def get_global_stats_cached():
             'pending': media_stats[2] or 0,
         }
 
+def update_global_stats_cache():
+    """Fuerza la actualización de las estadísticas globales en caché.
+    Diseñado para ser llamado después de operaciones que modifiquen los contadores."""
+    logger.info("Forzando actualización de las estadísticas globales en caché.")
+    CacheManager.invalidate_global_stats() # Invalidar el caché existente
+    return get_global_stats_cached() # Recalcular y volver a cachear
+
 @stats_bp.route('/')
 def api_general_stats():
-    """API endpoint general para estadísticas básicas del sistema"""
+    """
+    API endpoint general para estadísticas básicas del sistema.
+    Las estadísticas se cargan una vez al inicio y se mantienen en caché.
+    Se actualizarán explícitamente tras operaciones que modifiquen los contadores.
+    """
     try:
         stats = get_global_stats_cached()
         return jsonify({

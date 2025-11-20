@@ -127,12 +127,13 @@ def api_get_creator(creator_name):
                 c.name,
                 pl.name as platform_name,
                 pl.id as platform_id,
+                c.profile_url,
                 COUNT(p.id) as post_count
             FROM creators c
             JOIN posts p ON c.id = p.creator_id
             JOIN platforms pl ON p.platform_id = pl.id
             WHERE c.name = ? AND p.deleted_at IS NULL
-            GROUP BY c.id, c.name, pl.name, pl.id
+            GROUP BY c.id, c.name, pl.name, pl.id, c.profile_url
         """
         
         with db.get_connection() as conn:
@@ -155,11 +156,7 @@ def api_get_creator(creator_name):
             platform_name = row['platform_name']
             if platform_name not in creator_data['platforms']:
                 # Mapear URLs y suscripciones como en la versión anterior
-                platform_urls = {
-                    'youtube': f'https://www.youtube.com/@{creator_name.lower().replace(" ", "")}',
-                    'tiktok': f'https://www.tiktok.com/@{creator_name.lower().replace(" ", "")}',
-                    'instagram': f'https://www.instagram.com/{creator_name.lower().replace(" ", "")}',
-                }
+                # Se eliminan los platform_urls ya que solo se usará la URL del perfil
                 subscription_types = {
                     'youtube': ('channel', 'Canal'),
                     'tiktok': ('feed', 'Feed'),
@@ -168,7 +165,7 @@ def api_get_creator(creator_name):
                 sub_type, sub_name = subscription_types.get(platform_name, ('feed', 'Feed'))
 
                 creator_data['platforms'][platform_name] = {
-                    'url': platform_urls.get(platform_name, f'https://{platform_name}.com/{creator_name.lower().replace(" ", "")}'),
+                    'url': row['profile_url'], # Usar profile_url directamente de la BD
                     'postCount': row['post_count'],
                     'subscriptions': [{
                         'type': sub_type,

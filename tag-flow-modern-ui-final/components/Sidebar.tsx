@@ -33,9 +33,6 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen, localStats }) => {
     };
 
     loadGlobalStats();
-    // Actualizar cada 30 segundos
-    const interval = setInterval(loadGlobalStats, 30000);
-    return () => clearInterval(interval);
   }, []);
 
   const handleNavClick = () => {
