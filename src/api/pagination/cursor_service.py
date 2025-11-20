@@ -265,20 +265,6 @@ class CursorPaginationService:
             logger.error(f"Error in cursor pagination: {e}")
             raise e
 
-    def get_creator_videos(
-        self,
-        creator_name: str,
-        platform: Optional[str] = None,
-        cursor: Optional[str] = None,
-        limit: Optional[int] = None
-    ) -> CursorResult:
-        """Videos de creador con cursor pagination"""
-        filters = {'creator_name': creator_name}
-        if platform:
-            filters['platform'] = platform
-
-        return self.get_videos(filters, cursor, 'next', limit)
-
     def get_subscription_videos(
         self,
         subscription_type: str,

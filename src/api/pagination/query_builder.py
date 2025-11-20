@@ -107,6 +107,29 @@ class OptimizedQueryBuilder:
             where_conditions.append("pl.name = ?")
             params.append(filters['platform'])
 
+        # Búsqueda de texto para la galería principal
+        if filters.get('search'):
+            search_term = f"%{filters['search']}%"
+            where_conditions.append(
+                "(p.title_post LIKE ? OR m.file_name LIKE ? OR c.name LIKE ?)"
+            )
+            params.extend([search_term, search_term, search_term])
+        
+        # Mini-búsqueda para la página de creador
+        if filters.get('creator_search'):
+            search_term = f"%{filters['creator_search']}%"
+            search_conditions = [
+                "p.title_post LIKE ?",
+                "m.file_name LIKE ?",
+                "m.detected_music_artist LIKE ?",
+                "m.final_music_artist LIKE ?",
+                "m.detected_characters LIKE ?",
+                "m.final_characters LIKE ?",
+                "m.notes LIKE ?"
+            ]
+            where_conditions.append(f"({' OR '.join(search_conditions)})")
+            params.extend([search_term] * len(search_conditions))
+
         # Filtro por estado de edición
         if filters.get('edit_status'):
             where_conditions.append("m.edit_status = ?")
@@ -121,14 +144,6 @@ class OptimizedQueryBuilder:
         if filters.get('subscription_type') and filters.get('subscription_id'):
             where_conditions.append("s.subscription_type = ? AND s.id = ?")
             params.extend([filters['subscription_type'], filters['subscription_id']])
-
-        # Búsqueda de texto optimizada
-        if filters.get('search'):
-            search_term = f"%{filters['search']}%"
-            where_conditions.append(
-                "(p.title_post LIKE ? OR m.file_name LIKE ? OR c.name LIKE ?)"
-            )
-            params.extend([search_term, search_term, search_term])
 
         # Filtro por dificultad
         if filters.get('difficulty_level'):

@@ -42,7 +42,7 @@ def get_videos_cursor():
         cursor (str): Cursor de paginación (timestamp)
         direction (str): 'next' o 'prev' (default: 'next')
         limit (int): Número de resultados (1-100, default: 50)
-        sort_by (str): Campo de ordenamiento (default: 'created_at')
+        sort_by (str): Campo de ordenamiento (default: 'id')
         sort_order (str): Orden 'asc' o 'desc' (default: 'desc')
         creator_name (str): Filtrar por creador
         platform (str): Filtrar por plataforma
@@ -205,40 +205,87 @@ def get_videos_cursor():
 
 @cursor_pagination_bp.route('/creators/<creator_name>/videos', methods=['GET'])
 def get_creator_videos_cursor(creator_name: str):
-    """Endpoint optimizado para videos de creador con cursor pagination"""
+    """Endpoint optimizado para videos de creador con cursor pagination, ordenamiento y búsqueda."""
     try:
-        # Inicializar cursor_service con conexión DB
+        # Inicializar conexión DB
         db_manager = DatabaseManager()
         conn = db_manager.get_connection()
-        cursor_service = CursorPaginationService(conn)
 
+        # Parámetros de paginación y ordenamiento
         cursor = request.args.get('cursor')
         limit = min(int(request.args.get('limit', 50)), 100)
+        direction = request.args.get('direction', 'next')
+        
+        # Orden por defecto: fecha de publicación
+        sort_by = request.args.get('sort_by', 'publication_date')
+        sort_order = request.args.get('sort_order', 'desc')
+
+        # Campos de ordenación permitidos para esta vista
+        allowed_sort_fields = {
+            'publication_date': 'p.publication_date',
+            'download_date': 'p.download_date',
+            'title': 'p.title_post',
+            'size': 'm.file_size',
+            'duration': 'm.duration_seconds',
+            'id': 'm.id'
+        }
+
+        if sort_by not in allowed_sort_fields:
+            sort_by = 'publication_date'
+
+        if sort_order not in ['asc', 'desc']:
+            sort_order = 'desc'
+
+        # Inicializar servicio con el campo de ordenación
+        cursor_service = CursorPaginationService(conn, cursor_field=allowed_sort_fields[sort_by])
+
+        # Filtros: El creador es fijo, se pueden añadir otros
+        filters = {'creator_name': creator_name}
+        
         platform = request.args.get('platform')
+        if platform:
+            filters['platform'] = platform
+        
+        # Mini-búsqueda: Se pasa al query builder con un tipo especial
+        search_query = request.args.get('search')
+        if search_query:
+            filters['creator_search'] = search_query
 
-        result = cursor_service.get_creator_videos(creator_name, platform, cursor, limit)
+        # Agregar parámetros de ordenamiento a filters para la clave de cache
+        filters['sort_by'] = sort_by
+        filters['sort_order'] = sort_order
 
-        # Procesar datos
+        # Lógica de cache y obtención de datos (similar a get_videos_cursor)
+        cached_result = cache_coordinator.get_cursor_result(filters, cursor)
+        if cached_result:
+            # ... (manejo de cache hit, igual que en get_videos_cursor)
+            return jsonify({
+                'success': True,
+                'data': cached_result.data,
+                'pagination': {
+                    'next_cursor': cached_result.next_cursor,
+                    'prev_cursor': cached_result.prev_cursor,
+                    'has_more': cached_result.has_more,
+                    'total_estimated': cached_result.total_estimated
+                },
+                'performance': cached_result.performance_info,
+                'cache_hit': True
+            })
+
+        # Llamar al método genérico get_videos que ya soporta todos los filtros y ordenamiento
+        result = cursor_service.get_videos(filters, cursor, direction, limit, sort_order)
+
+        # Procesar datos y devolver respuesta (igual que en get_videos_cursor)
         from src.api.videos.carousels import process_video_data_for_api, add_video_categories
 
-        processed_data = []
-        for video in result.data:
-            processed_video = process_video_data_for_api(video)
-            processed_data.append(processed_video)
-
-        db_manager = DatabaseManager()
-        with db_manager.get_connection() as conn:
+        processed_data = [process_video_data_for_api(video) for video in result.data]
+        
+        with db_manager.get_connection() as conn_inner:
             processed_data = add_video_categories(db_manager, processed_data)
 
         result.data = processed_data
-
-        # Cache resultado
-        filters = {'creator_name': creator_name}
-        if platform:
-            filters['platform'] = platform
         cache_coordinator.cache_cursor_result(filters, cursor, result)
 
-        # Registrar métrica
         performance_monitor.record_query(
             query_type='cursor_creator_videos',
             execution_time_ms=result.performance_info.get('query_time_ms', 0),
@@ -262,13 +309,9 @@ def get_creator_videos_cursor(creator_name: str):
 
     except Exception as e:
         logger.error(f"Error in cursor creator videos endpoint: {e}")
-        return jsonify({
-            'success': False,
-            'error': 'Internal server error'
-        }), 500
+        return jsonify({'success': False, 'error': 'Internal server error'}), 500
 
     finally:
-        # Cerrar conexión si existe
         if 'conn' in locals():
             conn.close()
 

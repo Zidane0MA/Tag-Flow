@@ -115,65 +115,67 @@ def api_get_creators():
 
 @creators_bp.route('/creator/<creator_name>')
 def api_get_creator(creator_name):
-    """API endpoint para obtener información detallada de un creador"""
+    """API endpoint para obtener información detallada de un creador, optimizado."""
     try:
         from src.service_factory import get_database
         db = get_database()
+
+        # Query optimizada para obtener conteos por plataforma para un creador específico
+        query = """
+            SELECT
+                c.id,
+                c.name,
+                pl.name as platform_name,
+                pl.id as platform_id,
+                COUNT(p.id) as post_count
+            FROM creators c
+            JOIN posts p ON c.id = p.creator_id
+            JOIN platforms pl ON p.platform_id = pl.id
+            WHERE c.name = ? AND p.deleted_at IS NULL
+            GROUP BY c.id, c.name, pl.name, pl.id
+        """
         
-        # Verificar que el creador existe
-        videos = db.get_videos({'creator_name': creator_name}, limit=4000)
-        if not videos:
-            return jsonify({'success': False, 'error': 'Creator not found'}), 404
-        
-        # Agrupar por plataforma y construir estructura
-        platforms = {}
-        for video in videos:
-            platform = video['platform']
-            if platform not in platforms:
-                # Mapear URLs específicas por plataforma
+        with db.get_connection() as conn:
+            cursor = conn.execute(query, (creator_name,))
+            rows = cursor.fetchall()
+
+        if not rows:
+            return jsonify({'success': False, 'error': 'Creator not found or has no posts'}), 404
+
+        # Estructura base del creador
+        creator_data = {
+            'id': rows[0]['id'],
+            'name': rows[0]['name'],
+            'displayName': rows[0]['name'],
+            'platforms': {}
+        }
+
+        # Agrupar por plataforma y construir la estructura final
+        for row in rows:
+            platform_name = row['platform_name']
+            if platform_name not in creator_data['platforms']:
+                # Mapear URLs y suscripciones como en la versión anterior
                 platform_urls = {
                     'youtube': f'https://www.youtube.com/@{creator_name.lower().replace(" ", "")}',
                     'tiktok': f'https://www.tiktok.com/@{creator_name.lower().replace(" ", "")}',
                     'instagram': f'https://www.instagram.com/{creator_name.lower().replace(" ", "")}',
-                    'facebook': f'https://www.facebook.com/{creator_name.lower().replace(" ", "")}',
-                    'twitter': f'https://twitter.com/{creator_name.lower().replace(" ", "")}',
-                    'twitch': f'https://www.twitch.tv/{creator_name.lower().replace(" ", "")}',
-                    'discord': f'https://discord.gg/{creator_name.lower().replace(" ", "")}',
-                    'vimeo': f'https://vimeo.com/{creator_name.lower().replace(" ", "")}'
                 }
-                
-                # Mapear tipos de suscripción por plataforma
                 subscription_types = {
                     'youtube': ('channel', 'Canal'),
                     'tiktok': ('feed', 'Feed'),
                     'instagram': ('feed', 'Feed'),
-                    'facebook': ('account', 'Página'),
-                    'twitter': ('account', 'Cuenta'),
-                    'twitch': ('channel', 'Canal'),
-                    'discord': ('account', 'Servidor'),
-                    'vimeo': ('channel', 'Canal')
                 }
-                
-                sub_type, sub_name = subscription_types.get(platform, ('feed', 'Feed'))
-                
-                platforms[platform] = {
-                    'url': platform_urls.get(platform, f'https://{platform}.com/{creator_name.lower().replace(" ", "")}'),
-                    'postCount': 0,
-                    'subscriptions': [
-                        {
-                            'type': sub_type,
-                            'id': f'{creator_name.lower().replace(" ", "_")}_{platform}_main',
-                            'name': f'{sub_name} Principal'
-                        }
-                    ]
+                sub_type, sub_name = subscription_types.get(platform_name, ('feed', 'Feed'))
+
+                creator_data['platforms'][platform_name] = {
+                    'url': platform_urls.get(platform_name, f'https://{platform_name}.com/{creator_name.lower().replace(" ", "")}'),
+                    'postCount': row['post_count'],
+                    'subscriptions': [{
+                        'type': sub_type,
+                        'id': f'{creator_name.lower().replace(" ", "_")}_{platform_name}_main',
+                        'name': f'{sub_name} Principal'
+                    }]
                 }
-            platforms[platform]['postCount'] += 1
-        
-        creator_data = {
-            'name': creator_name,
-            'displayName': creator_name,
-            'platforms': platforms
-        }
         
         return jsonify({
             'success': True,
@@ -181,8 +183,8 @@ def api_get_creator(creator_name):
         })
         
     except Exception as e:
-        logger.error(f"Error obteniendo creador {creator_name}: {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
+        logger.error(f"Error obteniendo creador {creator_name}: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': 'An internal error occurred.'}), 500
 
 
 @creators_bp.route('/subscriptions')

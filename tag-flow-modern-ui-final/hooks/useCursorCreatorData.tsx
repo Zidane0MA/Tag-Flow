@@ -1,8 +1,7 @@
 /**
  * Tag-Flow V2 - Cursor Creator Data Hook
- * Hook especializado para paginas de creadores con cursor pagination
+ * Hook especializado para paginas de creadores con cursor pagination, ordenamiento y búsqueda.
  */
-
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { Post } from '../types';
 import { cursorApiService } from '../services/pagination/cursorApiService';
@@ -22,6 +21,7 @@ interface CreatorDataState {
   loadingMore: boolean;
   error: string | null;
   scrollState: ScrollState;
+  filters: FilterParams;
 }
 
 interface UseCursorCreatorDataResult extends CreatorDataState {
@@ -29,7 +29,14 @@ interface UseCursorCreatorDataResult extends CreatorDataState {
   loadMoreVideos: () => Promise<void>;
   refreshData: () => Promise<void>;
   clearData: () => void;
+  setAndReloadFilters: (newFilters: Partial<FilterParams>) => void;
 }
+
+const INITIAL_FILTERS: FilterParams = {
+  sort_by: 'publication_date',
+  sort_order: 'desc',
+  search: '',
+};
 
 export const useCursorCreatorData = (): UseCursorCreatorDataResult => {
   // State
@@ -37,6 +44,7 @@ export const useCursorCreatorData = (): UseCursorCreatorDataResult => {
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [filters, setFilters] = useState<FilterParams>(INITIAL_FILTERS);
   const [scrollState, setScrollState] = useState<ScrollState>({
     hasMore: true,
     loading: false,
@@ -46,49 +54,41 @@ export const useCursorCreatorData = (): UseCursorCreatorDataResult => {
   // Refs para evitar stale closures
   const currentCreatorRef = useRef<string>('');
   const currentPlatformRef = useRef<string | undefined>(undefined);
-  const loadingMoreRef = useRef(false);
-  const hasMoreRef = useRef(true);
+  const filtersRef = useRef(filters);
 
-  // WebSocket integration (will be initialized after refreshData is defined)
+  // WebSocket integration
   const refreshDataRef = useRef<(() => Promise<void>) | null>(null);
 
-  // Update refs cuando cambien los estados
   useEffect(() => {
-    loadingMoreRef.current = loadingMore;
-    hasMoreRef.current = scrollState.hasMore;
-  }, [loadingMore, scrollState.hasMore]);
+    filtersRef.current = filters;
+  }, [filters]);
 
-  /**
-   * Load creator videos (primera página)
-   */
-  const loadCreatorVideos = useCallback(async (creatorName: string, platform?: string) => {
+  const loadCreatorVideos = useCallback(async (creatorName: string, platform?: string, currentFilters?: FilterParams) => {
     if (!creatorName) return;
+
+    const effectiveFilters = currentFilters || filtersRef.current;
 
     try {
       setLoading(true);
       setError(null);
       setPosts([]);
 
-      // Update refs
       currentCreatorRef.current = creatorName;
       currentPlatformRef.current = platform;
 
-      setScrollState({
-        cursor: undefined,
-        hasMore: true,
-        loading: true,
-        initialLoaded: false
-      });
+      setScrollState({ cursor: undefined, hasMore: true, loading: true, initialLoaded: false });
 
-      const filters: FilterParams = {};
+      const apiParams: FilterParams = {
+        limit: 20,
+        sort_by: effectiveFilters.sort_by,
+        sort_order: effectiveFilters.sort_order,
+        search: effectiveFilters.search,
+      };
       if (platform) {
-        filters.platform = platform;
+        apiParams.platform = platform;
       }
 
-      const result = await cursorApiService.getCreatorVideosCursor(creatorName, {
-        limit: 20,
-        filters
-      });
+      const result = await cursorApiService.getCreatorVideosCursor(creatorName, apiParams);
 
       setPosts(result.data);
       setScrollState({
@@ -98,24 +98,15 @@ export const useCursorCreatorData = (): UseCursorCreatorDataResult => {
         initialLoaded: true
       });
 
-      console.log(`✅ Loaded ${result.data.length} creator videos, hasMore: ${result.pagination.has_more}`);
-
-    } catch (error: any) {
-      console.error('Error loading creator videos:', error);
-      setError(error.message || 'Error loading creator videos');
-      setScrollState(prev => ({
-        ...prev,
-        loading: false,
-        initialLoaded: true
-      }));
+    } catch (err: any) {
+      console.error('Error loading creator videos:', err);
+      setError(err.message || 'Error loading creator videos');
+      setScrollState(prev => ({ ...prev, loading: false, initialLoaded: true }));
     } finally {
       setLoading(false);
     }
-  }, []); // Remover dependencia loading temporalmente
+  }, []);
 
-  /**
-   * Load more videos (páginas siguientes)
-   */
   const loadMoreVideos = useCallback(async () => {
     if (loadingMore || !scrollState.hasMore || !scrollState.cursor || !currentCreatorRef.current) {
       return;
@@ -125,18 +116,19 @@ export const useCursorCreatorData = (): UseCursorCreatorDataResult => {
       setLoadingMore(true);
       setError(null);
 
-      const filters: FilterParams = {};
-      if (currentPlatformRef.current) {
-        filters.platform = currentPlatformRef.current;
-      }
-
-      const result = await cursorApiService.getCreatorVideosCursor(currentCreatorRef.current, {
+      const apiParams: FilterParams = {
         cursor: scrollState.cursor,
         limit: 20,
-        filters
-      });
+        sort_by: filtersRef.current.sort_by,
+        sort_order: filtersRef.current.sort_order,
+        search: filtersRef.current.search,
+      };
+      if (currentPlatformRef.current) {
+        apiParams.platform = currentPlatformRef.current;
+      }
 
-      // Evitar duplicados por ID
+      const result = await cursorApiService.getCreatorVideosCursor(currentCreatorRef.current, apiParams);
+
       setPosts(prevPosts => {
         const existingIds = new Set(prevPosts.map(post => post.id));
         const uniqueNewPosts = result.data.filter(post => !existingIds.has(post.id));
@@ -147,67 +139,54 @@ export const useCursorCreatorData = (): UseCursorCreatorDataResult => {
         cursor: result.pagination.next_cursor,
         hasMore: result.pagination.has_more,
         loading: false,
-        initialLoaded: true
+        initialLoaded: true,
       });
-    } catch (error: any) {
-      console.error('Error loading more creator videos:', error);
-      setError(error.message || 'Error loading more videos');
+    } catch (err: any) {
+      console.error('Error loading more creator videos:', err);
+      setError(err.message || 'Error loading more videos');
     } finally {
       setLoadingMore(false);
     }
-  }, [loadingMore, scrollState.hasMore, scrollState.cursor]);
+  }, [loadingMore, scrollState.cursor, scrollState.hasMore]);
 
-  /**
-   * Refresh data (reload current creator)
-   */
-  const refreshData = useCallback(async () => {
-    if (currentCreatorRef.current) {
-      await loadCreatorVideos(currentCreatorRef.current, currentPlatformRef.current);
-    }
+  const setAndReloadFilters = useCallback((newFilters: Partial<FilterParams>) => {
+    const updatedFilters = { ...filtersRef.current, ...newFilters };
+    setFilters(updatedFilters);
+    loadCreatorVideos(currentCreatorRef.current, currentPlatformRef.current, updatedFilters);
   }, [loadCreatorVideos]);
 
-  // Update refresh ref and setup WebSocket sync
+  const refreshData = useCallback(async () => {
+    if (currentCreatorRef.current) {
+      await loadCreatorVideos(currentCreatorRef.current, currentPlatformRef.current, filtersRef.current);
+    }
+  }, [loadCreatorVideos]);
+  
   useEffect(() => {
     refreshDataRef.current = refreshData;
   }, [refreshData]);
 
-  // WebSocket integration for real-time updates
   useCursorWebSocketSync(() => refreshDataRef.current?.() || Promise.resolve());
 
-  /**
-   * Clear all data
-   */
   const clearData = useCallback(() => {
     setPosts([]);
-    setScrollState({
-      hasMore: true,
-      loading: false,
-      initialLoaded: false
-    });
+    setFilters(INITIAL_FILTERS);
+    setScrollState({ hasMore: true, loading: false, initialLoaded: false });
     setError(null);
     currentCreatorRef.current = '';
     currentPlatformRef.current = undefined;
   }, []);
 
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      // Cleanup if needed
-    };
-  }, []);
-
   return {
-    // Data
     posts,
     loading,
     loadingMore,
     error,
     scrollState,
-
-    // Actions
+    filters,
     loadCreatorVideos,
     loadMoreVideos,
     refreshData,
-    clearData
+    clearData,
+    setAndReloadFilters,
   };
 };
