@@ -76,17 +76,19 @@ CREATE INDEX idx_subscriptions_account ON subscriptions(have_account);
 
 #### **Mapeo Correcto de 4K Apps a Subscriptions**
 
-| App | External UUID | Subscription Type | Is Account | Category Type | Descripción |
+| App | External UUID | Subscription Type | Have Account | Category Type | Descripción |
 |-----|--------------|------------------|------------|---------------|-------------|
 | **4K YouTube** | type=5 | account | TRUE | videos/shorts | Contenido propio del creador |
-| **4K YouTube** | type=3 | playlist | TRUE | videos/shorts | Listas del creador (Liked videos, Watch Later) |
+| **4K YouTube** | type=3 | playlist | TRUE | videos/shorts | Listas del creador (Liked videos/Videos que me gustan, Watch Later/Ver más tarde) |
+| **4K YouTube** | type=3 | search | FALSE | videos/shorts | Busqueda |
 | **4K TikTok** | type=1 + downloadFeed=1 | account | TRUE | videos | Feed del creador |
 | **4K TikTok** | type=1 + downloadLiked=1 | liked | TRUE | videos | Videos que le gustan al creador |
 | **4K TikTok** | type=1 + downloadFavorites=1 | saved | TRUE | videos | Favoritos del creador |
 | **4K TikTok** | type=2 | hashtag | FALSE | videos | Hashtag |
 | **4K TikTok** | type=3 | music | FALSE | videos | Música |
-| **4K Stogram** | type=1 | account | TRUE | feed/reels/stories | Cuenta de Instagram |
+| **4K Stogram** | type=1 | account | TRUE | feed/reels/stories/etc | Cuenta de Instagram |
 | **4K Stogram** | type=2 | hashtag | FALSE | feed/reels | Hashtag |
+| **4K Stogram** | type=3 | location | FALSE | feed/reels | Ubicación |
 | **4K Stogram** | type=4 | saved | TRUE | feed/reels | Contenido guardado |
 
 ### **Estrategia de Vinculación de Creadores**
