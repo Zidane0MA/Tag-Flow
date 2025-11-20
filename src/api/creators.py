@@ -155,24 +155,38 @@ def api_get_creator(creator_name):
         for row in rows:
             platform_name = row['platform_name']
             if platform_name not in creator_data['platforms']:
-                # Mapear URLs y suscripciones como en la versión anterior
-                # Se eliminan los platform_urls ya que solo se usará la URL del perfil
-                subscription_types = {
-                    'youtube': ('channel', 'Canal'),
-                    'tiktok': ('feed', 'Feed'),
-                    'instagram': ('feed', 'Feed'),
-                }
-                sub_type, sub_name = subscription_types.get(platform_name, ('feed', 'Feed'))
-
                 creator_data['platforms'][platform_name] = {
-                    'url': row['profile_url'], # Usar profile_url directamente de la BD
+                    'url': row['profile_url'],
                     'postCount': row['post_count'],
-                    'subscriptions': [{
-                        'type': sub_type,
-                        'id': f'{creator_name.lower().replace(" ", "_")}_{platform_name}_main',
-                        'name': f'{sub_name} Principal'
-                    }]
+                    'subscriptions': []
                 }
+
+        # Obtener suscripciones reales de la base de datos
+        with db.get_connection() as conn:
+            cursor = conn.execute('''
+                SELECT id, name, platform_id, subscription_type, subscription_url, external_uuid 
+                FROM subscriptions 
+                WHERE creator_id = ?
+            ''', (creator_data['id'],))
+            
+            subscriptions_rows = cursor.fetchall()
+            
+            # Mapear IDs de plataforma a nombres
+            cursor = conn.execute('SELECT id, name FROM platforms')
+            platform_map = {row[0]: row[1] for row in cursor.fetchall()}
+
+            for sub in subscriptions_rows:
+                sub_platform_id = sub[2]
+                platform_name = platform_map.get(sub_platform_id)
+                
+                if platform_name and platform_name in creator_data['platforms']:
+                    creator_data['platforms'][platform_name]['subscriptions'].append({
+                        'id': sub[0], # Usar ID real de la BD
+                        'name': sub[1],
+                        'type': sub[3],
+                        'url': sub[4],
+                        'external_uuid': sub[5]
+                    })
         
         return jsonify({
             'success': True,

@@ -22,11 +22,11 @@ export enum EditStatus {
 }
 
 export enum ProcessStatus {
-    PENDING = 'pending',
-    PROCESSING = 'processing',
-    COMPLETED = 'completed',
-    FAILED = 'failed',
-    SKIPPED = 'skipped'
+  PENDING = 'pending',
+  PROCESSING = 'processing',
+  COMPLETED = 'completed',
+  FAILED = 'failed',
+  SKIPPED = 'skipped'
 }
 
 export enum Difficulty {
@@ -39,7 +39,7 @@ export type SubscriptionType = 'account' | 'playlist' | 'hashtag' | 'location' |
 
 export interface Subscription {
   type: SubscriptionType;
-  id: string; 
+  id: string | number;
   name: string;
 }
 
@@ -90,26 +90,26 @@ export interface CreatorPlatformInfo {
 }
 
 export interface Creator {
-    id: number;
-    name: string; // The creator name
-    displayName: string; // The display name
-    platforms: Partial<Record<Platform, CreatorPlatformInfo>>;
-    parentCreatorId?: number; // For alias relationships
-    isPrimary: boolean;
-    aliasType?: 'main' | 'alias' | 'variation';
+  id: number;
+  name: string; // The creator name
+  displayName: string; // The display name
+  platforms: Partial<Record<Platform, CreatorPlatformInfo>>;
+  parentCreatorId?: number; // For alias relationships
+  isPrimary: boolean;
+  aliasType?: 'main' | 'alias' | 'variation';
 }
 
 export interface SubscriptionInfo {
-    id: number;
-    name: string;
-    type: SubscriptionType;
-    platform: Platform;
-    url?: string;
-    postCount: number;
-    isAccount: boolean; // TRUE for account subscriptions
-    creatorId?: number; // For account subscriptions
-    creatorName?: string; // Creator name for display
-    externalUuid?: string; // For 4K apps mapping
+  id: number;
+  name: string;
+  type: SubscriptionType;
+  platform: Platform;
+  url?: string;
+  postCount: number;
+  isAccount: boolean; // TRUE for account subscriptions
+  creatorId?: number; // For account subscriptions
+  creatorName?: string; // Creator name for display
+  externalUuid?: string; // For 4K apps mapping
 }
 
 
@@ -122,10 +122,10 @@ export interface DataContextType {
   moveToTrash: (id: string) => void;
   moveMultipleToTrash: (ids: string[]) => void;
   restoreFromTrash: (id: string) => void;
-  deletePermanently: (id: string) => Promise<{success: boolean, message?: string}>;
+  deletePermanently: (id: string) => Promise<{ success: boolean, message?: string }>;
   emptyTrash: () => void;
   analyzePost: (id: string) => Promise<void>;
-  reanalyzePosts: (ids:string[]) => Promise<void>;
+  reanalyzePosts: (ids: string[]) => Promise<void>;
   getStats: () => {
     total: number;
     totalInDB: number;

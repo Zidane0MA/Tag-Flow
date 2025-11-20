@@ -3,21 +3,22 @@ import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import { useCursorCreatorData } from '../hooks/useCursorCreatorData';
 import { useCursorData } from '../hooks/useCursorData';
-import { Creator, Platform, CreatorPlatformInfo } from '../types'; // Added Creator import
+import { Creator, Platform, CreatorPlatformInfo } from '../types';
 import PostCard from '../components/VideoCard';
 import Breadcrumbs, { Crumb } from '../components/Breadcrumbs';
 import PlatformTabs, { Tab } from '../components/PlatformTabs';
+import SubscriptionList from '../components/SubscriptionList'; // New import
 import { ICONS, getSubscriptionIcon, getCategoryIcon } from '../constants';
-import { apiService } from '../services/apiService'; // Added apiService import
+import { apiService } from '../services/apiService';
 
 const CreatorPage: React.FC = () => {
     const { creatorName, platform: platformParam, subscriptionId } = useParams<{ creatorName: string, platform?: string, subscriptionId?: string }>();
     const location = useLocation();
     
     // State for fetched creator metadata
-    const [fetchedCreator, setFetchedCreator] = useState<Creator | null>(null); // New state
-    const [creatorMetadataLoading, setCreatorMetadataLoading] = useState<boolean>(true); // New state
-    const [creatorMetadataError, setCreatorMetadataError] = useState<string | null>(null); // New state
+    const [fetchedCreator, setFetchedCreator] = useState<Creator | null>(null);
+    const [creatorMetadataLoading, setCreatorMetadataLoading] = useState<boolean>(true);
+    const [creatorMetadataError, setCreatorMetadataError] = useState<string | null>(null);
     
     // Decode URL-encoded platform parameter
     const decodedPlatform = platformParam ? decodeURIComponent(platformParam) : undefined;
@@ -26,6 +27,7 @@ const CreatorPage: React.FC = () => {
         posts: displayedPosts,
         loading: postsLoading,
         loadingMore,
+        loading: videosLoading, // Add this if available in hook, otherwise use postsLoading
         error: videosError,
         scrollState,
         loadCreatorVideos,
@@ -72,21 +74,49 @@ const CreatorPage: React.FC = () => {
         return fetchedCreator;
     }, [fetchedCreator]);
     
+    // Get subscriptions for the active platform
+    const activePlatformSubscriptions = useMemo(() => {
+        if (!creator || !activePlatform || !creator.platforms) return [];
+        const platformInfo = creator.platforms[activePlatform];
+        return platformInfo?.subscriptions || [];
+    }, [creator, activePlatform]);
 
     // Load creator videos when params change (with ref to prevent duplicates)
     const lastLoadParamsRef = useRef<string>('');
     useEffect(() => {
         if (creatorName) {
-            const loadKey = `${creatorName}|${activePlatform || 'all'}`;
+            // If subscriptionId is present, we need to wait for creator data to get the subscription type
+            // unless creator data is already loaded or we failed to load it.
+            if (subscriptionId && creatorMetadataLoading) {
+                return;
+            }
+
+            let subType: string | undefined = undefined;
+            let effectiveSubId: string | undefined = undefined;
+
+            if (subscriptionId && activePlatformSubscriptions.length > 0) {
+                const sub = activePlatformSubscriptions.find(s => s.id.toString() === subscriptionId);
+                if (sub) {
+                    // If the ID is a number, it's a real DB subscription.
+                    // If it's a string, it's a generated "Main Feed" (which means all videos for platform).
+                    if (typeof sub.id === 'number') {
+                        subType = sub.type;
+                        effectiveSubId = subscriptionId;
+                    }
+                }
+            }
+
+            const loadKey = `${creatorName}|${activePlatform || 'all'}|${effectiveSubId || 'all'}|${subType || 'none'}`;
+            
             if (lastLoadParamsRef.current !== loadKey) {
                 lastLoadParamsRef.current = loadKey;
-                loadCreatorVideos(creatorName, activePlatform);
+                loadCreatorVideos(creatorName, activePlatform, effectiveSubId, subType); 
             }
         } else {
             lastLoadParamsRef.current = '';
             clearData();
         }
-    }, [creatorName, activePlatform, loadCreatorVideos, clearData]);
+    }, [creatorName, activePlatform, subscriptionId, loadCreatorVideos, clearData, creatorMetadataLoading, activePlatformSubscriptions]);
 
     // Handle navigation from video player - scroll to video and highlight
     useEffect(() => {
@@ -164,10 +194,7 @@ const CreatorPage: React.FC = () => {
         return displayedPosts.length;
     }, [displayedPosts.length]);
 
-    // Simplified: No subscription tabs for now
-    const subscriptionTabs: Tab[] | undefined = undefined;
-
-    // Dynamically generate platform tabs - MOVED UP
+    // Dynamically generate platform tabs
     const platformTabs: Tab[] = useMemo(() => {
         const tabs: Tab[] = [{ id: 'all', label: 'All', count: creator?.platforms ? (Object.values(creator.platforms) as CreatorPlatformInfo[]).reduce((sum, p) => sum + p.postCount, 0) : totalPostCount }];
 
@@ -185,9 +212,9 @@ const CreatorPage: React.FC = () => {
             if (b.id === 'all') return 1;
             return a.label.localeCompare(b.label);
         });
-    }, [creator, totalPostCount]); // Dependency on creator
+    }, [creator, totalPostCount]);
 
-    const handlePlatformTabClick = (platformId: string) => { // MOVED UP
+    const handlePlatformTabClick = (platformId: string) => {
         if (platformId === 'all') {
             navigate(`/creator/${encodeURIComponent(creatorName || '')}`);
         }
@@ -196,16 +223,8 @@ const CreatorPage: React.FC = () => {
         }
     };
     
-    const handleSubscriptionTabClick = (subId: string) => { // This was already defined before the block
-        if (subId === 'sub-all') {
-             navigate(`/creator/${creatorName}/${encodeURIComponent(activePlatform || '')}`);
-        }
-        else {
-            // Encontrar el ID real de la suscripción usando el ID del tab
-            const subTab = subscriptionTabs?.find(s => s.id === subId);
-            const realSubId = (subTab as any)?.subscriptionId || subId;
-            navigate(`/creator/${creatorName}/${encodeURIComponent(activePlatform || '')}/${encodeURIComponent(realSubId)}`);
-        }
+    const handleSubscriptionClick = (subId: string) => {
+        navigate(`/creator/${creatorName}/${encodeURIComponent(activePlatform || '')}/${encodeURIComponent(subId)}`);
     }
 
     // Early returns for loading and errors
@@ -247,10 +266,10 @@ const CreatorPage: React.FC = () => {
 
     if(activePlatform && decodedPlatform) {
         breadcrumbs.push({ label: activePlatform, href: `/creator/${creatorName}/${encodeURIComponent(activePlatform)}`});
-        if(subscriptionId && subscriptionTabs) {
-            const sub = subscriptionTabs.find(s => s.id === subscriptionId);
+        if(subscriptionId) {
+            const sub = activePlatformSubscriptions.find(s => s.id.toString() === subscriptionId);
             if(sub) {
-                breadcrumbs.push({ label: sub.label, href: `/creator/${creatorName}/${encodeURIComponent(activePlatform)}/${encodeURIComponent(subscriptionId)}`});
+                breadcrumbs.push({ label: sub.name, href: `/creator/${creatorName}/${encodeURIComponent(activePlatform)}/${encodeURIComponent(subscriptionId)}`});
             }
         }
     }
@@ -281,73 +300,75 @@ const CreatorPage: React.FC = () => {
             
             <PlatformTabs
                 tabs={platformTabs}
-                activeTab={activePlatform || 'all'} // Simplified active tab determination
+                activeTab={activePlatform || 'all'}
                 onTabClick={handlePlatformTabClick}
             />
 
-            {subscriptionTabs && (
-                 <PlatformTabs
-                    tabs={subscriptionTabs}
-                    activeTab={(() => {
-                        if (!subscriptionId) return 'sub-all';
-                        // Encontrar el tab ID que corresponde a la suscripción actual
-                        const subTab = subscriptionTabs.find(tab => (tab as any).subscriptionId === subscriptionId);
-                        return subTab?.id || 'sub-all';
-                    })()}
-                    onTabClick={handleSubscriptionTabClick}
-                    isSubTabs
-                />
-            )}
-            
-            {/* EXACTAMENTE IGUAL QUE GALLERY - NUNCA OCULTAR EL GRID */}
-            <div>
-                {displayedPosts.length > 0 ? (
-                    <>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-                            {displayedPosts.map(post => (
-                                <PostCard
-                                    key={post.id}
-                                    video={post}
-                                    videos={displayedPosts} // IGUAL QUE GALLERY - pasar array completo
-                                    isSelected={false}
-                                    onSelect={() => {}}
-                                    onEdit={() => {}}
-                                    isHighlighted={highlightedVideoId === post.id}
-                                    onRefresh={refreshData}
-                                />
-                            ))}
+            <div className="flex flex-col lg:flex-row gap-6">
+                {/* Sidebar for Subscriptions - Only show if we have subscriptions and a platform is selected */}
+                {activePlatform && activePlatformSubscriptions.length > 0 && (
+                    <aside className="w-full lg:w-64 flex-shrink-0 space-y-4">
+                        <div className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800/50">
+                            <SubscriptionList 
+                                subscriptions={activePlatformSubscriptions}
+                                activeSubscriptionId={subscriptionId}
+                                onSubscriptionClick={(id) => handleSubscriptionClick(id.toString())}
+                                platform={activePlatform}
+                            />
                         </div>
-                        
-                        {/* Indicador de carga para más contenido */}
-                        {loadingMore && (
-                            <div className="flex items-center justify-center py-8">
-                                <div className="flex items-center space-x-2 text-gray-400">
-                                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-red-500"></div>
-                                    <span>Cargando más videos...</span>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Mensaje de final de contenido */}
-                        {!scrollState.hasMore && displayedPosts.length > 0 && (
-                            <div className="text-center py-8 text-gray-400">
-                                <p>Has visto todos los videos disponibles del creador ({displayedPosts.length} videos)</p>
-                            </div>
-                        )}
-                    </>
-                ) : postsLoading && !scrollState.initialLoaded ? (
-                    <div className="flex items-center justify-center min-h-[400px]">
-                        <div className="text-center">
-                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-500 mx-auto mb-4"></div>
-                            <p className="text-white text-lg">Cargando videos del creador...</p>
-                        </div>
-                    </div>
-                ) : (
-                    <div className="text-center py-16">
-                        <h3 className="text-2xl font-semibold text-white">No se encontraron posts</h3>
-                        <p className="text-gray-400 mt-2">No hay contenido que coincida con los filtros seleccionados.</p>
-                    </div>
+                    </aside>
                 )}
+
+                {/* Main Content Grid */}
+                <div className="flex-1 min-w-0">
+                    {displayedPosts.length > 0 ? (
+                        <>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                                {displayedPosts.map(post => (
+                                    <PostCard
+                                        key={post.id}
+                                        video={post}
+                                        videos={displayedPosts}
+                                        isSelected={false}
+                                        onSelect={() => {}}
+                                        onEdit={() => {}}
+                                        isHighlighted={highlightedVideoId === post.id}
+                                        onRefresh={refreshData}
+                                    />
+                                ))}
+                            </div>
+                            
+                            {/* Indicador de carga para más contenido */}
+                            {loadingMore && (
+                                <div className="flex items-center justify-center py-8">
+                                    <div className="flex items-center space-x-2 text-gray-400">
+                                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-red-500"></div>
+                                        <span>Cargando más videos...</span>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Mensaje de final de contenido */}
+                            {!scrollState.hasMore && displayedPosts.length > 0 && (
+                                <div className="text-center py-8 text-gray-400">
+                                    <p>Has visto todos los videos disponibles ({displayedPosts.length} videos)</p>
+                                </div>
+                            )}
+                        </>
+                    ) : postsLoading && !scrollState.initialLoaded ? (
+                        <div className="flex items-center justify-center min-h-[400px]">
+                            <div className="text-center">
+                                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-500 mx-auto mb-4"></div>
+                                <p className="text-white text-lg">Cargando videos del creador...</p>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="text-center py-16 bg-[#1a1a1a] rounded-xl border border-gray-800/50">
+                            <h3 className="text-2xl font-semibold text-white">No se encontraron posts</h3>
+                            <p className="text-gray-400 mt-2">No hay contenido que coincida con los filtros seleccionados.</p>
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
     );

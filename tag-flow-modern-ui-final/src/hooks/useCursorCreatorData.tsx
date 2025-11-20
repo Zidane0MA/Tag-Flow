@@ -5,7 +5,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { Post } from '../types';
 import { cursorApiService } from '../services/pagination/cursorApiService';
-import { FilterParams } from '../services/pagination/types';
+import { FilterParams, CursorPaginationParams } from '../services/pagination/types';
 import { useCursorWebSocketSync } from './useWebSocketUpdates';
 
 interface ScrollState {
@@ -25,7 +25,7 @@ interface CreatorDataState {
 }
 
 interface UseCursorCreatorDataResult extends CreatorDataState {
-  loadCreatorVideos: (creatorName: string, platform?: string) => Promise<void>;
+  loadCreatorVideos: (creatorName: string, platform?: string, subscriptionId?: string, subscriptionType?: string) => Promise<void>;
   loadMoreVideos: () => Promise<void>;
   refreshData: () => Promise<void>;
   clearData: () => void;
@@ -54,6 +54,8 @@ export const useCursorCreatorData = (): UseCursorCreatorDataResult => {
   // Refs para evitar stale closures
   const currentCreatorRef = useRef<string>('');
   const currentPlatformRef = useRef<string | undefined>(undefined);
+  const currentSubscriptionIdRef = useRef<string | undefined>(undefined);
+  const currentSubscriptionTypeRef = useRef<string | undefined>(undefined);
   const filtersRef = useRef(filters);
 
   // WebSocket integration
@@ -63,7 +65,7 @@ export const useCursorCreatorData = (): UseCursorCreatorDataResult => {
     filtersRef.current = filters;
   }, [filters]);
 
-  const loadCreatorVideos = useCallback(async (creatorName: string, platform?: string, currentFilters?: FilterParams) => {
+  const loadCreatorVideos = useCallback(async (creatorName: string, platform?: string, subscriptionId?: string, subscriptionType?: string, currentFilters?: FilterParams) => {
     if (!creatorName) return;
 
     const effectiveFilters = currentFilters || filtersRef.current;
@@ -75,22 +77,40 @@ export const useCursorCreatorData = (): UseCursorCreatorDataResult => {
 
       currentCreatorRef.current = creatorName;
       currentPlatformRef.current = platform;
+      currentSubscriptionIdRef.current = subscriptionId;
+      currentSubscriptionTypeRef.current = subscriptionType;
 
       setScrollState({ cursor: undefined, hasMore: true, loading: true, initialLoaded: false });
 
-      const apiParams: CursorPaginationParams = {
-        limit: 20,
-        filters: { // All filter params go inside 'filters' object
-            sort_by: effectiveFilters.sort_by,
-            sort_order: effectiveFilters.sort_order,
-            search: effectiveFilters.search,
-        }
-      };
-      if (platform) {
-        apiParams.filters.platform = platform;
+      let result;
+      
+      if (subscriptionId && subscriptionType) {
+          // Load subscription videos
+          // Note: subscriptionId is passed as string but API expects number usually, check API service
+          // cursorApiService.getSubscriptionVideosCursor expects number for id
+          const subIdNum = parseInt(subscriptionId);
+          if (!isNaN(subIdNum)) {
+            result = await cursorApiService.getSubscriptionVideosCursor(subscriptionType, subIdNum, {
+                limit: 20
+            });
+          } else {
+             throw new Error("Invalid subscription ID");
+          }
+      } else {
+          // Load creator videos
+          const apiParams: CursorPaginationParams = {
+            limit: 20,
+            filters: { // All filter params go inside 'filters' object
+                sort_by: effectiveFilters.sort_by,
+                sort_order: effectiveFilters.sort_order,
+                search: effectiveFilters.search,
+            }
+          };
+          if (platform) {
+            apiParams.filters.platform = platform;
+          }
+          result = await cursorApiService.getCreatorVideosCursor(creatorName, apiParams);
       }
-
-      const result = await cursorApiService.getCreatorVideosCursor(creatorName, apiParams);
 
       setPosts(result.data);
       setScrollState({
@@ -118,20 +138,35 @@ export const useCursorCreatorData = (): UseCursorCreatorDataResult => {
       setLoadingMore(true);
       setError(null);
 
-      const apiParams: CursorPaginationParams = {
-        cursor: scrollState.cursor,
-        limit: 20,
-        filters: {
-            sort_by: filtersRef.current.sort_by,
-            sort_order: filtersRef.current.sort_order,
-            search: filtersRef.current.search,
-        }
-      };
-      if (currentPlatformRef.current) {
-        apiParams.filters.platform = currentPlatformRef.current;
-      }
+      let result;
 
-      const result = await cursorApiService.getCreatorVideosCursor(currentCreatorRef.current, apiParams);
+      if (currentSubscriptionIdRef.current && currentSubscriptionTypeRef.current) {
+           // Load more subscription videos
+           const subIdNum = parseInt(currentSubscriptionIdRef.current);
+           result = await cursorApiService.getSubscriptionVideosCursor(
+            currentSubscriptionTypeRef.current,
+            subIdNum,
+            {
+              cursor: scrollState.cursor,
+              limit: 20
+            }
+          );
+      } else {
+          // Load more creator videos
+          const apiParams: CursorPaginationParams = {
+            cursor: scrollState.cursor,
+            limit: 20,
+            filters: {
+                sort_by: filtersRef.current.sort_by,
+                sort_order: filtersRef.current.sort_order,
+                search: filtersRef.current.search,
+            }
+          };
+          if (currentPlatformRef.current) {
+            apiParams.filters.platform = currentPlatformRef.current;
+          }
+          result = await cursorApiService.getCreatorVideosCursor(currentCreatorRef.current, apiParams);
+      }
 
       setPosts(prevPosts => {
         const existingIds = new Set(prevPosts.map(post => post.id));
@@ -156,12 +191,12 @@ export const useCursorCreatorData = (): UseCursorCreatorDataResult => {
   const setAndReloadFilters = useCallback((newFilters: Partial<FilterParams>) => {
     const updatedFilters = { ...filtersRef.current, ...newFilters };
     setFilters(updatedFilters);
-    loadCreatorVideos(currentCreatorRef.current, currentPlatformRef.current, updatedFilters);
+    loadCreatorVideos(currentCreatorRef.current, currentPlatformRef.current, currentSubscriptionIdRef.current, currentSubscriptionTypeRef.current, updatedFilters);
   }, [loadCreatorVideos]);
 
   const refreshData = useCallback(async () => {
     if (currentCreatorRef.current) {
-      await loadCreatorVideos(currentCreatorRef.current, currentPlatformRef.current, filtersRef.current);
+      await loadCreatorVideos(currentCreatorRef.current, currentPlatformRef.current, currentSubscriptionIdRef.current, currentSubscriptionTypeRef.current, filtersRef.current);
     }
   }, [loadCreatorVideos]);
   
@@ -178,6 +213,8 @@ export const useCursorCreatorData = (): UseCursorCreatorDataResult => {
     setError(null);
     currentCreatorRef.current = '';
     currentPlatformRef.current = undefined;
+    currentSubscriptionIdRef.current = undefined;
+    currentSubscriptionTypeRef.current = undefined;
   }, []);
 
   return {
