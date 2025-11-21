@@ -3,7 +3,7 @@ import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import { useCursorCreatorData } from '../hooks/useCursorCreatorData';
 import { useCursorData } from '../hooks/useCursorData';
-import { Creator, Platform, CreatorPlatformInfo } from '../types';
+import { Creator, Platform, CreatorPlatformInfo, CategoryType } from '../types';
 import PostCard from '../components/VideoCard';
 import Breadcrumbs, { Crumb } from '../components/Breadcrumbs';
 import PlatformTabs, { Tab } from '../components/PlatformTabs';
@@ -43,10 +43,63 @@ const CreatorPage: React.FC = () => {
     const [highlightedVideoId, setHighlightedVideoId] = useState<string | null>(highlightVideoId || null);
     const scrolledToVideoRef = useRef(false);
     
-    
+    // Search, Filter, Sort State
+    const [showSearch, setShowSearch] = useState(false);
+    const [searchText, setSearchText] = useState('');
+    const [showFilterMenu, setShowFilterMenu] = useState(false);
+    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+    const [selectedFilters, setSelectedFilters] = useState<string[]>([]);
+    const searchInputRef = useRef<HTMLInputElement>(null);
+
     const activePlatform = useMemo(() => {
         return decodedPlatform as Platform | undefined;
     }, [decodedPlatform]);
+
+    // Focus search input when shown
+    useEffect(() => {
+        if (showSearch && searchInputRef.current) {
+            searchInputRef.current.focus();
+        }
+    }, [showSearch]);
+
+    // Close filter menu when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            const target = event.target as HTMLElement;
+            if (showFilterMenu && !target.closest('.filter-menu-container')) {
+                setShowFilterMenu(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [showFilterMenu]);
+
+    const toggleSort = () => {
+        setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+    };
+
+    const toggleFilter = (filter: string) => {
+        setSelectedFilters(prev => 
+            prev.includes(filter) 
+                ? prev.filter(f => f !== filter)
+                : [...prev, filter]
+        );
+    };
+
+    const getPlatformCategories = (platform?: Platform): CategoryType[] => {
+        switch (platform) {
+            case Platform.INSTAGRAM:
+                return ['feed', 'reels', 'stories', 'highlights', 'tagged'];
+            case Platform.YOUTUBE:
+                return ['videos', 'shorts'];
+            case Platform.TIKTOK:
+                return ['videos']; // TikTok usually just has videos (rack)
+            default:
+                return ['videos'];
+        }
+    };
+
+    const availableCategories = useMemo(() => getPlatformCategories(activePlatform), [activePlatform]);
 
     // Fetch creator metadata
     useEffect(() => {
@@ -194,6 +247,54 @@ const CreatorPage: React.FC = () => {
         return displayedPosts.length;
     }, [displayedPosts.length]);
 
+    // Filter and Sort Posts
+    const filteredPosts = useMemo(() => {
+        let posts = [...displayedPosts];
+
+        // Filter by search text
+        if (searchText) {
+            const lowerSearch = searchText.toLowerCase();
+            posts = posts.filter(post => 
+                post.title.toLowerCase().includes(lowerSearch) || 
+                (post.notes && post.notes.toLowerCase().includes(lowerSearch))
+            );
+        }
+
+        // Filter by selected filters
+        if (selectedFilters.length > 0) {
+            const categoryFilters = selectedFilters.filter(f => availableCategories.includes(f as CategoryType));
+            const normalFilters = selectedFilters.filter(f => !availableCategories.includes(f as CategoryType));
+
+            posts = posts.filter(post => {
+                // Check "Normales" filters
+                if (normalFilters.includes('Descargados') && !post.downloadDate) return false;
+                // if (normalFilters.includes('Pendientes') && post.processStatus !== 'pending') return false; 
+                // if (normalFilters.includes('Favoritos') && post.subscription?.type !== 'liked') return false;
+
+                // Check "Dinámicos" filters (categories)
+                if (categoryFilters.length > 0) {
+                    if (!post.categories || !post.categories.some(c => categoryFilters.includes(c.type))) {
+                        return false;
+                    }
+                }
+                
+                return true;
+            });
+        }
+
+        // Sort
+        return posts.sort((a, b) => {
+            const dateA = new Date(a.publicationDate || a.downloadDate || 0).getTime();
+            const dateB = new Date(b.publicationDate || b.downloadDate || 0).getTime();
+            
+            if (sortOrder === 'asc') {
+                return dateA - dateB;
+            } else {
+                return dateB - dateA;
+            }
+        });
+    }, [displayedPosts, searchText, selectedFilters, sortOrder, availableCategories]);
+
     // Dynamically generate platform tabs
     const platformTabs: Tab[] = useMemo(() => {
         const tabs: Tab[] = [{ id: 'all', label: 'All', count: creator?.platforms ? (Object.values(creator.platforms) as CreatorPlatformInfo[]).reduce((sum, p) => sum + p.postCount, 0) : totalPostCount }];
@@ -298,11 +399,105 @@ const CreatorPage: React.FC = () => {
                 </div>
             </header>
             
-            <PlatformTabs
-                tabs={platformTabs}
-                activeTab={activePlatform || 'all'}
-                onTabClick={handlePlatformTabClick}
-            />
+            <div className="flex flex-col md:flex-row justify-between items-end gap-4">
+                <div className="flex-1 w-full md:w-auto">
+                    <PlatformTabs
+                        tabs={platformTabs}
+                        activeTab={activePlatform || 'all'}
+                        onTabClick={handlePlatformTabClick}
+                    />
+                </div>
+
+                <div className="flex items-center gap-2 bg-black/30 p-1.5 rounded-lg mb-6">
+                    {/* Search Input */}
+                    <div className={`transition-all duration-300 overflow-hidden flex items-center ${showSearch ? 'w-48 opacity-100 border-b border-gray-500 mr-2' : 'w-0 opacity-0'}`}>
+                        <input 
+                            ref={searchInputRef}
+                            type="text" 
+                            className="bg-transparent text-white px-2 py-1 focus:outline-none w-full text-sm"
+                            placeholder="Buscar..."
+                            value={searchText}
+                            onChange={(e) => setSearchText(e.target.value)}
+                        />
+                    </div>
+                    <button 
+                        onClick={() => setShowSearch(!showSearch)} 
+                        className={`p-2 hover:bg-white/10 rounded-lg transition ${showSearch ? 'text-white' : 'text-gray-400'}`}
+                        title="Buscar"
+                    >
+                        {React.cloneElement(ICONS.search, { className: 'h-5 w-5' })}
+                    </button>
+
+                    {/* Filter Button & Popover */}
+                    <div className="relative filter-menu-container">
+                        <button 
+                            onClick={() => setShowFilterMenu(!showFilterMenu)} 
+                            className={`p-2 hover:bg-white/10 rounded-lg transition ${showFilterMenu || selectedFilters.length > 0 ? 'text-white' : 'text-gray-400'}`}
+                            title="Filtrar"
+                        >
+                            {React.cloneElement(ICONS.filter, { className: 'h-5 w-5' })}
+                            {selectedFilters.length > 0 && (
+                                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+                            )}
+                        </button>
+                        
+                        {showFilterMenu && (
+                            <div className="absolute right-0 top-full mt-2 w-64 bg-[#1a1a1a] border border-gray-700 rounded-lg shadow-xl z-50 p-3">
+                                <div className="mb-3">
+                                    <div className="text-xs font-bold text-gray-500 uppercase mb-2 px-1">Normales</div>
+                                    <div className="space-y-1">
+                                        {['Descargados', 'Pendientes', 'Favoritos'].map(filter => (
+                                            <label key={filter} className="flex items-center gap-2 px-2 py-1.5 hover:bg-white/5 rounded cursor-pointer">
+                                                <input 
+                                                    type="checkbox" 
+                                                    checked={selectedFilters.includes(filter)}
+                                                    onChange={() => toggleFilter(filter)}
+                                                    className="rounded border-gray-600 bg-gray-800 text-red-600 focus:ring-red-500"
+                                                />
+                                                <span className="text-sm text-gray-300">{filter}</span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                </div>
+                                
+                                <div className="border-t border-gray-700 my-2"></div>
+                                
+                                <div>
+                                    <div className="text-xs font-bold text-gray-500 uppercase mb-2 px-1">Dinámicos</div>
+                                    <div className="space-y-1">
+                                        {availableCategories.map(category => (
+                                            <label key={category} className="flex items-center gap-2 px-2 py-1.5 hover:bg-white/5 rounded cursor-pointer">
+                                                <input 
+                                                    type="checkbox" 
+                                                    checked={selectedFilters.includes(category)}
+                                                    onChange={() => toggleFilter(category)}
+                                                    className="rounded border-gray-600 bg-gray-800 text-red-600 focus:ring-red-500"
+                                                />
+                                                <span className="flex items-center gap-2 text-sm text-gray-300">
+                                                    {getCategoryIcon(category, activePlatform)}
+                                                    <span className="capitalize">{category}</span>
+                                                </span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Sort Button */}
+                    <button 
+                        onClick={toggleSort} 
+                        className="p-2 hover:bg-white/10 rounded-lg transition text-gray-400 hover:text-white"
+                        title={`Ordenar ${sortOrder === 'asc' ? 'Ascendente' : 'Descendente'}`}
+                    >
+                        {sortOrder === 'asc' 
+                            ? React.cloneElement(ICONS.sort_asc, { className: 'h-5 w-5' })
+                            : React.cloneElement(ICONS.sort_desc, { className: 'h-5 w-5' })
+                        }
+                    </button>
+                </div>
+            </div>
 
             <div className="flex flex-col lg:flex-row gap-6">
                 {/* Sidebar for Subscriptions - Only show if we have subscriptions and a platform is selected */}
@@ -321,14 +516,14 @@ const CreatorPage: React.FC = () => {
 
                 {/* Main Content Grid */}
                 <div className="flex-1 min-w-0">
-                    {displayedPosts.length > 0 ? (
+                    {filteredPosts.length > 0 ? (
                         <>
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                                {displayedPosts.map(post => (
+                                {filteredPosts.map(post => (
                                     <PostCard
                                         key={post.id}
                                         video={post}
-                                        videos={displayedPosts}
+                                        videos={filteredPosts}
                                         isSelected={false}
                                         onSelect={() => {}}
                                         onEdit={() => {}}
@@ -349,9 +544,9 @@ const CreatorPage: React.FC = () => {
                             )}
 
                             {/* Mensaje de final de contenido */}
-                            {!scrollState.hasMore && displayedPosts.length > 0 && (
+                            {!scrollState.hasMore && filteredPosts.length > 0 && (
                                 <div className="text-center py-8 text-gray-400">
-                                    <p>Has visto todos los videos disponibles ({displayedPosts.length} videos)</p>
+                                    <p>Has visto todos los videos disponibles ({filteredPosts.length} videos)</p>
                                 </div>
                             )}
                         </>
