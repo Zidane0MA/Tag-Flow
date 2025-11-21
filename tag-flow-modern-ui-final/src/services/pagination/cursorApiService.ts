@@ -7,7 +7,9 @@ import { Post } from '../../types';
 import { CursorPaginationParams, CursorPaginationResult, FilterParams } from './types';
 import { cacheManager } from '../unifiedCacheManager';
 
-const API_BASE_URL = 'http://localhost:5000';
+const host = import.meta.env.VITE_BACKEND_HOST || 'localhost';
+const port = import.meta.env.VITE_BACKEND_PORT || 5000;
+const API_BASE_URL = `http://${host}:${port}`;
 
 class CursorApiService {
 

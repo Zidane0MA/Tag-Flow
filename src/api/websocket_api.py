@@ -83,10 +83,14 @@ def start_websocket_server():
     try:
         start_websocket_server_if_needed()
 
+        # Obtener configuración desde variables de entorno
+        ws_host = os.getenv('WEBSOCKET_HOST', 'localhost')
+        ws_port = os.getenv('WEBSOCKET_PORT', '8766')
+        
         return jsonify({
             'success': True,
             'message': 'WebSocket server iniciado',
-            'websocket_url': 'ws://localhost:8765'
+            'websocket_url': f'ws://{ws_host}:{ws_port}'
         })
 
     except Exception as e:

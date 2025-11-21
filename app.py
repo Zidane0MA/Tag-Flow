@@ -28,7 +28,26 @@ def create_app():
     # Crear aplicación Flask
     app = Flask(__name__)
     app.config.from_object(config)
-    CORS(app)
+    # Configurar CORS explícitamente para permitir acceso desde dispositivos móviles
+    # En desarrollo, permitir todos los orígenes. En producción, especificar dominios exactos.
+    CORS(app, resources={
+        r"/api/*": {
+            "origins": "*",  # En producción, cambiar a lista específica de dominios
+            "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+            "allow_headers": ["Content-Type", "Authorization"],
+            "expose_headers": ["Content-Type"],
+            "supports_credentials": False,
+            "max_age": 3600
+        },
+        r"/thumbnail/*": {
+            "origins": "*",
+            "methods": ["GET", "OPTIONS"]
+        },
+        r"/video-stream/*": {
+            "origins": "*",
+            "methods": ["GET", "OPTIONS"]
+        }
+    })
     
     # Asegurar que los directorios existen
     config.ensure_directories()

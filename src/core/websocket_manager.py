@@ -78,9 +78,12 @@ class WebSocketManager:
     - Reconexión automática
     """
     
-    def __init__(self, host: str = "localhost", port: int = 8766):
-        self.host = host
-        self.port = port
+    def __init__(self, host: str = None, port: int = None):
+        import os
+        
+        # Leer configuración desde variables de entorno
+        self.host = host or os.getenv('WEBSOCKET_HOST', 'localhost')
+        self.port = port or int(os.getenv('WEBSOCKET_PORT', '8766'))
         self.clients: Dict[str, Any] = {}
         self.subscriptions: Dict[str, Set[str]] = {}  # client_id -> set of operation_ids
         self.message_queue: Queue = Queue()

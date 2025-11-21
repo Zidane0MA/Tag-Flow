@@ -35,7 +35,7 @@ class WebSocketService {
   private clientId: string | null = null;
 
   // Configuración
-  private readonly websocketUrl = 'ws://localhost:8766';
+  private readonly websocketUrl = (() => { const backendHost = import.meta.env.VITE_BACKEND_HOST || 'localhost'; const websocketPort = import.meta.env.VITE_WEBSOCKET_PORT || '8766'; return `ws://${backendHost}:${websocketPort}`; })();
   private readonly heartbeatInterval = 30000; // 30 segundos
   private heartbeatTimer: NodeJS.Timeout | null = null;
 
