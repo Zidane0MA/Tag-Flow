@@ -295,14 +295,21 @@ const CreatorPage: React.FC = () => {
                             <div className="absolute right-0 top-full mt-2 w-64 bg-[#1a1a1a] border border-gray-700 rounded-lg shadow-xl z-50 p-3">
                                 <div className="mb-3">
                                     <div className="text-xs font-bold text-gray-500 uppercase mb-2 px-1">Ordenar por</div>
-                                    <select value={filters.sort_by} onChange={(e) => handleSortByChange(e.target.value)} className="w-full bg-gray-800 text-white text-sm rounded-md border-gray-600 focus:ring-red-500 focus:border-red-500 p-2">
-                                        <option value="publication_date">Publicación</option>
-                                        <option value="download_date">Descarga</option>
-                                        <option value="title">Título</option>
-                                        <option value="size">Tamaño</option>
-                                        <option value="duration">Duración</option>
-                                        <option value="id">ID</option>
-                                    </select>
+                                    <div className="relative">
+                                        <select value={filters.sort_by} onChange={(e) => handleSortByChange(e.target.value)} className="w-full bg-gray-800 text-white text-sm rounded-md border-gray-600 focus:outline-none focus:ring-1 focus:ring-red-500 focus:border-red-500 p-2 pr-10 cursor-pointer hover:border-gray-500 transition-colors appearance-none">
+                                            <option value="publication_date">Publicación</option>
+                                            <option value="download_date">Descarga</option>
+                                            <option value="title">Título</option>
+                                            <option value="size">Tamaño</option>
+                                            <option value="duration">Duración</option>
+                                            <option value="id">ID</option>
+                                        </select>
+                                        <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none text-gray-400">
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                            </svg>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div className="border-t border-gray-700 my-2"></div>
                                 <div>
