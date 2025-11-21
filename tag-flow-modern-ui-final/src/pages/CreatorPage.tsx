@@ -5,7 +5,7 @@ import { Creator, Platform, CreatorPlatformInfo, CategoryType } from '../types';
 import PostCard from '../components/VideoCard';
 import Breadcrumbs, { Crumb } from '../components/Breadcrumbs';
 import PlatformTabs, { Tab } from '../components/PlatformTabs';
-import SubscriptionList from '../components/SubscriptionList';
+
 import { ICONS, getSubscriptionIcon, getCategoryIcon } from '../constants';
 import { apiService } from '../services/apiService';
 
@@ -42,6 +42,7 @@ const CreatorPage: React.FC = () => {
     const [showSearch, setShowSearch] = useState(false);
     const [searchText, setSearchText] = useState('');
     const [showFilterMenu, setShowFilterMenu] = useState(false);
+    const [showSubscriptionMenu, setShowSubscriptionMenu] = useState(false);
     const [selectedDynamicFilters, setSelectedDynamicFilters] = useState<string[]>([]);
     const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -278,8 +279,48 @@ const CreatorPage: React.FC = () => {
             </header>
             
             <div className="flex flex-col md:flex-row justify-between items-end gap-4">
-                <div className="flex-1 w-full md:w-auto">
+                <div className="flex-1 w-full md:w-auto flex items-center justify-between gap-4">
                     <PlatformTabs tabs={platformTabs} activeTab={activePlatform || 'all'} onTabClick={handlePlatformTabClick} />
+                    
+                    {/* Subscription Dropdown Menu */}
+                    {activePlatform && activePlatformSubscriptions.length > 0 && (
+                        <div className="relative">
+                            <button 
+                                onClick={() => setShowSubscriptionMenu(!showSubscriptionMenu)}
+                                className={`p-2 rounded-lg transition-colors ${showSubscriptionMenu ? 'bg-red-600 text-white' : 'bg-[#212121]/50 text-gray-400 hover:text-white hover:bg-[#212121]'}`}
+                                title="Suscripciones"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                                </svg>
+                            </button>
+
+                            {showSubscriptionMenu && (
+                                <div className="absolute right-0 top-full mt-2 w-56 bg-[#1a1a1a] border border-gray-700 rounded-lg shadow-xl z-50 overflow-hidden">
+                                    <div className="p-2 border-b border-gray-800 bg-[#212121]/50">
+                                        <span className="text-xs font-bold text-gray-400 uppercase">Suscripciones</span>
+                                    </div>
+                                    <div className="max-h-64 overflow-y-auto">
+                                        {activePlatformSubscriptions.map(sub => (
+                                            <Link 
+                                                key={sub.id} 
+                                                to={`/subscription/${sub.type}/${sub.id}`}
+                                                className="block px-4 py-3 hover:bg-white/5 transition-colors border-b border-gray-800/50 last:border-0"
+                                                onClick={() => setShowSubscriptionMenu(false)}
+                                            >
+                                                <div className="flex items-center gap-3">
+                                                    {React.cloneElement(getSubscriptionIcon(sub.type), { className: 'h-4 w-4 text-red-500' })}
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-xs font-medium text-gray-200 truncate">{sub.name}</p>
+                                                    </div>
+                                                </div>
+                                            </Link>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
                 <div className="flex items-center gap-2 bg-black/30 p-1.5 rounded-lg">
                     <div className={`transition-all duration-300 overflow-hidden flex items-center ${showSearch ? 'w-48 opacity-100 border-b border-gray-500 mr-2' : 'w-0 opacity-0'}`}>
@@ -292,7 +333,7 @@ const CreatorPage: React.FC = () => {
                             {selectedDynamicFilters.length > 0 && (<span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>)}
                         </button>
                         {showFilterMenu && (
-                            <div className="absolute right-0 top-full mt-2 w-64 bg-[#1a1a1a] border border-gray-700 rounded-lg shadow-xl z-50 p-3">
+                            <div className="absolute right-0 top-full mt-2 w-56 bg-[#1a1a1a] border border-gray-700 rounded-lg shadow-xl z-50 p-3">
                                 <div className="mb-3">
                                     <div className="text-xs font-bold text-gray-500 uppercase mb-2 px-1">Ordenar por</div>
                                     <div className="relative">
@@ -331,50 +372,42 @@ const CreatorPage: React.FC = () => {
                     </button>
                 </div>
             </div>
-            <div className="flex flex-col lg:flex-row gap-6">
-                {activePlatform && activePlatformSubscriptions.length > 0 && (
-                    <aside className="w-full lg:w-64 flex-shrink-0 space-y-4">
-                        <div className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800/50">
-                            <SubscriptionList subscriptions={activePlatformSubscriptions} activeSubscriptionId={subscriptionId} onSubscriptionClick={(id) => handleSubscriptionClick(id.toString())} platform={activePlatform} />
+            
+            <div className="min-w-0">
+                {displayedPosts.length > 0 ? (
+                    <>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                            {displayedPosts.map(post => (
+                                <PostCard key={post.id} video={post} videos={displayedPosts} isSelected={false} onSelect={() => {}} onEdit={() => {}} isHighlighted={highlightedVideoId === post.id} onRefresh={refreshData} />
+                            ))}
                         </div>
-                    </aside>
+                        {loadingMore && (
+                            <div className="flex items-center justify-center py-8">
+                                <div className="flex items-center space-x-2 text-gray-400">
+                                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-red-500"></div>
+                                    <span>Cargando más videos...</span>
+                                </div>
+                            </div>
+                        )}
+                        {!scrollState.hasMore && displayedPosts.length > 0 && (
+                            <div className="text-center pt-8 text-gray-400">
+                                <p>Has visto todos los videos disponibles ({displayedPosts.length} videos)</p>
+                            </div>
+                        )}
+                    </>
+                ) : postsLoading ? (
+                    <div className="flex items-center justify-center min-h-[400px]">
+                        <div className="text-center">
+                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-500 mx-auto mb-4"></div>
+                            <p className="text-white text-lg">Cargando videos del creador...</p>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="text-center py-16 bg-[#1a1a1a] rounded-xl border border-gray-800/50">
+                        <h3 className="text-2xl font-semibold text-white">No se encontraron posts</h3>
+                        <p className="text-gray-400 mt-2">No hay contenido que coincida con los filtros seleccionados.</p>
+                    </div>
                 )}
-                <div className="flex-1 min-w-0">
-                    {displayedPosts.length > 0 ? (
-                        <>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                                {displayedPosts.map(post => (
-                                    <PostCard key={post.id} video={post} videos={displayedPosts} isSelected={false} onSelect={() => {}} onEdit={() => {}} isHighlighted={highlightedVideoId === post.id} onRefresh={refreshData} />
-                                ))}
-                            </div>
-                            {loadingMore && (
-                                <div className="flex items-center justify-center py-8">
-                                    <div className="flex items-center space-x-2 text-gray-400">
-                                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-red-500"></div>
-                                        <span>Cargando más videos...</span>
-                                    </div>
-                                </div>
-                            )}
-                            {!scrollState.hasMore && displayedPosts.length > 0 && (
-                                <div className="text-center pt-8 text-gray-400">
-                                    <p>Has visto todos los videos disponibles ({displayedPosts.length} videos)</p>
-                                </div>
-                            )}
-                        </>
-                    ) : postsLoading ? (
-                        <div className="flex items-center justify-center min-h-[400px]">
-                            <div className="text-center">
-                                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-500 mx-auto mb-4"></div>
-                                <p className="text-white text-lg">Cargando videos del creador...</p>
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="text-center py-16 bg-[#1a1a1a] rounded-xl border border-gray-800/50">
-                            <h3 className="text-2xl font-semibold text-white">No se encontraron posts</h3>
-                            <p className="text-gray-400 mt-2">No hay contenido que coincida con los filtros seleccionados.</p>
-                        </div>
-                    )}
-                </div>
             </div>
         </div>
     );
