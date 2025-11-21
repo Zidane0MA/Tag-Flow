@@ -25,13 +25,10 @@ const App: React.FC = () => {
           {/* All other routes use the main Layout component */}
           <Route path="/*" element={
             <Layout>
-              <Routes>
-                <Route path="/" element={<Navigate to="/gallery" replace />} />
-                <Route path="/gallery" element={
-                  <CursorDataProvider>
-                    <GalleryPage />
-                  </CursorDataProvider>
-                } />
+              <CursorDataProvider>
+                <Routes>
+                  <Route path="/" element={<Navigate to="/gallery" replace />} />
+                  <Route path="/gallery" element={<GalleryPage />} />
                   <Route path="/admin/*" element={<AdminPage />} />
                   <Route path="/trash" element={<TrashPage />} />
                   
@@ -51,7 +48,8 @@ const App: React.FC = () => {
                   {/* Fallback for any other route to redirect to gallery */}
                   <Route path="*" element={<Navigate to="/gallery" replace />} />
                 </Routes>
-              </Layout>
+              </CursorDataProvider>
+            </Layout>
             } />
           </Routes>
         </HashRouter>

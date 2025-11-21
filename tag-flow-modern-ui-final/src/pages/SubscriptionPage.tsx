@@ -4,7 +4,7 @@ import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useCursorSubscriptionData } from '../hooks/useCursorSubscriptionData';
 import { useCursorData } from '../hooks/useCursorData';
 import { apiService } from '../services/apiService';
-import { SubscriptionType, SubscriptionInfo } from '../types';
+import { SubscriptionType, SubscriptionInfo, CreatorPlatformInfo } from '../types';
 import Breadcrumbs, { Crumb } from '../components/Breadcrumbs';
 import { ICONS, getSubscriptionIcon, getCategoryIcon } from '../constants';
 import PostCard from '../components/VideoCard';
@@ -39,7 +39,7 @@ const SubscriptionPage: React.FC = () => {
 
     const getSubscriptionInfo = useCallback(async (type: SubscriptionType, id: string) => {
         try {
-            return await apiService.getSubscriptionInfo(type, id);
+            return await apiService.getSubscriptionInfo(type, parseInt(id, 10));
         } catch (error) {
             console.error('Error getting subscription info:', error);
             return undefined;
@@ -88,11 +88,11 @@ const SubscriptionPage: React.FC = () => {
                     if (creator) {
                         const platformKey = Object.keys(creator.platforms)[0] as any;
                         setSubscriptionInfo({
-                            id: creator.name,
+                            id: creator.name, // Use name as ID for account type
                             type: 'account' as SubscriptionType,
                             name: creator.displayName,
                             platform: platformKey,
-                            postCount: Object.values(creator.platforms).reduce((acc, p) => acc + (p?.postCount || 0), 0),
+                            postCount: Object.values(creator.platforms).reduce((acc: number, p) => acc + ((p as CreatorPlatformInfo)?.postCount || 0), 0),
                             creator: creator.name,
                             url: creator.platforms[platformKey]?.url,
                         });
@@ -310,7 +310,7 @@ const SubscriptionPage: React.FC = () => {
 
                         {/* Mensaje de final de contenido */}
                         {!scrollState.hasMore && displayedPosts.length > 0 && (
-                            <div className="text-center py-8 text-gray-400">
+                            <div className="text-center pt-8 text-gray-400">
                                 <p>Has visto todos los videos disponibles de la suscripción ({displayedPosts.length} videos)</p>
                             </div>
                         )}

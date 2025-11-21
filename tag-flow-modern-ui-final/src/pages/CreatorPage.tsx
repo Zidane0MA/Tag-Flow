@@ -349,7 +349,7 @@ const CreatorPage: React.FC = () => {
                                 </div>
                             )}
                             {!scrollState.hasMore && displayedPosts.length > 0 && (
-                                <div className="text-center py-8 text-gray-400">
+                                <div className="text-center pt-8 text-gray-400">
                                     <p>Has visto todos los videos disponibles ({displayedPosts.length} videos)</p>
                                 </div>
                             )}

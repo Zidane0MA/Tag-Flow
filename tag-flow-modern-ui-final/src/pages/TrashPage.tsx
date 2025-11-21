@@ -10,6 +10,7 @@ import BulkActionBar from '../components/BulkActionBar';
 import Modal from '../components/Modal';
 import PermanentDeleteModal from '../components/PermanentDeleteModal';
 import Toast from '../components/Toast';
+import Pagination from '../components/Pagination';
 
 const timeAgo = (date: string | Date): string => {
     const seconds = Math.floor((new Date().getTime() - new Date(date).getTime()) / 1000);

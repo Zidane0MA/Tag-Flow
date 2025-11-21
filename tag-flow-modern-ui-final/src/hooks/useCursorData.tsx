@@ -6,6 +6,7 @@
 import React, { createContext, useState, useContext, useCallback, useEffect, useRef } from 'react';
 import { Post, Platform, Creator } from '../types';
 import { cursorApiService } from '../services/pagination/cursorApiService';
+import { apiService } from '../services/apiService';
 import {
   CursorPaginationParams,
   FilterParams,
@@ -33,6 +34,7 @@ interface CursorDataContextType {
   loadMoreVideos: () => Promise<void>;
   refreshData: () => Promise<void>;
   clearData: () => void;
+  loadCreators: () => Promise<void>;
 
   // Filter management
   setFilters: (filters: FilterParams, sortBy?: string, sortOrder?: 'asc' | 'desc') => Promise<void>;
@@ -51,6 +53,12 @@ interface CursorDataContextType {
       avgQueryTime: number;
       cacheHitRate: number;
       totalQueries: number;
+    };
+    cache: {
+      hitRate: number;
+      totalEntries: number;
+      totalSizeBytes: number;
+      mostAccessed: string[];
     };
   };
 }
@@ -116,9 +124,21 @@ export const CursorDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const prefetch = useCursorWithPrefetch(cursorDataLoader, 'gallery-container', {
     threshold: 0.6,        // Activar prefetch al 60% del scroll (antes 80%)
     maxPrefetchPages: 5,   // Prefetch hasta 5 páginas (antes 3)
-    enablePredictive: true,
-    debounceMs: 100        // Reducir debounce para respuesta más rápida
+    enablePredictive: true
   });
+
+  /**
+   * Load creators list
+   */
+  const loadCreators = useCallback(async () => {
+    try {
+        const creatorsList = await apiService.getCreators();
+        setCreators(creatorsList);
+    } catch (err) {
+        console.error('Error loading creators:', err);
+        // No blocking error for creators, just log it
+    }
+  }, []);
 
   /**
    * Load initial videos with filters
@@ -206,7 +226,7 @@ export const CursorDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       console.log(`🔑 Cache key: ${cacheKey}, cursor: ${scrollState.cursor}`);
 
       let result: any;
-      const cachedResult = cacheManager.get(cacheKey);
+      const cachedResult = cacheManager.get(cacheKey) as any;
 
       if (cachedResult) {
         console.log('🚀 Using unified cache for loadMore');
@@ -307,7 +327,8 @@ export const CursorDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const refreshData = useCallback(async () => {
     setScrollState(prev => ({ ...prev, cursor: undefined, hasMore: true }));
     await loadVideos(currentFiltersRef.current);
-  }, [loadVideos]);
+    await loadCreators();
+  }, [loadVideos, loadCreators]);
 
   // WebSocket integration for real-time updates (after refreshData is defined)
   useCursorWebSocketSync(refreshData);
@@ -403,8 +424,9 @@ export const CursorDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     if (!initialLoadRef.current) {
       initialLoadRef.current = true;
       loadVideos();
+      loadCreators();
     }
-  }, [loadVideos]);
+  }, [loadVideos, loadCreators]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -432,6 +454,7 @@ export const CursorDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     loadMoreVideos,
     refreshData,
     clearData,
+    loadCreators,
 
     // Filter management
     setFilters,
