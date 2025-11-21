@@ -281,7 +281,7 @@ const CreatorPage: React.FC = () => {
                 <div className="flex-1 w-full md:w-auto">
                     <PlatformTabs tabs={platformTabs} activeTab={activePlatform || 'all'} onTabClick={handlePlatformTabClick} />
                 </div>
-                <div className="flex items-center gap-2 bg-black/30 p-1.5 rounded-lg mb-6">
+                <div className="flex items-center gap-2 bg-black/30 p-1.5 rounded-lg">
                     <div className={`transition-all duration-300 overflow-hidden flex items-center ${showSearch ? 'w-48 opacity-100 border-b border-gray-500 mr-2' : 'w-0 opacity-0'}`}>
                         <input ref={searchInputRef} type="text" className="bg-transparent text-white px-2 py-1 focus:outline-none w-full text-sm" placeholder="Buscar en este creador..." value={searchText} onChange={(e) => setSearchText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') handleSearchSubmit(); }} />
                     </div>

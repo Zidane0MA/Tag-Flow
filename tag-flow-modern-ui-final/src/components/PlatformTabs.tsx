@@ -26,7 +26,7 @@ const PlatformTabs: React.FC<PlatformTabsProps> = ({ tabs, activeTab, onTabClick
 
     if (isSubTabs) {
         return (
-             <div className="border-b border-gray-700/80 mb-6">
+             <div className="border-b border-gray-700/80">
                 <nav className="-mb-px flex space-x-6 overflow-x-auto no-scrollbar" aria-label="Sub-tabs">
                     {tabs.map(tab => (
                         <button
@@ -46,7 +46,7 @@ const PlatformTabs: React.FC<PlatformTabsProps> = ({ tabs, activeTab, onTabClick
     }
 
     return (
-        <nav className="flex flex-wrap items-center gap-2 p-1.5 bg-black/30 rounded-lg mb-6">
+        <nav className="flex flex-wrap items-center gap-2 p-1.5 bg-black/30 rounded-lg">
             {tabs.map(tab => (
                 <button
                     key={tab.id}
