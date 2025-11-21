@@ -62,10 +62,13 @@ const CreatorPage: React.FC = () => {
             if (showFilterMenu && !target.closest('.filter-menu-container')) {
                 setShowFilterMenu(false);
             }
+            if (showSubscriptionMenu && !target.closest('.subscription-menu-container')) {
+                setShowSubscriptionMenu(false);
+            }
         };
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, [showFilterMenu]);
+    }, [showFilterMenu, showSubscriptionMenu]);
 
     const handleSearchSubmit = useCallback(() => {
         if (searchText !== filters.search) {
@@ -284,7 +287,7 @@ const CreatorPage: React.FC = () => {
                     
                     {/* Subscription Dropdown Menu */}
                     {activePlatform && activePlatformSubscriptions.length > 0 && (
-                        <div className="relative">
+                        <div className="relative subscription-menu-container">
                             <button 
                                 onClick={() => setShowSubscriptionMenu(!showSubscriptionMenu)}
                                 className={`p-2 rounded-lg transition-colors ${showSubscriptionMenu ? 'bg-red-600 text-white' : 'bg-[#212121]/50 text-gray-400 hover:text-white hover:bg-[#212121]'}`}
@@ -296,26 +299,26 @@ const CreatorPage: React.FC = () => {
                             </button>
 
                             {showSubscriptionMenu && (
-                                <div className="absolute right-0 top-full mt-2 w-56 bg-[#1a1a1a] border border-gray-700 rounded-lg shadow-xl z-50 overflow-hidden">
-                                    <div className="p-2 border-b border-gray-800 bg-[#212121]/50">
-                                        <span className="text-xs font-bold text-gray-400 uppercase">Suscripciones</span>
-                                    </div>
-                                    <div className="max-h-64 overflow-y-auto">
-                                        {activePlatformSubscriptions.map(sub => (
-                                            <Link 
-                                                key={sub.id} 
-                                                to={`/subscription/${sub.type}/${sub.id}`}
-                                                className="block px-4 py-3 hover:bg-white/5 transition-colors border-b border-gray-800/50 last:border-0"
-                                                onClick={() => setShowSubscriptionMenu(false)}
-                                            >
-                                                <div className="flex items-center gap-3">
-                                                    {React.cloneElement(getSubscriptionIcon(sub.type), { className: 'h-4 w-4 text-red-500' })}
-                                                    <div className="flex-1 min-w-0">
-                                                        <p className="text-xs font-medium text-gray-200 truncate">{sub.name}</p>
+                                <div className="absolute right-0 top-full mt-2 w-56 bg-[#1a1a1a] border border-gray-700 rounded-lg shadow-xl z-50 p-3">
+                                    <div>
+                                        <div className="text-xs font-bold text-gray-500 uppercase mb-2 px-1">Suscripciones</div>
+                                        <div className="max-h-64 overflow-y-auto space-y-1">
+                                            {activePlatformSubscriptions.map(sub => (
+                                                <Link 
+                                                    key={sub.id} 
+                                                    to={`/subscription/${sub.type}/${sub.id}`}
+                                                    className="block px-2 py-2 hover:bg-white/5 rounded-md transition-colors"
+                                                    onClick={() => setShowSubscriptionMenu(false)}
+                                                >
+                                                    <div className="flex items-center gap-2">
+                                                        {React.cloneElement(getSubscriptionIcon(sub.type), { className: 'h-4 w-4 text-red-500' })}
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className="text-xs font-medium text-gray-200 truncate">{sub.name}</p>
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            </Link>
-                                        ))}
+                                                </Link>
+                                            ))}
+                                        </div>
                                     </div>
                                 </div>
                             )}
