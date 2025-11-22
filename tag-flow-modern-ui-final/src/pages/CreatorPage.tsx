@@ -281,13 +281,13 @@ const CreatorPage: React.FC = () => {
                 </div>
             </header>
             
-            <div className="flex flex-col md:flex-row justify-between items-end gap-4">
-                <div className="flex-1 w-full md:w-auto flex items-center justify-between gap-4">
+            <div className="flex flex-row items-center justify-between gap-2">
+                <div className="flex-1 min-w-0 flex items-center justify-between gap-2">
                     <PlatformTabs tabs={platformTabs} activeTab={activePlatform || 'all'} onTabClick={handlePlatformTabClick} />
                     
                     {/* Subscription Dropdown Menu */}
                     {activePlatform && activePlatformSubscriptions.length > 0 && (
-                        <div className="relative subscription-menu-container">
+                        <div className="relative subscription-menu-container flex-shrink-0">
                             <button 
                                 onClick={() => setShowSubscriptionMenu(!showSubscriptionMenu)}
                                 className={`p-2 rounded-lg transition-colors ${showSubscriptionMenu ? 'bg-red-600 text-white' : 'bg-[#212121]/50 text-gray-400 hover:text-white hover:bg-[#212121]'}`}
@@ -325,9 +325,9 @@ const CreatorPage: React.FC = () => {
                         </div>
                     )}
                 </div>
-                <div className="flex items-center gap-2 bg-black/30 p-1.5 rounded-lg">
-                    <div className={`transition-all duration-300 overflow-hidden flex items-center ${showSearch ? 'w-48 opacity-100 border-b border-gray-500 mr-2' : 'w-0 opacity-0'}`}>
-                        <input ref={searchInputRef} type="text" className="bg-transparent text-white px-2 py-1 focus:outline-none w-full text-sm" placeholder="Buscar en este creador..." value={searchText} onChange={(e) => setSearchText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') handleSearchSubmit(); }} />
+                <div className="flex items-center gap-2 bg-black/30 p-1.5 rounded-lg flex-shrink-0">
+                    <div className={`transition-all duration-300 overflow-hidden flex items-center ${showSearch ? 'w-24 opacity-100 border-b border-gray-500 mr-2' : 'w-0 opacity-0'}`}>
+                        <input ref={searchInputRef} type="text" className="bg-transparent text-white px-2 py-1 focus:outline-none w-full text-sm" placeholder="Buscar..." value={searchText} onChange={(e) => setSearchText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') handleSearchSubmit(); }} />
                     </div>
                     <button onClick={() => setShowSearch(!showSearch)} className={`p-2 hover:bg-white/10 rounded-lg transition ${showSearch ? 'text-white' : 'text-gray-400'}`} title="Buscar">{React.cloneElement(ICONS.search, { className: 'h-5 w-5' })}</button>
                     <div className="relative filter-menu-container">

@@ -46,7 +46,7 @@ const PlatformTabs: React.FC<PlatformTabsProps> = ({ tabs, activeTab, onTabClick
     }
 
     return (
-        <nav className="flex flex-wrap items-center gap-2 p-1.5 bg-black/30 rounded-lg">
+        <nav className="flex flex-nowrap items-center gap-2 p-1.5 bg-black/30 rounded-lg overflow-x-auto no-scrollbar">
             {tabs.map(tab => (
                 <button
                     key={tab.id}
