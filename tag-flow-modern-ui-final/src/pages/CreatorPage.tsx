@@ -44,6 +44,7 @@ const CreatorPage: React.FC = () => {
     const [showFilterMenu, setShowFilterMenu] = useState(false);
     const [showSubscriptionMenu, setShowSubscriptionMenu] = useState(false);
     const [selectedDynamicFilters, setSelectedDynamicFilters] = useState<string[]>([]);
+    const [showMobileTools, setShowMobileTools] = useState(false);
     const searchInputRef = useRef<HTMLInputElement>(null);
 
     const activePlatform = useMemo(() => {
@@ -325,7 +326,24 @@ const CreatorPage: React.FC = () => {
                         </div>
                     )}
                 </div>
-                <div className="flex items-center gap-2 bg-black/30 p-1.5 rounded-lg flex-shrink-0">
+
+                {/* Mobile Tools Toggle */}
+                <button 
+                    onClick={() => setShowMobileTools(!showMobileTools)}
+                    className="md:hidden p-2 rounded-lg bg-[#212121]/50 text-gray-400 hover:text-white hover:bg-[#212121] transition-colors flex-shrink-0"
+                >
+                    {showMobileTools ? (
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                    ) : (
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                        </svg>
+                    )}
+                </button>
+
+                <div className={`${showMobileTools ? 'flex' : 'hidden'} md:flex items-center gap-2 bg-black/30 p-1.5 rounded-lg flex-shrink-0`}>
                     <div className={`transition-all duration-300 overflow-hidden flex items-center ${showSearch ? 'w-24 opacity-100 border-b border-gray-500 mr-2' : 'w-0 opacity-0'}`}>
                         <input ref={searchInputRef} type="text" className="bg-transparent text-white px-2 py-1 focus:outline-none w-full text-sm" placeholder="Buscar..." value={searchText} onChange={(e) => setSearchText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') handleSearchSubmit(); }} />
                     </div>
