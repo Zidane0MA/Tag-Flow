@@ -81,10 +81,12 @@ const ContentControls: React.FC<ContentControlsProps> = ({
                 )}
             </button>
 
-            <div className={`flex items-center gap-2 bg-black/30 rounded-lg flex-shrink-0 transition-all duration-300 ease-in-out ${showMobileTools ? 'max-w-[500px] opacity-100 p-1.5' : 'max-w-0 opacity-0 p-0 overflow-hidden md:max-w-none md:opacity-100 md:p-1.5'}`}>
+            <div className={`flex items-center gap-2 bg-black/30 rounded-lg flex-shrink-0 transition-all duration-300 ease-in-out ${showMobileTools ? 'max-w-[500px] opacity-100 p-1.5' : 'max-w-0 opacity-0 p-0 overflow-hidden md:max-w-none md:opacity-100 md:p-1.5 md:overflow-visible'}`}>
                 <div className={`transition-all duration-300 overflow-hidden flex items-center ${showSearch ? 'w-24 opacity-100 border-b border-gray-500 mr-2' : 'w-0 opacity-0'}`}>
                     <input 
                         ref={searchInputRef} 
+                        id="search-input"
+                        name="search"
                         type="text" 
                         className="bg-transparent text-white px-2 py-1 focus:outline-none w-full text-sm" 
                         placeholder="Buscar..." 
@@ -106,7 +108,13 @@ const ContentControls: React.FC<ContentControlsProps> = ({
                             <div className="mb-3">
                                 <div className="text-xs font-bold text-gray-500 uppercase mb-2 px-1">Ordenar por</div>
                                 <div className="relative">
-                                    <select value={sortBy} onChange={(e) => onSortByChange(e.target.value)} className="w-full bg-gray-800 text-white text-sm rounded-md border-gray-600 focus:outline-none focus:ring-1 focus:ring-red-500 focus:border-red-500 p-2 pr-10 cursor-pointer hover:border-gray-500 transition-colors appearance-none">
+                                    <select 
+                                        id="sort-by-select"
+                                        name="sort-by"
+                                        value={sortBy} 
+                                        onChange={(e) => onSortByChange(e.target.value)} 
+                                        className="w-full bg-gray-800 text-white text-sm rounded-md border-gray-600 focus:outline-none focus:ring-1 focus:ring-red-500 focus:border-red-500 p-2 pr-10 cursor-pointer hover:border-gray-500 transition-colors appearance-none"
+                                    >
                                         <option value="publication_date">Publicación</option>
                                         <option value="download_date">Descarga</option>
                                         <option value="title">Título</option>
@@ -116,7 +124,7 @@ const ContentControls: React.FC<ContentControlsProps> = ({
                                     </select>
                                     <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none text-gray-400">
                                         <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7 7" />
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                                         </svg>
                                     </div>
                                 </div>
