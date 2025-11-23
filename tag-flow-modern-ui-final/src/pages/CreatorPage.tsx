@@ -5,6 +5,7 @@ import { Creator, Platform, CreatorPlatformInfo, CategoryType } from '../types';
 import PostCard from '../components/VideoCard';
 import Breadcrumbs, { Crumb } from '../components/Breadcrumbs';
 import PlatformTabs, { Tab } from '../components/PlatformTabs';
+import ContentControls from '../components/ContentControls';
 
 import { ICONS, getSubscriptionIcon, getCategoryIcon } from '../constants';
 import { apiService } from '../services/apiService';
@@ -42,34 +43,12 @@ const CreatorPage: React.FC = () => {
     const [showSearch, setShowSearch] = useState(false);
     const [searchText, setSearchText] = useState('');
     const [showFilterMenu, setShowFilterMenu] = useState(false);
-    const [showSubscriptionMenu, setShowSubscriptionMenu] = useState(false);
     const [selectedDynamicFilters, setSelectedDynamicFilters] = useState<string[]>([]);
     const [showMobileTools, setShowMobileTools] = useState(false);
-    const searchInputRef = useRef<HTMLInputElement>(null);
 
     const activePlatform = useMemo(() => {
         return decodedPlatform as Platform | undefined;
     }, [decodedPlatform]);
-
-    useEffect(() => {
-        if (showSearch && searchInputRef.current) {
-            searchInputRef.current.focus();
-        }
-    }, [showSearch]);
-
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            const target = event.target as HTMLElement;
-            if (showFilterMenu && !target.closest('.filter-menu-container')) {
-                setShowFilterMenu(false);
-            }
-            if (showSubscriptionMenu && !target.closest('.subscription-menu-container')) {
-                setShowSubscriptionMenu(false);
-            }
-        };
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, [showFilterMenu, showSubscriptionMenu]);
 
     const handleSearchSubmit = useCallback(() => {
         if (searchText !== filters.search) {
@@ -235,10 +214,6 @@ const CreatorPage: React.FC = () => {
         navigate(`/creator/${encodeURIComponent(creatorName || '')}${platformId === 'all' ? '' : `/${encodeURIComponent(platformId)}`}`);
     };
     
-    const handleSubscriptionClick = (subId: string) => {
-        navigate(`/creator/${creatorName}/${encodeURIComponent(activePlatform || '')}/${encodeURIComponent(subId)}`);
-    }
-
     if (creatorMetadataLoading || (postsLoading && !scrollState.initialLoaded)) {
         return <div className="text-center py-16"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mx-auto"></div><p className="text-gray-400 mt-4">Cargando...</p></div>;
     }
@@ -284,114 +259,34 @@ const CreatorPage: React.FC = () => {
             
             <div className="flex flex-row items-center justify-between gap-2">
                 <div className="flex-1 min-w-0 flex items-center justify-between gap-2">
-                    <PlatformTabs tabs={platformTabs} activeTab={activePlatform || 'all'} onTabClick={handlePlatformTabClick} />
-                    
-                    {/* Subscription Dropdown Menu */}
-                    {activePlatform && activePlatformSubscriptions.length > 0 && (
-                        <div className="relative subscription-menu-container flex-shrink-0">
-                            <button 
-                                onClick={() => setShowSubscriptionMenu(!showSubscriptionMenu)}
-                                className={`p-2 rounded-lg transition-colors ${showSubscriptionMenu ? 'bg-red-600 text-white' : 'bg-[#212121]/50 text-gray-400 hover:text-white hover:bg-[#212121]'}`}
-                                title="Suscripciones"
-                            >
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
-                                </svg>
-                            </button>
-
-                            {showSubscriptionMenu && (
-                                <div className="absolute right-0 top-full mt-2 w-56 bg-[#1a1a1a] border border-gray-700 rounded-lg shadow-xl z-50 p-3">
-                                    <div>
-                                        <div className="text-xs font-bold text-gray-500 uppercase mb-2 px-1">Suscripciones</div>
-                                        <div className="max-h-64 overflow-y-auto space-y-1">
-                                            {activePlatformSubscriptions.map(sub => (
-                                                <Link 
-                                                    key={sub.id} 
-                                                    to={`/subscription/${sub.type}/${sub.id}`}
-                                                    className="block px-2 py-2 hover:bg-white/5 rounded-md transition-colors"
-                                                    onClick={() => setShowSubscriptionMenu(false)}
-                                                >
-                                                    <div className="flex items-center gap-2">
-                                                        {React.cloneElement(getSubscriptionIcon(sub.type), { className: 'h-4 w-4 text-red-500' })}
-                                                        <div className="flex-1 min-w-0">
-                                                            <p className="text-xs font-medium text-gray-200 truncate">{sub.name}</p>
-                                                        </div>
-                                                    </div>
-                                                </Link>
-                                            ))}
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    )}
+                    <PlatformTabs 
+                        tabs={platformTabs} 
+                        activeTab={activePlatform || 'all'} 
+                        onTabClick={handlePlatformTabClick}
+                        subscriptions={activePlatform ? activePlatformSubscriptions : []}
+                        activeSubscriptionId={subscriptionId}
+                    />
                 </div>
 
-                {/* Mobile Tools Toggle */}
-                <button 
-                    onClick={() => setShowMobileTools(!showMobileTools)}
-                    className="md:hidden p-2 rounded-lg bg-[#212121]/50 text-gray-400 hover:text-white hover:bg-[#212121] transition-colors flex-shrink-0"
-                >
-                    {showMobileTools ? (
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                        </svg>
-                    ) : (
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                        </svg>
-                    )}
-                </button>
-
-                <div className={`${showMobileTools ? 'flex' : 'hidden'} md:flex items-center gap-2 bg-black/30 p-1.5 rounded-lg flex-shrink-0`}>
-                    <div className={`transition-all duration-300 overflow-hidden flex items-center ${showSearch ? 'w-24 opacity-100 border-b border-gray-500 mr-2' : 'w-0 opacity-0'}`}>
-                        <input ref={searchInputRef} type="text" className="bg-transparent text-white px-2 py-1 focus:outline-none w-full text-sm" placeholder="Buscar..." value={searchText} onChange={(e) => setSearchText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') handleSearchSubmit(); }} />
-                    </div>
-                    <button onClick={() => setShowSearch(!showSearch)} className={`p-2 hover:bg-white/10 rounded-lg transition ${showSearch ? 'text-white' : 'text-gray-400'}`} title="Buscar">{React.cloneElement(ICONS.search, { className: 'h-5 w-5' })}</button>
-                    <div className="relative filter-menu-container">
-                        <button onClick={() => setShowFilterMenu(!showFilterMenu)} className={`p-2 hover:bg-white/10 rounded-lg transition ${showFilterMenu || selectedDynamicFilters.length > 0 ? 'text-white' : 'text-gray-400'}`} title="Filtrar y Ordenar">
-                            {React.cloneElement(ICONS.filter, { className: 'h-5 w-5' })}
-                            {selectedDynamicFilters.length > 0 && (<span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>)}
-                        </button>
-                        {showFilterMenu && (
-                            <div className="absolute right-0 top-full mt-2 w-56 bg-[#1a1a1a] border border-gray-700 rounded-lg shadow-xl z-50 p-3">
-                                <div className="mb-3">
-                                    <div className="text-xs font-bold text-gray-500 uppercase mb-2 px-1">Ordenar por</div>
-                                    <div className="relative">
-                                        <select value={filters.sort_by} onChange={(e) => handleSortByChange(e.target.value)} className="w-full bg-gray-800 text-white text-sm rounded-md border-gray-600 focus:outline-none focus:ring-1 focus:ring-red-500 focus:border-red-500 p-2 pr-10 cursor-pointer hover:border-gray-500 transition-colors appearance-none">
-                                            <option value="publication_date">Publicación</option>
-                                            <option value="download_date">Descarga</option>
-                                            <option value="title">Título</option>
-                                            <option value="size">Tamaño</option>
-                                            <option value="duration">Duración</option>
-                                            <option value="id">ID</option>
-                                        </select>
-                                        <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none text-gray-400">
-                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                            </svg>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="border-t border-gray-700 my-2"></div>
-                                <div>
-                                    <div className="text-xs font-bold text-gray-500 uppercase mb-2 px-1">Tipos de Contenido</div>
-                                    <div className="space-y-1">
-                                        {availableCategories.map(category => (
-                                            <label key={category} className="flex items-center gap-2 px-2 py-1.5 hover:bg-white/5 rounded cursor-pointer">
-                                                <input type="checkbox" checked={selectedDynamicFilters.includes(category)} onChange={() => toggleDynamicFilter(category)} className="rounded border-gray-600 bg-gray-800 text-red-600 focus:ring-red-500" />
-                                                <span className="flex items-center gap-2 text-sm text-gray-300">{getCategoryIcon(category, activePlatform)}<span className="capitalize">{category}</span></span>
-                                            </label>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                    <button onClick={toggleSortOrder} className="p-2 hover:bg-white/10 rounded-lg transition text-gray-400 hover:text-white" title={`Ordenar ${filters.sort_order === 'asc' ? 'Ascendente' : 'Descendente'}`}>
-                        {filters.sort_order === 'asc' ? React.cloneElement(ICONS.sort_asc, { className: 'h-5 w-5' }) : React.cloneElement(ICONS.sort_desc, { className: 'h-5 w-5' })}
-                    </button>
-                </div>
+                <ContentControls
+                    showSearch={showSearch}
+                    setShowSearch={setShowSearch}
+                    searchText={searchText}
+                    setSearchText={setSearchText}
+                    onSearchSubmit={handleSearchSubmit}
+                    showFilterMenu={showFilterMenu}
+                    setShowFilterMenu={setShowFilterMenu}
+                    selectedDynamicFilters={selectedDynamicFilters}
+                    toggleDynamicFilter={toggleDynamicFilter}
+                    availableCategories={availableCategories}
+                    activePlatform={activePlatform}
+                    sortBy={filters.sort_by}
+                    onSortByChange={handleSortByChange}
+                    sortOrder={filters.sort_order}
+                    toggleSortOrder={toggleSortOrder}
+                    showMobileTools={showMobileTools}
+                    setShowMobileTools={setShowMobileTools}
+                />
             </div>
             
             <div className="min-w-0">
