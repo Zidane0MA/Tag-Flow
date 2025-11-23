@@ -64,7 +64,10 @@ const ContentControls: React.FC<ContentControlsProps> = ({
         <>
             {/* Mobile Tools Toggle */}
             <button 
-                onClick={() => setShowMobileTools(!showMobileTools)}
+                onClick={() => {
+                    setShowMobileTools(!showMobileTools);
+                    setShowSearch(false);
+                }}
                 className="md:hidden p-2 rounded-lg bg-[#212121]/50 text-gray-400 hover:text-white hover:bg-[#212121] transition-colors flex-shrink-0"
             >
                 {showMobileTools ? (

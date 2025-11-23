@@ -265,6 +265,7 @@ const CreatorPage: React.FC = () => {
                         onTabClick={handlePlatformTabClick}
                         subscriptions={activePlatform ? activePlatformSubscriptions : []}
                         activeSubscriptionId={subscriptionId}
+                        hideSubscriptionButton={showSearch}
                     />
                 </div>
 

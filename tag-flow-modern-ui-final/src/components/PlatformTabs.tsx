@@ -17,6 +17,7 @@ interface PlatformTabsProps {
     isSubTabs?: boolean;
     subscriptions?: Subscription[];
     activeSubscriptionId?: string;
+    hideSubscriptionButton?: boolean;
 }
 
 const PlatformTabs: React.FC<PlatformTabsProps> = ({ 
@@ -25,12 +26,19 @@ const PlatformTabs: React.FC<PlatformTabsProps> = ({
     onTabClick, 
     isSubTabs = false,
     subscriptions = [],
-    activeSubscriptionId
+    activeSubscriptionId,
+    hideSubscriptionButton = false
 }) => {
     const [showSubscriptionMenu, setShowSubscriptionMenu] = useState(false);
     const [dropdownPos, setDropdownPos] = useState<{top: number, left: number} | null>(null);
     const menuButtonRef = useRef<HTMLButtonElement>(null);
     const menuRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (hideSubscriptionButton) {
+            setShowSubscriptionMenu(false);
+        }
+    }, [hideSubscriptionButton]);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -62,13 +70,19 @@ const PlatformTabs: React.FC<PlatformTabsProps> = ({
         } else {
             if (menuButtonRef.current) {
                 const rect = menuButtonRef.current.getBoundingClientRect();
-                // Position dropdown below the button, aligned to the right if possible, or left
-                // We'll align to the left of the button by default, but check for overflow
-                let left = rect.left;
                 const dropdownWidth = 224; // w-56 = 14rem = 224px
-                if (left + dropdownWidth > window.innerWidth) {
-                    left = window.innerWidth - dropdownWidth - 10;
+                
+                // Align the right edge of the dropdown with the right edge of the button
+                // rect.right is the distance from the left edge of the viewport to the right edge of the button
+                // We want the dropdown's right edge to be at rect.right
+                // So dropdown's left edge should be rect.right - dropdownWidth
+                let left = rect.right - dropdownWidth;
+                
+                // Ensure it doesn't go off-screen to the left
+                if (left < 10) {
+                    left = 10;
                 }
+
                 setDropdownPos({ top: rect.bottom + 8, left });
             }
             setShowSubscriptionMenu(true);
@@ -105,8 +119,9 @@ const PlatformTabs: React.FC<PlatformTabsProps> = ({
     }
 
     return (
-        <div className="flex items-center gap-2 w-full">
-            <nav className="flex flex-nowrap items-center gap-2 p-1.5 bg-black/30 rounded-lg overflow-x-auto no-scrollbar min-w-0 flex-1">
+        <div className="flex items-center gap-2 p-1.5 bg-black/30 rounded-lg w-full min-w-0">
+            {/* Contenedor de tabs con scroll horizontal */}
+            <nav className="flex flex-nowrap items-center gap-2 overflow-x-auto no-scrollbar flex-1 min-w-0">
                 {tabs.map(tab => (
                     <button
                         key={tab.id}
@@ -118,23 +133,24 @@ const PlatformTabs: React.FC<PlatformTabsProps> = ({
                         <span className="text-xs font-normal opacity-80">{tab.count}</span>
                     </button>
                 ))}
-
-                {subscriptions.length > 0 && (
-                    <>
-                        <div className="w-px h-6 bg-gray-700 mx-1 flex-shrink-0"></div>
-                        <button 
-                            ref={menuButtonRef}
-                            onClick={toggleMenu}
-                            className={`p-2 rounded-lg transition-colors flex-shrink-0 ${showSubscriptionMenu || activeSubscriptionId ? 'bg-red-600 text-white' : 'bg-[#212121]/50 text-gray-400 hover:text-white hover:bg-[#212121]'}`}
-                            title="Suscripciones"
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
-                            </svg>
-                        </button>
-                    </>
-                )}
             </nav>
+
+            {/* Separador + Botón de suscripciones (fijo a la derecha) */}
+            {!hideSubscriptionButton && subscriptions.length > 0 && (
+                <div className="flex items-center gap-2 flex-shrink-0">
+                    <div className="w-px h-6 bg-gray-700"></div>
+                    <button 
+                        ref={menuButtonRef}
+                        onClick={toggleMenu}
+                        className={`p-2 rounded-lg transition-colors ${showSubscriptionMenu || activeSubscriptionId ? 'bg-red-600 text-white' : 'bg-[#212121]/50 text-gray-400 hover:text-white hover:bg-[#212121]'}`}
+                        title="Suscripciones"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                        </svg>
+                    </button>
+                </div>
+            )}
 
             {showSubscriptionMenu && dropdownPos && (
                 <div 
